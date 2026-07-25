@@ -12,7 +12,7 @@
 
 ### 2.1 認証系画面
 
-[auth-login-requirements.md](./auth-login-requirements.md) 4章に準拠。
+[auth-login-requirements.md](./auth-login-requirements.md) 4章に準拠。各画面の詳細要件は [screen-requirements-auth.md](./screen-requirements-auth.md) を参照。
 
 | 画面ID | 画面名 | 概要 |
 |---|---|---|
@@ -26,6 +26,8 @@
 
 ### 2.2 ダッシュボード・データ管理系画面
 
+各画面の詳細要件は [screen-requirements-dashboard.md](./screen-requirements-dashboard.md) を参照。
+
 | 画面ID | 画面名 | 概要 | 関連要件 |
 |---|---|---|---|
 | B1 | ダッシュボード画面 | 総資産推移グラフ、分類別内訳(円グラフ)、FIRE達成度ゲージ/到達予測日、収支サマリ(月次収支・費目別支出)を表示するトップ画面。分類軸の切り替えに対応 | 要件定義書 4.3 / 4.4 |
@@ -35,6 +37,8 @@
 
 ### 2.3 不動産管理系画面
 
+各画面の詳細要件は [screen-requirements-real-estate.md](./screen-requirements-real-estate.md) を参照。
+
 | 画面ID | 画面名 | 概要 | 関連要件 |
 |---|---|---|---|
 | B5 | 不動産一覧画面 | 登録済み物件の一覧表示 | 要件定義書 4.5 |
@@ -43,12 +47,16 @@
 
 ### 2.4 FIRE目標・シミュレーション設定系画面
 
+各画面の詳細要件は [screen-requirements-fire-goal.md](./screen-requirements-fire-goal.md) を参照。
+
 | 画面ID | 画面名 | 概要 | 関連要件 |
 |---|---|---|---|
 | B8 | FIRE目標設定画面 | 目標資産額の直接設定、または年間支出額からの逆算(4%ルール等)を切り替えて設定 | 要件定義書 4.6 |
 | B9 | 想定利回り・リスク設定画面 | 資産クラスごとの想定利回り・リスク値・不動産時価等を手動設定。シミュレーション入力と可視化の両方に反映 | 要件定義書 4.7 |
 
 ### 2.5 アカウント系画面
+
+各画面の詳細要件は [screen-requirements-account.md](./screen-requirements-account.md) を参照。
 
 | 画面ID | 画面名 | 概要 | 関連要件 |
 |---|---|---|---|
