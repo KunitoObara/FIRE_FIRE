@@ -15,12 +15,12 @@
 
 ## 3. データストア/ストレージ
 
-- **Cloud Firestore**: セキュリティルールは`firestore.rules`に定義し、[firestore-rules-review](../../.claude/skills/firestore-rules-review/SKILL.md)スキルでユーザー単位のアクセス制御を都度確認する
+- **Cloud Firestore**: セキュリティルールは`firestore.rules`に定義し、[firestore-rules-review](../../../.claude/skills/firestore-rules-review/SKILL.md)スキルでユーザー単位のアクセス制御を都度確認する
 - **Firebase Storage**: マネーフォワードCSVアップロードファイルの保管
 
 ## 4. 認証
 
-- **Identity Platform**: TOTP型2FA・パスワードポリシーの実体([docs/auth-login-requirements.md](../../docs/auth-login-requirements.md)参照)
+- **Identity Platform**: TOTP型2FA・パスワードポリシーの実体([docs/auth-login-requirements.md](../../../docs/auth-login-requirements.md)参照)
 - ログイン通知メールはBlocking Functions経由でCloud Functionsを起動し、外部メール送信サービスから送信する構成(docs/auth-login-requirements.md 3.6)。**送信サービスは未定**(7章オープン課題)
 
 ## 5. バリデーション
@@ -29,7 +29,7 @@
 
 ## 6. CSVパース
 
-- **papaparse**: マネーフォワードCSV(資産残高推移/入出金明細)のパースに使用。[mf-csv-parser-check](../../.claude/skills/mf-csv-parser-check/SKILL.md)スキルで、正常系/異常系それぞれの挙動を検証する
+- **papaparse**: マネーフォワードCSV(資産残高推移/入出金明細)のパースに使用。[mf-csv-parser-check](../../../.claude/skills/mf-csv-parser-check/SKILL.md)スキルで、正常系/異常系それぞれの挙動を検証する
 
 ## 7. テスト(ユニットのみ)
 
