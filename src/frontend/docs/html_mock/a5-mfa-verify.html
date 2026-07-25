@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A5 2FA検証 | FIRE-FIRE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-card">
+    <div class="mb-6 text-center">
+      <p class="text-sm font-semibold text-slate-400 mb-1">FIRE-FIRE</p>
+      <h1 class="text-xl font-bold">2段階認証</h1>
+      <p class="text-sm text-slate-500 mt-2">
+        taro.yamada@example.com として一次認証済みです
+      </p>
+    </div>
+
+    <!-- 確認コード入力(既定) -->
+    <div id="mode-otp">
+      <div class="field items-center mb-6">
+        <label class="label text-center">認証アプリの確認コード(6桁)</label>
+        <div class="otp-row justify-center">
+          <input class="otp-box" maxlength="1" inputmode="numeric" />
+          <input class="otp-box" maxlength="1" inputmode="numeric" />
+          <input class="otp-box" maxlength="1" inputmode="numeric" />
+          <input class="otp-box" maxlength="1" inputmode="numeric" />
+          <input class="otp-box" maxlength="1" inputmode="numeric" />
+          <input class="otp-box" maxlength="1" inputmode="numeric" />
+        </div>
+      </div>
+      <a href="b1-dashboard.html" class="btn btn-primary btn-block">検証する</a>
+      <p class="text-center mt-4">
+        <a class="link" href="#" onclick="document.getElementById('mode-otp').classList.add('hidden'); document.getElementById('mode-recovery').classList.remove('hidden'); return false;">
+          リカバリーコードを使う
+        </a>
+      </p>
+    </div>
+
+    <!-- リカバリーコード入力(切替後) -->
+    <div id="mode-recovery" class="hidden">
+      <div class="field mb-6">
+        <label class="label" for="recovery">リカバリーコード</label>
+        <input class="input" id="recovery" placeholder="XXXX-XXXX" />
+        <p class="field-hint">各リカバリーコードは一度使用すると無効になります</p>
+      </div>
+      <a href="b1-dashboard.html" class="btn btn-primary btn-block">検証する</a>
+      <p class="text-center mt-4">
+        <a class="link" href="#" onclick="document.getElementById('mode-recovery').classList.add('hidden'); document.getElementById('mode-otp').classList.remove('hidden'); return false;">
+          認証アプリのコードに戻る
+        </a>
+      </p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
