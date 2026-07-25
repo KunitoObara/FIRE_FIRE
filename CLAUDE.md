@@ -15,7 +15,8 @@ This repository is currently in the requirements/design phase for a personal FIR
 - [docs/screen-list-and-transitions.md](docs/screen-list-and-transitions.md) — full screen inventory (IDs A1–A7, B1–B10) and Mermaid transition diagrams
 - [docs/screen-requirements-auth.md](docs/screen-requirements-auth.md), [screen-requirements-dashboard.md](docs/screen-requirements-dashboard.md), [screen-requirements-real-estate.md](docs/screen-requirements-real-estate.md), [screen-requirements-fire-goal.md](docs/screen-requirements-fire-goal.md), [screen-requirements-account.md](docs/screen-requirements-account.md) — per-screen field/behavior detail, keyed to the screen IDs above
 - [DESIGN.md](DESIGN.md) — frontend design system: Tailwind/shadcn-based stack, color/typography rules, layout patterns, and the screen-ID-to-library mapping. Read this before adding any UI library or component pattern.
-- [src/frontend/TECH_STACK.md](src/frontend/TECH_STACK.md), [src/backend/TECH_STACK.md](src/backend/TECH_STACK.md) — full technical stack per side (language, data fetching, testing, lint/format, deployment). Read these before adding a dependency or scaffolding either project; they complement rather than repeat DESIGN.md.
+- [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md), [src/backend/docs/TECH_STACK.md](src/backend/docs/TECH_STACK.md) — full technical stack per side (language, data fetching, testing, lint/format, deployment). Read these before adding a dependency or scaffolding either project; they complement rather than repeat DESIGN.md.
+- [src/frontend/docs/CODING_STANDARDS.md](src/frontend/docs/CODING_STANDARDS.md) — TypeScript/Next.js coding conventions (naming, import order, Server vs Client Components, styling). Read this before writing frontend code, not just before adding a dependency.
 
 When a requirement seems ambiguous or missing, check the "今後の検討事項" (open issues) section at the end of the relevant doc before assuming — several decisions (hosting target, MFA recovery, social login, multi-tenant model) are explicitly deferred rather than omitted.
 
@@ -23,16 +24,16 @@ When a requirement seems ambiguous or missing, check the "今後の検討事項"
 
 | Layer | Choice |
 |---|---|
-| Frontend | Vite + React, built as a pure SPA (no SSR/SSG) — adaptive layout for PC/tablet/mobile |
+| Frontend | Next.js (React) built to behave as an SPA per [Next.js's own SPA guide](https://nextjsjp.org/docs/app/guides/single-page-applications) — client-side transitions via `next/link`, Server Components/Server Actions kept (no `output: 'export'`) — adaptive layout for PC/tablet/mobile |
 | Backend | Serverless (Firebase) |
 | Auth | Firebase Authentication upgraded to **Identity Platform** (required for TOTP-based MFA) |
 | Data store | Cloud Firestore — schemas for master data (e.g. asset category axes) must stay extensible, not hardcoded |
 | File storage | Firebase Storage (CSV uploads) |
-| Hosting | Firebase Hosting, static SPA hosting with a catch-all rewrite to `index.html` (decided — see [src/frontend/TECH_STACK.md](src/frontend/TECH_STACK.md) §7) |
+| Hosting | Firebase App Hosting (decided — see [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md) §7) |
+
+See [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md) §0 for what "built as an SPA" concretely means here — it is not a static export; Next.js's server features stay in use.
 
 Single-user (developer-only) in the initial release; multi-tenant/role-based access is explicitly out of scope until a later SaaS phase — don't design auth or data access around multiple users prematurely.
-
-Because the frontend is a pure SPA, all rendering and routing (React Router) happen client-side after the Firebase SDK loads — there is no server-rendered HTML and no Next.js-style file-based routing or Server Components. Server-side work (CSV parsing, login-notification Blocking Functions) lives exclusively in `src/backend` Cloud Functions.
 
 ### Core domain flow
 
