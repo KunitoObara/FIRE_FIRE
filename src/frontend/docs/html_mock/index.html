@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HTMLモック一覧 | FIRE-FIRE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+<style>
+  .screen-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 1rem 1.125rem;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    text-decoration: none;
+    color: hsl(var(--foreground));
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .screen-card:hover {
+    border-color: hsl(var(--primary) / 0.5);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08);
+  }
+  .screen-id {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background-color: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+  }
+</style>
+</head>
+<body>
+
+<div style="min-height: 100vh; background-color: hsl(var(--muted));">
+  <div class="max-w-5xl mx-auto px-6 py-10">
+
+    <header class="mb-8">
+      <p class="text-sm font-semibold text-slate-400 mb-1">FIRE-FIRE</p>
+      <h1 class="text-2xl font-bold mb-2">HTMLモック一覧</h1>
+      <p class="text-sm text-slate-500">
+        docs/screen-list-and-transitions.md の画面一覧・遷移図に基づくHTMLモックです。各カードから各画面を確認できます。
+        認証系(A1〜A7)は中央寄せ1カラムレイアウト、ログイン後(B1〜B10)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
+      </p>
+    </header>
+
+    <!-- 認証系画面 -->
+    <section class="mb-10">
+      <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
+        認証系画面(A1〜A7)
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <a class="screen-card" href="a1-signup.html">
+          <span class="screen-id w-fit">A1</span>
+          <span class="text-sm font-medium">サインアップ画面</span>
+          <span class="text-xs text-slate-400">メール・パスワード入力、パスワードポリシー表示</span>
+        </a>
+        <a class="screen-card" href="a2-verify-email.html">
+          <span class="screen-id w-fit">A2</span>
+          <span class="text-sm font-medium">メールアドレス確認待ち画面</span>
+          <span class="text-xs text-slate-400">確認メール再送導線</span>
+        </a>
+        <a class="screen-card" href="a3-mfa-setup.html">
+          <span class="screen-id w-fit">A3</span>
+          <span class="text-sm font-medium">2FA登録画面</span>
+          <span class="text-xs text-slate-400">QRコード表示、確認コード入力、リカバリーコード</span>
+        </a>
+        <a class="screen-card" href="a4-login.html">
+          <span class="screen-id w-fit">A4</span>
+          <span class="text-sm font-medium">ログイン画面</span>
+          <span class="text-xs text-slate-400">メール・パスワード入力</span>
+        </a>
+        <a class="screen-card" href="a5-mfa-verify.html">
+          <span class="screen-id w-fit">A5</span>
+          <span class="text-sm font-medium">2FA検証画面</span>
+          <span class="text-xs text-slate-400">確認コード/リカバリーコード切替</span>
+        </a>
+        <a class="screen-card" href="a6-forgot-password.html">
+          <span class="screen-id w-fit">A6</span>
+          <span class="text-sm font-medium">パスワードをお忘れの方画面</span>
+          <span class="text-xs text-slate-400">リセットメール送信</span>
+        </a>
+        <a class="screen-card" href="a7-reset-password.html">
+          <span class="screen-id w-fit">A7</span>
+          <span class="text-sm font-medium">パスワード再設定画面</span>
+          <span class="text-xs text-slate-400">新パスワード設定、リンク無効時の表示</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ダッシュボード・データ管理系画面 -->
+    <section class="mb-10">
+      <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
+        ダッシュボード・データ管理系画面(B1〜B4)
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <a class="screen-card" href="b1-dashboard.html">
+          <span class="screen-id w-fit">B1</span>
+          <span class="text-sm font-medium">ダッシュボード画面</span>
+          <span class="text-xs text-slate-400">資産推移・分類内訳・FIRE達成度・収支サマリ</span>
+        </a>
+        <a class="screen-card" href="b2-csv-import.html">
+          <span class="screen-id w-fit">B2</span>
+          <span class="text-sm font-medium">CSV取込画面</span>
+          <span class="text-xs text-slate-400">取込種別タブ、プレビュー、完了通知</span>
+        </a>
+        <a class="screen-card" href="b3-transactions.html">
+          <span class="screen-id w-fit">B3</span>
+          <span class="text-sm font-medium">収支明細一覧画面</span>
+          <span class="text-xs text-slate-400">絞り込み・並び替え(参照専用)</span>
+        </a>
+        <a class="screen-card" href="b4-category-master.html">
+          <span class="screen-id w-fit">B4</span>
+          <span class="text-sm font-medium">資産分類マスタ設定画面</span>
+          <span class="text-xs text-slate-400">分類の追加・編集・削除禁止確認</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- 不動産管理系画面 -->
+    <section class="mb-10">
+      <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
+        不動産管理系画面(B5〜B7)
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <a class="screen-card" href="b5-real-estate-list.html">
+          <span class="screen-id w-fit">B5</span>
+          <span class="text-sm font-medium">不動産一覧画面</span>
+          <span class="text-xs text-slate-400">登録済み物件の一覧</span>
+        </a>
+        <a class="screen-card" href="b6-real-estate-detail.html">
+          <span class="screen-id w-fit">B6</span>
+          <span class="text-sm font-medium">不動産詳細画面</span>
+          <span class="text-xs text-slate-400">利ざや自動計算(参照専用)</span>
+        </a>
+        <a class="screen-card" href="b7-real-estate-edit.html">
+          <span class="screen-id w-fit">B7</span>
+          <span class="text-sm font-medium">不動産登録・編集画面</span>
+          <span class="text-xs text-slate-400">収益物件チェックで賃貸収支欄を切替</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- FIRE目標・シミュレーション設定系画面 -->
+    <section class="mb-10">
+      <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
+        FIRE目標・シミュレーション設定系画面(B8〜B9)
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <a class="screen-card" href="b8-fire-goal.html">
+          <span class="screen-id w-fit">B8</span>
+          <span class="text-sm font-medium">FIRE目標設定画面</span>
+          <span class="text-xs text-slate-400">直接入力/逆算タブ切替</span>
+        </a>
+        <a class="screen-card" href="b9-assumption-settings.html">
+          <span class="screen-id w-fit">B9</span>
+          <span class="text-sm font-medium">想定利回り・リスク設定画面</span>
+          <span class="text-xs text-slate-400">一覧内インライン編集</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- アカウント系画面 -->
+    <section class="mb-10">
+      <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
+        アカウント系画面(B10)
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <a class="screen-card" href="b10-account-settings.html">
+          <span class="screen-id w-fit">B10</span>
+          <span class="text-sm font-medium">アカウント設定画面</span>
+          <span class="text-xs text-slate-400">パスワード変更・2FA再設定</span>
+        </a>
+      </div>
+    </section>
+
+    <p class="text-xs text-slate-400">
+      参照元: docs/screen-list-and-transitions.md ・ docs/screen-requirements-*.md ・ DESIGN.md
+    </p>
+  </div>
+</div>
+
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 ## 1. 位置付け
 
-本ドキュメントは [FIRE資産管理WEBアプリ 要件定義書](./fire-asset-management-requirements.md) の「4.1 認証・ユーザー管理」を詳細化したものである。
+本ドキュメントは [FIRE-FIRE 要件定義書](./fire-asset-management-requirements.md) の「4.1 認証・ユーザー管理」を詳細化したものである。
 基本方針として Firebase Authentication の標準仕様に準拠しつつ、二要素認証(2FA)・パスワードリマインダー・ログイン通知の3点を追加要件として実装する。
 
 ## 2. 概要・目的
