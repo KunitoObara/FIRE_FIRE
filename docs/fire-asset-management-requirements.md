@@ -18,7 +18,7 @@
 |---|---|
 | フロントエンド | Next.js(React)、アダプティブデザイン(PC/タブレット/スマホ対応) |
 | バックエンド | サーバレス構成(Firebaseを想定) |
-| 認証 | Firebase Authentication |
+| 認証 | Firebase Authentication(Identity Platformへアップグレード。TOTP型2FA必須化のため。従量課金体系になる) |
 | データストア | Cloud Firestore(NoSQL)を想定。分類マスタ等は拡張しやすいスキーマとする |
 | ファイルストレージ | Firebase Storage(CSVアップロードファイルの保管を想定) |
 | ホスティング | 要決定(Vercel または Firebase Hosting) |
@@ -30,7 +30,7 @@
 
 ### 4.1 認証・ユーザー管理
 
-- Firebase Authenticationによるログイン機能を実装する
+- Firebase Authentication(Identity Platform)によるログイン機能を実装する。2FA(TOTP)必須化・パスワードリマインダー・ログイン通知などの詳細は [ログイン画面・認証機能 要件定義書](./auth-login-requirements.md) を参照
 - 初期リリースは本人専用のシングルユーザー運用
 - 将来のSaaS化・複数ユーザー対応(権限モデル、データ分離方式)は本ドキュメントでは範囲外とし、別途設計する
 
