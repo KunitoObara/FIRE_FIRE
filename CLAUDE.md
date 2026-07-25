@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This repository is currently in the requirements/design phase for a personal FIRE (Financial Independence, Retire Early) asset management web app. There is no application code yet — `src/frontend` and `src/backend` exist as empty scaffolding. All authoritative specs live under `docs/`. When implementation begins, update this file with real build/lint/test commands; do not invent them in the meantime.
+This repository is currently in the requirements/design phase for **FIRE-FIRE**, a personal FIRE (Financial Independence, Retire Early) asset management web app. There is no application code yet — `src/frontend` and `src/backend` exist as empty scaffolding. All authoritative specs live under `docs/`. When implementation begins, update this file with real build/lint/test commands; do not invent them in the meantime.
 
 `docs/.env` is a real secrets file (excluded via `.gitignore`) — never read, print, or commit its contents.
 
