@@ -15,7 +15,9 @@
 
 - **Firebase Authentication** をベースとする
 - TOTP型2FAをFirebase公式のMFA機能で実現するため、Firebaseプロジェクトを **Identity Platform** にアップグレードする
-  - Identity Platformは従量課金体系(無料枠あり)。プロジェクト全体の認証基盤がこの前提に切り替わるため、[要件定義書](./fire-asset-management-requirements.md) 3章の技術スタック表(認証行)にも反映が必要
+  - Identity Platformは従量課金体系だが、標準認証方式(メール/パスワード等)は月間アクティブユーザー(MAU)50,000人まで無料。TOTP型2FAはSMSを送信しないため追加課金の対象外で、通常のMAUとしてカウントされるのみ。個人利用規模(数人程度)では実質無料で運用できる
+  - SMSを使う電話認証・SMSベースMFAとは異なり課金体系が別建てである点に注意(参考: [Identity Platform pricing](https://cloud.google.com/identity-platform/pricing))
+  - プロジェクト全体の認証基盤がこの前提に切り替わるため、[要件定義書](./fire-asset-management-requirements.md) 3章の技術スタック表(認証行)にも反映済み
 - パスワードポリシー(8文字以上・大小英数字+記号の組み合わせ)は、Identity Platformの **パスワードポリシー機能** をコンソール側で設定し、サーバーサイドでも強制する(クライアント側のバリデーションのみに頼らない)
 
 ### 3.2 ID・パスワード仕様
@@ -76,7 +78,7 @@
 
 ## 6. アーキテクチャへの影響
 
-- Firebaseプロジェクトを **Identity Platform** にアップグレードする必要があり、認証基盤が従量課金体系になる(親ドキュメントの技術スタック表の更新が必要)
+- Firebaseプロジェクトを **Identity Platform** にアップグレードする必要がある(親ドキュメントの技術スタック表は更新済み)。認証基盤は従量課金体系になるが、MAU 50,000人までは無料でTOTP型2FAにも追加課金がないため、個人利用規模では実質コスト影響なし
 - ログイン通知メール送信のため、Cloud Functions(Blocking Functions)と外部メール送信サービスとの連携が新たに必要になる
 
 ## 7. MVPスコープ

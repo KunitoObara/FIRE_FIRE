@@ -18,7 +18,7 @@
 |---|---|
 | フロントエンド | Next.js(React)、アダプティブデザイン(PC/タブレット/スマホ対応) |
 | バックエンド | サーバレス構成(Firebaseを想定) |
-| 認証 | Firebase Authentication(Identity Platformへアップグレード。TOTP型2FA必須化のため。従量課金体系になる) |
+| 認証 | Firebase Authentication(Identity Platformへアップグレード。TOTP型2FA必須化のため。従量課金体系になるが、月間アクティブユーザー(MAU)50,000人まで無料。TOTP自体もSMSを送信しないため追加課金なし。個人利用規模では実質無料) |
 | データストア | Cloud Firestore(NoSQL)を想定。分類マスタ等は拡張しやすいスキーマとする |
 | ファイルストレージ | Firebase Storage(CSVアップロードファイルの保管を想定) |
 | ホスティング | 要決定(Vercel または Firebase Hosting) |
