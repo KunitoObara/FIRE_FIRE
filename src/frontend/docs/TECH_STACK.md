@@ -25,6 +25,11 @@ UI層のライブラリ選定・カラー/レイアウト方針は [DESIGN.md](.
 
 Tailwind CSS / shadcn/ui およびその周辺ライブラリ(フォーム・チャート・データテーブル等)の選定理由は [DESIGN.md](../../../DESIGN.md) 2章・6章・7章を参照。
 
+実装時に判明した、DESIGN.md 6章の記述と現行ライブラリのずれ:
+
+- **shadcn/uiの`form`コンポーネントは廃止されており、`field`(`Field` / `FieldLabel` / `FieldError` 等)に置き換わっている**。`npx shadcn add form`は空の項目を返すだけで何も生成しない。react-hook-form + zodという組み合わせ自体は変わらないため、`field`のマークアップにreact-hook-formの`register` / `Controller`と`FieldError`の`errors`propsを組み合わせて使う(実装例: `src/components/auth/SignupForm.tsx`)
+- **`@hookform/resolvers`は5.4.0に固定する**。5.5.x はoptional peerの依存関係(`@typeschema/valibot`が要求するvalibotのバージョン)が自身のpeer指定と矛盾しており、`npm install`が`ERESOLVE`で失敗する。上流が解決したら固定を外してよい
+
 ## 3. データ取得・状態管理
 
 - **firebase**(クライアントSDK): Auth/Firestore/Storageへのアクセス

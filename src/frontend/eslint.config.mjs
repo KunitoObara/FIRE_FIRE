@@ -68,7 +68,8 @@ const eslintConfig = defineConfig([
       // --- CODING_STANDARDS.md 1章: TypeScript ---
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-non-null-assertion": "error",
-      "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+      // CODING_STANDARDS.md 1章: 型は interface ではなく type で宣言する
+      "@typescript-eslint/consistent-type-definitions": ["error", "type"],
       "@typescript-eslint/consistent-type-imports": [
         "error",
         { prefer: "type-imports", fixStyle: "separate-type-imports" },
@@ -82,6 +83,11 @@ const eslintConfig = defineConfig([
           message: "enumは使わずユニオン型のリテラルを使ってください(CODING_STANDARDS.md 1章)。",
         },
       ],
+
+      // --- CODING_STANDARDS.md 2章: 関数はアロー関数で書く ---
+      // function宣言を禁止する(page/layoutのdefault exportも `const` + アロー関数にする)
+      "func-style": ["error", "expression"],
+      "prefer-arrow-callback": "error",
 
       // --- CODING_STANDARDS.md 2章: React / Next.js ---
       // `count && <Badge />` は count が 0 のとき 0 が描画されるため禁止
@@ -110,6 +116,8 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "@typescript-eslint/consistent-type-definitions": "off",
       "react/jsx-no-leaked-render": "off",
+      "func-style": "off",
+      eqeqeq: "off",
     },
   },
 

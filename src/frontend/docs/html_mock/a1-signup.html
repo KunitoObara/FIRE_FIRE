@@ -7,6 +7,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<!-- パスワード表示/非表示トグルの目のアイコン(実装と同じ FontAwesome 7.3.1) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css" />
 <link rel="stylesheet" href="common.css" />
 </head>
 <body>
@@ -26,7 +28,14 @@
 
       <div class="field">
         <label class="label" for="password">パスワード</label>
-        <input class="input input-error" type="password" id="password" value="passw0rd" />
+
+        <!-- 入力欄の右端に表示/非表示トグルを重ねる(A1要件) -->
+        <div class="relative">
+          <input class="input input-error pr-10" type="password" id="password" value="passw0rd" />
+          <button class="password-toggle" type="button" aria-label="パスワードを表示" aria-pressed="false" onclick="togglePassword(this, 'password')">
+            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+          </button>
+        </div>
         <p class="field-error">記号を1文字以上含めてください</p>
 
         <!-- パスワードポリシーのリアルタイムバリデーション表示(A1要件) -->
@@ -52,7 +61,12 @@
 
       <div class="field">
         <label class="label" for="password2">パスワード(確認用)</label>
-        <input class="input" type="password" id="password2" />
+        <div class="relative">
+          <input class="input pr-10" type="password" id="password2" />
+          <button class="password-toggle" type="button" aria-label="パスワードを表示" aria-pressed="false" onclick="togglePassword(this, 'password2')">
+            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+          </button>
+        </div>
       </div>
 
       <label class="checkbox-row">
@@ -63,7 +77,8 @@
         </span>
       </label>
 
-      <a href="a2-verify-email.html" class="btn btn-primary btn-block">アカウント作成</a>
+      <!-- 押下で直接作成せず、入力内容の確認ダイアログを開く(A1要件) -->
+      <button class="btn btn-primary btn-block" type="button" onclick="document.getElementById('signup-confirm-dialog').classList.remove('hidden')">アカウント作成</button>
     </form>
 
     <p class="text-center text-sm text-slate-500 mt-6">
@@ -72,6 +87,39 @@
     </p>
   </div>
 </div>
+
+<!-- 入力内容の確認ダイアログ。パスワードは伏字で表示する(A1要件) -->
+<div id="signup-confirm-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4);">
+  <div class="card p-6 max-w-sm w-full">
+    <h3 class="text-base font-bold mb-3">入力内容の確認</h3>
+    <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm mb-4">
+      <dt class="text-slate-500">メールアドレス:</dt>
+      <dd class="break-all">you@example.com</dd>
+      <dt class="text-slate-500">パスワード:</dt>
+      <dd>********</dd>
+    </dl>
+    <p class="text-sm text-slate-500 mb-5">以上の内容でアカウント作成します</p>
+    <div class="flex gap-3">
+      <button class="btn btn-outline flex-1" type="button" onclick="document.getElementById('signup-confirm-dialog').classList.add('hidden')">もどる</button>
+      <a href="a2-verify-email.html" class="btn btn-primary flex-1">はい</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // パスワード欄ごとに独立して平文表示を切り替える(A1要件)
+  function togglePassword(button, inputId) {
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector("i");
+    const willShow = input.type === "password";
+
+    input.type = willShow ? "text" : "password";
+    icon.classList.toggle("fa-eye", !willShow);
+    icon.classList.toggle("fa-eye-slash", willShow);
+    // 状態は aria-pressed だけで伝える(ラベルも切り替えると二重に読み上げられる)
+    button.setAttribute("aria-pressed", String(willShow));
+  }
+</script>
 
 </body>
 </html>
