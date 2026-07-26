@@ -1,0 +1,41 @@
+# デプロイ成果物に含めないファイル(gitignoreと同じ記法)。
+# App Hostingのビルド時間はそのまま課金対象になるため、
+# アプリの実行・ビルドに不要なものはアップロード対象から外す
+# (src/backend/docs/TECH_STACK.md 9章)。
+
+.git/
+.gitignore
+.github/
+.claude/
+
+# ドキュメント類(実行にもビルドにも不要)。
+# ディレクトリ名 docs はどの階層でも対象になるため、
+# src/frontend/docs・src/backend/docs も併せて除外される。
+docs/
+*.md
+
+# Firebase CLI・エミュレータの生成物
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+database-debug.log
+pubsub-debug.log
+ui-debug.log
+storage-debug.log
+*-debug.log
+.firebase/
+
+# 依存はビルド時にインストールされるためアップロードしない
+node_modules/
+
+# ローカルのビルド成果物・キャッシュ(デプロイ時に作り直される)。
+# Functionsのビルド出力 src/backend/lib は実行に必要なので除外しない。
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# ローカル環境設定(そもそもコミットされないが、念のため)
+.env
+.env.*
+!.env.example
