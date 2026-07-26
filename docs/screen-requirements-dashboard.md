@@ -2,7 +2,7 @@
 
 ## 1. 位置付け
 
-本ドキュメントは [画面一覧・画面遷移図](./screen-list-and-transitions.md) 2.2節のダッシュボード・データ管理系画面(B1〜B4)について、画面ごとの要件を詳細化したものである。機能全体の方針は [FIRE資産管理WEBアプリ 要件定義書](./fire-asset-management-requirements.md) 4.2〜4.4節を参照。
+本ドキュメントは [画面一覧・画面遷移図](./screen-list-and-transitions.md) 2.2節のダッシュボード・データ管理系画面(B1〜B4)について、画面ごとの要件を詳細化したものである。機能全体の方針は [FIRE-FIRE 要件定義書](./fire-asset-management-requirements.md) 4.2〜4.4節を参照。
 
 ## B1. ダッシュボード画面
 

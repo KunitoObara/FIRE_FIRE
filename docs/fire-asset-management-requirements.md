@@ -1,8 +1,8 @@
-# FIRE資産管理WEBアプリ 要件定義書
+# FIRE-FIRE 要件定義書
 
 ## 1. 概要・目的
 
-個人のFIRE(Financial Independence, Retire Early)達成を支援するための資産管理WEBアプリケーションを開発する。
+個人のFIRE(Financial Independence, Retire Early)達成を支援するための資産管理WEBアプリケーション「FIRE-FIRE」を開発する。
 マネーフォワードからエクスポートしたCSVデータを取り込み、資産全体をダッシュボードとして可視化するとともに、FIRE目標に対する達成度・到達期間の予測を行う。
 
 ## 2. 想定ユーザー

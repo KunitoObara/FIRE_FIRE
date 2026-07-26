@@ -2,7 +2,7 @@
 
 ## 1. 位置付け
 
-本ドキュメントは [FIRE資産管理WEBアプリ 要件定義書](./fire-asset-management-requirements.md) および [ログイン画面・認証機能 要件定義書](./auth-login-requirements.md) をもとに、画面一覧と画面遷移図を整理したものである。
+本ドキュメントは [FIRE-FIRE 要件定義書](./fire-asset-management-requirements.md) および [ログイン画面・認証機能 要件定義書](./auth-login-requirements.md) をもとに、画面一覧と画面遷移図を整理したものである。
 
 対象スコープは Phase 1〜4(認証、CSV取込、資産ダッシュボード、不動産管理、FIRE目標設定)とし、Phase 5(マネーフォワード定期自動取得、SaaS化)に関連する画面は対象外とする。
 
