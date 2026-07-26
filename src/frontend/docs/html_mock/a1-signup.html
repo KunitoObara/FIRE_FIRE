@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A1 サインアップ | FIRE-FIRE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-card">
+    <div class="mb-6 text-center">
+      <p class="text-sm font-semibold text-slate-400 mb-1">FIRE-FIRE</p>
+      <h1 class="text-xl font-bold">アカウントを作成</h1>
+    </div>
+
+    <form class="flex flex-col gap-5" onsubmit="return false;">
+      <div class="field">
+        <label class="label" for="email">メールアドレス</label>
+        <input class="input" type="email" id="email" placeholder="you@example.com" />
+      </div>
+
+      <div class="field">
+        <label class="label" for="password">パスワード</label>
+        <input class="input input-error" type="password" id="password" value="passw0rd" />
+        <p class="field-error">記号を1文字以上含めてください</p>
+
+        <!-- パスワードポリシーのリアルタイムバリデーション表示(A1要件) -->
+        <div class="policy-list mt-1">
+          <div class="policy-item met">
+            <svg class="policy-dot" viewBox="0 0 20 20" fill="none"><path d="M5 10.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            8文字以上
+          </div>
+          <div class="policy-item met">
+            <svg class="policy-dot" viewBox="0 0 20 20" fill="none"><path d="M5 10.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            大文字・小文字を含む
+          </div>
+          <div class="policy-item met">
+            <svg class="policy-dot" viewBox="0 0 20 20" fill="none"><path d="M5 10.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            数字を含む
+          </div>
+          <div class="policy-item">
+            <svg class="policy-dot" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5" stroke="currentColor" stroke-width="1.5"/></svg>
+            記号を含む
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="password2">パスワード(確認用)</label>
+        <input class="input" type="password" id="password2" />
+      </div>
+
+      <label class="checkbox-row">
+        <input type="checkbox" />
+        <span>
+          <a class="link" href="#">利用規約</a> と
+          <a class="link" href="#">プライバシーポリシー</a> に同意します
+        </span>
+      </label>
+
+      <a href="a2-verify-email.html" class="btn btn-primary btn-block">アカウント作成</a>
+    </form>
+
+    <p class="text-center text-sm text-slate-500 mt-6">
+      すでにアカウントをお持ちの方は
+      <a class="link" href="a4-login.html">ログインはこちら</a>
+    </p>
+  </div>
+</div>
+
+</body>
+</html>
