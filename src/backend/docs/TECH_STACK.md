@@ -40,7 +40,13 @@
 
 - ESLint + Prettier(フロントエンドと同等の構成)
 
-## 9. 今後の検討事項(オープン課題)
+## 9. コスト管理
+
+- 個人利用規模ではFirestore/Storage/Cloud Functions/Identity Platformいずれも無料枠内に収まる想定([docs/auth-login-requirements.md](../../../docs/auth-login-requirements.md) 3.1参照)
+- Blazeプラン(従量課金)には自動の支出上限機能がない(廃止済み)ため、Google Cloud Billing Budgetsで月額10,000円の予算アラートを50%/90%/100%のしきい値で設定し、メール通知で異常な利用を検知する。予算超過を検知して自動的に課金を停止する仕組みは導入せず、アラート受信後は手動で原因調査・対応する
+- 費用が想定外に膨らみうる主な要因は「Firestore/Storageのセキュリティルールの不備による外部からの不正アクセス」「Cloud Functionsのバグによる無限ループ的実行」「App Hostingへの頻繁なデプロイによるビルド時間消費」の3つ。セキュリティルールは[firestore-rules-review](../../../.claude/skills/firestore-rules-review/SKILL.md)スキルで都度確認する
+
+## 10. 今後の検討事項(オープン課題)
 
 - ログイン通知メールの送信サービス選定(未定。docs/auth-login-requirements.md 8章の課題と対応)
 - Cloud FunctionsのNode.jsバージョン固定

@@ -1,0 +1,13 @@
+.next/
+out/
+build/
+coverage/
+node_modules/
+next-env.d.ts
+package-lock.json
+
+# ドキュメント・HTMLモックはPrettierの整形対象外(既存の体裁を保つ)
+docs/
+README.md
+AGENTS.md
+CLAUDE.md
