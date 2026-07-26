@@ -181,6 +181,26 @@ body {
   box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.2);
 }
 
+/* パスワード入力欄の右端に重ねる表示/非表示トグル。
+   `.input` に `pr-10` を併記して、入力文字がアイコンに重ならないようにする。 */
+.password-toggle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 0.625rem;
+  color: hsl(var(--muted-foreground));
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  color: hsl(var(--foreground));
+}
+
 .field-error {
   font-size: 0.8125rem;
   color: hsl(var(--destructive));

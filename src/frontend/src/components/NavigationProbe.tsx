@@ -14,7 +14,7 @@ import type { JSX } from "react";
  *
  * 開発環境構築の動作確認専用。画面実装が始まったら `(setup-check)` ごと削除してよい。
  */
-export function NavigationProbe(): JSX.Element {
+export const NavigationProbe = (): JSX.Element => {
   const pathname = usePathname();
   const [count, setCount] = useState(0);
 
@@ -43,4 +43,4 @@ export function NavigationProbe(): JSX.Element {
       </p>
     </section>
   );
-}
+};
