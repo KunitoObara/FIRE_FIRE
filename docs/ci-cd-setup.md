@@ -100,6 +100,14 @@ echo "GCP_SA_EMAIL:     ${SA}"
 
 未設定のまま `develop` / `main` に push した場合、`deploy` ジョブは冒頭の確認ステップで「設定が不足しています」と表示して停止する（環境をまたいだ誤デプロイを防ぐため）。
 
+**Claude GitHub App のインストール**
+
+`ANTHROPIC_API_KEY` の登録だけでは PR 自動レビューは動かない。https://github.com/apps/claude からアプリを **`KunitoObara/private_room` に対してインストール**する必要がある。未インストールだと `claude-review` ジョブが以下のエラーで失敗する（CI の必須チェックには含めていないため、マージ自体はブロックされない）。
+
+```
+401 Unauthorized - Claude Code is not installed on this repository.
+```
+
 `main` 向けには GitHub Environment `production` を作成し、承認を必須にするかを判断する（`deploy.yml` は `main` で `production`、`develop` で `development` の Environment を参照する）。
 
 ## 4. App Hosting バックエンドの作成
