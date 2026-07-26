@@ -1,3 +1,5 @@
+import "@fortawesome/fontawesome-svg-core/styles.css";
+
 import { Geist_Mono, Noto_Sans_JP } from "next/font/google";
 
 import "./globals.css";
@@ -25,10 +27,10 @@ export const metadata: Metadata = {
   description: "パーソナルFIRE資産管理アプリ",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>): JSX.Element {
-  return (
-    <html lang="ja" className={`${notoSansJp.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">{children}</body>
-    </html>
-  );
-}
+const RootLayout = ({ children }: Readonly<{ children: ReactNode }>): JSX.Element => (
+  <html lang="ja" className={`${notoSansJp.variable} ${geistMono.variable} h-full antialiased`}>
+    <body className="flex min-h-full flex-col">{children}</body>
+  </html>
+);
+
+export default RootLayout;
