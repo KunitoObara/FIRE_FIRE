@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "export PATH=\"$HOME/.volta/bin:/opt/homebrew/bin:$PATH\"; cd src/frontend && exec npm run dev"
+      ],
+      "port": 3000
+    }
+  ]
+}
