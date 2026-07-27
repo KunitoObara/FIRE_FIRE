@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This repository is currently in the requirements/design phase for **FIRE-FIRE**, a personal FIRE (Financial Independence, Retire Early) asset management web app. There is no application code yet — `src/frontend` and `src/backend` exist as empty scaffolding. All authoritative specs live under `docs/`. When implementation begins, update this file with real build/lint/test commands; do not invent them in the meantime.
+**FIRE-FIRE** is a personal FIRE (Financial Independence, Retire Early) asset management web app. All authoritative specs live under `docs/` — the docs lead the code, so check them before assuming behaviour from what is implemented. Implementation has started with Phase 1 (auth): `src/frontend` is a working Next.js project (A1 signup implemented), `src/backend` is a Cloud Functions scaffold. See "Commands" below for the real build/lint/test commands.
 
 `docs/.env` is a real secrets file (excluded via `.gitignore`) — never read, print, or commit its contents.
 
@@ -17,8 +17,36 @@ This repository is currently in the requirements/design phase for **FIRE-FIRE**,
 - [DESIGN.md](DESIGN.md) — frontend design system: Tailwind/shadcn-based stack, color/typography rules, layout patterns, and the screen-ID-to-library mapping. Read this before adding any UI library or component pattern.
 - [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md), [src/backend/docs/TECH_STACK.md](src/backend/docs/TECH_STACK.md) — full technical stack per side (language, data fetching, testing, lint/format, deployment). Read these before adding a dependency or scaffolding either project; they complement rather than repeat DESIGN.md.
 - [src/frontend/docs/CODING_STANDARDS.md](src/frontend/docs/CODING_STANDARDS.md) — TypeScript/Next.js coding conventions (naming, import order, Server vs Client Components, styling). Read this before writing frontend code, not just before adding a dependency.
+- [docs/ci-cd-setup.md](docs/ci-cd-setup.md) — CI/deploy setup: what the GitHub Actions workflows do, plus the one-time manual setup (service accounts, Workload Identity, GitHub secrets, App Hosting backend, branch protection) that lives outside the repo.
 
 When a requirement seems ambiguous or missing, check the "今後の検討事項" (open issues) section at the end of the relevant doc before assuming — several decisions (hosting target, MFA recovery, social login, multi-tenant model) are explicitly deferred rather than omitted.
+
+## Commands
+
+There is no root-level package — run commands inside `src/frontend` or `src/backend`. These are exactly what CI runs; if one fails locally, the PR will not be mergeable.
+
+| | `src/frontend` | `src/backend` |
+|---|---|---|
+| Install | `npm ci` | `npm ci` |
+| Lint | `npm run lint` | `npm run lint` |
+| Format check | `npm run format:check` | — (Prettier not set up yet) |
+| Type check | `npm run typecheck` | `npm run typecheck` (`npm run build` also type-checks) |
+| Test | `npm run test` | `npm run test` |
+| Build | `npm run build` | `npm run build` (tsc → `lib/`) |
+| Dev server | `npm run dev` | `firebase emulators:start` (repo root) |
+
+Node.js 22 / npm is pinned via Volta in `src/frontend/package.json`.
+
+## CI / deployment
+
+Branch model: feature branch → PR → `develop` (deploys to `fire-fire-dev`) → PR → `main` (deploys to `fire-fire-prod`).
+
+- **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on PRs targeting `develop`/`main`: `wip-check` (fails if the PR title contains `WIP`), `frontend`, and `backend`. These three are the required status checks — a failing check blocks the merge button.
+- **Claude review** ([.github/workflows/claude-review.yml](.github/workflows/claude-review.yml)) posts review comments on every PR. It is deliberately *not* a required check. The action only runs when the workflow file matches the copy on the default branch (`main`) — edits to it stay inert, and the job still reports success, until they land on `main`.
+- **Deploy** ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) runs on push to `develop`/`main`: `firebase deploy --only functions,firestore,storage`, then an App Hosting rollout for the frontend. Auth is via Workload Identity — no service account keys in the repo. There is no automatic rollback; a failed deploy is caught via GitHub notifications.
+- Files excluded from deploy artifacts live in [.gcloudignore](.gcloudignore) (repo-wide) and the `functions.ignore` list in [firebase.json](firebase.json). App Hosting builds only `src/frontend`, configured by [src/frontend/apphosting.yaml](src/frontend/apphosting.yaml). Keep `docs/` and other non-runtime files out — App Hosting build minutes are billed.
+
+The one-time cloud/GitHub-side setup is in [docs/ci-cd-setup.md](docs/ci-cd-setup.md).
 
 ## Architecture (planned)
 

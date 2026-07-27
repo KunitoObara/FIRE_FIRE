@@ -1,0 +1,61 @@
+# Firebase App Hosting のビルド・実行設定。
+#
+# このファイルはApp Hostingバックエンドの「ルートディレクトリ」に置く必要がある。
+# ルートディレクトリ自体はこのYAMLでは指定できず、バックエンド作成時に
+# `--root-dir src/frontend` として設定する(docs/ci-cd-setup.md 4章)。
+# これによりビルド対象がフロントエンド配下に閉じ、docs/ 等は含まれない。
+#
+# 環境変数はSecret Managerのシークレットを参照する。dev/prodそれぞれの
+# プロジェクトに同じ名前でシークレットを作っておけば、同一のこのファイルで
+# 両環境に対応できる。作成手順は docs/ci-cd-setup.md 5章。
+
+runConfig:
+  # 個人利用規模のため最小構成。無通信時はインスタンス0までスケールインさせ、
+  # 想定外の課金が起きないよう上限も絞る(src/backend/docs/TECH_STACK.md 9章)。
+  minInstances: 0
+  maxInstances: 1
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  # FirebaseクライアントSDKの設定値(src/lib/firebase/client.ts)。
+  # NEXT_PUBLIC_* はビルド時にバンドルへ埋め込まれるため BUILD が必須。
+  # 実行時のServer Componentsからも参照しうるので RUNTIME も付ける。
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    secret: NEXT_PUBLIC_FIREBASE_API_KEY
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    secret: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    secret: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    secret: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    secret: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    secret: NEXT_PUBLIC_FIREBASE_APP_ID
+    availability:
+      - BUILD
+      - RUNTIME
+# NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL はローカル開発専用。
+# デプロイ環境で設定するとエミュレータへ繋ごうとして認証が壊れるため、ここには置かない。
