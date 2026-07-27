@@ -181,11 +181,24 @@ gcloud iam workload-identity-pools providers describe github \
 claude setup-token
 ```
 
-出力されたトークンを `CLAUDE_CODE_OAUTH_TOKEN` として登録する。API キー方式（`anthropic_api_key`）でも動作するが、その場合は Anthropic Console でのクレジット購入が別途必要になる。残高不足だとレビューは以下のように、実行直後（1ターン・課金ゼロ）で失敗する。
+出力された**トークン文字列だけ**を `CLAUDE_CODE_OAUTH_TOKEN` として登録する。説明文やターミナルの折り返しを一緒にコピーすると値が壊れ、認証リクエストが送信時点で弾かれる。API キー方式（`anthropic_api_key`）でも動作するが、その場合は Anthropic Console でのクレジット購入が別途必要になる。
+
+### レビューが失敗するときは `show_full_output` を有効にする
+
+action は失敗しても既定では `is_error: true` としか出さず、**エラー本文を握りつぶす**。原因を見るには action の入力に以下を追加する。
+
+```yaml
+show_full_output: true
+```
+
+`claude_args` に `--debug` を渡しても SDK には届かないので効果がない（入力パラメータであって CLI 引数ではない）。これを有効にすると、例えば次のように実際の理由が出る。
 
 ```
-"is_error": true, "duration_ms": 535, "num_turns": 1, "total_cost_usd": 0
+API Error: Header 'Authorization' has invalid value
+"terminal_reason": "api_error"
 ```
+
+上はトークンの値が壊れていたときのもの。原因が分かったら、ログが大量に出るうえ機微な情報が出る可能性もあるため**外すこと**。
 
 **Claude GitHub App のインストール**
 
@@ -331,5 +344,3 @@ Go to https://console.firebase.google.com/.../storage and click 'Get Started'
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)
 - [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action)
-
-<!-- CI動作確認用 -->
