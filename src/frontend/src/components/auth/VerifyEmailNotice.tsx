@@ -3,7 +3,7 @@
 import { MailIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +29,16 @@ const shouldKeepWatching = (status: EmailVerificationState["status"]): boolean =
   status !== "verified" && status !== "signed-out" && status !== "configuration-error";
 
 /**
+ * 再送が失敗したあともクールダウンを置くか。
+ *
+ * リクエストがFirebaseに届いた失敗(レート制限・原因不明)は、すぐ押し直しても状況は変わらず
+ * レート制限を深めるだけなので待たせる。届かなかった失敗(接続不可・設定不足)は原因がローカル側に
+ * あり、直したらすぐ試せる方がよいので待たせない。
+ */
+const shouldCooldownAfterFailure = (reason: ResendVerificationEmailFailureReason): boolean =>
+  reason === "too-many-requests" || reason === "unknown";
+
+/**
  * A2 メールアドレス確認待ち画面(docs/screen-requirements-auth.md A2)。
  *
  * 確認リンクは別タブ・別デバイスで開かれるためこの画面へ通知が来ない。そのため
@@ -45,6 +55,12 @@ export const VerifyEmailNotice = (): JSX.Element => {
   const [feedback, setFeedback] = useState<ResendVerificationEmailFeedback | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
+  // 確認状況の取得は間隔ポーリングとタブ復帰で並行しうる。遅れて解決した古い応答が
+  // 新しい結果を上書きしないよう、最後に開始した取得だけを採用する
+  // (確認済み・セッション無しへの遷移は effect の破棄でも防がれるが、未確認とエラーの
+  //  間の巻き戻りはここでしか防げない)
+  const latestCheckIdRef = useRef(0);
+
   const isWatching = shouldKeepWatching(state.status);
 
   // 確認完了の検知: 初回・一定間隔・タブ復帰時にFirebaseの状態を取り直す
@@ -56,8 +72,11 @@ export const VerifyEmailNotice = (): JSX.Element => {
     let cancelled = false;
 
     const check = async (): Promise<void> => {
+      latestCheckIdRef.current += 1;
+      const checkId = latestCheckIdRef.current;
+
       const next = await reloadEmailVerificationState();
-      if (cancelled) {
+      if (cancelled || checkId !== latestCheckIdRef.current) {
         return;
       }
 
@@ -131,6 +150,9 @@ export const VerifyEmailNotice = (): JSX.Element => {
     }
 
     setFeedback({ kind: "error", message: RESEND_VERIFICATION_EMAIL_MESSAGES[result.reason] });
+    if (shouldCooldownAfterFailure(result.reason)) {
+      setCooldownSeconds(RESEND_VERIFICATION_EMAIL_COOLDOWN_SECONDS);
+    }
   };
 
   if (state.status === "loading") {
