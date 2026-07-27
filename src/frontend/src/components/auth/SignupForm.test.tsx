@@ -330,6 +330,19 @@ describe("SignupForm", () => {
       expect(push).not.toHaveBeenCalled();
     });
 
+    it("Firebaseに接続できないときはエミュレータ起動を促すエラーを表示する", async () => {
+      const user = userEvent.setup();
+      signUpWithEmail.mockResolvedValue({ ok: false, reason: "network-error" });
+      render(<SignupForm />);
+
+      await fillValidForm(user);
+      await submitAndAwaitConfirmation(user);
+      await user.click(screen.getByRole("button", { name: "はい" }));
+
+      expect(await screen.findByText(/firebase emulators:start/)).toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+    });
+
     it("Firebase未設定はフォーム全体のエラーとして対処法を表示する", async () => {
       const user = userEvent.setup();
       signUpWithEmail.mockResolvedValue({ ok: false, reason: "configuration-error" });

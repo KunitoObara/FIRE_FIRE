@@ -23,6 +23,7 @@ declare global {
     | "password-policy-violation"
     | "too-many-requests"
     | "configuration-error"
+    | "network-error"
     | "unknown";
 
   type SignUpResult = { ok: true } | { ok: false; reason: SignUpFailureReason };
@@ -30,7 +31,7 @@ declare global {
   /** 特定の入力項目に紐づかず、フォーム全体のエラーとして表示する失敗理由 */
   type SignUpFormLevelFailureReason = Extract<
     SignUpFailureReason,
-    "too-many-requests" | "configuration-error" | "unknown"
+    "too-many-requests" | "configuration-error" | "network-error" | "unknown"
   >;
 
   /**
@@ -46,11 +47,19 @@ declare global {
     /** 確認済み。A3へ進む */
     | { status: "verified" }
     | { status: "configuration-error" }
+    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    | { status: "network-error" }
     | { status: "unknown-error" };
+
+  /** A2で確認状況を取得できず、画面にエラーとして出す状態 */
+  type EmailVerificationErrorStatus = Extract<
+    EmailVerificationState["status"],
+    "configuration-error" | "network-error" | "unknown-error"
+  >;
 
   /** A2の確認メール再送で画面に出し分ける必要がある失敗理由 */
   type ResendVerificationEmailFailureReason =
-    "too-many-requests" | "configuration-error" | "unknown";
+    "too-many-requests" | "configuration-error" | "network-error" | "unknown";
 
   type ResendVerificationEmailResult =
     | { ok: true }

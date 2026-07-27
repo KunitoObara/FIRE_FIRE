@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  EMAIL_VERIFICATION_ERROR_MESSAGES,
   EMAIL_VERIFICATION_POLL_INTERVAL_MS,
   RESEND_VERIFICATION_EMAIL_COOLDOWN_SECONDS,
   RESEND_VERIFICATION_EMAIL_COUNTDOWN_TICK_MS,
@@ -157,6 +158,10 @@ export const VerifyEmailNotice = (): JSX.Element => {
     );
   }
 
+  // 確認状況を取得できなかった場合の理由。未確認(正常)のときは出さない
+  const errorMessage =
+    state.status === "unverified" ? null : EMAIL_VERIFICATION_ERROR_MESSAGES[state.status];
+
   const resendLabel = ((): string => {
     if (isResending) {
       return "送信中...";
@@ -189,14 +194,9 @@ export const VerifyEmailNotice = (): JSX.Element => {
           メールが届かない場合は、迷惑メールフォルダもご確認ください。
         </p>
 
-        {state.status === "unknown-error" ? (
+        {errorMessage !== null ? (
           <p role="alert" className="mt-4 text-sm text-destructive">
-            確認状況を取得できませんでした。通信状況をご確認ください。
-          </p>
-        ) : null}
-        {state.status === "configuration-error" ? (
-          <p role="alert" className="mt-4 text-sm text-destructive">
-            {RESEND_VERIFICATION_EMAIL_MESSAGES["configuration-error"]}
+            {errorMessage}
           </p>
         ) : null}
 
