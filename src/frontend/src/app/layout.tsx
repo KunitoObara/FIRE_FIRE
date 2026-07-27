@@ -27,8 +27,18 @@ export const metadata: Metadata = {
   description: "パーソナルFIRE資産管理アプリ",
 };
 
+/**
+ * `suppressHydrationWarning` は `<html>` 要素そのものの属性差分だけを許容する。
+ * ブラウザ拡張がハイドレーション前に `<html>` へ独自属性を足すとサーバーの出力と
+ * 一致せずハイドレーションエラーになるため、この1要素に限って差分を無視する。
+ * 効果は1階層のみで、配下のコンポーネントの不一致は従来どおり検出される。
+ */
 const RootLayout = ({ children }: Readonly<{ children: ReactNode }>): JSX.Element => (
-  <html lang="ja" className={`${notoSansJp.variable} ${geistMono.variable} h-full antialiased`}>
+  <html
+    lang="ja"
+    className={`${notoSansJp.variable} ${geistMono.variable} h-full antialiased`}
+    suppressHydrationWarning
+  >
     <body className="flex min-h-full flex-col">{children}</body>
   </html>
 );
