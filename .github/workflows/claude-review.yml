@@ -23,7 +23,10 @@ jobs:
 
       - uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # APIの従量課金ではなく、Claude Pro / Max サブスクリプションの
+          # OAuthトークンで認証する(docs/ci-cd-setup.md 3章)。
+          # トークンはローカルで `claude setup-token` を実行して発行する。
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
