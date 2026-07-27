@@ -3,5 +3,17 @@
     "default": "fire-fire-dev",
     "dev": "fire-fire-dev",
     "prod": "fire-fire-prod"
+  },
+  "targets": {
+    "fire-fire-dev": {
+      "storage": {
+        "default-bucket": ["fire-fire-dev.firebasestorage.app"]
+      }
+    },
+    "fire-fire-prod": {
+      "storage": {
+        "default-bucket": ["fire-fire-prod.firebasestorage.app"]
+      }
+    }
   }
 }
