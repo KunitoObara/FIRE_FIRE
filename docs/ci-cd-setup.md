@@ -325,3 +325,9 @@ Go to https://console.firebase.google.com/.../storage and click 'Get Started'
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
 - `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
+
+## 10. 参考リンク
+
+- [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
+- [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)
+- [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action)
