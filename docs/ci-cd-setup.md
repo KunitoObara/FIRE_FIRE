@@ -70,6 +70,35 @@ echo "GCP_SA_EMAIL:     ${SA}"
 
 > 上記のロールは最小構成の想定。`firebase deploy` が権限エラーで落ちる場合は、エラーメッセージが要求するロール（`roles/run.admin`・`roles/cloudbuild.builds.editor`・`roles/storage.admin` など）を必要な分だけ追加する。
 
+### `GCP_WIF_PROVIDER_*` の値の形式に注意する
+
+`GCP_WIF_PROVIDER_*` に入れるのは**プロバイダのフルリソース名だけ**。
+
+```
+projects/<プロジェクト番号>/locations/global/workloadIdentityPools/<プールID>/providers/<プロバイダID>
+```
+
+形式を誤ると、デプロイの「Google Cloudに認証する」ステップで以下のエラーになる。
+
+```
+failed to generate Google Cloud federated token for //iam.googleapis.com/***:
+Invalid value for "audience". This value should be the full resource name of the Identity Provider.
+```
+
+ありがちな誤りは3つ。
+
+- **`//iam.googleapis.com/` を含めてしまう** — Google Cloud コンソールの「Workload Identity 連携」画面が表示する*既定の対象ユーザー（audience）*はこのプレフィックス付き。action 側が自分で付けるため、コピーする際は `projects/` 以降だけにする。**コンソールで設定した場合はこれを踏みやすい**
+- **プロジェクトID（`fire-fire-dev`）を使う** — ここは**プロジェクト番号**（数字）
+- **`/providers/<プロバイダID>` が抜ける** — プール止まりの値になっている
+
+コンソールで設定した場合は、次のコマンドで正しい値を確認できる（出力をそのまま Secret に入れる）。
+
+```bash
+gcloud iam workload-identity-pools providers describe github \
+  --project=fire-fire-dev --location=global \
+  --workload-identity-pool=github --format='value(name)'
+```
+
 ## 3. GitHub の Secrets / Variables
 
 リポジトリの Settings → Secrets and variables → Actions で登録する。
@@ -185,7 +214,19 @@ done
 5. `main` へマージし、`fire-fire-prod` にデプロイされることを確認
 6. `docs` のみを変更した PR をマージし、デプロイ成果物に `docs` が含まれないことを確認
 
-## 8. 今後の検討事項（オープン課題）
+## 8. 既知の問題
+
+### firebase-tools のバージョンを 15.22.1 に固定している
+
+15.22.2 以降、`requireAuth` 内のタイムアウトに Workload Identity の資格情報交換が間に合わず、ADC が正しく設定されていても以下のエラーでデプロイが失敗する回帰がある（[firebase-tools#10716](https://github.com/firebase/firebase-tools/issues/10716)）。
+
+```
+Error: Failed to authenticate, have you run firebase login?
+```
+
+実際の ADC のエラーが握りつぶされて汎用メッセージになるため、認証設定側を疑って時間を溶かしやすい。`deploy.yml` では 15.22.1 に固定して回避している。上流で修正されたら固定を外す。
+
+## 9. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
