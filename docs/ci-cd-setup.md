@@ -108,6 +108,22 @@ echo "GCP_SA_EMAIL:     ${SA}"
 401 Unauthorized - Claude Code is not installed on this repository.
 ```
 
+**自動レビューはデフォルトブランチ（`main`）に入るまで動かない**
+
+App をインストールしても、`claude-review.yml` が `main` に存在して**内容が完全一致**するまで、action は Claude を起動せずスキップする。PR 側でワークフローを書き換えて `ANTHROPIC_API_KEY` を盗み出す攻撃を防ぐための仕様。
+
+```
+Skipping action due to workflow validation: The workflow file must exist and have
+identical content to the version on the repository's default branch.
+```
+
+スキップされてもジョブは**成功扱いで終わる**ため、「CI は緑なのにレビューコメントだけ付かない」という見え方になる。原因を調べるときはジョブのログを確認する。
+
+本リポジトリのブランチモデル（feature → `develop` → `main`）では、検証先は常にデフォルトブランチの `main` である点に注意する。
+
+- `develop` へマージしただけでは動かない。`develop` → `main` のマージまで済ませて初めて、以降の PR でレビューが投稿される
+- 同じ理由で、`claude-review.yml` を後から編集した場合、その変更は `main` に入るまで反映されない（編集を含む PR 自体は再びスキップされる）
+
 `main` 向けには GitHub Environment `production` を作成し、承認を必須にするかを判断する（`deploy.yml` は `main` で `production`、`develop` で `development` の Environment を参照する）。
 
 ## 4. App Hosting バックエンドの作成
@@ -164,7 +180,7 @@ done
 
 1. わざと Lint エラーを含む PR を出し、CI が落ちてマージがブロックされることを確認
 2. タイトルを `WIP: ...` にした PR で `wip-check` が落ち、`WIP` を外して再実行するとパスすることを確認
-3. PR 作成時に Claude のレビューコメントが自動で付くことを確認
+3. PR 作成時に Claude のレビューコメントが自動で付くことを確認（3章のとおり、`claude-review.yml` が `main` に入った後の PR で確認する）
 4. `develop` へマージし、`fire-fire-dev` にデプロイされて画面が開くことを確認
 5. `main` へマージし、`fire-fire-prod` にデプロイされることを確認
 6. `docs` のみを変更した PR をマージし、デプロイ成果物に `docs` が含まれないことを確認
