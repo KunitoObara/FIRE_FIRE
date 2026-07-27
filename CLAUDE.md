@@ -42,7 +42,7 @@ Node.js 22 / npm is pinned via Volta in `src/frontend/package.json`.
 Branch model: feature branch → PR → `develop` (deploys to `fire-fire-dev`) → PR → `main` (deploys to `fire-fire-prod`).
 
 - **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on PRs targeting `develop`/`main`: `wip-check` (fails if the PR title contains `WIP`), `frontend`, and `backend`. These three are the required status checks — a failing check blocks the merge button.
-- **Claude review** ([.github/workflows/claude-review.yml](.github/workflows/claude-review.yml)) posts review comments on every PR. It is deliberately *not* a required check.
+- **Claude review** ([.github/workflows/claude-review.yml](.github/workflows/claude-review.yml)) posts review comments on every PR. It is deliberately *not* a required check. The action only runs when the workflow file matches the copy on the default branch (`main`) — edits to it stay inert, and the job still reports success, until they land on `main`.
 - **Deploy** ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) runs on push to `develop`/`main`: `firebase deploy --only functions,firestore,storage`, then an App Hosting rollout for the frontend. Auth is via Workload Identity — no service account keys in the repo. There is no automatic rollback; a failed deploy is caught via GitHub notifications.
 - Files excluded from deploy artifacts live in [.gcloudignore](.gcloudignore) (repo-wide) and the `functions.ignore` list in [firebase.json](firebase.json). App Hosting builds only `src/frontend`, configured by [src/frontend/apphosting.yaml](src/frontend/apphosting.yaml). Keep `docs/` and other non-runtime files out — App Hosting build minutes are billed.
 
