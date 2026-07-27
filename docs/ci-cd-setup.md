@@ -331,3 +331,5 @@ Go to https://console.firebase.google.com/.../storage and click 'Get Started'
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)
 - [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action)
+
+<!-- CI動作確認用 -->
