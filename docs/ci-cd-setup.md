@@ -155,7 +155,7 @@ gcloud iam workload-identity-pools providers describe github \
 | `GCP_WIF_PROVIDER_PROD` | `fire-fire-prod` のプロバイダのリソース名 |
 | `GCP_SA_EMAIL_DEV` | `github-actions-deployer@fire-fire-dev.iam.gserviceaccount.com` |
 | `GCP_SA_EMAIL_PROD` | `github-actions-deployer@fire-fire-prod.iam.gserviceaccount.com` |
-| `ANTHROPIC_API_KEY` | PR 自動レビュー用の API キー |
+| `CLAUDE_CODE_OAUTH_TOKEN` | PR 自動レビュー用。ローカルで `claude setup-token` を実行して発行する（Claude Pro / Max の契約が必要） |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | CI のフロントエンドビルド用。Firebase コンソール（プロジェクトの設定 → マイアプリ → ウェブアプリ）の値 |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | 同上 |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | 同上 |
@@ -173,9 +173,23 @@ gcloud iam workload-identity-pools providers describe github \
 
 未設定のまま `develop` / `main` に push した場合、`deploy` ジョブは冒頭の確認ステップで「設定が不足しています」と表示して停止する（環境をまたいだ誤デプロイを防ぐため）。
 
+**PR 自動レビューの認証方式**
+
+サブスクリプション（Claude Pro / Max）の OAuth トークンを使う。API の従量課金は使わない。
+
+```bash
+claude setup-token
+```
+
+出力されたトークンを `CLAUDE_CODE_OAUTH_TOKEN` として登録する。API キー方式（`anthropic_api_key`）でも動作するが、その場合は Anthropic Console でのクレジット購入が別途必要になる。残高不足だとレビューは以下のように、実行直後（1ターン・課金ゼロ）で失敗する。
+
+```
+"is_error": true, "duration_ms": 535, "num_turns": 1, "total_cost_usd": 0
+```
+
 **Claude GitHub App のインストール**
 
-`ANTHROPIC_API_KEY` の登録だけでは PR 自動レビューは動かない。https://github.com/apps/claude からアプリを **`KunitoObara/private_room` に対してインストール**する必要がある。未インストールだと `claude-review` ジョブが以下のエラーで失敗する（CI の必須チェックには含めていないため、マージ自体はブロックされない）。
+トークンの登録だけでは PR 自動レビューは動かない。https://github.com/apps/claude からアプリを **`KunitoObara/private_room` に対してインストール**する必要がある。未インストールだと `claude-review` ジョブが以下のエラーで失敗する（CI の必須チェックには含めていないため、マージ自体はブロックされない）。
 
 ```
 401 Unauthorized - Claude Code is not installed on this repository.
@@ -247,6 +261,14 @@ firebase apphosting:secrets:grantaccess \
 
 ## 6. ブランチ保護ルール
 
+> **現時点では設定できない。** プライベートリポジトリでのブランチ保護は有料プランの機能で、クラシックな Branch protection・Rulesets のどちらも API が 403 を返す。
+>
+> ```
+> Upgrade to GitHub Pro or make this repository public to enable this feature.
+> ```
+>
+> このため **CI が失敗してもマージボタンは押せる**。CI 自体は動作しているので、赤いチェックが付いた PR はマージしない運用でカバーする。解消するには GitHub Pro へのアップグレードか、リポジトリの公開が必要（本アプリは個人資産データを扱うため公開は現実的でない）。以下は有効化できるようになった時点で設定する内容。
+
 `develop` と `main` の両方に設定する（Settings → Branches）。
 
 - Pull Request 必須（直接 push を禁止）
@@ -259,7 +281,7 @@ firebase apphosting:secrets:grantaccess \
 
 ## 7. 動作確認
 
-1. わざと Lint エラーを含む PR を出し、CI が落ちてマージがブロックされることを確認
+1. わざと Lint エラーを含む PR を出し、CI が落ちることを確認（6章のとおり、マージのブロック自体は現行プランでは効かない）
 2. タイトルを `WIP: ...` にした PR で `wip-check` が落ち、`WIP` を外して再実行するとパスすることを確認
 3. PR 作成時に Claude のレビューコメントが自動で付くことを確認（3章のとおり、`claude-review.yml` が `main` に入った後の PR で確認する）
 4. `develop` へマージし、`fire-fire-dev` にデプロイされて画面が開くことを確認
