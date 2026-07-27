@@ -13,11 +13,22 @@ export const PASSWORD_MASK = "********";
 export const FIREBASE_CONFIGURATION_MESSAGE =
   "Firebaseの設定が完了していません。.env.example をコピーして .env.local を作成し、設定値を記入してください。";
 
+/**
+ * 認証リクエストがFirebaseに届かなかったときに画面へ出すメッセージ。
+ *
+ * `.env.local` は既定でAuthエミュレータ(127.0.0.1:9099)を向くため、ローカル開発では
+ * 「エミュレータを起動していない」が最も多い原因になる。単なる通信エラーとして扱うと
+ * 原因に辿り着けないので、確認先を具体的に示す(README「開発サーバーを起動する」参照)。
+ */
+export const FIREBASE_NETWORK_ERROR_MESSAGE =
+  "Firebaseに接続できませんでした。ローカル開発ではリポジトリルートで `firebase emulators:start` を実行しているか、ネットワーク接続を確認してください。";
+
 /** サインアップ失敗のうち、特定の入力項目に紐づかずフォーム全体に出すメッセージ */
 export const SIGN_UP_FORM_LEVEL_MESSAGES: Record<SignUpFormLevelFailureReason, string> = {
   "too-many-requests":
     "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
   unknown: "アカウントを作成できませんでした。しばらく待ってから再度お試しください。",
 };
 
@@ -32,7 +43,15 @@ export const RESEND_VERIFICATION_EMAIL_MESSAGES: Record<
   "too-many-requests":
     "再送の回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
   unknown: "確認メールを再送できませんでした。しばらく待ってから再度お試しください。",
+};
+
+/** A2でメールアドレスの確認状況を取得できなかったときのメッセージ */
+export const EMAIL_VERIFICATION_ERROR_MESSAGES: Record<EmailVerificationErrorStatus, string> = {
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  "unknown-error": "確認状況を取得できませんでした。しばらく待ってから再度お試しください。",
 };
 
 /** A2で確認メールの再送に成功したときのメッセージ */

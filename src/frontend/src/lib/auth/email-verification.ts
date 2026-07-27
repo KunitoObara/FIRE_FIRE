@@ -11,6 +11,10 @@ const SESSION_LOST_ERROR_CODES = ["auth/user-token-expired", "auth/user-not-foun
 const isSessionLost = (error: unknown): boolean =>
   error instanceof FirebaseError && SESSION_LOST_ERROR_CODES.includes(error.code);
 
+/** リクエストがFirebaseに届かなかったか。ローカルではAuthエミュレータ未起動が主な原因 */
+const isNetworkError = (error: unknown): boolean =>
+  error instanceof FirebaseError && error.code === "auth/network-request-failed";
+
 /**
  * 永続化されたセッションの復元を待ってからAuthを返す。
  *
@@ -53,6 +57,10 @@ export const reloadEmailVerificationState = async (): Promise<EmailVerificationS
       return { status: "signed-out" };
     }
 
+    if (isNetworkError(error)) {
+      return { status: "network-error" };
+    }
+
     console.error("メールアドレスの確認状況を取得できませんでした", error);
     return { status: "unknown-error" };
   }
@@ -69,6 +77,10 @@ const toResendFailure = (error: unknown): ResendVerificationEmailResult => {
 
   if (error instanceof FirebaseError && error.code === "auth/too-many-requests") {
     return { ok: false, reason: "too-many-requests" };
+  }
+
+  if (isNetworkError(error)) {
+    return { ok: false, reason: "network-error" };
   }
 
   console.error("確認メールを再送できませんでした", error);

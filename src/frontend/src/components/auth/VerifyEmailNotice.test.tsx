@@ -167,7 +167,7 @@ describe("VerifyEmailNotice", () => {
       await advance(EMAIL_VERIFICATION_POLL_INTERVAL_MS);
 
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "確認状況を取得できませんでした。通信状況をご確認ください。",
+        "確認状況を取得できませんでした。しばらく待ってから再度お試しください。",
       );
       // 送信先は判明済みの値を保ち続ける
       expect(screen.getByText("user@example.com")).toBeInTheDocument();
@@ -176,6 +176,18 @@ describe("VerifyEmailNotice", () => {
       await advance(EMAIL_VERIFICATION_POLL_INTERVAL_MS);
 
       expect(replace).toHaveBeenCalledWith("/mfa-setup");
+    });
+
+    it("Firebaseに接続できないときはエミュレータ起動を促し、確認は続ける", async () => {
+      reloadEmailVerificationState.mockResolvedValue({ status: "network-error" });
+      await renderAndSettle();
+
+      expect(screen.getByRole("alert")).toHaveTextContent("firebase emulators:start");
+
+      const callsAfterMount = reloadEmailVerificationState.mock.calls.length;
+      await advance(EMAIL_VERIFICATION_POLL_INTERVAL_MS);
+
+      expect(reloadEmailVerificationState.mock.calls.length).toBeGreaterThan(callsAfterMount);
     });
 
     it("Firebase未設定のときは対処法を表示し、確認を繰り返さない", async () => {
@@ -267,6 +279,15 @@ describe("VerifyEmailNotice", () => {
       await settle();
 
       expect(screen.getByText("確認メールを再送しました。")).toBeInTheDocument();
+    });
+
+    it("Firebaseに接続できないときは再送エラーとしてエミュレータ起動を促す", async () => {
+      resendVerificationEmail.mockResolvedValue({ ok: false, reason: "network-error" });
+      await renderAndSettle();
+
+      await clickResend();
+
+      expect(screen.getByText(/firebase emulators:start/)).toBeInTheDocument();
     });
 
     it("レート制限のときはエラーメッセージを表示する", async () => {
