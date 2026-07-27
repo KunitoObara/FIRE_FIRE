@@ -41,6 +41,7 @@ for role in \
   roles/cloudfunctions.admin \
   roles/datastore.owner \
   roles/firebaserules.admin \
+  roles/firebasestorage.admin \
   roles/iam.serviceAccountUser \
   roles/artifactregistry.writer
 do
@@ -68,7 +69,34 @@ echo "GCP_WIF_PROVIDER: projects/${PROJECT_NUMBER}/locations/global/workloadIden
 echo "GCP_SA_EMAIL:     ${SA}"
 ```
 
+> 作成直後のサービスアカウントは伝播に少し時間がかかり、続けて実行する `add-iam-policy-binding` が最初の1〜2件だけ失敗することがある。失敗したロールを再実行すれば通る。
+
 > 上記のロールは最小構成の想定。`firebase deploy` が権限エラーで落ちる場合は、エラーメッセージが要求するロール（`roles/run.admin`・`roles/cloudbuild.builds.editor`・`roles/storage.admin` など）を必要な分だけ追加する。
+
+### Firebase Storage を初期化しておく
+
+`firebase deploy --only storage` はデフォルトバケットの存在を前提にする。未初期化のプロジェクトでは以下のエラーになる。
+
+```
+Permission 'firebasestorage.defaultBucket.get' denied on resource
+'//firebasestorage.googleapis.com/projects/fire-fire-dev/defaultBucket' (or it may not exist).
+```
+
+権限エラーに見えるが、実際にはバケットが存在しないだけのことが多い。まず存在を確認する。
+
+```bash
+gcloud storage buckets list --project=fire-fire-dev --format='value(name,location)'
+```
+
+無ければ Firebase コンソール（Storage → 始める）か、以下の API で作成する。**ロケーションは後から変更できない**ので dev / prod で揃えること（本プロジェクトは `asia-northeast1`）。
+
+```bash
+curl -s -X POST \
+  "https://firebasestorage.googleapis.com/v1beta/projects/fire-fire-dev/defaultBucket" \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -d '{"location":"asia-northeast1"}'
+```
 
 ### `GCP_WIF_PROVIDER_*` の値の形式に注意する
 
@@ -225,6 +253,26 @@ Error: Failed to authenticate, have you run firebase login?
 ```
 
 実際の ADC のエラーが握りつぶされて汎用メッセージになるため、認証設定側を疑って時間を溶かしやすい。`deploy.yml` では 15.22.1 に固定して回避している。上流で修正されたら固定を外す。
+
+### Storage ルールはデプロイターゲットでバケットを明示している
+
+`firebase.json` の `storage` を**配列**にし、`.firebaserc` の `targets` でプロジェクトごとのバケットを指定している。単一オブジェクトで書くと firebase-tools が `getDefaultBucket()` を呼び、`GET firebasestorage.googleapis.com/v1alpha/projects/<project>/defaultBucket` の結果に依存する（[prepare.js](https://github.com/firebase/firebase-tools/blob/master/src/deploy/storage/prepare.ts) 参照）。
+
+このエンドポイントは**デプロイ用サービスアカウントに対してのみ 404 を返す**（オーナー権限では 200）。`firebasestorage.defaultBucket.get` を保持していても 404 になり、firebase-tools は 404 を「未セットアップ」と解釈するため、次の誤解を招くエラーになる。
+
+```
+Error: Firebase Storage has not been set up on project 'fire-fire-dev'.
+Go to https://console.firebase.google.com/.../storage and click 'Get Started'
+```
+
+コンソールでは Storage のファイルブラウザが正常に表示され、バケットも実在するのにこう出るため原因が掴みにくい。切り分け結果は以下のとおり。
+
+| 呼び出し主体 | `buckets`（一覧） | `defaultBucket` |
+|---|---|---|
+| オーナー | 200 | 200 |
+| デプロイ用サービスアカウント | 200 | **404** |
+
+`storage` を配列にすると `getDefaultBucket()` 自体が呼ばれなくなるため、この問題を回避できる。バケットを増やす場合は `.firebaserc` の `targets` に追加する。
 
 ## 9. 今後の検討事項（オープン課題）
 
