@@ -41,6 +41,7 @@ for role in \
   roles/cloudfunctions.admin \
   roles/datastore.owner \
   roles/firebaserules.admin \
+  roles/firebasestorage.admin \
   roles/iam.serviceAccountUser \
   roles/artifactregistry.writer
 do
@@ -68,7 +69,34 @@ echo "GCP_WIF_PROVIDER: projects/${PROJECT_NUMBER}/locations/global/workloadIden
 echo "GCP_SA_EMAIL:     ${SA}"
 ```
 
+> 作成直後のサービスアカウントは伝播に少し時間がかかり、続けて実行する `add-iam-policy-binding` が最初の1〜2件だけ失敗することがある。失敗したロールを再実行すれば通る。
+
 > 上記のロールは最小構成の想定。`firebase deploy` が権限エラーで落ちる場合は、エラーメッセージが要求するロール（`roles/run.admin`・`roles/cloudbuild.builds.editor`・`roles/storage.admin` など）を必要な分だけ追加する。
+
+### Firebase Storage を初期化しておく
+
+`firebase deploy --only storage` はデフォルトバケットの存在を前提にする。未初期化のプロジェクトでは以下のエラーになる。
+
+```
+Permission 'firebasestorage.defaultBucket.get' denied on resource
+'//firebasestorage.googleapis.com/projects/fire-fire-dev/defaultBucket' (or it may not exist).
+```
+
+権限エラーに見えるが、実際にはバケットが存在しないだけのことが多い。まず存在を確認する。
+
+```bash
+gcloud storage buckets list --project=fire-fire-dev --format='value(name,location)'
+```
+
+無ければ Firebase コンソール（Storage → 始める）か、以下の API で作成する。**ロケーションは後から変更できない**ので dev / prod で揃えること（本プロジェクトは `asia-northeast1`）。
+
+```bash
+curl -s -X POST \
+  "https://firebasestorage.googleapis.com/v1beta/projects/fire-fire-dev/defaultBucket" \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -d '{"location":"asia-northeast1"}'
+```
 
 ### `GCP_WIF_PROVIDER_*` の値の形式に注意する
 
