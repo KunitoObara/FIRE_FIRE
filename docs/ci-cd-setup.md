@@ -31,7 +31,19 @@ GITHUB_REPO=KunitoObara/private_room
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 SA="github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
 
-gcloud services enable iamcredentials.googleapis.com sts.googleapis.com --project="$PROJECT_ID"
+# デプロイに必要なAPIを先に有効化しておく。
+# デプロイ用サービスアカウントにAPI有効化権限（serviceusage.services.enable）を
+# 与えずに済ませるため、ここでまとめて有効化する。
+# 複数を1コマンドで指定すると失敗することがあるので1件ずつ実行する。
+for api in \
+  iamcredentials.googleapis.com sts.googleapis.com \
+  cloudfunctions.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
+  run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com storage.googleapis.com \
+  firestore.googleapis.com firebaserules.googleapis.com firebasestorage.googleapis.com \
+  secretmanager.googleapis.com cloudbilling.googleapis.com firebaseextensions.googleapis.com
+do
+  gcloud services enable "$api" --project="$PROJECT_ID"
+done
 
 gcloud iam service-accounts create github-actions-deployer \
   --project="$PROJECT_ID" --display-name="GitHub Actions Deployer"
@@ -42,6 +54,8 @@ for role in \
   roles/datastore.owner \
   roles/firebaserules.admin \
   roles/firebasestorage.admin \
+  roles/developerconnect.user \
+  roles/developerconnect.readTokenAccessor \
   roles/iam.serviceAccountUser \
   roles/artifactregistry.writer
 do
@@ -71,7 +85,9 @@ echo "GCP_SA_EMAIL:     ${SA}"
 
 > 作成直後のサービスアカウントは伝播に少し時間がかかり、続けて実行する `add-iam-policy-binding` が最初の1〜2件だけ失敗することがある。失敗したロールを再実行すれば通る。
 
-> 上記のロールは最小構成の想定。`firebase deploy` が権限エラーで落ちる場合は、エラーメッセージが要求するロール（`roles/run.admin`・`roles/cloudbuild.builds.editor`・`roles/storage.admin` など）を必要な分だけ追加する。
+> `developerconnect` の2つは App Hosting のロールアウト作成に必要。`user` が `gitRepositoryLinks.fetchGitRefs`、`readTokenAccessor` が `fetchReadToken` を担当し、片方だけでは足りない（`roles/developerconnect.viewer` は `user` に包含されるので不要）。
+
+> 上記のロールは最小構成の想定。`firebase deploy` が権限エラーで落ちる場合は、エラーメッセージが要求するロール（`roles/run.admin`・`roles/cloudbuild.builds.editor`・`roles/storage.admin` など）を必要な分だけ追加する。IAM の変更は反映まで1〜2分かかることがあるため、付与直後に失敗した場合は少し待って再実行する。
 
 ### Firebase Storage を初期化しておく
 
@@ -220,6 +236,14 @@ done
 ```
 
 値は Firebase コンソール（プロジェクトの設定 → マイアプリ → ウェブアプリ）のものを使う。`NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` はローカル開発専用なので**登録しない**（デプロイ環境に設定するとエミュレータへ繋ごうとして認証が壊れる）。
+
+登録後、App Hosting のバックエンドから読めるように IAM を付与する。これを忘れるとビルドがシークレット解決で失敗する。
+
+```bash
+firebase apphosting:secrets:grantaccess \
+  NEXT_PUBLIC_FIREBASE_API_KEY,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,NEXT_PUBLIC_FIREBASE_PROJECT_ID,NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,NEXT_PUBLIC_FIREBASE_APP_ID \
+  --project fire-fire-dev --backend fire-fire
+```
 
 ## 6. ブランチ保護ルール
 
