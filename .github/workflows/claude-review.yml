@@ -1,0 +1,60 @@
+name: Claude PR Review
+
+# PR作成時・追加push時にClaudeがレビューコメントを投稿する。
+# コメントのみで、マージのブロック条件にはしない(必須ステータスチェックには含めない)。
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+
+jobs:
+  review:
+    name: claude-review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            このPRをレビューしてください。PRブランチは既に作業ディレクトリにチェックアウト済みです。
+            レビューコメントは日本語で書いてください。
+
+            本リポジトリ固有の観点を優先して見てください。
+
+            1. 要件との整合
+               - ルートの CLAUDE.md と docs/ 配下の要件(特に docs/fire-asset-management-requirements.md、
+                 docs/screen-list-and-transitions.md、docs/screen-requirements-*.md)と矛盾していないか
+               - 画面(A1〜A7 / B1〜B10)の実装は、対応する画面要件の項目・遷移条件を満たしているか
+            2. コーディング規約
+               - src/frontend/docs/CODING_STANDARDS.md に沿っているか(命名、import順、
+                 Server / Client Componentsの使い分け、スタイリング方針)
+               - src/frontend/docs/TECH_STACK.md・src/backend/docs/TECH_STACK.md にない依存が
+                 追加されていないか
+            3. Firestoreセキュリティルール
+               - firestore.rules / storage.rules に変更があれば必ず指摘し、
+                 他ユーザーの資産データを読み書きできる穴がないかを重点的に確認する
+            4. 分類軸のハードコード
+               - 資産の分類軸(総資産 / 純金融資産 / 投資性資産 等)はユーザー編集可能なマスタデータであり、
+                 enumや定数配列としてコードに埋め込んではならない(要件 4.3)。
+                 ハードコードされていれば必ず指摘する
+            5. 一般的な観点(バグ、セキュリティ、パフォーマンス)
+
+            `gh pr comment` で全体へのコメントを投稿してください。
+            個別の箇所の指摘は `mcp__github_inline_comment__create_inline_comment`
+            (`confirmed: true` を付ける)を使ってください。
+            レビュー内容はGitHubのコメントとしてのみ出力し、メッセージ本文には書かないでください。
+
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

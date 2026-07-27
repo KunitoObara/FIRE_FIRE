@@ -1,0 +1,91 @@
+name: Deploy
+
+# develop / main へのマージ(= push)でそれぞれ dev / prod へデプロイする。
+# App HostingのGitHub自動連携は使わず、CIがパスしたことを前提にできるよう
+# GitHub ActionsからFirebase CLIを叩く方式に統一している。
+on:
+  push:
+    branches:
+      - develop
+      - main
+
+# 同一環境への同時デプロイを直列化する(実行中のものはキャンセルしない)。
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity連携でのトークン取得に必要
+
+jobs:
+  deploy:
+    name: deploy (${{ github.ref_name }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    env:
+      FIREBASE_PROJECT: ${{ github.ref_name == 'main' && 'fire-fire-prod' || 'fire-fire-dev' }}
+      WIF_PROVIDER: ${{ github.ref_name == 'main' && secrets.GCP_WIF_PROVIDER_PROD || secrets.GCP_WIF_PROVIDER_DEV }}
+      SA_EMAIL: ${{ github.ref_name == 'main' && secrets.GCP_SA_EMAIL_PROD || secrets.GCP_SA_EMAIL_DEV }}
+      # App HostingのバックエンドID。dev/prod で同じIDを使う前提。
+      # リポジトリの Variables に APPHOSTING_BACKEND_ID を登録しておく
+      # (docs/ci-cd-setup.md 3章・4章)。
+      APPHOSTING_BACKEND_ID: ${{ vars.APPHOSTING_BACKEND_ID }}
+    steps:
+      # 環境別のSecretが未設定だと、式の `||` により反対側の環境の値へ黙って
+      # フォールバックしてしまう。事故を防ぐため先に存在確認する。
+      - name: デプロイ先の設定が揃っているか確認する
+        run: |
+          missing=""
+          [ -n "$WIF_PROVIDER" ] || missing="$missing GCP_WIF_PROVIDER_*"
+          [ -n "$SA_EMAIL" ] || missing="$missing GCP_SA_EMAIL_*"
+          [ -n "$APPHOSTING_BACKEND_ID" ] || missing="$missing APPHOSTING_BACKEND_ID(Variables)"
+          if [ -n "$missing" ]; then
+            echo "::error::リポジトリの設定が不足しています:$missing (docs/ci-cd-setup.md 参照)"
+            exit 1
+          fi
+          echo "デプロイ先: $FIREBASE_PROJECT / App Hostingバックエンド: $APPHOSTING_BACKEND_ID"
+
+      - uses: actions/checkout@v4
+
+      # サービスアカウント鍵は置かず、Workload Identity連携で短命の資格情報を取得する。
+      # Firebase CLIは google-github-actions/auth が書き出す
+      # GOOGLE_APPLICATION_CREDENTIALS を参照する。
+      - name: Google Cloudに認証する
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.SA_EMAIL }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/backend/package-lock.json
+
+      - name: Firebase CLIを導入する
+        run: npm i -g firebase-tools@15
+
+      # firebase.json の predeploy で `npm run build` が走るため、
+      # 先に src/backend の依存をインストールしておく必要がある。
+      - name: Backendをビルドする
+        working-directory: src/backend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Functions / Firestore / Storage をデプロイする
+        run: |
+          firebase deploy \
+            --only functions,firestore,storage \
+            --project "$FIREBASE_PROJECT" \
+            --non-interactive
+
+      # Frontend(Next.js)はApp Hostingのロールアウトを作成してデプロイする。
+      # ビルドはApp Hosting側で src/frontend/apphosting.yaml に従って実行される。
+      - name: App Hostingのロールアウトを作成する
+        run: |
+          firebase apphosting:rollouts:create "$APPHOSTING_BACKEND_ID" \
+            --project "$FIREBASE_PROJECT" \
+            --git-branch "${{ github.ref_name }}" \
+            --non-interactive
