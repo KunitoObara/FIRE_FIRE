@@ -64,16 +64,49 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Storageバケット |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | メッセージング送信者ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | アプリID |
+| `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` | Authエミュレータの接続先。**既定で有効**(`http://127.0.0.1:9099`) |
 
 `.env.local` は `.gitignore` で除外済み。コミットしない(`.env.example` のみコミットする)。
 
-### 4. 開発サーバーを起動する
+### 4. Firebaseエミュレータを起動する
+
+`.env.local` は既定でAuthエミュレータを向くため、**エミュレータを起動していないと認証が一切通らない**(サインアップが `auth/network-request-failed` で失敗する)。リポジトリルートで別ターミナルを開いて起動しておく。
+
+```bash
+firebase emulators:start
+```
+
+Emulator UI は <http://127.0.0.1:4000/auth> で、作成済みユーザーを確認・削除できる。
+
+エミュレータを使う理由は、本番のIdentity Platformに実アカウントが作られ、入力したアドレスへ実際に確認メールが飛ぶのを防ぐため。本番プロジェクトに対して手動で確認したいときだけ `.env.local` の `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` をコメントアウトする。
+
+> エミュレータは `--import` / `--export` を付けていないためデータを永続化しない。再起動すると作成済みユーザーは消えるので、同じメールアドレスで作り直せる。
+
+### 5. 開発サーバーを起動する
 
 ```bash
 npm run dev
 ```
 
 <http://localhost:3000> を開く。
+
+#### 確認メール(A2)をローカルで開く
+
+エミュレータは確認メールを実際には送信せず、`firebase emulators:start` を実行しているターミナルに確認リンクを出力する。
+
+```
+i  To verify the email address you@example.com, follow this link: http://127.0.0.1:9099/emulator/action?mode=verifyEmail&lang=en&oobCode=...&apiKey=fake-api-key
+```
+
+このリンクをブラウザで開くと確認が完了し、A2の画面が数秒以内にA3(2FA登録画面)へ自動遷移する。
+
+#### ローカルで確認できないもの
+
+以下はエミュレータでは再現できないため、`develop` マージ後のステージング環境(`fire-fire-dev`)で確認する。
+
+- Identity Platform側で強制するパスワードポリシー(エミュレータは強制しない)
+- 実際に送信される確認メール・パスワードリセットメールの文面と到達
+- TOTPによる2FA、Blocking Functions経由のログイン通知メール
 
 ## 利用可能なスクリプト
 
