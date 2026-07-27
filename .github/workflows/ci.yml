@@ -1,0 +1,110 @@
+name: CI
+
+# PR時のみ実行する。デプロイはしないのでFirebaseの認証情報は一切必要ない。
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+# 同一PRに連続pushした場合、古い実行はキャンセルする。
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  wip-check:
+    name: wip-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: PRタイトルにWIPが含まれていないことを確認する
+        # PRタイトルは外部入力なので、runの中に直接展開せずenv経由で渡す(コマンド注入対策)。
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # 単純な部分一致だと "swipe" のような無関係な単語にも反応するため、
+          # 前後が英数字でない場合のみWIPとみなす(大文字小文字は区別しない)。
+          if printf '%s' "$PR_TITLE" | grep -qiE '(^|[^[:alnum:]])wip([^[:alnum:]]|$)'; then
+            echo "::error::PRタイトルに WIP が含まれています: ${PR_TITLE}"
+            echo "::error::作業中のPRはマージできません。完了したらタイトルから WIP を外してください。"
+            exit 1
+          fi
+          echo "PRタイトルにWIPは含まれていません: ${PR_TITLE}"
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      # package.jsonのvoltaフィールドで固定しているnpmに合わせる。
+      # npm 11はinstallスクリプトを既定でブロックするため(allowScriptsで承認済み)、
+      # ローカルとCIで依存のインストール結果を揃える意味がある。
+      - name: npmをvoltaで固定したバージョンに合わせる
+        run: npm i -g "npm@$(node -p "require('./package.json').volta.npm")"
+
+      - run: npm ci
+
+      - name: Lint(ESLint)
+        run: npm run lint
+
+      - name: フォーマット確認(Prettier)
+        run: npm run format:check
+
+      - name: 型チェック
+        run: npm run typecheck
+
+      - name: テスト(Vitest)
+        run: npm run test
+
+      # 本番ビルドが通ることの確認。CIではデプロイもFirebaseへの接続もしないが、
+      # ビルド時にバンドルへ埋め込まれる NEXT_PUBLIC_* をリポジトリのSecretsから与える。
+      # (src/lib/firebase/client.ts が空文字を弾くため、値が必要)
+      - name: ビルド
+        run: npm run build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint(ESLint)
+        run: npm run lint
+
+      # tscでの型チェックを兼ねる(backendのbuildはtsc)
+      - name: ビルド(tsc)
+        run: npm run build
+
+      - name: テスト(Vitest)
+        run: npm run test

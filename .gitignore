@@ -1,3 +1,16 @@
 .env
 .env.*
 !.env.example
+
+# Firebase エミュレータ・CLI のログ（実データが混入しうる）
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+database-debug.log
+pubsub-debug.log
+ui-debug.log
+storage-debug.log
+*-debug.log
+
+# Firebase エミュレータのエクスポートデータ
+.firebase/
