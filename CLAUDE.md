@@ -37,6 +37,8 @@ There is no root-level package — run commands inside `src/frontend` or `src/ba
 
 Node.js 22 / npm is pinned via Volta in `src/frontend/package.json`.
 
+Running the frontend against auth needs `firebase emulators:start` (repo root) alongside `npm run dev`: `.env.local` points at the Auth emulator by default, so with the emulator down every auth call fails with `auth/network-request-failed`. The emulator prints the email-verification link to its own terminal instead of sending mail, and it does not persist data between restarts. Server-side password policy, real emails, TOTP MFA and login-notification Blocking Functions are not reproduced locally — verify those on `fire-fire-dev` after merging to `develop`. See [src/frontend/README.md](src/frontend/README.md) "セットアップ".
+
 ## CI / deployment
 
 Branch model: feature branch → PR → `develop` (deploys to `fire-fire-dev`) → PR → `main` (deploys to `fire-fire-prod`).
