@@ -73,6 +73,7 @@ flowchart TD
 
     Signup --> VerifyWait[A2 メールアドレス確認待ち画面]
     VerifyWait -->|メール内リンクで確認完了| MFASetup[A3 2FA登録画面]
+    VerifyWait -->|セッション無し / やり直し| Signup
     MFASetup -->|確認コード検証成功| Dashboard[B1 ダッシュボード画面]
 
     Login -->|ID/PW認証成功| MFAVerify[A5 2FA検証画面]

@@ -33,6 +33,37 @@ declare global {
     "too-many-requests" | "configuration-error" | "unknown"
   >;
 
+  /**
+   * A2で表示するメールアドレス確認の状況。
+   * Firebaseの`User`をそのまま画面に持ち込まず、A2が出し分ける状態だけに絞る。
+   */
+  type EmailVerificationState =
+    | { status: "loading" }
+    /** セッションが無い(直接アクセス・サインアウト済み)。A1へ戻す */
+    | { status: "signed-out" }
+    /** 未確認。`email`は送信先の表示に使う(取得できない場合はnull) */
+    | { status: "unverified"; email: string | null }
+    /** 確認済み。A3へ進む */
+    | { status: "verified" }
+    | { status: "configuration-error" }
+    | { status: "unknown-error" };
+
+  /** A2の確認メール再送で画面に出し分ける必要がある失敗理由 */
+  type ResendVerificationEmailFailureReason =
+    "too-many-requests" | "configuration-error" | "unknown";
+
+  type ResendVerificationEmailResult =
+    | { ok: true }
+    /** 再送対象のユーザーが居ない。A1へ戻す */
+    | { ok: false; reason: "no-session" }
+    | { ok: false; reason: ResendVerificationEmailFailureReason };
+
+  /** A2の再送操作の結果として画面に出すメッセージ */
+  type ResendVerificationEmailFeedback = {
+    kind: "success" | "error";
+    message: string;
+  };
+
   /** 表示/非表示を切り替えられるパスワード入力欄のProps */
   type PasswordFieldProps = {
     /** input要素のid。ラベルとの紐付けに使う */
