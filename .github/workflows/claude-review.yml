@@ -27,11 +27,6 @@ jobs:
           # OAuthトークンで認証する(docs/ci-cd-setup.md 3章)。
           # トークンはローカルで `claude setup-token` を実行して発行する。
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # 原因調査用の一時的な指定。
-          # actionは失敗時に `is_error: true` としか出さずエラー本文を握りつぶすため、
-          # レビューが投稿されない原因を特定するまで全出力を有効にする。
-          # 解決したら外すこと(ログが大量に出るうえ、機微な情報が出る可能性もある)。
-          show_full_output: true
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
