@@ -59,7 +59,11 @@ declare global {
 
   /** A2の確認メール再送で画面に出し分ける必要がある失敗理由 */
   type ResendVerificationEmailFailureReason =
-    "too-many-requests" | "configuration-error" | "network-error" | "unknown";
+    | "too-many-requests"
+    | "configuration-error"
+    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    | "network-error"
+    | "unknown";
 
   type ResendVerificationEmailResult =
     | { ok: true }

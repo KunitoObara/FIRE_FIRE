@@ -56,7 +56,8 @@ const resendButton = (): HTMLElement =>
 
 /**
  * 「確認メールを再送する」を押し、結果が反映されるまで進める。
- * `userEvent`は内部の待機が偽装タイマーと噛み合わないため、`fireEvent`を使う。
+ * `userEvent`は内部の待機が偽装タイマーと噛み合わないため、`fireEvent`を使う
+ * (Reactは無効化されたボタンのクリックハンドラを呼ばないため、無効時の検証にも使える)。
  */
 const clickResend = async (): Promise<void> => {
   await act(async () => {
@@ -157,6 +158,29 @@ describe("VerifyEmailNotice", () => {
 
       expect(reloadEmailVerificationState.mock.calls.length).toBeGreaterThan(callsAfterMount);
       expect(replace).toHaveBeenCalledWith("/mfa-setup");
+    });
+
+    it("先に開始した確認の遅い応答で、後から得た結果を巻き戻さない", async () => {
+      // 初回チェックを保留させ、その間にタブ復帰のチェックが先に解決する状況を作る
+      let resolveFirstCheck: ((state: EmailVerificationState) => void) | undefined;
+      reloadEmailVerificationState.mockReturnValueOnce(
+        new Promise<EmailVerificationState>((resolve) => {
+          resolveFirstCheck = resolve;
+        }),
+      );
+      render(<VerifyEmailNotice />);
+      await settle();
+
+      reloadEmailVerificationState.mockResolvedValue({ status: "unknown-error" });
+      await returnToTab();
+
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+
+      // 遅れて解決した古い応答は捨てる(新しく判明したエラー表示を消さない)
+      resolveFirstCheck?.(UNVERIFIED);
+      await settle();
+
+      expect(screen.getByRole("alert")).toBeInTheDocument();
     });
 
     it("確認状況の取得に失敗しても画面は保ち、エラーを表示したまま確認を続ける", async () => {
@@ -281,16 +305,18 @@ describe("VerifyEmailNotice", () => {
       expect(screen.getByText("確認メールを再送しました。")).toBeInTheDocument();
     });
 
-    it("Firebaseに接続できないときは再送エラーとしてエミュレータ起動を促す", async () => {
+    it("Firebaseに接続できないときは再送エラーとしてエミュレータ起動を促し、すぐ再試行できる", async () => {
       resendVerificationEmail.mockResolvedValue({ ok: false, reason: "network-error" });
       await renderAndSettle();
 
       await clickResend();
 
       expect(screen.getByText(/firebase emulators:start/)).toBeInTheDocument();
+      // 原因がローカル側にあるため、直したらすぐ試せるようクールダウンは置かない
+      expect(screen.getByRole("button", { name: "確認メールを再送する" })).toBeEnabled();
     });
 
-    it("レート制限のときはエラーメッセージを表示する", async () => {
+    it("レート制限のときはエラーメッセージを表示し、クールダウンを開始して連打を止める", async () => {
       resendVerificationEmail.mockResolvedValue({ ok: false, reason: "too-many-requests" });
       await renderAndSettle();
 
@@ -301,6 +327,15 @@ describe("VerifyEmailNotice", () => {
           "再送の回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
         ),
       ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: `確認メールを再送する(あと${RESEND_VERIFICATION_EMAIL_COOLDOWN_SECONDS}秒)`,
+        }),
+      ).toBeDisabled();
+
+      // クールダウン中は押せないので、レート制限を深める連打にならない
+      await clickResend();
+      expect(resendVerificationEmail).toHaveBeenCalledTimes(1);
     });
 
     it("原因不明の失敗時もエラーメッセージを表示し、画面に留まる", async () => {
@@ -317,13 +352,17 @@ describe("VerifyEmailNotice", () => {
       expect(replace).not.toHaveBeenCalled();
     });
 
-    it("失敗したときはクールダウンを開始せず、すぐに再試行できる", async () => {
+    it("原因不明の失敗でもクールダウンを開始する", async () => {
       resendVerificationEmail.mockResolvedValue({ ok: false, reason: "unknown" });
       await renderAndSettle();
 
       await clickResend();
 
-      expect(screen.getByRole("button", { name: "確認メールを再送する" })).toBeEnabled();
+      expect(
+        screen.getByRole("button", {
+          name: `確認メールを再送する(あと${RESEND_VERIFICATION_EMAIL_COOLDOWN_SECONDS}秒)`,
+        }),
+      ).toBeDisabled();
     });
 
     it("再送時にセッションが失われていたらA1へ遷移する", async () => {
