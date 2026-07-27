@@ -247,6 +247,14 @@ firebase apphosting:secrets:grantaccess \
 
 ## 6. ブランチ保護ルール
 
+> **現時点では設定できない。** プライベートリポジトリでのブランチ保護は有料プランの機能で、クラシックな Branch protection・Rulesets のどちらも API が 403 を返す。
+>
+> ```
+> Upgrade to GitHub Pro or make this repository public to enable this feature.
+> ```
+>
+> このため **CI が失敗してもマージボタンは押せる**。CI 自体は動作しているので、赤いチェックが付いた PR はマージしない運用でカバーする。解消するには GitHub Pro へのアップグレードか、リポジトリの公開が必要（本アプリは個人資産データを扱うため公開は現実的でない）。以下は有効化できるようになった時点で設定する内容。
+
 `develop` と `main` の両方に設定する（Settings → Branches）。
 
 - Pull Request 必須（直接 push を禁止）
@@ -259,7 +267,7 @@ firebase apphosting:secrets:grantaccess \
 
 ## 7. 動作確認
 
-1. わざと Lint エラーを含む PR を出し、CI が落ちてマージがブロックされることを確認
+1. わざと Lint エラーを含む PR を出し、CI が落ちることを確認（6章のとおり、マージのブロック自体は現行プランでは効かない）
 2. タイトルを `WIP: ...` にした PR で `wip-check` が落ち、`WIP` を外して再実行するとパスすることを確認
 3. PR 作成時に Claude のレビューコメントが自動で付くことを確認（3章のとおり、`claude-review.yml` が `main` に入った後の PR で確認する）
 4. `develop` へマージし、`fire-fire-dev` にデプロイされて画面が開くことを確認
