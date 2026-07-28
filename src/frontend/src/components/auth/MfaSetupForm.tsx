@@ -268,10 +268,21 @@ export const MfaSetupForm = (): JSX.Element => {
           </Button>
 
           {/*
-            確認コードの誤り以外は、QRコードを取り直せば解消しうる(登録セッションの期限切れが
-            代表例。専用のエラーコードを特定できていないため、理由を絞らず導線を出す)
+            復旧導線の出し分け。
+            - 確認コードの誤り: QRコードは有効なままなので何も出さず、入力し直してもらう
+            - 再認証が必要: QRコードを取り直しても同じ結果になるため、ログイン画面へ送る
+            - それ以外: QRコードを取り直せば解消しうる(登録セッションの期限切れが代表例。
+              専用のエラーコードを特定できていないため、理由を絞らずこちらに寄せる)
           */}
-          {enrollFailure !== null && enrollFailure !== "invalid-verification-code" ? (
+          {enrollFailure === "requires-recent-login" ? (
+            <Button asChild variant="outline" className="mt-3 w-full">
+              <Link href={LOGIN_PATH}>ログイン画面へ</Link>
+            </Button>
+          ) : null}
+
+          {enrollFailure !== null &&
+          enrollFailure !== "invalid-verification-code" &&
+          enrollFailure !== "requires-recent-login" ? (
             <Button type="button" variant="outline" className="mt-3 w-full" onClick={handleRetry}>
               QRコードを再取得する
             </Button>

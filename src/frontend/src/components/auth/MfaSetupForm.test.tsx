@@ -210,6 +210,23 @@ describe("MfaSetupForm", () => {
       ).not.toBeInTheDocument();
     });
 
+    it("再認証が必要なときはログイン画面へ誘導し、QRコードの再取得は勧めない", async () => {
+      completeTotpEnrollment.mockResolvedValue({ ok: false, reason: "requires-recent-login" });
+      await renderAndSettle();
+
+      await enterCode("123456");
+      await clickSubmit();
+
+      expect(screen.getByRole("link", { name: "ログイン画面へ" })).toHaveAttribute(
+        "href",
+        "/login",
+      );
+      // QRコードを取り直しても同じ結果になるため、この導線は出さない
+      expect(
+        screen.queryByRole("button", { name: "QRコードを再取得する" }),
+      ).not.toBeInTheDocument();
+    });
+
     it("検証時にセッションが失われていたらA1へ遷移する", async () => {
       completeTotpEnrollment.mockResolvedValue({ ok: false, reason: "signed-out" });
       await renderAndSettle();
