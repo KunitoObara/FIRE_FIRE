@@ -115,15 +115,14 @@ export const TOTP_ENROLLMENT_START_MESSAGES: Record<
 export const TOTP_ENROLLMENT_MESSAGES: Record<TotpEnrollmentDisplayFailureReason, string> = {
   "invalid-verification-code":
     "確認コードが正しくありません。認証アプリに表示されている最新のコードを入力してください。",
-  "enrollment-expired":
-    "設定の有効期限が切れました。QRコードを再取得して、もう一度読み取ってください。",
   "requires-recent-login": REQUIRES_RECENT_LOGIN_MESSAGE,
   "totp-not-enabled": TOTP_NOT_ENABLED_MESSAGE,
   "too-many-requests":
     "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
-  unknown: "2段階認証を設定できませんでした。しばらく待ってから再度お試しください。",
+  unknown:
+    "2段階認証を設定できませんでした。QRコードを表示してから時間が経っている場合は設定の有効期限が切れている可能性があるため、QRコードを再取得してやり直してください。",
 };
 
 /**

@@ -148,6 +148,10 @@ describe("MfaSetupForm", () => {
       // 古いコードを押し直さないよう入力は消し、画面はそのまま残す
       expect(submitButton()).toBeDisabled();
       expect(screen.getByTestId("totp-qr-code")).toBeInTheDocument();
+      // QRコードは有効なままなので、取り直す導線は出さない
+      expect(
+        screen.queryByRole("button", { name: "QRコードを再取得する" }),
+      ).not.toBeInTheDocument();
 
       completeTotpEnrollment.mockResolvedValue({ ok: true });
       await enterCode("654321");
@@ -186,14 +190,14 @@ describe("MfaSetupForm", () => {
       ).toBeInTheDocument();
     });
 
-    it("有効期限切れならQRコードの再取得を促す", async () => {
-      completeTotpEnrollment.mockResolvedValue({ ok: false, reason: "enrollment-expired" });
+    it("確認コード誤り以外の失敗ではQRコードの再取得を促す", async () => {
+      completeTotpEnrollment.mockResolvedValue({ ok: false, reason: "unknown" });
       await renderAndSettle();
 
       await enterCode("123456");
       await clickSubmit();
 
-      expect(screen.getByRole("alert")).toHaveTextContent("設定の有効期限が切れました。");
+      expect(screen.getByRole("alert")).toHaveTextContent("設定の有効期限が切れている可能性がある");
 
       const retryButton = screen.getByRole("button", { name: "QRコードを再取得する" });
       await act(async () => {

@@ -124,8 +124,6 @@ declare global {
   type TotpEnrollmentFailureReason =
     /** 確認コードが誤り。QRコードはそのままで再入力できる */
     | "invalid-verification-code"
-    /** 登録の有効期限切れ。QRコードの再生成が必要 */
-    | "enrollment-expired"
     | "already-enrolled"
     | "signed-out"
     | "requires-recent-login"

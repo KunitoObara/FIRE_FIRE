@@ -267,7 +267,11 @@ export const MfaSetupForm = (): JSX.Element => {
             {isSubmitting ? "確認中..." : "確認する"}
           </Button>
 
-          {enrollFailure === "enrollment-expired" ? (
+          {/*
+            確認コードの誤り以外は、QRコードを取り直せば解消しうる(登録セッションの期限切れが
+            代表例。専用のエラーコードを特定できていないため、理由を絞らず導線を出す)
+          */}
+          {enrollFailure !== null && enrollFailure !== "invalid-verification-code" ? (
             <Button type="button" variant="outline" className="mt-3 w-full" onClick={handleRetry}>
               QRコードを再取得する
             </Button>

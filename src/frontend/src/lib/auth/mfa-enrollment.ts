@@ -64,7 +64,8 @@ const toSharedFailureReason = (error: unknown): TotpEnrollmentStartFailureReason
     return "email-unverified";
   }
 
-  if (hasErrorCode(error, "auth/second-factor-already-enrolled")) {
+  // 定数名は SECOND_FACTOR_ALREADY_ENROLLED だが、コード文字列は -in-use である
+  if (hasErrorCode(error, "auth/second-factor-already-in-use")) {
     return "already-enrolled";
   }
 
@@ -171,11 +172,9 @@ export const completeTotpEnrollment = async (
       return { ok: false, reason: "invalid-verification-code" };
     }
 
-    // 保留中の登録セッションが期限切れ。QRコードの再生成からやり直す必要がある
-    if (hasErrorCode(error, "auth/totp-challenge-timeout")) {
-      return { ok: false, reason: "enrollment-expired" };
-    }
-
+    // 保留中の登録セッションの期限切れ(`TotpSecret.enrollmentCompletionDeadline`超過)は、
+    // 専用のエラーコードを特定できていないため個別には判定しない。確認コードの誤り以外の失敗は
+    // まとめて`unknown`に落ち、画面側がQRコードの再取得を促すようにしてある。
     const reason = toSharedFailureReason(error);
     // 検証時のメール未確認はA2へ戻す理由にならない(登録開始時点で確認済みのため)
     if (reason !== undefined && reason !== "email-unverified") {
