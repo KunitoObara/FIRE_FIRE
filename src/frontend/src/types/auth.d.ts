@@ -1,3 +1,4 @@
+import type { TotpSecret } from "firebase/auth";
 import type { ReactNode } from "react";
 import type { FieldError, UseFormRegisterReturn } from "react-hook-form";
 import type { z } from "zod";
@@ -75,6 +76,86 @@ declare global {
   type ResendVerificationEmailFeedback = {
     kind: "success" | "error";
     message: string;
+  };
+
+  /**
+   * A3のQRコード生成(登録の開始)で画面に出し分ける必要がある失敗理由。
+   * Firebaseのエラーコードをそのまま画面に持ち込まないための境界。
+   */
+  type TotpEnrollmentStartFailureReason =
+    /** セッションが無い(直接アクセス・サインアウト済み)。A1へ戻す */
+    | "signed-out"
+    /** メールアドレスが未確認。2FA登録の前提を満たしていないためA2へ戻す */
+    | "email-unverified"
+    /** 既に2FA登録済み。A3に留まる意味がないためB1へ進める */
+    | "already-enrolled"
+    /** 再認証が必要なほどセッションが古い。ログインし直しを促す */
+    | "requires-recent-login"
+    /** プロジェクト側でTOTP多要素認証が有効化されていない */
+    | "totp-not-enabled"
+    | "too-many-requests"
+    | "configuration-error"
+    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    | "network-error"
+    | "unknown";
+
+  /**
+   * A3の登録開始結果。
+   * `secret`はFirebaseが発行する登録セッションそのもので、画面側は検証時に返すためだけに保持する
+   * (シークレットの中身を画面のロジックで解釈しない)。
+   */
+  type TotpEnrollmentStartResult =
+    | { ok: true; secret: TotpSecret; qrCodeUrl: string }
+    | { ok: false; reason: TotpEnrollmentStartFailureReason };
+
+  /** 登録開始の失敗のうち、A3では解決できず他画面へ移すもの */
+  type TotpEnrollmentStartRedirectFailureReason = Extract<
+    TotpEnrollmentStartFailureReason,
+    "signed-out" | "email-unverified" | "already-enrolled"
+  >;
+
+  /** 登録開始の失敗のうち、A3に留まってメッセージとして出すもの */
+  type TotpEnrollmentStartDisplayFailureReason = Exclude<
+    TotpEnrollmentStartFailureReason,
+    TotpEnrollmentStartRedirectFailureReason
+  >;
+
+  /** A3の確認コード検証で画面に出し分ける必要がある失敗理由 */
+  type TotpEnrollmentFailureReason =
+    /** 確認コードが誤り。QRコードはそのままで再入力できる */
+    | "invalid-verification-code"
+    | "already-enrolled"
+    | "signed-out"
+    | "requires-recent-login"
+    | "totp-not-enabled"
+    | "too-many-requests"
+    | "configuration-error"
+    | "network-error"
+    | "unknown";
+
+  type TotpEnrollmentResult = { ok: true } | { ok: false; reason: TotpEnrollmentFailureReason };
+
+  /** 検証の失敗のうち、A3に留まってメッセージとして出すもの(他画面へ移すものを除く) */
+  type TotpEnrollmentDisplayFailureReason = Exclude<
+    TotpEnrollmentFailureReason,
+    "signed-out" | "already-enrolled"
+  >;
+
+  /**
+   * A3が表示に使う状態。
+   * 登録開始の結果と、検証成功後の完了表示をひとまとめに扱う。
+   */
+  type MfaSetupState =
+    | { status: "loading" }
+    | { status: "ready"; secret: TotpSecret; qrCodeUrl: string }
+    /** 検証成功。ユーザーが「開始する」を押すまでこの画面に留まる */
+    | { status: "enrolled" }
+    | { status: "start-failed"; reason: TotpEnrollmentStartFailureReason };
+
+  /** A3のQRコード表示のProps */
+  type TotpQrCodeProps = {
+    /** `otpauth://`形式のURL(Firebaseの`TotpSecret.generateQrCodeUrl()`の戻り値) */
+    url: string;
   };
 
   /** 表示/非表示を切り替えられるパスワード入力欄のProps */

@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - [DESIGN.md](DESIGN.md) — frontend design system: Tailwind/shadcn-based stack, color/typography rules, layout patterns, and the screen-ID-to-library mapping. Read this before adding any UI library or component pattern.
 - [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md), [src/backend/docs/TECH_STACK.md](src/backend/docs/TECH_STACK.md) — full technical stack per side (language, data fetching, testing, lint/format, deployment). Read these before adding a dependency or scaffolding either project; they complement rather than repeat DESIGN.md.
 - [src/frontend/docs/CODING_STANDARDS.md](src/frontend/docs/CODING_STANDARDS.md) — TypeScript/Next.js coding conventions (naming, import order, Server vs Client Components, styling). Read this before writing frontend code, not just before adding a dependency.
-- [docs/ci-cd-setup.md](docs/ci-cd-setup.md) — CI/deploy setup: what the GitHub Actions workflows do, plus the one-time manual setup (service accounts, Workload Identity, GitHub secrets, App Hosting backend, branch protection) that lives outside the repo.
+- [docs/ci-cd-setup.md](docs/ci-cd-setup.md) — CI/deploy setup: what the GitHub Actions workflows do, plus the one-time manual setup (service accounts, Workload Identity, GitHub secrets, App Hosting backend, branch protection, Identity Platform upgrade + TOTP 2FA enablement) that lives outside the repo.
 
 When a requirement seems ambiguous or missing, check the "今後の検討事項" (open issues) section at the end of the relevant doc before assuming — several decisions (hosting target, MFA recovery, social login, multi-tenant model) are explicitly deferred rather than omitted.
 

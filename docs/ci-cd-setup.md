@@ -333,14 +333,67 @@ Go to https://console.firebase.google.com/.../storage and click 'Get Started'
 
 `storage` を配列にすると `getDefaultBucket()` 自体が呼ばれなくなるため、この問題を回避できる。バケットを増やす場合は `.firebaserc` の `targets` に追加する。
 
-## 9. 今後の検討事項（オープン課題）
+## 9. Identity Platform へのアップグレードと TOTP 2FA の有効化
+
+`fire-fire-dev` / `fire-fire-prod` の**両方**で実施する。A3（2FA登録画面）はこの設定なしでは動かない。
+
+### 9.1 Identity Platform へアップグレードする
+
+Firebase コンソール → Authentication → **Settings（設定）** タブから実行する。コード変更は不要で、既存のクライアント / Admin SDK はそのまま動く。
+
+これで多要素認証・Blocking Functions・監査ログが解禁される（[docs/auth-login-requirements.md](auth-login-requirements.md) 2章・3.3・4.4 の前提）。課金は Blaze プランで MAU 50,000 まで無料。Spark プランのままだと DAU 3,000 の上限が付く。
+
+TOTP を使う前提条件は次の2つで、どちらもアプリ側で満たしている。
+
+- MFA 対応プロバイダが有効であること → メール/パスワードは対応済み
+- メールアドレス確認が実装されていること → A2 で実装済み
+
+### 9.2 TOTP を有効化する
+
+**Firebase コンソールに TOTP のトグルは無い。** Admin SDK か REST API でしか設定できない（[TOTP MFA の有効化手順](https://cloud.google.com/identity-platform/docs/admin/enabling-totp-mfa)）。
+
+```bash
+curl -X PATCH "https://identitytoolkit.googleapis.com/admin/v2/projects/fire-fire-dev/config?updateMask=mfa" \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -H "X-Goog-User-Project: fire-fire-dev" \
+  -d '{"mfa":{"providerConfigs":[{"state":"ENABLED","totpProviderConfig":{"adjacentIntervals":1}}]}}'
+```
+
+`adjacentIntervals` は前後いくつの時間枠のコードまで受け付けるかで、1枠が約30秒。指定できるのは 0〜10 で既定値は 5。既定の 5 は前後約2.5分ぶんを許容するため、資産情報を扱う本アプリでは 1（前後30秒）に絞っている。端末の時刻ずれで弾かれる事象が出たら 2〜3 に緩める。
+
+`fire-fire-prod` にも `fire-fire-dev` を2箇所とも置換して実行する。
+
+### 9.3 有効化を確認する
+
+```bash
+curl -s "https://identitytoolkit.googleapis.com/admin/v2/projects/fire-fire-dev/config" \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "X-Goog-User-Project: fire-fire-dev" \
+  | python3 -c 'import json,sys;m=json.load(sys.stdin).get("mfa",{});t=[p for p in m.get("providerConfigs",[]) if "totpProviderConfig" in p];print(json.dumps(t,indent=2) if t else "TOTP未設定")'
+```
+
+> **`mfa` 直下の `"state": "DISABLED"` は異常ではない。**
+> `mfa` には2種類の `state` がある。TOTP を制御するのは `mfa.providerConfigs[].state` の方で、`mfa` 直下の `state` は SMS を含む MFA 全体のポリシー（`DISABLED` / `ENABLED` / `MANDATORY`）である。9.2 の公式手順は `mfa` 直下の `state` を設定しないため、TOTP を有効化しても DISABLED のまま残る。設定状況は必ず `providerConfigs` 側で確認すること。
+>
+> なお `mfa` 直下を `MANDATORY` にすると MFA をサーバー側で全ユーザーに強制できるが、**本アプリでは設定しない**。2FA 必須化はサインアップ後に A3 を挟むアプリ側のフローで実現しており（auth-login-requirements.md 3.3）、`MANDATORY` にすると第2要素を登録する前のログイン自体が弾かれてこのフローが成立しなくなる。
+
+### 9.4 動作確認
+
+Auth エミュレータは SMS の多要素認証しか実装しておらず、TOTP の登録要求を `auth/invalid-argument`（`Missing phoneEnrollmentInfo.`）で拒否する。そのため **A3 の登録成功はローカルでは確認できない**。`develop` マージ後に `fire-fire-dev` で QR コード表示 → 認証アプリ登録 → 検証成功までを確認する。
+
+TOTP が未有効の場合、A3 は「2段階認証(TOTP)がプロジェクトで有効になっていません」というエラー表示になる。この文言が出たら本章の設定を疑う。
+
+## 10. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
 - `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
-## 10. 参考リンク
+## 11. 参考リンク
 
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)
 - [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action)
+- [Identity Platform: TOTP MFA の有効化](https://cloud.google.com/identity-platform/docs/admin/enabling-totp-mfa)
+- [Firebase Authentication: TOTP 多要素認証をウェブアプリに追加する](https://firebase.google.com/docs/auth/web/totp-mfa)

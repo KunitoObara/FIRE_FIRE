@@ -108,6 +108,10 @@ i  To verify the email address you@example.com, follow this link: http://127.0.0
 - 実際に送信される確認メール・パスワードリセットメールの文面と到達
 - TOTPによる2FA、Blocking Functions経由のログイン通知メール
 
+A3(2FA登録画面)はエミュレータではQRコードを発行できず、TOTPの有効化を促すエラー表示になる。
+エミュレータがSMSの多要素認証しか実装しておらず、TOTPの登録要求を `auth/invalid-argument`
+(`Missing phoneEnrollmentInfo.`)で拒否するため。登録が成功するところまでは `fire-fire-dev` で確認する。
+
 ## 利用可能なスクリプト
 
 | コマンド | 内容 |
