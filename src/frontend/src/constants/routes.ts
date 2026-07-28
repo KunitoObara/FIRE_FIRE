@@ -7,7 +7,9 @@
 export const SIGNUP_PATH = "/signup";
 /** A2 メールアドレス確認待ち画面 */
 export const VERIFY_EMAIL_PATH = "/verify-email";
-/** A3 2FA登録画面。別カードで実装するため、現時点では遷移先が存在しない。 */
+/** A3 2FA登録画面 */
 export const MFA_SETUP_PATH = "/mfa-setup";
 /** A4 ログイン画面。別カードで実装するため、現時点では遷移先が存在しない。 */
 export const LOGIN_PATH = "/login";
+/** B1 ダッシュボード画面。別カードで実装するため、現時点では遷移先が存在しない。 */
+export const DASHBOARD_PATH = "/dashboard";
