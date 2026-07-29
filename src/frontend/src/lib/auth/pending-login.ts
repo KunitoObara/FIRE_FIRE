@@ -19,18 +19,16 @@ export const setPendingLogin = (login: PendingLogin): void => {
 };
 
 /**
- * 預けられた情報を取り出して破棄する(A5)。
+ * 預けられた情報を読み出す(A5)。
  *
- * 取り出しと破棄を分けないのは、検証の成否に関わらずresolverが一度きりの
- * 検証セッションを指すため。使い回されないようここで確実に捨てる。
+ * 読み出しでは破棄しない。resolverは確認コードを間違えたときの再入力でも同じものが要り、
+ * A5は描画のたびにここから読むため(React Strict Modeの二重描画を含む)、
+ * 副作用のない読み出しにしておく必要がある。破棄はA5の検証成功時と、
+ * A4の次のログイン試行時に`clearPendingLogin`で行う。
  */
-export const consumePendingLogin = (): PendingLogin | null => {
-  const login = pendingLogin;
-  pendingLogin = null;
-  return login;
-};
+export const getPendingLogin = (): PendingLogin | null => pendingLogin;
 
-/** 検証待ちの状態を捨てる(ログインのやり直し・サインアウト時) */
+/** 検証待ちの状態を捨てる(検証成功・ログインのやり直し・サインアウト時) */
 export const clearPendingLogin = (): void => {
   pendingLogin = null;
 };

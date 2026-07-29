@@ -16,6 +16,13 @@ if (!("ResizeObserver" in globalThis)) {
   };
 }
 
+// jsdomは`document.elementFromPoint`を実装していないが、input-otp(確認コードの入力欄)が
+// フォーカス中にパスワードマネージャーのバッジ位置を測るために呼ぶ。位置はテストで検証しないため、
+// 何も見つからなかったことにして足りる。
+if (document.elementFromPoint === undefined) {
+  document.elementFromPoint = (): null => null;
+}
+
 afterEach(() => {
   cleanup();
 });

@@ -11,7 +11,7 @@ export const VERIFY_EMAIL_PATH = "/verify-email";
 export const MFA_SETUP_PATH = "/mfa-setup";
 /** A4 ログイン画面 */
 export const LOGIN_PATH = "/login";
-/** A5 2FA検証画面。別カードで実装するため、現時点では遷移先が存在しない。 */
+/** A5 2FA検証画面 */
 export const MFA_VERIFY_PATH = "/mfa-verify";
 /** A6 パスワードをお忘れの方画面。別カードで実装するため、現時点では遷移先が存在しない。 */
 export const FORGOT_PASSWORD_PATH = "/forgot-password";

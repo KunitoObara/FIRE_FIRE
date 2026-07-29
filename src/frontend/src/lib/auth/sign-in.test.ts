@@ -1,7 +1,7 @@
 import { FirebaseError } from "firebase/app";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { consumePendingLogin, setPendingLogin } from "@/lib/auth/pending-login";
+import { clearPendingLogin, getPendingLogin, setPendingLogin } from "@/lib/auth/pending-login";
 import { signInWithEmail } from "@/lib/auth/sign-in";
 import { FirebaseConfigurationError } from "@/lib/firebase/client";
 
@@ -50,7 +50,7 @@ describe("signInWithEmail", () => {
     setPersistence.mockResolvedValue(undefined);
     signInWithEmailAndPassword.mockReset();
     signInWithEmailAndPassword.mockResolvedValue(credentialWith(true));
-    consumePendingLogin();
+    clearPendingLogin();
   });
 
   describe("一次認証の通過後に進む先", () => {
@@ -58,7 +58,7 @@ describe("signInWithEmail", () => {
       signInWithEmailAndPassword.mockRejectedValue(multiFactorRequired);
 
       await expect(signIn()).resolves.toEqual({ ok: true, next: "mfa-verify" });
-      expect(consumePendingLogin()).toEqual({
+      expect(getPendingLogin()).toEqual({
         resolver,
         email: "user@example.com",
         rememberMe: true,
@@ -83,7 +83,7 @@ describe("signInWithEmail", () => {
       // 2FA未登録のアカウントでログインし直すと、A5へ進まないまま前回の分が残り得る
       await signIn();
 
-      expect(consumePendingLogin()).toBeNull();
+      expect(getPendingLogin()).toBeNull();
     });
 
     it("ログインに失敗したときも前回の検証待ちを残さない", async () => {
@@ -94,7 +94,7 @@ describe("signInWithEmail", () => {
 
       await signIn();
 
-      expect(consumePendingLogin()).toBeNull();
+      expect(getPendingLogin()).toBeNull();
     });
   });
 
