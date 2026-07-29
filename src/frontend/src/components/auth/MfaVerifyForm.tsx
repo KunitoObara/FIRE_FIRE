@@ -107,6 +107,11 @@ export const MfaVerifyForm = (): JSX.Element => {
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col items-center">
           <Label htmlFor="totp-code">認証アプリの確認コード({TOTP_CODE_LENGTH}桁)</Label>
 
+          {/*
+            オートフォーカスは付けない。input-otpはフォーカス中にパスワードマネージャーの
+            バッジ位置を測るタイマーを回すため、描画と同時にフォーカスするとjsdom上でも
+            そのタイマーが走り、環境の破棄後に発火して未捕捉エラーになる。A3の入力欄と揃える
+          */}
           <InputOTP
             id="totp-code"
             maxLength={TOTP_CODE_LENGTH}
@@ -117,7 +122,6 @@ export const MfaVerifyForm = (): JSX.Element => {
             aria-invalid={errorMessage !== null}
             aria-describedby="totp-code-error"
             containerClassName="mt-2"
-            autoFocus
           >
             <InputOTPGroup>
               {TOTP_CODE_SLOT_INDEXES.map((index) => (
