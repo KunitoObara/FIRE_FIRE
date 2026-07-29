@@ -78,7 +78,8 @@ flowchart TD
 
     Login -->|ID/PW認証成功(2FA登録済み)| MFAVerify[A5 2FA検証画面]
     MFAVerify -->|確認コード検証成功| Dashboard
-    MFAVerify -->|検証セッション無し / 期限切れ| Login
+    MFAVerify -->|検証セッション無し(自動)| Login
+    MFAVerify -->|検証セッション期限切れ(ログイン画面へ)| Login
     Login -->|ID/PW認証成功(メール未確認)| VerifyWait
     Login -->|ID/PW認証成功(2FA未登録)| MFASetup
     Login -->|パスワードを忘れた| Forgot[A6 パスワードをお忘れの方画面]

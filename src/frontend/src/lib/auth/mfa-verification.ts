@@ -58,7 +58,12 @@ export const verifyTotpForSignIn = async (
     );
 
     if (totpHint === undefined) {
-      console.error("TOTPの2要素目が登録されていません", login.resolver.hints);
+      // 切り分けに要るのは「何が登録されているか」だけなので、hintsをそのまま出さずに
+      // factorIdの一覧に絞る(hintには2要素目のuidが含まれるため)
+      console.error(
+        "TOTPの2要素目が登録されていません",
+        login.resolver.hints.map((hint) => hint.factorId),
+      );
       return { ok: false, reason: "unknown" };
     }
 
