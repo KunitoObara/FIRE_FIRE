@@ -6,7 +6,9 @@
  * このresolverは関数を含みJSONへ直列化できないため、`sessionStorage`等には置けない。
  *
  * 保持先をメモリに限ることで、A5をリロードしたり直接開いたりした場合は必ず空になる。
- * A5はその場合A4へ戻せばよく、検証待ちの状態がタブに残り続けることもない。
+ * A5はその場合A4へ戻せばよい。ただしSPA遷移だけならこの変数は残るため、
+ * 古い検証待ちが次のログインに紛れ込まないよう、A4は試行のたびに`clearPendingLogin`する
+ * (`src/lib/auth/sign-in.ts`)。
  */
 
 let pendingLogin: PendingLogin | null = null;

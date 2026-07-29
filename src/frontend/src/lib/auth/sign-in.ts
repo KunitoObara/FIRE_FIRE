@@ -7,7 +7,7 @@ import {
   signInWithEmailAndPassword,
 } from "firebase/auth";
 
-import { setPendingLogin } from "@/lib/auth/pending-login";
+import { clearPendingLogin, setPendingLogin } from "@/lib/auth/pending-login";
 import { FirebaseConfigurationError, getFirebaseAuth } from "@/lib/firebase/client";
 
 import type { MultiFactorError } from "firebase/auth";
@@ -78,6 +78,11 @@ export const signInWithEmail = async (
   password: string,
   rememberMe: boolean,
 ): Promise<SignInResult> => {
+  // 前回の試行で預けた検証待ちを先に捨てる。モジュールスコープの変数はSPA遷移では
+  // 消えないため、別のアカウントでログインし直したあとにブラウザの「進む」でA5へ戻ると、
+  // 前のアカウントのresolverが残ったままになってしまう
+  clearPendingLogin();
+
   try {
     // 設定値が不足していると`FirebaseConfigurationError`を投げる。これも
     // `configuration-error`として画面に返したいので、取得はtryの中に置く
