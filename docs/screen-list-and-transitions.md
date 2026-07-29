@@ -76,9 +76,12 @@ flowchart TD
     VerifyWait -->|セッション無し / やり直し| Signup
     MFASetup -->|確認コード検証成功| Dashboard[B1 ダッシュボード画面]
 
-    Login -->|ID/PW認証成功| MFAVerify[A5 2FA検証画面]
+    Login -->|ID/PW認証成功(2FA登録済み)| MFAVerify[A5 2FA検証画面]
     MFAVerify -->|確認コード検証成功| Dashboard
+    Login -->|ID/PW認証成功(メール未確認)| VerifyWait
+    Login -->|ID/PW認証成功(2FA未登録)| MFASetup
     Login -->|パスワードを忘れた| Forgot[A6 パスワードをお忘れの方画面]
+    Login -->|アカウントをお持ちでない方| Signup
     Forgot -->|リセットメール送信| ResetPw[A7 パスワード再設定画面]
     ResetPw -->|再設定完了| Login
 ```

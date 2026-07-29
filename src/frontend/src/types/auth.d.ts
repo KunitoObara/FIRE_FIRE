@@ -1,8 +1,9 @@
-import type { TotpSecret } from "firebase/auth";
+import type { MultiFactorResolver, TotpSecret } from "firebase/auth";
 import type { ReactNode } from "react";
 import type { FieldError, UseFormRegisterReturn } from "react-hook-form";
 import type { z } from "zod";
 
+import type { loginSchema } from "@/schemas/login";
 import type { signupSchema } from "@/schemas/signup";
 
 // 認証(A1〜A7)関連の型。import を持つため既にモジュールであり、
@@ -152,6 +153,63 @@ declare global {
     | { status: "enrolled" }
     | { status: "start-failed"; reason: TotpEnrollmentStartFailureReason };
 
+  /**
+   * A4ログインフォームの入力値。
+   * 同じ形を手で書き直すと実際の検証内容とずれるため、zodスキーマから導出する。
+   */
+  type LoginFormValues = z.infer<typeof loginSchema>;
+
+  /**
+   * A4ログインで画面に出し分ける必要がある失敗理由。
+   * Firebaseのエラーコードをそのまま画面に持ち込まないための境界。
+   */
+  type SignInFailureReason =
+    /**
+     * メールアドレスかパスワードが誤り。どちらが誤りかは区別しない
+     * (区別すると未登録のメールアドレスを外部から判定できてしまう)。
+     */
+    | "invalid-credential"
+    /** 管理コンソール等でアカウントが無効化されている */
+    | "user-disabled"
+    | "too-many-requests"
+    | "configuration-error"
+    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    | "network-error"
+    | "unknown";
+
+  /**
+   * 一次認証の通過後に進む先。
+   *
+   * 2FAは全ユーザー必須(docs/auth-login-requirements.md 3.3)のため、
+   * 通常のログインは`mfa-verify`に落ちる。残り2つはサインアップを途中で離脱した
+   * アカウントの復帰経路で、未完了の手順まで戻す。
+   */
+  type SignInNextStep =
+    /** 2FA登録済み。確認コードの検証が要る(A5) */
+    | "mfa-verify"
+    /** メールアドレスが未確認。確認を待つ(A2) */
+    | "email-unverified"
+    /** メール確認済みだが2FAが未登録。登録を強制する(A3) */
+    | "mfa-setup";
+
+  type SignInResult =
+    { ok: true; next: SignInNextStep } | { ok: false; reason: SignInFailureReason };
+
+  /**
+   * 一次認証を通過し、二次認証(A5)の完了を待っているログイン。
+   *
+   * `resolver`はFirebaseが発行する検証セッションそのもので、A5はこれを使って
+   * 確認コードを検証する。関数を含みJSONへ直列化できないため、`sessionStorage`等ではなく
+   * メモリ上で受け渡す(`src/lib/auth/pending-login.ts`)。
+   */
+  type PendingLogin = {
+    resolver: MultiFactorResolver;
+    /** A5の「一次認証済みのメールアドレス(確認表示)」に使う */
+    email: string;
+    /** A4の「ログイン状態を保持する」の選択。A5が検証成功時のセッション永続化に使う */
+    rememberMe: boolean;
+  };
+
   /** A3のQRコード表示のProps */
   type TotpQrCodeProps = {
     /** `otpauth://`形式のURL(Firebaseの`TotpSecret.generateQrCodeUrl()`の戻り値) */
@@ -165,6 +223,11 @@ declare global {
     label: string;
     /** react-hook-formの`register()`の戻り値 */
     registration: UseFormRegisterReturn;
+    /**
+     * ブラウザ/パスワードマネージャーへの用途の伝え方。
+     * 既定は新規設定用(A1・A7)。ログイン(A4)は`current-password`を渡す。
+     */
+    autoComplete?: "new-password" | "current-password";
     /** 対応する項目のバリデーションエラー(未エラー時はundefined) */
     error?: FieldError;
     /** エラーメッセージの下に差し込む補助表示(パスワードポリシーの充足一覧など) */
