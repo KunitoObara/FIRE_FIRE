@@ -1,6 +1,12 @@
 /** 認証系画面(A1〜A7)で使う定数 */
 
-import { DASHBOARD_PATH, SIGNUP_PATH, VERIFY_EMAIL_PATH } from "@/constants/routes";
+import {
+  DASHBOARD_PATH,
+  MFA_SETUP_PATH,
+  MFA_VERIFY_PATH,
+  SIGNUP_PATH,
+  VERIFY_EMAIL_PATH,
+} from "@/constants/routes";
 
 /**
  * A1の確認モーダルに表示するパスワードのマスク。
@@ -32,6 +38,34 @@ export const SIGN_UP_FORM_LEVEL_MESSAGES: Record<SignUpFormLevelFailureReason, s
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
   unknown: "アカウントを作成できませんでした。しばらく待ってから再度お試しください。",
+};
+
+/**
+ * A4ログイン失敗時のメッセージ。すべてフォーム全体のエラーとして表示する。
+ *
+ * 資格情報の誤りをメールアドレス欄/パスワード欄に出し分けないのは、
+ * 未登録のメールアドレスかどうかを外部から判定できてしまうため。
+ */
+export const SIGN_IN_MESSAGES: Record<SignInFailureReason, string> = {
+  "invalid-credential": "メールアドレスまたはパスワードが正しくありません。",
+  "user-disabled": "このアカウントは利用できません。",
+  "too-many-requests":
+    "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  unknown: "ログインできませんでした。しばらく待ってから再度お試しください。",
+};
+
+/**
+ * A4で一次認証を通過したあとの遷移先。
+ *
+ * 2FAは全ユーザー必須(docs/auth-login-requirements.md 3.3)のため通常はA5へ進む。
+ * 残り2つはサインアップを途中で離脱したアカウントの復帰経路で、未完了の手順まで戻す。
+ */
+export const SIGN_IN_NEXT_PATHS: Record<SignInNextStep, string> = {
+  "mfa-verify": MFA_VERIFY_PATH,
+  "email-unverified": VERIFY_EMAIL_PATH,
+  "mfa-setup": MFA_SETUP_PATH,
 };
 
 /**
