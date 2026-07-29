@@ -1,6 +1,12 @@
 /** 認証系画面(A1〜A7)で使う定数 */
 
-import { DASHBOARD_PATH, SIGNUP_PATH, VERIFY_EMAIL_PATH } from "@/constants/routes";
+import {
+  DASHBOARD_PATH,
+  MFA_SETUP_PATH,
+  MFA_VERIFY_PATH,
+  SIGNUP_PATH,
+  VERIFY_EMAIL_PATH,
+} from "@/constants/routes";
 
 /**
  * A1の確認モーダルに表示するパスワードのマスク。
@@ -25,13 +31,63 @@ export const FIREBASE_CONFIGURATION_MESSAGE =
 export const FIREBASE_NETWORK_ERROR_MESSAGE =
   "Firebaseに接続できませんでした。ローカル開発ではリポジトリルートで `firebase emulators:start` を実行しているか、ネットワーク接続を確認してください。";
 
+/**
+ * Firebase側のレート制限(`auth/too-many-requests`)に当たったときのメッセージ。
+ *
+ * A4のログイン失敗では、資格情報の誤りとは別の文言のままにしている。制限を招いたのは
+ * 要求した本人の試行回数であり、待てば解消することを伝えないと、正しい資格情報を持つ人が
+ * 誤りだと思って試行を重ね、制限をさらに延ばしてしまうため。
+ * (制限がアカウント単位かIP単位かは公開ドキュメントで確認できていない。アカウント単位なら
+ * 存在判定の手掛かりになり得るが、その時点で既に制限がかかっており試行を続けられない)
+ */
+export const TOO_MANY_REQUESTS_MESSAGE =
+  "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。";
+
 /** サインアップ失敗のうち、特定の入力項目に紐づかずフォーム全体に出すメッセージ */
 export const SIGN_UP_FORM_LEVEL_MESSAGES: Record<SignUpFormLevelFailureReason, string> = {
-  "too-many-requests":
-    "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
   unknown: "アカウントを作成できませんでした。しばらく待ってから再度お試しください。",
+};
+
+/**
+ * ログインを許可しなかったことだけを伝えるメッセージ。
+ *
+ * メールアドレス欄/パスワード欄に出し分けず、理由も明かさない。
+ * 「未登録」「無効化済み」のように状態を伝えると、そのメールアドレスが
+ * 登録されているかどうかを外部から判定できてしまうため。
+ *
+ * ただしFirebaseからの応答自体はブラウザの開発者ツールで見えるので、これは
+ * 画面表示を一貫させるための措置であり、完全な秘匿ではない。
+ */
+const SIGN_IN_REJECTED_MESSAGE = "メールアドレスまたはパスワードが正しくありません。";
+
+/**
+ * A4ログイン失敗時のメッセージ。すべてフォーム全体のエラーとして表示する。
+ *
+ * `user-disabled`を`invalid-credential`と同じ文言にしているのは上記の理由による。
+ * 型としては区別したままにするが、コンソールにも出さない(`src/lib/auth/sign-in.ts`)。
+ */
+export const SIGN_IN_MESSAGES: Record<SignInFailureReason, string> = {
+  "invalid-credential": SIGN_IN_REJECTED_MESSAGE,
+  "user-disabled": SIGN_IN_REJECTED_MESSAGE,
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  unknown: "ログインできませんでした。しばらく待ってから再度お試しください。",
+};
+
+/**
+ * A4で一次認証を通過したあとの遷移先。
+ *
+ * 2FAは全ユーザー必須(docs/auth-login-requirements.md 3.3)のため通常はA5へ進む。
+ * 残り2つはサインアップを途中で離脱したアカウントの復帰経路で、未完了の手順まで戻す。
+ */
+export const SIGN_IN_NEXT_PATHS: Record<SignInNextStep, string> = {
+  "mfa-verify": MFA_VERIFY_PATH,
+  "email-unverified": VERIFY_EMAIL_PATH,
+  "mfa-setup": MFA_SETUP_PATH,
 };
 
 /**
@@ -101,8 +157,7 @@ export const TOTP_ENROLLMENT_START_MESSAGES: Record<
 > = {
   "requires-recent-login": REQUIRES_RECENT_LOGIN_MESSAGE,
   "totp-not-enabled": TOTP_NOT_ENABLED_MESSAGE,
-  "too-many-requests":
-    "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
   unknown: "QRコードを生成できませんでした。しばらく待ってから再度お試しください。",
@@ -117,8 +172,7 @@ export const TOTP_ENROLLMENT_MESSAGES: Record<TotpEnrollmentDisplayFailureReason
     "確認コードが正しくありません。認証アプリに表示されている最新のコードを入力してください。",
   "requires-recent-login": REQUIRES_RECENT_LOGIN_MESSAGE,
   "totp-not-enabled": TOTP_NOT_ENABLED_MESSAGE,
-  "too-many-requests":
-    "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
   unknown:
