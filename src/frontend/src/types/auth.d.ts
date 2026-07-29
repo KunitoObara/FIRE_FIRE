@@ -210,6 +210,23 @@ declare global {
     rememberMe: boolean;
   };
 
+  /**
+   * A5の確認コード検証で画面に出し分ける必要がある失敗理由。
+   * Firebaseのエラーコードをそのまま画面に持ち込まないための境界。
+   */
+  type MfaVerificationFailureReason =
+    /** 確認コードが誤り。検証セッションは有効なままなので再入力できる */
+    | "invalid-verification-code"
+    /** 検証セッションが期限切れ・不正。A5では解決できないためA4からやり直す */
+    | "session-expired"
+    | "too-many-requests"
+    | "configuration-error"
+    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    | "network-error"
+    | "unknown";
+
+  type MfaVerificationResult = { ok: true } | { ok: false; reason: MfaVerificationFailureReason };
+
   /** A3のQRコード表示のProps */
   type TotpQrCodeProps = {
     /** `otpauth://`形式のURL(Firebaseの`TotpSecret.generateQrCodeUrl()`の戻り値) */
