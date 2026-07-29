@@ -67,8 +67,7 @@ const SIGN_IN_REJECTED_MESSAGE = "メールアドレスまたはパスワード�
  * A4ログイン失敗時のメッセージ。すべてフォーム全体のエラーとして表示する。
  *
  * `user-disabled`を`invalid-credential`と同じ文言にしているのは上記の理由による。
- * 型としては区別したままにして、原因の切り分けはコンソール出力で行う
- * (`src/lib/auth/sign-in.ts`)。
+ * 型としては区別したままにするが、コンソールにも出さない(`src/lib/auth/sign-in.ts`)。
  */
 export const SIGN_IN_MESSAGES: Record<SignInFailureReason, string> = {
   "invalid-credential": SIGN_IN_REJECTED_MESSAGE,

@@ -109,13 +109,11 @@ export const signInWithEmail = async (
     }
 
     const reason = toFailureReason(error);
+    // `user-disabled`はここでログに出さない。画面表示を資格情報の誤りと揃えている意図
+    // (constants/auth.ts参照)に対して、コンソールが抜け道に見えてしまうため。
+    // 原因を切り分けたいときは、開発者ツールのネットワークタブでFirebaseの応答を見る
     if (reason === "unknown") {
       console.error("ログインに失敗しました", error);
-    }
-    // 無効化されたアカウントは画面上は資格情報の誤りと同じ文言になる(constants/auth.ts参照)。
-    // 開発者本人が原因を切り分けられるよう、理由はここに残す
-    if (reason === "user-disabled") {
-      console.warn("アカウントが無効化されているためログインできません", error);
     }
     return { ok: false, reason };
   }

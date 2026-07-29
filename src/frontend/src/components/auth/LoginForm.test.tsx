@@ -207,6 +207,34 @@ describe("LoginForm", () => {
       expect(replace).not.toHaveBeenCalled();
     });
 
+    it("レート制限のときは待てば解消することを伝える", async () => {
+      const user = userEvent.setup();
+      signInWithEmail.mockResolvedValue({ ok: false, reason: "too-many-requests" });
+      render(<LoginForm />);
+
+      await fillValidForm(user);
+      await submit(user);
+
+      expect(
+        await screen.findByText(
+          "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
+        ),
+      ).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it("Firebaseの設定不足のときは設定手順を促す", async () => {
+      const user = userEvent.setup();
+      signInWithEmail.mockResolvedValue({ ok: false, reason: "configuration-error" });
+      render(<LoginForm />);
+
+      await fillValidForm(user);
+      await submit(user);
+
+      expect(await screen.findByText(/\.env\.local/)).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
     it("失敗後に再度送信できる", async () => {
       const user = userEvent.setup();
       signInWithEmail.mockResolvedValue({ ok: false, reason: "invalid-credential" });
