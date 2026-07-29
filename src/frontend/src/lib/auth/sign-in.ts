@@ -1,13 +1,8 @@
 import { FirebaseError } from "firebase/app";
-import {
-  browserLocalPersistence,
-  browserSessionPersistence,
-  getMultiFactorResolver,
-  setPersistence,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
+import { getMultiFactorResolver, setPersistence, signInWithEmailAndPassword } from "firebase/auth";
 
 import { clearPendingLogin, setPendingLogin } from "@/lib/auth/pending-login";
+import { persistenceFor } from "@/lib/auth/session-persistence";
 import { FirebaseConfigurationError, getFirebaseAuth } from "@/lib/firebase/client";
 
 import type { MultiFactorError } from "firebase/auth";
@@ -18,15 +13,6 @@ import type { MultiFactorError } from "firebase/auth";
  */
 const isMultiFactorRequired = (error: unknown): error is MultiFactorError =>
   error instanceof FirebaseError && error.code === "auth/multi-factor-auth-required";
-
-/**
- * 「ログイン状態を保持する」の選択をFirebase Authの永続化方式に対応付ける。
- *
- * - 保持する: ブラウザを閉じてもセッションが残る(既定のIndexedDB保存)
- * - 保持しない: タブを閉じるとセッションが切れる
- */
-const persistenceFor = (rememberMe: boolean) =>
-  rememberMe ? browserLocalPersistence : browserSessionPersistence;
 
 const toFailureReason = (error: unknown): SignInFailureReason => {
   // 設定不足は通信エラーと区別し、対処法を画面に出せるようにする
@@ -89,8 +75,8 @@ export const signInWithEmail = async (
     const auth = getFirebaseAuth();
 
     // セッションの保存先は資格情報を渡す前に確定させる必要がある。
-    // 2FAありの場合に実際にセッションが作られるのはA5の検証成功時だが、
-    // 設定はAuthインスタンスに残るためここで一度指定すれば足りる
+    // 2FAありの場合に実際にセッションが作られるのはA5の検証成功時のため、
+    // A5も同じ選択を`rememberMe`から適用し直す(`src/lib/auth/mfa-verification.ts`)
     await setPersistence(auth, persistenceFor(rememberMe));
 
     const credential = await signInWithEmailAndPassword(auth, email, password);

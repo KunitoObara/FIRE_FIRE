@@ -164,12 +164,18 @@ export const TOTP_ENROLLMENT_START_MESSAGES: Record<
 };
 
 /**
+ * 認証アプリの確認コードが誤っていたときのメッセージ(A3の登録・A5の検証で共通)。
+ * コードは30秒程度で切り替わるため、書き写している間に古くなった可能性を示す。
+ */
+const TOTP_INVALID_CODE_MESSAGE =
+  "確認コードが正しくありません。認証アプリに表示されている最新のコードを入力してください。";
+
+/**
  * A3で確認コードの検証に失敗したときのメッセージ。
  * `signed-out`・`already-enrolled` は他画面へ移す扱いのため、ここには含めない。
  */
 export const TOTP_ENROLLMENT_MESSAGES: Record<TotpEnrollmentDisplayFailureReason, string> = {
-  "invalid-verification-code":
-    "確認コードが正しくありません。認証アプリに表示されている最新のコードを入力してください。",
+  "invalid-verification-code": TOTP_INVALID_CODE_MESSAGE,
   "requires-recent-login": REQUIRES_RECENT_LOGIN_MESSAGE,
   "totp-not-enabled": TOTP_NOT_ENABLED_MESSAGE,
   "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
@@ -202,7 +208,33 @@ export const TOTP_START_FAILURE_REDIRECT_NOTICES: Record<
   "already-enrolled": "2段階認証は設定済みです。ダッシュボードに移動します...",
 };
 
-/** A3の確認コードの桁数。認証アプリが表示するTOTPの既定値に合わせる */
+/**
+ * A5で確認コードの検証に失敗したときのメッセージ。
+ *
+ * リカバリーコードによる検証はここでは扱わない(Trelloカード [A3-2] 2FAリカバリーコードで実装)。
+ */
+export const MFA_VERIFICATION_MESSAGES: Record<MfaVerificationFailureReason, string> = {
+  "invalid-verification-code": TOTP_INVALID_CODE_MESSAGE,
+  "session-expired": "検証の有効期限が切れました。ログインからやり直してください。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  unknown: "確認コードを検証できませんでした。しばらく待ってから再度お試しください。",
+};
+
+/**
+ * A5に検証待ちのログインが無いとき(直接アクセス・リロード)に出す案内。
+ *
+ * 検証セッションはメモリ上でしか受け渡さないため、この状態は一次認証からやり直すほかない
+ * (`src/lib/auth/pending-login.ts`)。A4へ遷移するまでの間だけ表示される。
+ *
+ * 何かに失敗したわけではなく検証セッションが無いだけなので、
+ * 「〜できませんでした」とは書かず、やり直しの手順だけを伝える。
+ */
+export const MFA_VERIFY_NO_SESSION_NOTICE =
+  "ログインからやり直してください。ログイン画面に戻ります...";
+
+/** A3・A5の確認コードの桁数。認証アプリが表示するTOTPの既定値に合わせる */
 export const TOTP_CODE_LENGTH = 6;
 
 /** 確認コードの入力枠を桁数ぶん並べるための添字 */
