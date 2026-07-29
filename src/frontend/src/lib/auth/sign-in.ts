@@ -109,6 +109,11 @@ export const signInWithEmail = async (
     if (reason === "unknown") {
       console.error("ログインに失敗しました", error);
     }
+    // 無効化されたアカウントは画面上は資格情報の誤りと同じ文言になる(constants/auth.ts参照)。
+    // 開発者本人が原因を切り分けられるよう、理由はここに残す
+    if (reason === "user-disabled") {
+      console.warn("アカウントが無効化されているためログインできません", error);
+    }
     return { ok: false, reason };
   }
 };

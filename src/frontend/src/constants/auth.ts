@@ -41,14 +41,27 @@ export const SIGN_UP_FORM_LEVEL_MESSAGES: Record<SignUpFormLevelFailureReason, s
 };
 
 /**
+ * ログインを許可しなかったことだけを伝えるメッセージ。
+ *
+ * メールアドレス欄/パスワード欄に出し分けず、理由も明かさない。
+ * 「未登録」「無効化済み」のように状態を伝えると、そのメールアドレスが
+ * 登録されているかどうかを外部から判定できてしまうため。
+ *
+ * ただしFirebaseからの応答自体はブラウザの開発者ツールで見えるので、これは
+ * 画面表示を一貫させるための措置であり、完全な秘匿ではない。
+ */
+const SIGN_IN_REJECTED_MESSAGE = "メールアドレスまたはパスワードが正しくありません。";
+
+/**
  * A4ログイン失敗時のメッセージ。すべてフォーム全体のエラーとして表示する。
  *
- * 資格情報の誤りをメールアドレス欄/パスワード欄に出し分けないのは、
- * 未登録のメールアドレスかどうかを外部から判定できてしまうため。
+ * `user-disabled`を`invalid-credential`と同じ文言にしているのは上記の理由による。
+ * 型としては区別したままにして、原因の切り分けはコンソール出力で行う
+ * (`src/lib/auth/sign-in.ts`)。
  */
 export const SIGN_IN_MESSAGES: Record<SignInFailureReason, string> = {
-  "invalid-credential": "メールアドレスまたはパスワードが正しくありません。",
-  "user-disabled": "このアカウントは利用できません。",
+  "invalid-credential": SIGN_IN_REJECTED_MESSAGE,
+  "user-disabled": SIGN_IN_REJECTED_MESSAGE,
   "too-many-requests":
     "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。",
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,

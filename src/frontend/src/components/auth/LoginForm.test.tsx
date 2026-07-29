@@ -181,6 +181,20 @@ describe("LoginForm", () => {
       expect(replace).not.toHaveBeenCalled();
     });
 
+    it("無効化されたアカウントも資格情報の誤りと同じ文言にし、アカウントの存在を伝えない", async () => {
+      const user = userEvent.setup();
+      signInWithEmail.mockResolvedValue({ ok: false, reason: "user-disabled" });
+      render(<LoginForm />);
+
+      await fillValidForm(user);
+      await submit(user);
+
+      expect(
+        await screen.findByText("メールアドレスまたはパスワードが正しくありません。"),
+      ).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
     it("接続不可のときはエミュレータ起動の確認を促す", async () => {
       const user = userEvent.setup();
       signInWithEmail.mockResolvedValue({ ok: false, reason: "network-error" });
