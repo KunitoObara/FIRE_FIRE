@@ -79,6 +79,8 @@ export const signInWithEmail = async (
   rememberMe: boolean,
 ): Promise<SignInResult> => {
   try {
+    // 設定値が不足していると`FirebaseConfigurationError`を投げる。これも
+    // `configuration-error`として画面に返したいので、取得はtryの中に置く
     const auth = getFirebaseAuth();
 
     // セッションの保存先は資格情報を渡す前に確定させる必要がある。
@@ -97,6 +99,7 @@ export const signInWithEmail = async (
   } catch (error) {
     if (isMultiFactorRequired(error)) {
       setPendingLogin({
+        // ここに来た時点でAuthの取得は成功している。生成済みのインスタンスが返る
         resolver: getMultiFactorResolver(getFirebaseAuth(), error),
         // resolverは2要素目のヒントしか持たないため、A5の確認表示には入力値を使う
         email,
