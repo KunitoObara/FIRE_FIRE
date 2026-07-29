@@ -227,9 +227,12 @@ export const MFA_VERIFICATION_MESSAGES: Record<MfaVerificationFailureReason, str
  *
  * 検証セッションはメモリ上でしか受け渡さないため、この状態は一次認証からやり直すほかない
  * (`src/lib/auth/pending-login.ts`)。A4へ遷移するまでの間だけ表示される。
+ *
+ * 何かに失敗したわけではなく検証セッションが無いだけなので、
+ * 「〜できませんでした」とは書かず、やり直しの手順だけを伝える。
  */
 export const MFA_VERIFY_NO_SESSION_NOTICE =
-  "ログインの状態を確認できませんでした。ログイン画面に戻ります...";
+  "ログインからやり直してください。ログイン画面に戻ります...";
 
 /** A3・A5の確認コードの桁数。認証アプリが表示するTOTPの既定値に合わせる */
 export const TOTP_CODE_LENGTH = 6;

@@ -181,7 +181,10 @@ describe("MfaVerifyForm", () => {
       await renderAndSettle();
 
       expect(replace).toHaveBeenCalledWith(LOGIN_PATH);
-      expect(screen.getByRole("status")).toHaveTextContent("ログイン画面に戻ります...");
+      // 失敗ではなく検証セッションが無いだけなので、やり直しの手順だけを伝える
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "ログインからやり直してください。ログイン画面に戻ります...",
+      );
     });
   });
 });
