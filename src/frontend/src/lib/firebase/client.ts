@@ -1,9 +1,13 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 import { z } from "zod";
+
+import { FIREBASE_FUNCTIONS_REGION } from "@/constants/firebase";
 
 import type { FirebaseApp } from "firebase/app";
 import type { Auth } from "firebase/auth";
+import type { Functions } from "firebase/functions";
 
 /**
  * Firebaseの設定値が不足しているときに投げるエラー。
@@ -34,6 +38,7 @@ const firebaseEnvSchema = z.object({
 
 let cachedApp: FirebaseApp | undefined;
 let cachedAuth: Auth | undefined;
+let cachedFunctions: Functions | undefined;
 
 /**
  * Firebaseアプリを取得する。開発時のFast Refreshで多重初期化されないよう、
@@ -95,4 +100,31 @@ export const getFirebaseAuth = (): Auth => {
 
   cachedAuth = auth;
   return auth;
+};
+
+/**
+ * Cloud Functions(callable)のインスタンスを取得する。
+ *
+ * リージョンはバックエンドの`setGlobalOptions`と揃える必要がある。既定(us-central1)のままだと
+ * 存在しない関数を呼びに行き、原因の分かりにくい`functions/internal`になる。
+ *
+ * `NEXT_PUBLIC_FIREBASE_FUNCTIONS_EMULATOR_URL` が設定されていればFunctionsエミュレータへ繋ぐ
+ * (Authと同じく`.env.example`では既定で有効)。2FAリカバリーコードの発行・検証はcallable経由のため、
+ * ローカルで試すには`firebase emulators:start`でfunctionsも起動しておく必要がある。
+ */
+export const getFirebaseFunctions = (): Functions => {
+  if (cachedFunctions) {
+    return cachedFunctions;
+  }
+
+  const functions = getFunctions(getFirebaseApp(), FIREBASE_FUNCTIONS_REGION);
+
+  const emulatorUrl = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_EMULATOR_URL;
+  if (emulatorUrl) {
+    const { hostname, port } = new URL(emulatorUrl);
+    connectFunctionsEmulator(functions, hostname, Number(port));
+  }
+
+  cachedFunctions = functions;
+  return functions;
 };

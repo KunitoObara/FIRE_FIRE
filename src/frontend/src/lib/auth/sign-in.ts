@@ -94,6 +94,9 @@ export const signInWithEmail = async (
         resolver: getMultiFactorResolver(getFirebaseAuth(), error),
         // resolverは2要素目のヒントしか持たないため、A5の確認表示には入力値を使う
         email,
+        // A5の「リカバリーコードを使う」がサーバー側での一次認証の再確認に使う。
+        // 永続化はせず、resolverと同じくメモリ上に留める(`pending-login.ts`)
+        password,
         rememberMe,
       });
       return { ok: true, next: "mfa-verify" };

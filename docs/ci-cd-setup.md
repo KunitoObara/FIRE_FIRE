@@ -272,6 +272,18 @@ firebase apphosting:secrets:grantaccess \
   --project fire-fire-dev --backend fire-fire
 ```
 
+### Cloud Functions 用のシークレット（`IDENTITY_PLATFORM_WEB_API_KEY`）
+
+2FA リカバリーコードの検証（`useMfaRecoveryCode`）は、サーバー側から Identity Platform の REST API でパスワードを再確認する（[auth-login-requirements.md](./auth-login-requirements.md) 3.3）。そのための Web API キーを Secret Manager に登録する。**登録しないと functions のデプロイが「シークレットが存在しない」で失敗する。**
+
+```bash
+firebase functions:secrets:set IDENTITY_PLATFORM_WEB_API_KEY --project fire-fire-dev
+```
+
+- 値は `NEXT_PUBLIC_FIREBASE_API_KEY` と同じ Web API キー（フロントエンドのバンドルにも含まれる公開値）。秘密ではないが、CI からの非対話デプロイで確実に解決できる置き場が必要なため Secret Manager を使う（`.env` 系ファイルはリポジトリで除外している）
+- dev / prod それぞれのプロジェクトで実行する（キーの値はプロジェクトごとに異なる）
+- ローカルの Functions エミュレータでは Auth エミュレータがキーを検証しないため、**設定は不要**（コード側でダミーキーに切り替える）
+
 ## 6. ブランチ保護ルール
 
 > **現時点では設定できない。** プライベートリポジトリでのブランチ保護は有料プランの機能で、クラシックな Branch protection・Rulesets のどちらも API が 403 を返す。
@@ -406,13 +418,26 @@ Authentication → Settings → **承認済みドメイン**に、App Hosting �
 
 Auth エミュレータは Google プロバイダを**モック**で提供し、実際の Google 認証は行わない（任意のメールアドレスを入力できるダミー画面が開く）。連携分岐（`auth/account-exists-with-different-credential`）の挙動もエミュレータと本番で差があるため、**A8 の連携フローは `develop` マージ後に `fire-fire-dev` で確認する**。
 
-## 11. 今後の検討事項（オープン課題）
+## 11. 2FA リカバリーコードの動作確認
+
+リカバリーコード（[auth-login-requirements.md](./auth-login-requirements.md) 3.3）は Cloud Functions + Firestore で実装しているため、ローカルでは `firebase emulators:start` に functions と firestore が含まれている必要がある（`firebase.json` の既定で含まれる）。
+
+ただし **A3 の発行と A5 の使用は、エミュレータでは通しで確認できない**。Auth エミュレータが TOTP の登録に対応しておらず（9.4 と同じ理由）、2FA を登録した状態を作れないため。次の切り分けで確認する。
+
+| 確認対象 | 場所 |
+|---|---|
+| コード生成・正規化・scrypt ハッシュ照合 | `src/backend` のユニットテスト（`npm run test`） |
+| パスワード再検証の応答の解釈 | 同上（`fetch` を差し替えて検証） |
+| A3 の一覧表示・ダウンロード、A5 の切り替えと失敗表示 | `src/frontend` のユニットテスト（`npm run test`） |
+| 発行 → 使用 → TOTP 解除 → A3 で再登録の通し | `develop` マージ後に `fire-fire-dev` |
+
+## 12. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
 - `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
-## 12. 参考リンク
+## 13. 参考リンク
 
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)

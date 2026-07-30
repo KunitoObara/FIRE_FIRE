@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MfaVerifyForm } from "@/components/auth/MfaVerifyForm";
 import { TOTP_CODE_LENGTH } from "@/constants/auth";
-import { DASHBOARD_PATH, LOGIN_PATH } from "@/constants/routes";
+import { DASHBOARD_PATH, LOGIN_PATH, MFA_SETUP_PATH } from "@/constants/routes";
 import { clearPendingLogin, getPendingLogin, setPendingLogin } from "@/lib/auth/pending-login";
 
 import type { MultiFactorResolver } from "firebase/auth";
@@ -11,6 +11,10 @@ import type { MultiFactorResolver } from "firebase/auth";
 const replace = vi.fn();
 const verifyTotpForSignIn =
   vi.fn<(login: PendingLogin, code: string) => Promise<MfaVerificationResult>>();
+const redeemRecoveryCode =
+  vi.fn<(email: string, password: string, code: string) => Promise<MfaRecoveryUseResult>>();
+const signInWithEmail =
+  vi.fn<(email: string, password: string, rememberMe: boolean) => Promise<SignInResult>>();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
@@ -20,12 +24,23 @@ vi.mock("@/lib/auth/mfa-verification", () => ({
   verifyTotpForSignIn: (login: PendingLogin, code: string) => verifyTotpForSignIn(login, code),
 }));
 
+vi.mock("@/lib/auth/mfa-recovery", () => ({
+  redeemRecoveryCode: (email: string, password: string, code: string) =>
+    redeemRecoveryCode(email, password, code),
+}));
+
+vi.mock("@/lib/auth/sign-in", () => ({
+  signInWithEmail: (email: string, password: string, rememberMe: boolean) =>
+    signInWithEmail(email, password, rememberMe),
+}));
+
 // 画面はresolverを検証関数へ渡すだけなので、テストでは替え玉で足りる
 const resolver = {} as MultiFactorResolver;
 
 const PENDING_LOGIN: PendingLogin = {
   resolver,
   email: "taro.yamada@example.com",
+  password: "Passw0rd!",
   rememberMe: true,
 };
 
@@ -60,11 +75,29 @@ const submitCode = async (code = "123456"): Promise<void> => {
   await clickSubmit();
 };
 
+const recoveryCodeInput = (): HTMLElement => screen.getByLabelText("リカバリーコード");
+
+/** リカバリーコード入力へ切り替えてコードを入力し、「検証する」を押すまで */
+const submitRecoveryCode = async (code = "7F2K-9QRT"): Promise<void> => {
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "リカバリーコードを使う" }));
+  });
+  await act(async () => {
+    fireEvent.change(recoveryCodeInput(), { target: { value: code } });
+  });
+  await clickSubmit();
+};
+
 describe("MfaVerifyForm", () => {
   beforeEach(() => {
     replace.mockReset();
     verifyTotpForSignIn.mockReset();
     verifyTotpForSignIn.mockResolvedValue({ ok: true });
+    redeemRecoveryCode.mockReset();
+    redeemRecoveryCode.mockResolvedValue({ ok: true, remainingCodes: 7 });
+    signInWithEmail.mockReset();
+    // 2FA解除後のログインは、2FA未登録として扱われA3へ進む
+    signInWithEmail.mockResolvedValue({ ok: true, next: "mfa-setup" });
     setPendingLogin({ ...PENDING_LOGIN });
   });
 
@@ -77,11 +110,22 @@ describe("MfaVerifyForm", () => {
       expect(codeInput()).toBeInTheDocument();
     });
 
-    // リカバリーコードはTrelloカード [A3-2] で扱うため、この画面には導線を置かない
-    it("リカバリーコードへの切り替えは出さない", async () => {
+    it("リカバリーコードへの切り替え導線を出す", async () => {
       await renderAndSettle();
 
-      expect(screen.queryByText(/リカバリーコード/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "リカバリーコードを使う" })).toBeInTheDocument();
+    });
+
+    // 検証はサーバー側でパスワードによる一次認証の再確認を伴うため、
+    // パスワードを持たないログイン(Googleログイン経由)では成立しない
+    it("パスワードを引き継いでいないログインでは切り替え導線を出さない", async () => {
+      setPendingLogin({ ...PENDING_LOGIN, password: undefined });
+
+      await renderAndSettle();
+
+      expect(
+        screen.queryByRole("button", { name: "リカバリーコードを使う" }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -169,6 +213,97 @@ describe("MfaVerifyForm", () => {
       await submitCode();
 
       expect(screen.queryByRole("link", { name: "ログイン画面へ" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("リカバリーコードでの検証", () => {
+    it("切り替えるとリカバリーコードの入力欄と注意書きを出す", async () => {
+      await renderAndSettle();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "リカバリーコードを使う" }));
+      });
+
+      expect(recoveryCodeInput()).toBeInTheDocument();
+      expect(
+        screen.getByText(/各リカバリーコードは一度使用すると無効になります/),
+      ).toBeInTheDocument();
+      // 確認コードの入力へ戻れる
+      expect(screen.getByRole("button", { name: "認証アプリのコードに戻る" })).toBeInTheDocument();
+    });
+
+    it("未入力では「検証する」を押せない", async () => {
+      await renderAndSettle();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "リカバリーコードを使う" }));
+      });
+
+      expect(submitButton()).toBeDisabled();
+    });
+
+    it("A4から引き継いだメールアドレスとパスワードを添えて検証する", async () => {
+      await renderAndSettle();
+
+      await submitRecoveryCode();
+
+      expect(redeemRecoveryCode).toHaveBeenCalledWith(
+        PENDING_LOGIN.email,
+        PENDING_LOGIN.password,
+        "7F2K-9QRT",
+      );
+    });
+
+    // 2FAは解除されるため、そのままB1へは進めず認証アプリの再登録(A3)へ送る
+    it("検証成功後はログインをやり直してA3へ進む", async () => {
+      await renderAndSettle();
+
+      await submitRecoveryCode();
+
+      expect(signInWithEmail).toHaveBeenCalledWith(
+        PENDING_LOGIN.email,
+        PENDING_LOGIN.password,
+        PENDING_LOGIN.rememberMe,
+      );
+      expect(replace).toHaveBeenCalledWith(MFA_SETUP_PATH);
+    });
+
+    it("コードの誤りを伝え、入力をやり直せる", async () => {
+      redeemRecoveryCode.mockResolvedValue({ ok: false, reason: "invalid-recovery-code" });
+      await renderAndSettle();
+
+      await submitRecoveryCode();
+
+      expect(screen.getByRole("alert")).toHaveTextContent("リカバリーコードが正しくありません。");
+      expect(signInWithEmail).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+      expect(recoveryCodeInput()).toHaveValue("");
+    });
+
+    it("使えるコードが無いことを伝える", async () => {
+      redeemRecoveryCode.mockResolvedValue({ ok: false, reason: "no-recovery-codes" });
+      await renderAndSettle();
+
+      await submitRecoveryCode();
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "利用できるリカバリーコードがありません。",
+      );
+    });
+
+    // 解除は済んでいるため、ログイン画面からやり直せばA3の再登録へ進める
+    it("解除後のログインに失敗したときはログイン画面へ案内する", async () => {
+      signInWithEmail.mockResolvedValue({ ok: false, reason: "network-error" });
+      await renderAndSettle();
+
+      await submitRecoveryCode();
+
+      expect(screen.getByRole("alert")).toHaveTextContent("2段階認証を解除しました。");
+      expect(screen.getByRole("link", { name: "ログイン画面へ" })).toHaveAttribute(
+        "href",
+        LOGIN_PATH,
+      );
+      expect(replace).not.toHaveBeenCalled();
     });
   });
 
