@@ -270,7 +270,9 @@ body {
   background-color: hsl(var(--border));
 }
 
-.google-icon {
+/* ログイン方法(Googleのブランドマーク、メール/パスワードの封筒等)のアイコン。
+   Google専用ではないので、プロバイダを問わない名前にしている。 */
+.provider-icon {
   width: 1.125rem;
   height: 1.125rem;
   flex-shrink: 0;
