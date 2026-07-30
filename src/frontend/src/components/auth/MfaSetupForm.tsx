@@ -6,12 +6,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { RecoveryCodeList } from "@/components/auth/RecoveryCodeList";
 import { TotpQrCode } from "@/components/auth/TotpQrCode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import {
+  MFA_RECOVERY_ISSUE_FAILURE_NOTICE,
+  MFA_RECOVERY_ISSUE_MESSAGES,
   TOTP_CODE_LENGTH,
   TOTP_CODE_SLOT_INDEXES,
   TOTP_ENROLLMENT_MESSAGES,
@@ -25,6 +28,8 @@ import {
   formatTotpSecretKey,
   startTotpEnrollment,
 } from "@/lib/auth/mfa-enrollment";
+import { issueRecoveryCodes } from "@/lib/auth/mfa-recovery";
+import { downloadRecoveryCodes } from "@/lib/auth/recovery-code-file";
 
 import type { FormEvent, JSX } from "react";
 
@@ -38,8 +43,9 @@ const isRedirectedStartFailure = (
  * TOTP認証アプリと連携して2FAを有効化する、サインアップ完了の必須ステップ
  * (docs/auth-login-requirements.md 3.3 のとおり全ユーザー必須)。
  *
- * リカバリーコード(認証アプリ紛失時の代替手段)は同ドキュメント3.3でオープン課題とされており、
- * この画面では扱わない。検証成功後は完了表示のみを出してB1へ進める。
+ * 確認コードの検証に成功したら、続けて認証アプリ紛失時のためのリカバリーコードを発行して表示する。
+ * 平文のコードが手に入るのはこの表示だけなので、ユーザーが保存してから「開始する」でB1へ進む。
+ * 発行に失敗しても2FA自体は有効になっているため、B1へ進む導線は残す(再発行はB10)。
  */
 export const MfaSetupForm = (): JSX.Element => {
   const router = useRouter();
@@ -77,6 +83,35 @@ export const MfaSetupForm = (): JSX.Element => {
     void start();
   }, [start]);
 
+  /**
+   * リカバリーコードを発行して表示に載せる。
+   *
+   * 2FAの登録が済んだ直後にだけ呼ぶ。発行できなかった場合も登録自体は有効なので、
+   * この画面で行き止まりにせず、再試行とB1への導線を出す状態へ移す。
+   */
+  const issueCodes = useCallback(async (): Promise<void> => {
+    const result = await issueRecoveryCodes();
+
+    if (result.ok) {
+      setState({ status: "enrolled", codes: result.codes });
+      return;
+    }
+
+    // 発行にはサインイン中のセッションが要る。失われている場合はログインし直すほかない
+    if (result.reason === "signed-out") {
+      router.replace(LOGIN_PATH);
+      return;
+    }
+
+    setState({ status: "recovery-codes-failed", reason: result.reason });
+  }, [router]);
+
+  /** 発行に失敗したリカバリーコードを取り直す */
+  const handleRecoveryCodeRetry = (): void => {
+    setState({ status: "issuing-recovery-codes" });
+    void issueCodes();
+  };
+
   /** QRコードを取り直す。取得し直している間は読み込み中の表示に戻す */
   const handleRetry = (): void => {
     setState({ status: "loading" });
@@ -103,13 +138,16 @@ export const MfaSetupForm = (): JSX.Element => {
     setEnrollFailure(null);
 
     const result = await completeTotpEnrollment(state.secret, code);
-    setIsSubmitting(false);
 
     // 既に登録済みだった場合も目的は達成されているため、完了として扱う
     if (result.ok || result.reason === "already-enrolled") {
-      setState({ status: "enrolled" });
+      // 表示が入れ替わるまで再送信できないよう、`isSubmitting`は下ろさない
+      setState({ status: "issuing-recovery-codes" });
+      await issueCodes();
       return;
     }
+
+    setIsSubmitting(false);
 
     if (result.reason === "signed-out") {
       router.replace(SIGNUP_PATH);
@@ -170,6 +208,16 @@ export const MfaSetupForm = (): JSX.Element => {
     );
   }
 
+  if (state.status === "issuing-recovery-codes") {
+    return (
+      <Card>
+        <CardContent className="text-center text-sm text-muted-foreground">
+          <p role="status">リカバリーコードを発行しています...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (state.status === "enrolled") {
     return (
       <Card>
@@ -185,13 +233,64 @@ export const MfaSetupForm = (): JSX.Element => {
           </CardTitle>
         </CardHeader>
 
-        <CardContent className="text-center">
-          <p className="text-sm text-muted-foreground">
-            次回以降のログインでは、パスワードに加えて認証アプリの確認コードが必要になります。
-            認証アプリはアンインストールせずに保管してください。
+        <CardContent>
+          <p className="text-center text-sm text-muted-foreground">
+            認証アプリを紛失した場合に備えて、以下のリカバリーコードを安全な場所に保管してください。
+            各コードは一度だけ使用でき、この画面を離れると再表示できません。
           </p>
 
-          <Button asChild className="mt-6 w-full">
+          <div className="mt-6">
+            <RecoveryCodeList codes={state.codes} />
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-6 w-full"
+            onClick={() => downloadRecoveryCodes(state.codes, new Date())}
+          >
+            リカバリーコードをダウンロード
+          </Button>
+
+          <Button asChild className="mt-3 w-full">
+            <Link href={DASHBOARD_PATH}>保存しました。開始する</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (state.status === "recovery-codes-failed") {
+    return (
+      <Card>
+        <CardHeader className="items-center text-center">
+          <span
+            aria-hidden
+            className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10"
+          >
+            <CheckIcon className="size-7 text-primary" />
+          </span>
+          <CardTitle className="text-xl">
+            <h1>2段階認証の設定が完了しました</h1>
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="text-center">
+          <p role="alert" className="text-sm text-destructive">
+            {MFA_RECOVERY_ISSUE_MESSAGES[state.reason]}
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">{MFA_RECOVERY_ISSUE_FAILURE_NOTICE}</p>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-6 w-full"
+            onClick={handleRecoveryCodeRetry}
+          >
+            リカバリーコードを再発行する
+          </Button>
+
+          <Button asChild className="mt-3 w-full">
             <Link href={DASHBOARD_PATH}>開始する</Link>
           </Button>
         </CardContent>

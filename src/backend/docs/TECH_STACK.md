@@ -21,7 +21,9 @@
 ## 4. 認証
 
 - **Identity Platform**: TOTP型2FA・パスワードポリシーの実体([docs/auth-login-requirements.md](../../../docs/auth-login-requirements.md)参照)
-- ログイン通知メールはBlocking Functions経由でCloud Functionsを起動し、外部メール送信サービスから送信する構成(docs/auth-login-requirements.md 3.6)。**送信サービスは未定**(7章オープン課題)
+- ログイン通知メールはBlocking Functions経由でCloud Functionsを起動し、外部メール送信サービスから送信する構成(docs/auth-login-requirements.md 3.6)。**送信サービスは未定**(10章オープン課題)
+- 2FAリカバリーコード(docs/auth-login-requirements.md 3.3)はIdentity Platformに機能が無いためcallableで自前実装する。コードのハッシュ化はNode標準の`node:crypto`のscryptを使い、外部のハッシュライブラリは入れない
+- 設定値のうち秘密でないもの(Identity PlatformのWeb APIキー)も、CIからの非対話デプロイで確実に解決できるよう`firebase-functions/params`の`defineSecret`(Secret Manager)に置く。`.env`系ファイルはリポジトリで除外しているため、そちらは使わない
 
 ## 5. バリデーション
 

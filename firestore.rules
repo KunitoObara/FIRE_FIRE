@@ -2,6 +2,18 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 2FAリカバリーコードのハッシュ(docs/auth-login-requirements.md 3.3)。
+    // Cloud FunctionsがAdmin SDKで読み書きし(セキュリティルールを経由しない)、
+    // クライアントからは本人であっても一切触らせない。
+    // Firestoreに残るのはscryptハッシュだけで平文は保存しないが、ハッシュはオフラインでの
+    // 総当たりの起点になりうるため、参照させる理由が無い以上は明示的に拒否しておく。
+    // 残り本数のような表示用の情報も、この領域を読ませる代わりにcallableの応答で返す。
+    match /mfaRecoveryCodes/{userId} {
+      allow read, write: if false;
+    }
+
+    // 上記以外も既定で拒否する。コレクションを追加するときは、
+    // ここへ意図した許可を書くまで誰も読み書きできない状態から始める。
     match /{document=**} {
       allow read, write: if false;
     }

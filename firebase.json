@@ -24,7 +24,11 @@
         "*.local",
         "docs",
         "**/*.test.ts",
-        "**/*.spec.ts"
+        "**/*.spec.ts",
+        "lib/**/*.test.js",
+        "lib/**/*.test.js.map",
+        "lib/**/*.spec.js",
+        "lib/**/*.spec.js.map"
       ]
     }
   ],

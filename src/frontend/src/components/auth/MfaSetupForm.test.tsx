@@ -12,9 +12,22 @@ const replace = vi.fn();
 const startTotpEnrollment = vi.fn<() => Promise<TotpEnrollmentStartResult>>();
 const completeTotpEnrollment =
   vi.fn<(secret: TotpSecret, code: string) => Promise<TotpEnrollmentResult>>();
+const issueRecoveryCodes = vi.fn<() => Promise<MfaRecoveryIssueResult>>();
+const downloadRecoveryCodes = vi.fn<(codes: string[], issuedAt: Date) => void>();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
+}));
+
+vi.mock("@/lib/auth/mfa-recovery", () => ({
+  issueRecoveryCodes: () => issueRecoveryCodes(),
+}));
+
+// ダウンロードはブラウザのAPIに依るため、ここでは呼び出しだけを確認する
+// (組み立てるファイルの内容は`src/lib/auth/recovery-code-file.test.ts`で検証する)
+vi.mock("@/lib/auth/recovery-code-file", () => ({
+  downloadRecoveryCodes: (codes: string[], issuedAt: Date) =>
+    downloadRecoveryCodes(codes, issuedAt),
 }));
 
 vi.mock("@/lib/auth/mfa-enrollment", async () => {
@@ -40,6 +53,17 @@ const QR_CODE_URL = "otpauth://totp/FIRE-FIRE:user@example.com?secret=JBSWY3DPEH
 const SECRET = { secretKey: "JBSWY3DPEHPK3PXP" } as TotpSecret;
 
 const READY: TotpEnrollmentStartResult = { ok: true, secret: SECRET, qrCodeUrl: QR_CODE_URL };
+
+const RECOVERY_CODES = [
+  "7F2K-9QRT",
+  "M3XZ-2LDS",
+  "P8VC-4WYN",
+  "K6HJ-3BGE",
+  "T2UA-5NFM",
+  "D9RS-2CXQ",
+  "L4YB-8ZPK",
+  "N7QW-6VHT",
+];
 
 const settle = (): Promise<void> => act(async () => {});
 
@@ -74,6 +98,9 @@ describe("MfaSetupForm", () => {
     startTotpEnrollment.mockResolvedValue(READY);
     completeTotpEnrollment.mockReset();
     completeTotpEnrollment.mockResolvedValue({ ok: true });
+    issueRecoveryCodes.mockReset();
+    issueRecoveryCodes.mockResolvedValue({ ok: true, codes: RECOVERY_CODES });
+    downloadRecoveryCodes.mockReset();
   });
 
   describe("表示項目", () => {
@@ -129,7 +156,10 @@ describe("MfaSetupForm", () => {
       expect(
         screen.getByRole("heading", { level: 1, name: "2段階認証の設定が完了しました" }),
       ).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "開始する" })).toHaveAttribute("href", "/dashboard");
+      expect(screen.getByRole("link", { name: "保存しました。開始する" })).toHaveAttribute(
+        "href",
+        "/dashboard",
+      );
       // 「開始する」を押すまでこの画面に留まる
       expect(replace).not.toHaveBeenCalled();
     });
@@ -247,6 +277,71 @@ describe("MfaSetupForm", () => {
       expect(
         screen.getByRole("heading", { level: 1, name: "2段階認証の設定が完了しました" }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("リカバリーコードの発行", () => {
+    /** 確認コードを検証して完了表示まで進める */
+    const enrollAndSettle = async (): Promise<void> => {
+      await renderAndSettle();
+      await enterCode("123456");
+      await clickSubmit();
+    };
+
+    it("検証成功後に発行したコード一覧を表示する", async () => {
+      await enrollAndSettle();
+
+      expect(issueRecoveryCodes).toHaveBeenCalledTimes(1);
+      for (const code of RECOVERY_CODES) {
+        expect(screen.getByText(code)).toBeInTheDocument();
+      }
+      // 平文が手に入るのはこの表示だけなので、その旨を伝える
+      expect(screen.getByText(/この画面を離れると再表示できません/)).toBeInTheDocument();
+    });
+
+    it("発行中は読み込み中の表示にする", async () => {
+      issueRecoveryCodes.mockReturnValue(new Promise<MfaRecoveryIssueResult>(() => {}));
+      await enrollAndSettle();
+
+      expect(screen.getByRole("status")).toHaveTextContent("リカバリーコードを発行しています...");
+    });
+
+    it("ダウンロードできる", async () => {
+      await enrollAndSettle();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "リカバリーコードをダウンロード" }));
+      });
+
+      expect(downloadRecoveryCodes).toHaveBeenCalledWith(RECOVERY_CODES, expect.any(Date));
+    });
+
+    // 2FA自体は有効になっているため、B1への導線は残したまま再発行を促す
+    it("発行に失敗しても2FAは有効なことを伝え、再発行とB1への導線を出す", async () => {
+      issueRecoveryCodes.mockResolvedValue({ ok: false, reason: "unavailable" });
+      await enrollAndSettle();
+
+      expect(
+        screen.getByRole("heading", { level: 1, name: "2段階認証の設定が完了しました" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("firebase emulators:start");
+      expect(screen.getByText(/2段階認証の設定自体は完了しています/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "開始する" })).toHaveAttribute("href", "/dashboard");
+
+      issueRecoveryCodes.mockResolvedValue({ ok: true, codes: RECOVERY_CODES });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "リカバリーコードを再発行する" }));
+      });
+
+      expect(issueRecoveryCodes).toHaveBeenCalledTimes(2);
+      expect(screen.getByText(RECOVERY_CODES[0])).toBeInTheDocument();
+    });
+
+    it("発行時にセッションが失われていたらログイン画面へ遷移する", async () => {
+      issueRecoveryCodes.mockResolvedValue({ ok: false, reason: "signed-out" });
+      await enrollAndSettle();
+
+      expect(replace).toHaveBeenCalledWith("/login");
     });
   });
 

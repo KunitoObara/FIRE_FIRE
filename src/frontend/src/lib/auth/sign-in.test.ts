@@ -61,6 +61,8 @@ describe("signInWithEmail", () => {
       expect(getPendingLogin()).toEqual({
         resolver,
         email: "user@example.com",
+        // A5の「リカバリーコードを使う」がサーバー側での一次認証の再確認に使う
+        password: "Passw0rd!",
         rememberMe: true,
       });
     });
