@@ -133,4 +133,5 @@
 - 2FA認証アプリ紛失時のリカバリー手段(バックアップコード等)
 - Google以外のソーシャルログイン(Apple / X 等)への拡張要否。3.8ではGoogleのみを対象としている
 - Googleのみで作成したアカウントにパスワードを後から設定する導線(B10でのパスワード追加)の要否
+- メール未確認のパスワードアカウントに同一メールアドレスのGoogleを連携した場合の `emailVerified` の扱い。Identity Platform側の挙動に依存するため実装時に `fire-fire-dev` で確認する([screen-requirements-auth.md](./screen-requirements-auth.md) A8の注記)。連携後も未確認のまま残るならA2へ誘導する必要がある
 - 将来のSaaS化・権限モデル設計との連携方法
