@@ -12,12 +12,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - [docs/fire-asset-management-requirements.md](docs/fire-asset-management-requirements.md) — top-level requirements: architecture, features, phased MVP scope. Read this first; other docs detail specific sections of it.
 - [docs/auth-login-requirements.md](docs/auth-login-requirements.md) — detailed spec for §4.1 (auth)
-- [docs/screen-list-and-transitions.md](docs/screen-list-and-transitions.md) — full screen inventory (IDs A1–A7, B1–B10) and Mermaid transition diagrams
+- [docs/screen-list-and-transitions.md](docs/screen-list-and-transitions.md) — full screen inventory (IDs A1–A8, B1–B10) and Mermaid transition diagrams
 - [docs/screen-requirements-auth.md](docs/screen-requirements-auth.md), [screen-requirements-dashboard.md](docs/screen-requirements-dashboard.md), [screen-requirements-real-estate.md](docs/screen-requirements-real-estate.md), [screen-requirements-fire-goal.md](docs/screen-requirements-fire-goal.md), [screen-requirements-account.md](docs/screen-requirements-account.md) — per-screen field/behavior detail, keyed to the screen IDs above
 - [DESIGN.md](DESIGN.md) — frontend design system: Tailwind/shadcn-based stack, color/typography rules, layout patterns, and the screen-ID-to-library mapping. Read this before adding any UI library or component pattern.
 - [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md), [src/backend/docs/TECH_STACK.md](src/backend/docs/TECH_STACK.md) — full technical stack per side (language, data fetching, testing, lint/format, deployment). Read these before adding a dependency or scaffolding either project; they complement rather than repeat DESIGN.md.
 - [src/frontend/docs/CODING_STANDARDS.md](src/frontend/docs/CODING_STANDARDS.md) — TypeScript/Next.js coding conventions (naming, import order, Server vs Client Components, styling). Read this before writing frontend code, not just before adding a dependency.
-- [docs/ci-cd-setup.md](docs/ci-cd-setup.md) — CI/deploy setup: what the GitHub Actions workflows do, plus the one-time manual setup (service accounts, Workload Identity, GitHub secrets, App Hosting backend, branch protection, Identity Platform upgrade + TOTP 2FA enablement) that lives outside the repo.
+- [docs/ci-cd-setup.md](docs/ci-cd-setup.md) — CI/deploy setup: what the GitHub Actions workflows do, plus the one-time manual setup (service accounts, Workload Identity, GitHub secrets, App Hosting backend, branch protection, Identity Platform upgrade + TOTP 2FA enablement, Google sign-in provider enablement) that lives outside the repo.
 
 When a requirement seems ambiguous or missing, check the "今後の検討事項" (open issues) section at the end of the relevant doc before assuming — several decisions (hosting target, MFA recovery, social login, multi-tenant model) are explicitly deferred rather than omitted.
 
@@ -75,7 +75,7 @@ Single-user (developer-only) in the initial release; multi-tenant/role-based acc
 
 ### Screen navigation model
 
-Post-login, the app is a dashboard-app-style shell: common header/sidebar gives free navigation between primary screens (B1 Dashboard, B2 CSV Import, B3 Transactions, B4 Category Master, B5 Real Estate List, B8 FIRE Goal, B9 Assumption Settings, B10 Account Settings). Auth screens (A1–A7) instead follow a linear flow (signup → email verify → forced MFA setup → dashboard; login → MFA verify → dashboard) — see the Mermaid diagrams in [screen-list-and-transitions.md](docs/screen-list-and-transitions.md) for exact edges before adding new transitions.
+Post-login, the app is a dashboard-app-style shell: common header/sidebar gives free navigation between primary screens (B1 Dashboard, B2 CSV Import, B3 Transactions, B4 Category Master, B5 Real Estate List, B8 FIRE Goal, B9 Assumption Settings, B10 Account Settings). Auth screens (A1–A8) instead follow a linear flow (signup → email verify → forced MFA setup → dashboard; login → MFA verify → dashboard; Google sign-in → [A8 account link] → MFA setup/verify → dashboard) — see the Mermaid diagrams in [screen-list-and-transitions.md](docs/screen-list-and-transitions.md) for exact edges before adding new transitions.
 
 ### Auth-specific constraints worth knowing before touching auth flows
 
@@ -83,6 +83,7 @@ Post-login, the app is a dashboard-app-style shell: common header/sidebar gives 
 - Password policy (min 8 chars, mixed case + digit + symbol) must be enforced server-side via Identity Platform's password policy feature, not just client-side validation.
 - Login notification emails are sent on every successful login via Identity Platform Blocking Functions → Cloud Functions → an external email service (provider not yet chosen).
 - No custom brute-force/lockout logic — this is intentionally left to Firebase Authentication's built-in rate limiting.
+- Google social login (§3.8 of auth-login-requirements.md) is in scope: a "Googleで続ける" button on A1/A4, and A8 アカウント連携画面 for the same-email collision with an existing password account. Google sign-in does **not** exempt a user from mandatory TOTP 2FA.
 
 ## MVP phasing
 

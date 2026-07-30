@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A8 アカウント連携 | FIRE-FIRE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<!-- パスワード表示/非表示トグルの目のアイコン(実装と同じ FontAwesome 7.3.1) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css" />
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-card">
+    <div class="mb-6 text-center">
+      <p class="text-sm font-semibold text-slate-400 mb-1">FIRE-FIRE</p>
+      <h1 class="text-xl font-bold">アカウントを連携</h1>
+    </div>
+
+    <!-- エラーではなく「追加の手続き」として提示する(A8要件)。
+         既存アカウントが乗っ取られたような印象を与えない文言にする。 -->
+    <div class="alert alert-info mb-5">
+      <span>
+        このメールアドレスは、すでにパスワードでご登録済みです。
+        パスワードを入力すると、次回からGoogleでもログインできるようになります。
+      </span>
+    </div>
+
+    <!-- Googleから取得したメールアドレスの確認表示。入力欄ではない -->
+    <div class="flex items-center gap-2.5 mb-5 p-3 rounded-md" style="background-color: hsl(var(--secondary));">
+      <svg class="google-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.46a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.58-5.17 3.58-8.81z"/>
+        <path fill="#34A853" d="M12 24c3.24 0 5.96-1.08 7.94-2.91l-3.88-3.01c-1.08.72-2.45 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.95H1.28v3.11A11.997 11.997 0 0 0 12 24z"/>
+        <path fill="#FBBC05" d="M5.29 14.28a7.2 7.2 0 0 1 0-4.56V6.61H1.28a12 12 0 0 0 0 10.78l4.01-3.11z"/>
+        <path fill="#EA4335" d="M12 4.77c1.76 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.28 6.61l4.01 3.11C6.23 6.88 8.88 4.77 12 4.77z"/>
+      </svg>
+      <span class="text-sm break-all">taro.yamada@example.com</span>
+    </div>
+
+    <form class="flex flex-col gap-5" onsubmit="return false;">
+      <div class="field">
+        <label class="label" for="password">パスワード</label>
+        <div class="relative">
+          <input class="input pr-10" type="password" id="password" />
+          <button class="password-toggle" type="button" aria-label="パスワードを表示" aria-pressed="false" onclick="togglePassword(this, 'password')">
+            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+          </button>
+        </div>
+        <!-- 誤り時: この画面に到達している時点でメールアドレスの登録は確定しているため、
+             A4のような曖昧化はせず「パスワードが正しくありません」と表示する(A8要件)
+             <p class="field-error">パスワードが正しくありません</p> -->
+        <p class="field-hint">FIRE-FIREに登録済みのパスワードを入力してください。</p>
+      </div>
+
+      <!-- 2FA登録済みならパスワード検証だけではサインインが完了しないため、A5へ進んでから連携を実行する -->
+      <a href="a5-mfa-verify.html" class="btn btn-primary btn-block">連携してログイン</a>
+    </form>
+
+    <div class="flex items-center justify-between mt-6">
+      <a class="link" href="a6-forgot-password.html">パスワードをお忘れの方</a>
+      <a class="link" href="a4-login.html">連携せずにログインへ戻る</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // パスワード欄の平文表示を切り替える(A1と同じ挙動)
+  function togglePassword(button, inputId) {
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector("i");
+    const willShow = input.type === "password";
+
+    input.type = willShow ? "text" : "password";
+    icon.classList.toggle("fa-eye", !willShow);
+    icon.classList.toggle("fa-eye-slash", willShow);
+    // 状態は aria-pressed だけで伝える(ラベルも切り替えると二重に読み上げられる)
+    button.setAttribute("aria-pressed", String(willShow));
+  }
+</script>
+
+</body>
+</html>

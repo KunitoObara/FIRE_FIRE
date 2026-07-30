@@ -49,14 +49,14 @@
       <h1 class="text-2xl font-bold mb-2">HTMLモック一覧</h1>
       <p class="text-sm text-slate-500">
         docs/screen-list-and-transitions.md の画面一覧・遷移図に基づくHTMLモックです。各カードから各画面を確認できます。
-        認証系(A1〜A7)は中央寄せ1カラムレイアウト、ログイン後(B1〜B10)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
+        認証系(A1〜A8)は中央寄せ1カラムレイアウト、ログイン後(B1〜B10)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
       </p>
     </header>
 
     <!-- 認証系画面 -->
     <section class="mb-10">
       <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
-        認証系画面(A1〜A7)
+        認証系画面(A1〜A8)
       </h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <a class="screen-card" href="a1-signup.html">
@@ -94,7 +94,15 @@
           <span class="text-sm font-medium">パスワード再設定画面</span>
           <span class="text-xs text-slate-400">新パスワード設定、リンク無効時の表示</span>
         </a>
+        <a class="screen-card" href="a8-account-link.html">
+          <span class="screen-id w-fit">A8</span>
+          <span class="text-sm font-medium">アカウント連携画面</span>
+          <span class="text-xs text-slate-400">Googleログイン時の既存アカウント連携</span>
+        </a>
       </div>
+      <p class="text-xs text-slate-400 mt-3">
+        Googleソーシャルログインの導線は A1・A4 に「Googleで続ける」ボタンとして追加しています(新規画面ではありません)。
+      </p>
     </section>
 
     <!-- ダッシュボード・データ管理系画面 -->
