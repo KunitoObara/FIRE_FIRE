@@ -317,7 +317,7 @@ Error: Functions successfully deployed but could not set up cleanup policy in lo
 firebase functions:artifacts:setpolicy --project fire-fire-dev --location asia-northeast1 --force
 ```
 
-- 保持日数は既定の1日。イメージはビルド済みの成果物で、再デプロイはソースから行えるため長く持つ理由が無い（9章のコスト方針）
+- 保持日数は既定の1日。イメージはビルド済みの成果物で、再デプロイはソースから行えるため長く持つ理由が無い（[src/backend/docs/TECH_STACK.md](../src/backend/docs/TECH_STACK.md) 9章のコスト管理）
 - **リポジトリ（`gcf-artifacts`）は最初の functions デプロイで作られる**ため、一度もデプロイしていないプロジェクトでは先回りして設定できない（`does not exist in Artifact Registry` になる）。prod は `main` への初回デプロイが同じ理由で一度失敗するので、そのあとに上記を `--project fire-fire-prod` で実行し、デプロイを再実行する
 - `firebase deploy` 側に `--force` を付ける方法もあるが、`--force` はソースから消えた関数の削除確認もスキップしてしまうため採らない
 
