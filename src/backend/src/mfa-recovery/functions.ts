@@ -22,8 +22,14 @@ import type { UserRecord } from "firebase-admin/auth";
  * - `useMfaRecoveryCode`: A5で認証アプリを失ったときに呼ぶ。コードを1本消費してTOTP登録を解除し、
  *   ユーザーをA3の再登録へ戻す
  *
- * 追加のロック機構は持たない(docs/auth-login-requirements.md 3.7)。`useMfaRecoveryCode`は
- * パスワードの照合をIdentity Platformに投げるため、そのレート制限がそのまま効く。
+ * 追加のロック機構は持たない(docs/auth-login-requirements.md 3.7)。効く防御は相手によって違う。
+ *
+ * - パスワードを知らない相手: `useMfaRecoveryCode`はコードの照合より先にパスワードを
+ *   Identity Platformへ問い合わせるため、そのレート制限で試行そのものが止まる
+ * - パスワードを知っている相手(漏洩後の2FA迂回): 上記のレート制限は当てにできない。
+ *   コードの総当たりは40ビットの探索空間と、1回の照合につき未使用コードの本数(最大8)ぶん
+ *   かかるscryptのコストで抑える。1本を引き当てるまでに必要な試行回数は、
+ *   この呼び出し単価では現実的な時間・費用に収まらない
  */
 
 /**

@@ -36,9 +36,14 @@ describe("normalizeRecoveryCode", () => {
     expect(normalizeRecoveryCode("7F2K 9QRT")).toBe("7F2K9QRT");
   });
 
-  it("コードに現れない0/1は、書き写しの誤りとしてO/Lに読み替える", () => {
-    expect(normalizeRecoveryCode("0BGE-K6HJ")).toBe("OBGEK6HJ");
+  it("コードに現れない1は、Lの書き写しの誤りとして読み替える", () => {
     expect(normalizeRecoveryCode("1DSM-3XZ4")).toBe("LDSM3XZ4");
+  });
+
+  // 字形の近いOも使用文字から外しているため、0はどの文字の写し間違いか決められない
+  it("0は読み替えず、形式の検査で弾く", () => {
+    expect(normalizeRecoveryCode("0BGE-K6HJ")).toBe("0BGEK6HJ");
+    expect(isRecoveryCodeFormat(normalizeRecoveryCode("0BGE-K6HJ"))).toBe(false);
   });
 });
 

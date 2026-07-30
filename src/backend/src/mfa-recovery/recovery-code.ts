@@ -30,10 +30,16 @@ export const RECOVERY_CODE_GROUP_SIZE = 4;
 const RECOVERY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 /**
- * 入力時に読み替える文字。上記のとおり`0`と`1`はコードに現れないため、
- * 手書きから写して`O`を`0`、`L`を`1`と打ってしまった場合に限って一意に戻せる。
+ * 入力時に読み替える文字。
+ *
+ * `1`はコードに現れず、字形が近いのは使用文字に含まれる`L`だけなので、書き写す際に
+ * `L`を`1`と打ってしまった場合に限って一意に戻せる。
+ *
+ * `0`には対応する読み替え先が無い。字形が近い`O`も使用文字から外しているため、
+ * `0`と打たれた時点でどの文字の写し間違いかを決められない。読み替えずに残し、
+ * 形式の検査(`isRecoveryCodeFormat`)で弾く。
  */
-const RECOVERY_CODE_INPUT_REPLACEMENTS: Record<string, string> = { "0": "O", "1": "L" };
+const RECOVERY_CODE_INPUT_REPLACEMENTS: Record<string, string> = { "1": "L" };
 
 /** scryptで導出する鍵の長さ(バイト)。コスト係数はNode既定値(N=16384, r=8, p=1)に任せる */
 const SCRYPT_KEY_LENGTH = 32;
