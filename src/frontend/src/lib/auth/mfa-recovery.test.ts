@@ -123,6 +123,8 @@ describe("redeemRecoveryCode", () => {
     ["permission-denied", "too-many-requests"],
     ["failed-precondition", "no-recovery-codes"],
     ["failed-precondition", "mfa-not-enrolled"],
+    // コードは消費されているため、他の失敗と区別して伝える必要がある
+    ["unavailable", "unenroll-failed"],
   ])("%s(%s)はそのままの理由で返す", async (code, reason) => {
     callable.mockRejectedValue(callableError(`functions/${code}`, reason));
 

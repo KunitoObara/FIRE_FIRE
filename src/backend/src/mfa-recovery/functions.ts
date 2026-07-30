@@ -55,6 +55,8 @@ type RecoveryFailureReason =
   | "invalid-recovery-code"
   | "no-recovery-codes"
   | "too-many-requests"
+  /** コードは消費したが2FAを解除できなかった。他の失敗と違い、使ったコードが戻らない */
+  | "unenroll-failed"
   | "unavailable";
 
 const failure = (
@@ -192,8 +194,14 @@ export const useMfaRecoveryCode = onCall(
     }
 
     // 解除の前にコードを使用済みにしている。解除に失敗した場合コードは1本失われるが、
-    // 逆順にすると解除済みなのに有効なままのコードが残り、1回限りの前提が崩れる
-    await getAuth().updateUser(user.uid, { multiFactor: { enrolledFactors: null } });
+    // 逆順にすると解除済みなのに有効なままのコードが残り、1回限りの前提が崩れる。
+    // 消費したコードは戻さず、残っているコードでの再試行を画面から促す
+    try {
+      await getAuth().updateUser(user.uid, { multiFactor: { enrolledFactors: null } });
+    } catch (error) {
+      console.error("2段階認証の登録を解除できませんでした", error);
+      throw failure("unavailable", "unenroll-failed", "2段階認証を解除できませんでした");
+    }
 
     return { remainingCodes: consumed.remainingCodes };
   },

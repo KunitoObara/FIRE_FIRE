@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { RECOVERY_CODE_URL_REVOKE_DELAY_MS } from "@/constants/auth";
 import {
   buildRecoveryCodesFileContent,
   buildRecoveryCodesFileName,
@@ -32,10 +33,12 @@ describe("buildRecoveryCodesFileContent", () => {
 
 describe("downloadRecoveryCodes", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
   it("コードを収めたテキストファイルの保存を促し、生成したURLを解放する", async () => {
+    vi.useFakeTimers();
     // jsdomはObject URLを実装していないため、呼び出しを捕まえられるよう差し替える
     const createObjectURL = vi.fn<(blob: Blob) => string>().mockReturnValue("blob:recovery-codes");
     const revokeObjectURL = vi.fn();
@@ -56,6 +59,11 @@ describe("downloadRecoveryCodes", () => {
 
     const [blob] = createObjectURL.mock.calls[0];
     await expect(blob.text()).resolves.toBe(buildRecoveryCodesFileContent(CODES, ISSUED_AT));
+
+    // クリックの直後に解放すると、ダウンロードが始まる前に無効化されることがある
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(RECOVERY_CODE_URL_REVOKE_DELAY_MS);
 
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:recovery-codes");
   });

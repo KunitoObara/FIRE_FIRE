@@ -297,6 +297,9 @@ export const MFA_RECOVERY_USE_MESSAGES: Record<MfaRecoveryUseFailureReason, stri
   "invalid-credential": "ログイン情報を確認できませんでした。ログイン画面からやり直してください。",
   "no-recovery-codes": "利用できるリカバリーコードがありません。すべて使用済みの可能性があります。",
   "mfa-not-enrolled": "2段階認証が登録されていません。ログイン画面からやり直してください。",
+  // 入力したコードは消費済みで元に戻らないため、同じコードでの再試行を促さない
+  "unenroll-failed":
+    "入力したリカバリーコードは使用済みになりましたが、2段階認証を解除できませんでした。しばらく待ってから、別のリカバリーコードで再度お試しください。",
   "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   unavailable: FUNCTIONS_UNAVAILABLE_MESSAGE,
@@ -310,6 +313,15 @@ export const MFA_RECOVERY_USE_MESSAGES: Record<MfaRecoveryUseFailureReason, stri
  */
 export const MFA_RECOVERY_RESIGN_IN_FAILURE_MESSAGE =
   "2段階認証を解除しました。ログイン画面からログインし直して、認証アプリを登録してください。";
+
+/**
+ * ダウンロード用に作ったBlobのURLを解放するまでの待ち時間(ミリ秒)。
+ *
+ * クリックの直後に解放すると、ブラウザがダウンロードを始める前に無効化してしまい
+ * 保存に失敗することがある。平文のコードはA3の表示でしか手に入らないため、
+ * 解放を遅らせて取りこぼしを避ける(`src/lib/auth/recovery-code-file.ts`)。
+ */
+export const RECOVERY_CODE_URL_REVOKE_DELAY_MS = 1_000;
 
 /** ダウンロードするリカバリーコードのファイル名の接頭辞(`fire-fire-recovery-codes-20260730.txt`) */
 export const RECOVERY_CODE_FILE_NAME_PREFIX = "fire-fire-recovery-codes";

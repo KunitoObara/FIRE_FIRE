@@ -282,6 +282,11 @@ declare global {
     | "no-recovery-codes"
     /** 2FAが登録されていない。解除するものが無く、通常のログインで進める */
     | "mfa-not-enrolled"
+    /**
+     * 入力したコードは使用済みになったが、2FAの解除に失敗した。
+     * 使ったコードは戻らないため、残っている別のコードで試し直してもらう
+     */
+    | "unenroll-failed"
     | "too-many-requests"
     | "configuration-error"
     /** callableに到達できない・サーバー側で処理しきれなかった */

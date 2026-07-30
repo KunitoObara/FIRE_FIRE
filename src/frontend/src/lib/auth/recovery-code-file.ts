@@ -2,6 +2,7 @@ import {
   RECOVERY_CODE_FILE_NAME_PREFIX,
   RECOVERY_CODE_FILE_NOTES,
   RECOVERY_CODE_FILE_TITLE,
+  RECOVERY_CODE_URL_REVOKE_DELAY_MS,
 } from "@/constants/auth";
 
 /**
@@ -52,7 +53,10 @@ export const buildRecoveryCodesFileContent = (codes: string[], issuedAt: Date): 
  * リカバリーコードをテキストファイルとして保存する。
  *
  * `<a download>`を組み立ててクリックする以外に、ブラウザから保存操作を起こす方法が無い。
- * 生成したURLは使い終わったら解放する(解放しないとページを離れるまでBlobが残る)。
+ * 生成したURLは使い終わったら解放する(解放しないとページを離れるまでBlobが残る)が、
+ * クリックの直後に解放するとブラウザがダウンロードを始める前に無効化してしまい、
+ * 保存に失敗することがあるため、少し待ってから解放する。
+ * 平文のコードはこの表示でしか手に入らないので、取りこぼしは避ける。
  */
 export const downloadRecoveryCodes = (codes: string[], issuedAt: Date): void => {
   const blob = new Blob([buildRecoveryCodesFileContent(codes, issuedAt)], {
@@ -65,5 +69,5 @@ export const downloadRecoveryCodes = (codes: string[], issuedAt: Date): void => 
   link.download = buildRecoveryCodesFileName(issuedAt);
   link.click();
 
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), RECOVERY_CODE_URL_REVOKE_DELAY_MS);
 };

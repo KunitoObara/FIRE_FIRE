@@ -280,6 +280,22 @@ describe("MfaVerifyForm", () => {
       expect(recoveryCodeInput()).toHaveValue("");
     });
 
+    // 入力したコードは消費済みで戻らないため、同じコードでの再試行を促さない
+    it("解除に失敗したときはコードが使用済みになったことを伝え、別のコードを促す", async () => {
+      redeemRecoveryCode.mockResolvedValue({ ok: false, reason: "unenroll-failed" });
+      await renderAndSettle();
+
+      await submitRecoveryCode();
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "入力したリカバリーコードは使用済みになりましたが、2段階認証を解除できませんでした。",
+      );
+      expect(screen.getByRole("alert")).toHaveTextContent("別のリカバリーコードで");
+      // 入力欄はA5に残り、別のコードで試し直せる
+      expect(recoveryCodeInput()).toHaveValue("");
+      expect(signInWithEmail).not.toHaveBeenCalled();
+    });
+
     it("使えるコードが無いことを伝える", async () => {
       redeemRecoveryCode.mockResolvedValue({ ok: false, reason: "no-recovery-codes" });
       await renderAndSettle();

@@ -48,6 +48,7 @@ const USE_FAILURE_REASONS: readonly MfaRecoveryUseFailureReason[] = [
   "invalid-credential",
   "no-recovery-codes",
   "mfa-not-enrolled",
+  "unenroll-failed",
   "too-many-requests",
   "unavailable",
 ];
