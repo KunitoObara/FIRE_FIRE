@@ -208,11 +208,7 @@ export const TOTP_START_FAILURE_REDIRECT_NOTICES: Record<
   "already-enrolled": "2段階認証は設定済みです。ダッシュボードに移動します...",
 };
 
-/**
- * A5で確認コードの検証に失敗したときのメッセージ。
- *
- * リカバリーコードによる検証はここでは扱わない(Trelloカード [A3-2] 2FAリカバリーコードで実装)。
- */
+/** A5で確認コードの検証に失敗したときのメッセージ(リカバリーコードでの失敗は後述の別表) */
 export const MFA_VERIFICATION_MESSAGES: Record<MfaVerificationFailureReason, string> = {
   "invalid-verification-code": TOTP_INVALID_CODE_MESSAGE,
   "session-expired": "検証の有効期限が切れました。ログインからやり直してください。",
@@ -254,3 +250,92 @@ export const TOTP_ISSUER = "FIRE-FIRE";
 
 /** 登録した2要素目に付ける表示名。Firebase側に保存され、A5やB10で識別に使う */
 export const TOTP_FACTOR_DISPLAY_NAME = "認証アプリ";
+
+/**
+ * Cloud Functions(callable)に到達できなかった・サーバー側で処理しきれなかったときのメッセージ。
+ *
+ * 通信不能とサーバー側の想定外エラーはSDK上どちらも`functions/internal`になり区別できない
+ * (`src/lib/auth/mfa-recovery.ts`)。ローカル開発ではfunctionsエミュレータの未起動が
+ * 最も多い原因になるため、確認先を具体的に示す。
+ */
+export const FUNCTIONS_UNAVAILABLE_MESSAGE =
+  "サーバー側の処理に接続できませんでした。ローカル開発ではリポジトリルートで `firebase emulators:start` を実行しているか、ネットワーク接続を確認してください。";
+
+/**
+ * A3の2FA登録完了後・B10の再発行でリカバリーコードを発行できなかったときのメッセージ。
+ *
+ * `signed-out`は他画面へ移す扱いのため、ここには含めない。
+ */
+export const MFA_RECOVERY_ISSUE_MESSAGES: Record<
+  Exclude<MfaRecoveryIssueFailureReason, "signed-out">,
+  string
+> = {
+  "email-unverified":
+    "メールアドレスの確認が完了していないため、リカバリーコードを発行できません。",
+  "mfa-not-enrolled":
+    "2段階認証の登録が完了していないため、リカバリーコードを発行できません。設定をやり直してください。",
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  unavailable: FUNCTIONS_UNAVAILABLE_MESSAGE,
+  unknown: "リカバリーコードを発行できませんでした。しばらく待ってから再度お試しください。",
+};
+
+/**
+ * A3でリカバリーコードを発行できなかったときの補足。
+ *
+ * 2FAの登録自体は完了しているため、コードが無いままでもログインはできる。
+ * B10で再発行できることを伝えて、この画面で行き止まりにしない。
+ */
+export const MFA_RECOVERY_ISSUE_FAILURE_NOTICE =
+  "2段階認証の設定自体は完了しています。リカバリーコードはアカウント設定画面からあとで発行できます。";
+
+/** A5でリカバリーコードによる2FA解除に失敗したときのメッセージ */
+export const MFA_RECOVERY_USE_MESSAGES: Record<MfaRecoveryUseFailureReason, string> = {
+  "invalid-recovery-code":
+    "リカバリーコードが正しくありません。使用済みのコードは再度使えないため、別のコードを入力してください。",
+  // A5に来ている時点で一次認証は通っているため、通常は起きない
+  // (パスワード変更直後にA5へ戻った場合など、A4からやり直してもらうほかない)
+  "invalid-credential": "ログイン情報を確認できませんでした。ログイン画面からやり直してください。",
+  "no-recovery-codes": "利用できるリカバリーコードがありません。すべて使用済みの可能性があります。",
+  "mfa-not-enrolled": "2段階認証が登録されていません。ログイン画面からやり直してください。",
+  // 入力したコードは消費済みで元に戻らないため、同じコードでの再試行を促さない
+  "unenroll-failed":
+    "入力したリカバリーコードは使用済みになりましたが、2段階認証を解除できませんでした。しばらく待ってから、別のリカバリーコードで再度お試しください。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  unavailable: FUNCTIONS_UNAVAILABLE_MESSAGE,
+  unknown: "リカバリーコードを検証できませんでした。しばらく待ってから再度お試しください。",
+};
+
+/**
+ * A5でリカバリーコードによる解除に成功したが、その後のログインをやり直せなかったときのメッセージ。
+ *
+ * 2FAの解除自体は済んでいるので、ログイン画面からやり直せば2FAの再登録(A3)へ進める。
+ */
+export const MFA_RECOVERY_RESIGN_IN_FAILURE_MESSAGE =
+  "2段階認証を解除しました。ログイン画面からログインし直して、認証アプリを登録してください。";
+
+/**
+ * ダウンロード用に作ったBlobのURLを解放するまでの待ち時間(ミリ秒)。
+ *
+ * クリックの直後に解放すると、ブラウザがダウンロードを始める前に無効化してしまい
+ * 保存に失敗することがある。平文のコードはA3の表示でしか手に入らないため、
+ * 解放を遅らせて取りこぼしを避ける(`src/lib/auth/recovery-code-file.ts`)。
+ */
+export const RECOVERY_CODE_URL_REVOKE_DELAY_MS = 1_000;
+
+/** ダウンロードするリカバリーコードのファイル名の接頭辞(`fire-fire-recovery-codes-20260730.txt`) */
+export const RECOVERY_CODE_FILE_NAME_PREFIX = "fire-fire-recovery-codes";
+
+/** ダウンロードするファイルの見出し */
+export const RECOVERY_CODE_FILE_TITLE = "FIRE-FIRE 2段階認証 リカバリーコード";
+
+/**
+ * ダウンロードするファイルに残す注意事項。
+ * ファイルは発行から時間が経ってから開かれるため、画面の説明に頼らず前提を持たせる。
+ */
+export const RECOVERY_CODE_FILE_NOTES = [
+  "各コードは一度だけ使用できます。",
+  "認証アプリを紛失したときに、ログイン画面の2段階認証で「リカバリーコードを使う」から入力します。",
+  "リカバリーコードを使うと2段階認証の登録が解除されるため、ログイン後に認証アプリを登録し直してください(リカバリーコードも新しく発行されます)。",
+  "他人に渡さず、安全な場所に保管してください。",
+];

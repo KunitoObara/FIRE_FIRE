@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-**FIRE-FIRE** is a personal FIRE (Financial Independence, Retire Early) asset management web app. All authoritative specs live under `docs/` — the docs lead the code, so check them before assuming behaviour from what is implemented. Implementation has started with Phase 1 (auth): `src/frontend` is a working Next.js project (A1 signup implemented), `src/backend` is a Cloud Functions scaffold. See "Commands" below for the real build/lint/test commands.
+**FIRE-FIRE** is a personal FIRE (Financial Independence, Retire Early) asset management web app. All authoritative specs live under `docs/` — the docs lead the code, so check them before assuming behaviour from what is implemented. Implementation has started with Phase 1 (auth): `src/frontend` is a working Next.js project (A1–A5 implemented), `src/backend` holds the 2FA recovery-code callables (`src/backend/src/mfa-recovery`) and is otherwise still a scaffold. See "Commands" below for the real build/lint/test commands.
 
 `docs/.env` is a real secrets file (excluded via `.gitignore`) — never read, print, or commit its contents.
 
@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - [src/frontend/docs/CODING_STANDARDS.md](src/frontend/docs/CODING_STANDARDS.md) — TypeScript/Next.js coding conventions (naming, import order, Server vs Client Components, styling). Read this before writing frontend code, not just before adding a dependency.
 - [docs/ci-cd-setup.md](docs/ci-cd-setup.md) — CI/deploy setup: what the GitHub Actions workflows do, plus the one-time manual setup (service accounts, Workload Identity, GitHub secrets, App Hosting backend, branch protection, Identity Platform upgrade + TOTP 2FA enablement, Google sign-in provider enablement) that lives outside the repo.
 
-When a requirement seems ambiguous or missing, check the "今後の検討事項" (open issues) section at the end of the relevant doc before assuming — several decisions (hosting target, MFA recovery, social login, multi-tenant model) are explicitly deferred rather than omitted.
+When a requirement seems ambiguous or missing, check the "今後の検討事項" (open issues) section at the end of the relevant doc before assuming — several decisions (login-notification mail provider, recovery for Google-only accounts, multi-tenant model) are explicitly deferred rather than omitted.
 
 ## Commands
 
@@ -37,7 +37,7 @@ There is no root-level package — run commands inside `src/frontend` or `src/ba
 
 Node.js 22 / npm is pinned via Volta in `src/frontend/package.json`.
 
-Running the frontend against auth needs `firebase emulators:start` (repo root) alongside `npm run dev`: `.env.local` points at the Auth emulator by default, so with the emulator down every auth call fails with `auth/network-request-failed`. The emulator prints the email-verification link to its own terminal instead of sending mail, and it does not persist data between restarts. Server-side password policy, real emails, TOTP MFA and login-notification Blocking Functions are not reproduced locally — verify those on `fire-fire-dev` after merging to `develop`. Google sign-in is only *mocked* by the emulator (a dummy screen that accepts any address, no real Google auth), and the account-linking branch (`auth/account-exists-with-different-credential`) behaves differently there, so the A8 flow also has to be verified on `fire-fire-dev` — see [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §10.4. See [src/frontend/README.md](src/frontend/README.md) "セットアップ".
+Running the frontend against auth needs `firebase emulators:start` (repo root) alongside `npm run dev`: `.env.local` points at the Auth emulator by default, so with the emulator down every auth call fails with `auth/network-request-failed`. The emulator prints the email-verification link to its own terminal instead of sending mail, and it does not persist data between restarts. Server-side password policy, real emails, TOTP MFA and login-notification Blocking Functions are not reproduced locally — verify those on `fire-fire-dev` after merging to `develop`. Because no local account can reach the TOTP-enrolled state, the recovery-code flow (A3 issue → A5 redeem) can only be exercised end to end there too, even though the functions/firestore emulators do run it (see [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §11 for what is covered by unit tests instead). Google sign-in is only *mocked* by the emulator (a dummy screen that accepts any address, no real Google auth), and the account-linking branch (`auth/account-exists-with-different-credential`) behaves differently there, so the A8 flow also has to be verified on `fire-fire-dev` — see [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §10.4. See [src/frontend/README.md](src/frontend/README.md) "セットアップ".
 
 ## CI / deployment
 
@@ -84,6 +84,7 @@ Post-login, the app is a dashboard-app-style shell: common header/sidebar gives 
 - Login notification emails are sent on every successful login via Identity Platform Blocking Functions → Cloud Functions → an external email service (provider not yet chosen).
 - No custom brute-force/lockout logic — this is intentionally left to Firebase Authentication's built-in rate limiting.
 - Google social login (§3.8 of auth-login-requirements.md) is in scope: a "Googleで続ける" button on A1/A4, and A8 アカウント連携画面 for the same-email collision with an existing password account. Google sign-in does **not** exempt a user from mandatory TOTP 2FA.
+- TOTP recovery codes (§3.3) are hand-rolled — Identity Platform has no backup-code feature. Callables in `src/backend/src/mfa-recovery` issue them (A3 on enrollment, B10 on reissue) and redeem them (A5); Firestore stores only scrypt hashes in `mfaRecoveryCodes/{uid}`, denied to clients by `firestore.rules`. Redeeming a code **unenrolls TOTP** and sends the user back through A3 rather than signing them straight in to B1 — no custom-token path that skips MFA. Redeeming re-verifies the password server-side via Identity Platform's REST API, so it needs the `IDENTITY_PLATFORM_WEB_API_KEY` secret in each project (see [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §5) and is unavailable to Google-only accounts.
 
 ## MVP phasing
 

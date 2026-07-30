@@ -65,6 +65,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | メッセージング送信者ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | アプリID |
 | `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` | Authエミュレータの接続先。**既定で有効**(`http://127.0.0.1:9099`) |
+| `NEXT_PUBLIC_FIREBASE_FUNCTIONS_EMULATOR_URL` | Functionsエミュレータの接続先。**既定で有効**(`http://127.0.0.1:5001`)。2FAリカバリーコードの発行・検証で使う |
 
 `.env.local` は `.gitignore` で除外済み。コミットしない(`.env.example` のみコミットする)。
 
@@ -107,10 +108,16 @@ i  To verify the email address you@example.com, follow this link: http://127.0.0
 - Identity Platform側で強制するパスワードポリシー(エミュレータは強制しない)
 - 実際に送信される確認メール・パスワードリセットメールの文面と到達
 - TOTPによる2FA、Blocking Functions経由のログイン通知メール
+- 2FAリカバリーコードの発行(A3)と使用(A5)。2FAを登録した状態を作れないため通しで試せない(下記)
 
 A3(2FA登録画面)はエミュレータではQRコードを発行できず、TOTPの有効化を促すエラー表示になる。
 エミュレータがSMSの多要素認証しか実装しておらず、TOTPの登録要求を `auth/invalid-argument`
 (`Missing phoneEnrollmentInfo.`)で拒否するため。登録が成功するところまでは `fire-fire-dev` で確認する。
+
+リカバリーコード(A3の発行・A5の「リカバリーコードを使う」)は Cloud Functions を経由するため、
+`firebase emulators:start` に functions と firestore が含まれている必要がある(`firebase.json` の既定で含まれる)。
+ただし上記のとおり2FAを登録した状態自体が作れないので、通しの確認は `fire-fire-dev` で行う
+(切り分けの一覧は [docs/ci-cd-setup.md](../../docs/ci-cd-setup.md) 11章)。
 
 ## 利用可能なスクリプト
 

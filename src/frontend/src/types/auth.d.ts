@@ -149,8 +149,15 @@ declare global {
   type MfaSetupState =
     | { status: "loading" }
     | { status: "ready"; secret: TotpSecret; qrCodeUrl: string }
-    /** 検証成功。ユーザーが「開始する」を押すまでこの画面に留まる */
-    | { status: "enrolled" }
+    /** 検証成功。続けてリカバリーコードを発行している */
+    | { status: "issuing-recovery-codes" }
+    /** 検証成功かつリカバリーコード発行済み。ユーザーが「開始する」を押すまでこの画面に留まる */
+    | { status: "enrolled"; codes: string[] }
+    /** 検証は成功したがリカバリーコードを発行できなかった。2FA自体は有効になっている */
+    | {
+        status: "recovery-codes-failed";
+        reason: Exclude<MfaRecoveryIssueFailureReason, "signed-out">;
+      }
     | { status: "start-failed"; reason: TotpEnrollmentStartFailureReason };
 
   /**
@@ -206,6 +213,18 @@ declare global {
     resolver: MultiFactorResolver;
     /** A5の「一次認証済みのメールアドレス(確認表示)」に使う */
     email: string;
+    /**
+     * A4で入力されたパスワード。A5の「リカバリーコードを使う」でのみ使う。
+     *
+     * リカバリーコードの検証はCloud Functionsで行い、その際に一次認証の通過を
+     * サーバー側で確かめる必要がある(A5の時点ではまだサインインしておらず、
+     * IDトークンで本人確認ができない)。ユーザーにA5で再入力させずに済ませるため、
+     * resolverと同じくメモリ上でのみ引き継ぐ(永続化しない)。
+     *
+     * Googleログイン(A8経由を含む)ではパスワードが無いため`undefined`になり、
+     * A5は「リカバリーコードを使う」導線を出さない。
+     */
+    password?: string;
     /** A4の「ログイン状態を保持する」の選択。A5が検証成功時のセッション永続化に使う */
     rememberMe: boolean;
   };
@@ -226,6 +245,69 @@ declare global {
     | "unknown";
 
   type MfaVerificationResult = { ok: true } | { ok: false; reason: MfaVerificationFailureReason };
+
+  /**
+   * A3(登録完了時)・B10(再発行)でリカバリーコードを発行できなかった理由。
+   *
+   * 発行はCloud Functions(callable)で行うため、失敗理由はFirebaseのエラーコードと、
+   * バックエンドが`details.reason`に載せた値から決める
+   * (`src/lib/auth/mfa-recovery.ts`、src/backend/src/mfa-recovery/functions.ts)。
+   */
+  type MfaRecoveryIssueFailureReason =
+    /** セッションが無い(直接アクセス・サインアウト済み) */
+    | "signed-out"
+    /** メールアドレスが未確認。2FA登録自体の前提を満たしていない */
+    | "email-unverified"
+    /** 2FA(TOTP)が未登録。リカバリーコードだけ先に発行することはできない */
+    | "mfa-not-enrolled"
+    | "configuration-error"
+    /** callableに到達できない・サーバー側で処理しきれなかった */
+    | "unavailable"
+    | "unknown";
+
+  /**
+   * リカバリーコードの発行結果。
+   * `codes`は表示形(`XXXX-XXXX`)の平文で、この応答以降どこからも取得できない。
+   */
+  type MfaRecoveryIssueResult =
+    { ok: true; codes: string[] } | { ok: false; reason: MfaRecoveryIssueFailureReason };
+
+  /** A5でリカバリーコードによる2FA解除に失敗した理由 */
+  type MfaRecoveryUseFailureReason =
+    /** リカバリーコードが誤り、または既に使用済み */
+    | "invalid-recovery-code"
+    /** 一次認証の再確認に失敗した(パスワードの誤り・アカウント無効化) */
+    | "invalid-credential"
+    /** 未使用のリカバリーコードが1本も無い */
+    | "no-recovery-codes"
+    /** 2FAが登録されていない。解除するものが無く、通常のログインで進める */
+    | "mfa-not-enrolled"
+    /**
+     * 入力したコードは使用済みになったが、2FAの解除に失敗した。
+     * 使ったコードは戻らないため、残っている別のコードで試し直してもらう
+     */
+    | "unenroll-failed"
+    | "too-many-requests"
+    | "configuration-error"
+    /** callableに到達できない・サーバー側で処理しきれなかった */
+    | "unavailable"
+    | "unknown";
+
+  /**
+   * リカバリーコードによる2FA解除の結果。
+   * `remainingCodes`は消費後に残っている未使用コードの本数。
+   */
+  type MfaRecoveryUseResult =
+    { ok: true; remainingCodes: number } | { ok: false; reason: MfaRecoveryUseFailureReason };
+
+  /** A5の入力方法。認証アプリの確認コードと、リカバリーコードを切り替える */
+  type MfaVerifyMode = "totp" | "recovery";
+
+  /** 発行したリカバリーコードの一覧表示のProps(A3。B10の再発行でも使う想定) */
+  type RecoveryCodeListProps = {
+    /** 表示形(`XXXX-XXXX`)の平文コード */
+    codes: string[];
+  };
 
   /** A3のQRコード表示のProps */
   type TotpQrCodeProps = {
