@@ -251,6 +251,33 @@ body {
   flex-shrink: 0;
 }
 
+/* ---- ソーシャルログイン(Google)導線 ---- */
+
+/* メール/パスワードのフォームとGoogleボタンの間に置く「または」区切り線 */
+.divider-or {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.divider-or::before,
+.divider-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: hsl(var(--border));
+}
+
+/* ログイン方法(Googleのブランドマーク、メール/パスワードの封筒等)のアイコン。
+   Google専用ではないので、プロバイダを問わない名前にしている。 */
+.provider-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
 /* ---- リンク ---- */
 
 .link {

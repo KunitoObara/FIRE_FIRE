@@ -17,7 +17,7 @@ UI層のライブラリ選定・カラー/レイアウト方針は [DESIGN.md](.
 ## 1. 言語・ビルド・ルーティング
 
 - **TypeScript**: shadcn/ui・zod・Firebase SDKいずれも型定義が充実しており、フロント/バックエンド間で型を共有しやすいため採用
-- **Next.js(App Router)**: Server Components + Server Actionsを基本とし、CSV取込などの重い処理をサーバー側に寄せられる。画面一覧(docs/screen-list-and-transitions.md)の画面ID(A1〜A7, B1〜B10)は`app`ディレクトリのルーティング規約に対応させる
+- **Next.js(App Router)**: Server Components + Server Actionsを基本とし、CSV取込などの重い処理をサーバー側に寄せられる。画面一覧(docs/screen-list-and-transitions.md)の画面ID(A1〜A8, B1〜B10)は`app`ディレクトリのルーティング規約に対応させる
 - **npm**: パッケージ管理。Node.jsに標準同梱で追加インストール不要
 - **Volta**: Node.js(および npm)のバージョン切り替え・固定に使用する。`package.json`の`volta`フィールドにバージョンを記載し、`src/frontend`ディレクトリに入った際に自動でそのバージョンへ切り替わるようにする
 
