@@ -280,9 +280,46 @@ firebase apphosting:secrets:grantaccess \
 firebase functions:secrets:set IDENTITY_PLATFORM_WEB_API_KEY --project fire-fire-dev
 ```
 
-- 値は `NEXT_PUBLIC_FIREBASE_API_KEY` と同じ Web API キー（フロントエンドのバンドルにも含まれる公開値）。秘密ではないが、CI からの非対話デプロイで確実に解決できる置き場が必要なため Secret Manager を使う（`.env` 系ファイルはリポジトリで除外している）
+- 値は `NEXT_PUBLIC_FIREBASE_API_KEY` と同じ Web API キー（フロントエンドのバンドルにも含まれる公開値）。秘密ではないが、CI からの非対話デプロイで確実に解決できる置き場が必要なため Secret Manager を使う（`.env` 系ファイルはリポジトリで除外している。firebase-tools はパラメータを `.env` ファイルからしか解決せず、CI の環境変数は見ない）
 - dev / prod それぞれのプロジェクトで実行する（キーの値はプロジェクトごとに異なる）
 - ローカルの Functions エミュレータでは Auth エミュレータがキーを検証しないため、**設定は不要**（コード側でダミーキーに切り替える）
+
+続けて、**デプロイ用サービスアカウントにこのシークレットへの権限を付与する**。忘れると deploy が次のエラーで落ちる。
+
+```
+Permission 'secretmanager.secrets.get' denied on resource (or it may not exist)
+```
+
+```bash
+for PROJECT_ID in fire-fire-dev fire-fire-prod; do
+  gcloud secrets add-iam-policy-binding IDENTITY_PLATFORM_WEB_API_KEY \
+    --project="$PROJECT_ID" \
+    --member="serviceAccount:github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.admin"
+done
+```
+
+- 付与範囲は**このシークレット1件のみ**にする（プロジェクト全体には付けない）。2章のロール一覧に Secret Manager 系を入れていないのは、シークレットを使う関数が増えたときに対象を絞って追加する運用にするため
+- ロールが `roles/secretmanager.admin` なのは、firebase-tools がデプロイ時にシークレットを読むだけでなく、**関数の実行用サービスアカウントへ `roles/secretmanager.secretAccessor` を自動付与する**（`setIamPolicy` を呼ぶ）ため。`viewer` や `secretVersionManager` には `setIamPolicy` が無く、2回目のエラーになる
+- gcloud を使わない場合は Cloud Console → Secret Manager → 対象シークレット → 権限 → アクセスを許可 で、上記のプリンシパルに「Secret Manager 管理者」を付与しても同じ
+
+### Artifact Registry のクリーンアップポリシー
+
+Cloud Functions のコンテナイメージは Artifact Registry に蓄積する。firebase-tools は初回デプロイ時に自動削除ポリシーの設定を促すが、**CI は非対話のため確認プロンプトを出せず、関数のデプロイ自体は成功した状態でエラー終了する**（その結果、後続の App Hosting ロールアウトがスキップされる）。
+
+```
+Error: Functions successfully deployed but could not set up cleanup policy in location asia-northeast1.
+```
+
+一度だけ設定しておけば以後の deploy は通る。
+
+```bash
+firebase functions:artifacts:setpolicy --project fire-fire-dev --location asia-northeast1 --force
+```
+
+- 保持日数は既定の1日。イメージはビルド済みの成果物で、再デプロイはソースから行えるため長く持つ理由が無い（9章のコスト方針）
+- **リポジトリ（`gcf-artifacts`）は最初の functions デプロイで作られる**ため、一度もデプロイしていないプロジェクトでは先回りして設定できない（`does not exist in Artifact Registry` になる）。prod は `main` への初回デプロイが同じ理由で一度失敗するので、そのあとに上記を `--project fire-fire-prod` で実行し、デプロイを再実行する
+- `firebase deploy` 側に `--force` を付ける方法もあるが、`--force` はソースから消えた関数の削除確認もスキップしてしまうため採らない
 
 ## 6. ブランチ保護ルール
 
