@@ -37,7 +37,7 @@ There is no root-level package — run commands inside `src/frontend` or `src/ba
 
 Node.js 22 / npm is pinned via Volta in `src/frontend/package.json`.
 
-Running the frontend against auth needs `firebase emulators:start` (repo root) alongside `npm run dev`: `.env.local` points at the Auth emulator by default, so with the emulator down every auth call fails with `auth/network-request-failed`. The emulator prints the email-verification link to its own terminal instead of sending mail, and it does not persist data between restarts. Server-side password policy, real emails, TOTP MFA and login-notification Blocking Functions are not reproduced locally — verify those on `fire-fire-dev` after merging to `develop`. See [src/frontend/README.md](src/frontend/README.md) "セットアップ".
+Running the frontend against auth needs `firebase emulators:start` (repo root) alongside `npm run dev`: `.env.local` points at the Auth emulator by default, so with the emulator down every auth call fails with `auth/network-request-failed`. The emulator prints the email-verification link to its own terminal instead of sending mail, and it does not persist data between restarts. Server-side password policy, real emails, TOTP MFA and login-notification Blocking Functions are not reproduced locally — verify those on `fire-fire-dev` after merging to `develop`. Google sign-in is only *mocked* by the emulator (a dummy screen that accepts any address, no real Google auth), and the account-linking branch (`auth/account-exists-with-different-credential`) behaves differently there, so the A8 flow also has to be verified on `fire-fire-dev` — see [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §10.4. See [src/frontend/README.md](src/frontend/README.md) "セットアップ".
 
 ## CI / deployment
 
