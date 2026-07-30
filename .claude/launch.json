@@ -9,6 +9,15 @@
         "export PATH=\"$HOME/.volta/bin:/opt/homebrew/bin:$PATH\"; cd src/frontend && exec npm run dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "html-mock",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "exec python3 -m http.server 4173 --directory src/frontend/docs/html_mock"
+      ],
+      "port": 4173
     }
   ]
 }

@@ -142,7 +142,7 @@ npx shadcn@latest add button
 ```
 src/frontend/
 ├── src/
-│   ├── app/                    # App Router。画面ID(A1〜A7 / B1〜B10)をルーティング規約に対応させる
+│   ├── app/                    # App Router。画面ID(A1〜A8 / B1〜B10)をルーティング規約に対応させる
 │   │   ├── layout.tsx          # ルートレイアウト(Noto Sans JP・lang="ja")
 │   │   ├── globals.css         # Tailwind v4 + shadcn/ui のCSS変数テーマ
 │   │   └── (setup-check)/      # ★ 環境構築の動作確認用。画面実装時に削除してよい

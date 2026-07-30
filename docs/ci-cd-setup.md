@@ -384,16 +384,40 @@ Auth エミュレータは SMS の多要素認証しか実装しておらず、T
 
 TOTP が未有効の場合、A3 は「2段階認証(TOTP)がプロジェクトで有効になっていません」というエラー表示になる。この文言が出たら本章の設定を疑う。
 
-## 10. 今後の検討事項（オープン課題）
+## 10. Google ログイン（ソーシャルログイン）の有効化
+
+`fire-fire-dev` / `fire-fire-prod` の**両方**で実施する。A8（アカウント連携画面）と A1・A4 の「Googleで続ける」導線は、この設定なしでは `auth/operation-not-allowed` で失敗する（[docs/auth-login-requirements.md](auth-login-requirements.md) 3.8）。
+
+### 10.1 Google プロバイダを有効化する
+
+Firebase コンソール → Authentication → **Sign-in method** タブ → Google → 有効化。プロジェクトの公開名とサポートメールの入力を求められる。OAuth クライアントは Firebase 側が自動生成するため、GCP コンソールでの手動作成は不要。
+
+### 10.2 「メールアドレスごとに 1 つのアカウント」を確認する
+
+Authentication → **Settings** → ユーザーアカウントのリンク設定で、**「メールアドレスごとに 1 つのアカウントを作成する」**（既定）になっていることを確認する。
+
+これが「複数のアカウントを作成する」になっていると、同じメールアドレスでパスワードアカウントと Google アカウントが**別々に**作られ、資産データの所有者が分岐する。A8 の連携フローは前者の設定を前提に `auth/account-exists-with-different-credential` を受けて動くため、必ず既定のままにする。
+
+### 10.3 承認済みドメインを登録する
+
+Authentication → Settings → **承認済みドメイン**に、App Hosting のドメインを追加する。`localhost` と `<project-id>.firebaseapp.com` / `.web.app` は既定で登録済み。App Hosting のカスタムドメインや `*.hosted.app` のドメインを使う場合は、そのホスト名を明示的に追加しないとポップアップが `auth/unauthorized-domain` で失敗する。
+
+### 10.4 動作確認
+
+Auth エミュレータは Google プロバイダを**モック**で提供し、実際の Google 認証は行わない（任意のメールアドレスを入力できるダミー画面が開く）。連携分岐（`auth/account-exists-with-different-credential`）の挙動もエミュレータと本番で差があるため、**A8 の連携フローは `develop` マージ後に `fire-fire-dev` で確認する**。
+
+## 11. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
 - `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
-## 11. 参考リンク
+## 12. 参考リンク
 
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)
 - [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action)
 - [Identity Platform: TOTP MFA の有効化](https://cloud.google.com/identity-platform/docs/admin/enabling-totp-mfa)
 - [Firebase Authentication: TOTP 多要素認証をウェブアプリに追加する](https://firebase.google.com/docs/auth/web/totp-mfa)
+- [Firebase Authentication: Google ログインをウェブアプリに追加する](https://firebase.google.com/docs/auth/web/google-signin)
+- [Firebase Authentication: 複数の認証プロバイダをアカウントにリンクする](https://firebase.google.com/docs/auth/web/account-linking)
