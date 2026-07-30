@@ -109,13 +109,15 @@ flowchart TD
     LinkAccount -->|パスワード検証成功・2FA登録済み(自動)| MFAVerify
     LinkAccount -->|パスワード検証成功・2FA未登録(自動)| MFASetup
     LinkAccount -->|連携せずにログインへ戻る| Login
-    LinkAccount -->|連携セッション無し / 期限切れ(自動)| Login
+    LinkAccount -->|連携セッション無し(自動)| Login
 
     MFASetup -->|確認コード検証成功| Dashboard[B1 ダッシュボード画面]
     MFAVerify -->|確認コード検証成功| Dashboard
 ```
 
 > Googleアカウントの連携は、2FAの検証まで完了してサインインが成立した時点で実行する(2FA登録済みユーザーはパスワード検証だけではサインインが完了しないため)。
+>
+> A8から出る自動遷移は「連携セッション無し」の1本だけである。A5の「検証セッション期限切れ」に相当する手動導線はA8には無い — Google資格情報の期限切れは連携の実行時、つまり**サインインが成立した後**に判明するため、A8やA4へ戻さずB1の「Googleアカウント連携の失敗通知」で扱う(下記 [screen-requirements-dashboard.md](./screen-requirements-dashboard.md) B1)。
 
 ### 3.3 メイン画面遷移(ログイン後)
 
