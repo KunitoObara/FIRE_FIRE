@@ -107,10 +107,12 @@ flowchart TD
     Google -->|同一メールのパスワードアカウントが既存(自動)| LinkAccount[A8 アカウント連携画面]
 
     LinkAccount -->|パスワード検証成功・2FA登録済み(自動)| MFAVerify
-    LinkAccount -->|パスワード検証成功・2FA未登録(自動)| MFASetup
+    LinkAccount -->|パスワード検証成功・2FA未登録・メール確認済み(自動)| MFASetup
+    LinkAccount -->|パスワード検証成功・2FA未登録・メール未確認(自動)| VerifyWait[A2 メールアドレス確認待ち画面]
     LinkAccount -->|連携せずにログインへ戻る| Login
     LinkAccount -->|連携セッション無し(自動)| Login
 
+    VerifyWait -->|メール内リンクで確認完了| MFASetup
     MFASetup -->|確認コード検証成功| Dashboard[B1 ダッシュボード画面]
     MFAVerify -->|確認コード検証成功| Dashboard
 ```
@@ -118,6 +120,8 @@ flowchart TD
 > Googleアカウントの連携は、2FAの検証まで完了してサインインが成立した時点で実行する(2FA登録済みユーザーはパスワード検証だけではサインインが完了しないため)。
 >
 > ラベルの `(自動)` は3.1と同じく「ユーザーの操作を挟まずに遷移する」ことを指し、認証結果による分岐(パスワード検証成功後の2FA状況による振り分け)と、前提が満たされていない場合のガード(連携セッション無し)の両方に付く。
+>
+> A8の「2FA未登録・メール未確認」はA2へ戻る分岐で、A4が「メール未確認」を「2FA未登録」より優先するのと揃えている。ただし連携によって `emailVerified` がtrueになるならこの分岐は発生しない(未確証のオープン課題)。
 >
 > このうち**A8からA4へ戻す**ガードは「連携セッション無し」の1本だけである。A5の「検証セッション期限切れ」に相当する導線はA8には無い — Google資格情報の期限切れは連携の実行時、つまり**サインインが成立した後**に判明するため、A8やA4へ戻さずB1の「Googleアカウント連携の失敗通知」で扱う(下記 [screen-requirements-dashboard.md](./screen-requirements-dashboard.md) B1)。
 
