@@ -23,6 +23,12 @@ const VALID_CSV = [
   '"2026/06/30","62510797","3379431"',
 ].join("\r\n");
 
+/** 期間で見分けられるようにした別のCSV。選び直しの検証で「どちらが表示されているか」を見る */
+const OTHER_CSV = [
+  '"日付","合計（円）","預金・現金（円）"',
+  '"2020/01/31","1000000","1000000"',
+].join("\r\n");
+
 /**
  * 選択させるCSVファイルを作る。
  *
@@ -98,6 +104,43 @@ describe("AssetBalanceImportPanel", () => {
 
     expect(screen.queryByTestId("csv-import-summary")).not.toBeInTheDocument();
     expect(screen.queryByText(/選択中:/u)).not.toBeInTheDocument();
+  });
+
+  /**
+   * 既存データの照会が遅れて返る間に別のファイルを選び直したときの取り違え。
+   * 画面に出ているファイル名と、実際に取り込まれる中身がずれると影響が大きい。
+   */
+  it("読み込み中に選び直すと、古いファイルの結果でプレビューを上書きしない", async () => {
+    const slowPlan = { ok: true, plan: { newCount: 99, updatedCount: 99 } };
+    const fastPlan = { ok: true, plan: { newCount: 1, updatedCount: 0 } };
+    let resolveSlow: (value: unknown) => void = () => {};
+
+    buildImportPlan
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSlow = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(fastPlan);
+
+    render(<AssetBalanceImportPanel onImported={vi.fn()} />);
+
+    await selectFile(buildCsvFile(VALID_CSV, "先に選んだ.csv"));
+    await selectFile(buildCsvFile(OTHER_CSV, "後から選んだ.csv"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("csv-import-summary")).toHaveTextContent("新規 1件");
+    });
+
+    // ここで1回目の照会がようやく返る
+    resolveSlow(slowPlan);
+
+    await waitFor(() => {
+      expect(screen.getByText(/選択中: 後から選んだ.csv/u)).toBeInTheDocument();
+    });
+    const summary = screen.getByTestId("csv-import-summary");
+    expect(summary).toHaveTextContent("2020-01-31");
+    expect(summary).not.toHaveTextContent("99件");
   });
 
   it("取込を実行すると完了を通知し、続けて取り込める状態に戻す", async () => {

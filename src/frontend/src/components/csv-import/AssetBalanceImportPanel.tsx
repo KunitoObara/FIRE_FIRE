@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { CsvDropzone } from "@/components/csv-import/CsvDropzone";
@@ -46,8 +46,22 @@ export const AssetBalanceImportPanel = ({
   const [plan, setPlan] = useState<AssetBalanceImportPlan | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  /**
+   * 何回目の選択かを表す番号。読み込みの途中で別のファイルを選び直したり
+   * キャンセルしたりしたときに、先に始まった処理の結果を捨てるために使う。
+   *
+   * これが無いと、遅れて解決した古いファイルのプレビューが新しい選択を上書きし、
+   * 画面に出ているファイル名と取り込まれる中身が食い違う。
+   */
+  const selectionIdRef = useRef(0);
+
+  /** この処理より後に選択・キャンセルが入っていたら、結果はもう要らない */
+  const isStale = (selectionId: number): boolean => selectionIdRef.current !== selectionId;
+
   /** ファイル未選択の状態に戻す(「キャンセル」と取込完了後の後始末) */
   const reset = (): void => {
+    // 読み込み中のファイルがあれば、その結果も捨てる
+    selectionIdRef.current += 1;
     setStatus("idle");
     setFileName(null);
     setParsed(null);
@@ -63,6 +77,9 @@ export const AssetBalanceImportPanel = ({
   };
 
   const handleFileSelect = async (file: File): Promise<void> => {
+    selectionIdRef.current += 1;
+    const selectionId = selectionIdRef.current;
+
     setFileName(file.name);
     setParsed(null);
     setPlan(null);
@@ -80,7 +97,14 @@ export const AssetBalanceImportPanel = ({
       text = decodeCsvBytes(await file.arrayBuffer());
     } catch (error) {
       console.error("CSVファイルを読み取れませんでした", error);
-      failParse(CSV_PARSE_FAILURE_MESSAGES.unreadable);
+
+      if (!isStale(selectionId)) {
+        failParse(CSV_PARSE_FAILURE_MESSAGES.unreadable);
+      }
+      return;
+    }
+
+    if (isStale(selectionId)) {
       return;
     }
 
@@ -98,6 +122,11 @@ export const AssetBalanceImportPanel = ({
     // 上書きになる件数は既存データを引いて初めて分かる。ここで失敗してもプレビュー自体は
     // 成立するため、取込をやめさせずに件数の表示だけを諦める
     const planResult = await buildImportPlan(result.parsed);
+
+    if (isStale(selectionId)) {
+      return;
+    }
+
     setPlan(planResult.ok ? planResult.plan : null);
   };
 
