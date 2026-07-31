@@ -89,7 +89,7 @@ flowchart TD
     Login -->|ID/PW認証成功(2FA未登録)| MFASetup
     Login -->|パスワードを忘れた| Forgot[A6 パスワードをお忘れの方画面]
     Login -->|アカウントをお持ちでない方| Signup
-    Forgot -->|リセットメール送信| ResetPw[A7 パスワード再設定画面]
+    Forgot -->|メール内リンクで再設定へ| ResetPw[A7 パスワード再設定画面]
     ResetPw -->|再設定完了| Login
 ```
 
