@@ -35,8 +35,8 @@ const getReadyAuth = async (): Promise<Auth> => {
   return auth;
 };
 
-/** TOTPの2要素目が既に登録されているか */
-const hasEnrolledTotp = (user: User): boolean =>
+/** TOTPの2要素目が既に登録されているか。ログイン後画面のガード(`app-access.ts`)からも使う */
+export const hasEnrolledTotp = (user: User): boolean =>
   multiFactor(user).enrolledFactors.some(
     (factor) => factor.factorId === TotpMultiFactorGenerator.FACTOR_ID,
   );

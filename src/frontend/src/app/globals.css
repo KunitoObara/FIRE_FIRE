@@ -18,11 +18,15 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-chart-8: var(--chart-8);
+  --color-chart-7: var(--chart-7);
+  --color-chart-6: var(--chart-6);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-success: var(--success);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -67,11 +71,29 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /*
+    資産分類の質的パレット(DESIGN.md 3章)。shadcn/uiの既定はグレースケール5色で、
+    分類別内訳の円グラフのように「複数の分類を並べて区別させる」用途では判別できない。
+    色覚特性を含む隣接ペアの識別性を検証済みの8色に差し替える(dataviz スキルの
+    リファレンスパレット / `scripts/validate_palette.js` で白背景に対して検証)。
+
+    スロットの並び順そのものが識別性の担保になっているため、色の入れ替え・追加をする場合は
+    必ず同スクリプトで再検証すること。分類への割り当て方は
+    `src/lib/dashboard/category-color.ts` を参照。
+  */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+  --chart-7: #4a3aa7;
+  --chart-8: #e34948;
+  /*
+    増減の「プラス側」を示す文字色(収支サマリ等)。マイナス側は`--destructive`を使う。
+    色だけに意味を持たせないため、必ず符号付きの数値と併記する。
+  */
+  --success: #006300;
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -102,11 +124,16 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* 上と同じ8色を暗い面用に取り直したもの(自動反転ではない)。ダークモード対応の要否自体はDESIGN.md 8章の未決事項 */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+  --chart-7: #9085e9;
+  --chart-8: #e66767;
+  --success: #0ca30c;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
