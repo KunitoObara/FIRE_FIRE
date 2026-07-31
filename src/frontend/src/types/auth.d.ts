@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { FieldError, UseFormRegisterReturn } from "react-hook-form";
 import type { z } from "zod";
 
+import type { forgotPasswordSchema } from "@/schemas/forgot-password";
 import type { loginSchema } from "@/schemas/login";
 import type { signupSchema } from "@/schemas/signup";
 
@@ -302,6 +303,28 @@ declare global {
 
   /** A5の入力方法。認証アプリの確認コードと、リカバリーコードを切り替える */
   type MfaVerifyMode = "totp" | "recovery";
+
+  /**
+   * A6パスワードをお忘れの方フォームの入力値。
+   * 同じ形を手で書き直すと実際の検証内容とずれるため、zodスキーマから導出する。
+   */
+  type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+
+  /**
+   * A6のリセットメール送信で画面に出し分ける必要がある失敗理由。
+   *
+   * 未登録のメールアドレス・パスワード未設定(Googleのみ)のアカウントはここに現れない。
+   * アカウントの存在有無を伏せるため、`src/lib/auth/password-reset.ts`が成功として返すため。
+   * 残るのはリクエストがFirebaseに届かなかった場合と、要求した本人の試行回数による制限。
+   */
+  type PasswordResetFailureReason =
+    | "too-many-requests"
+    | "configuration-error"
+    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    | "network-error"
+    | "unknown";
+
+  type PasswordResetResult = { ok: true } | { ok: false; reason: PasswordResetFailureReason };
 
   /** 発行したリカバリーコードの一覧表示のProps(A3。B10の再発行でも使う想定) */
   type RecoveryCodeListProps = {

@@ -13,7 +13,7 @@ export const MFA_SETUP_PATH = "/mfa-setup";
 export const LOGIN_PATH = "/login";
 /** A5 2FA検証画面 */
 export const MFA_VERIFY_PATH = "/mfa-verify";
-/** A6 パスワードをお忘れの方画面。別カードで実装するため、現時点では遷移先が存在しない。 */
+/** A6 パスワードをお忘れの方画面 */
 export const FORGOT_PASSWORD_PATH = "/forgot-password";
 /** B1 ダッシュボード画面。別カードで実装するため、現時点では遷移先が存在しない。 */
 export const DASHBOARD_PATH = "/dashboard";
