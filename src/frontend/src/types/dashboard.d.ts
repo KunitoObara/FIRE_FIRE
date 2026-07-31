@@ -31,7 +31,7 @@ declare global {
     name: string;
   };
 
-  /** 総資産推移グラフの1点 */
+  /** 資産推移グラフの1点 */
   type NetWorthPoint = {
     /** 集計月の初日(`yyyy-MM-dd`) */
     date: string;

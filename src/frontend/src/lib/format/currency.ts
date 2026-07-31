@@ -29,7 +29,7 @@ export const formatSignedJpy = (amount: number): string => {
 };
 
 /**
- * 総資産推移グラフの軸ラベル用に、桁数を落とした概数へ整形する。
+ * 資産推移グラフの軸ラベル用に、桁数を落とした概数へ整形する。
  * 軸に`49,600,000`のような値が並ぶと読み取れないため、万/億で丸める。
  */
 export const formatCompactJpy = (amount: number): string => {
