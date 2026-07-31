@@ -16,6 +16,22 @@ if (!("ResizeObserver" in globalThis)) {
   };
 }
 
+// jsdomはPointer Events APIとscrollIntoViewを実装していない。Radix UIのSelect等は
+// ポインタ操作の判定にこれらを呼ぶため、呼ばれても落ちないだけのスタブを入れる。
+// 実際のキャプチャ・スクロール挙動はテストの対象外。
+const elementStubs: Record<string, () => unknown> = {
+  hasPointerCapture: () => false,
+  setPointerCapture: () => undefined,
+  releasePointerCapture: () => undefined,
+  scrollIntoView: () => undefined,
+};
+
+Object.entries(elementStubs).forEach(([name, stub]) => {
+  if (!(name in Element.prototype)) {
+    Object.defineProperty(Element.prototype, name, { value: stub, writable: true });
+  }
+});
+
 afterEach(() => {
   cleanup();
 });

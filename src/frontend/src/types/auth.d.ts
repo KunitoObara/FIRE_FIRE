@@ -463,4 +463,20 @@ declare global {
     /** エラーメッセージの下に差し込む補助表示(パスワードポリシーの充足一覧など) */
     children?: ReactNode;
   };
+
+  /**
+   * ログイン後画面(B1〜B10)を表示してよいかの判定結果。
+   * `ready`以外はいずれも認証フローの未完了で、対応する認証系画面へ戻す。
+   */
+  type ResolvedAppAccessState = "signed-out" | "email-unverified" | "mfa-required" | "ready";
+
+  /**
+   * ガード側が持つ状態。Firebaseはセッションをブラウザ側に持つため、
+   * 復元が終わるまでは「未ログイン」と区別できない`checking`を挟む。
+   * `configuration-error`はFirebaseの設定値不足で、認証状態を問い合わせることすらできない状態。
+   */
+  type AppAccessState = ResolvedAppAccessState | "checking" | "configuration-error";
+
+  /** 画面へ進ませずに認証系画面へ戻す状態 */
+  type AppAccessRedirectState = Exclude<ResolvedAppAccessState, "ready">;
 }

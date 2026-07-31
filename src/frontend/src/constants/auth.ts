@@ -2,6 +2,7 @@
 
 import {
   DASHBOARD_PATH,
+  LOGIN_PATH,
   MFA_SETUP_PATH,
   MFA_VERIFY_PATH,
   SIGNUP_PATH,
@@ -453,3 +454,23 @@ export const RECOVERY_CODE_FILE_NOTES = [
   "リカバリーコードを使うと2段階認証の登録が解除されるため、ログイン後に認証アプリを登録し直してください(リカバリーコードも新しく発行されます)。",
   "他人に渡さず、安全な場所に保管してください。",
 ];
+
+/**
+ * ログイン後画面(B1〜B10)に入れなかったときに戻す先(`src/lib/auth/app-access.ts`)。
+ * いずれも認証フローの未完了であり、その手順を行う画面へ戻す。
+ */
+export const APP_ACCESS_REDIRECTS: Record<AppAccessRedirectState, string> = {
+  "signed-out": LOGIN_PATH,
+  "email-unverified": VERIFY_EMAIL_PATH,
+  "mfa-required": MFA_SETUP_PATH,
+};
+
+/** 上記の遷移が反映されるまでの間に出しておく案内 */
+export const APP_ACCESS_REDIRECT_NOTICES: Record<AppAccessRedirectState, string> = {
+  "signed-out": "ログインが必要です。ログイン画面に移動します...",
+  "email-unverified": "メールアドレスの確認が必要です。確認画面に移動します...",
+  "mfa-required": "2段階認証の設定が必要です。設定画面に移動します...",
+};
+
+/** セッションの復元待ち(`checking`)の間に出しておく案内 */
+export const APP_ACCESS_CHECKING_NOTICE = "ログイン状態を確認しています...";
