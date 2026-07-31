@@ -2,7 +2,7 @@
 
 import { CircleCheckIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,27 +30,29 @@ export const VerifyEmailActionNotice = ({ oobCode }: VerifyEmailActionNoticeProp
     oobCode === null ? { status: "failed", reason: "invalid-action-code" } : { status: "applying" },
   );
 
-  useEffect(() => {
-    if (oobCode === null) {
-      return undefined;
-    }
+  /**
+   * 既に適用を開始したワンタイムコード。
+   *
+   * 開発時のStrict Modeではeffectが「実行→破棄→再実行」されるため、ガードが無いと
+   * `applyActionCode`が2回走る。1回目でコードは消費されるので2回目は必ず
+   * `auth/invalid-action-code`になり、確認は成功しているのに失敗表示になってしまう。
+   * `applyActionCode`は読み取りではなく一度きりの副作用のため、結果を捨てる
+   * 破棄フラグでは足りず、呼び出し自体を1回に抑える必要がある。
+   */
+  const appliedOobCodeRef = useRef<string | null>(null);
 
-    let cancelled = false;
+  useEffect(() => {
+    if (oobCode === null || appliedOobCodeRef.current === oobCode) {
+      return;
+    }
+    appliedOobCodeRef.current = oobCode;
 
     const apply = async (): Promise<void> => {
       const result = await applyEmailVerification(oobCode);
-      if (cancelled) {
-        return;
-      }
-
       setState(result.ok ? { status: "applied" } : { status: "failed", reason: result.reason });
     };
 
     void apply();
-
-    return () => {
-      cancelled = true;
-    };
   }, [oobCode]);
 
   if (state.status === "applying") {

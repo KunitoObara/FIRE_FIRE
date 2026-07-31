@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { VerifyEmailActionNotice } from "@/components/auth/VerifyEmailActionNotice";
@@ -44,6 +45,24 @@ describe("VerifyEmailActionNotice", () => {
       await screen.findByRole("heading", { level: 1, name: "確認を完了できませんでした" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/確認メールを再送してください/)).toBeInTheDocument();
+  });
+
+  /**
+   * ワンタイムコードは1回目の適用で消費されるため、2回呼ぶと2回目は必ず失敗し、
+   * 確認は成功しているのに失敗表示になってしまう。開発時のStrict Modeでは
+   * effectが「実行→破棄→再実行」されるので、その状況を再現して防げていることを確かめる。
+   */
+  it("Strict Modeで再マウントされても適用は1回だけ行い、成功表示のままにする", async () => {
+    render(
+      <StrictMode>
+        <VerifyEmailActionNotice oobCode="oob-code" />
+      </StrictMode>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "メールアドレスを確認しました" }),
+    ).toBeInTheDocument();
+    expect(applyEmailVerification).toHaveBeenCalledTimes(1);
   });
 
   it("oobCodeが無いときは問い合わせずに無効として扱う", () => {
