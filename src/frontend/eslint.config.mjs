@@ -109,14 +109,18 @@ const eslintConfig = defineConfig([
   {
     // shadcn/ui のCLIが生成するコンポーネントはベンダーコード扱いとし、
     // 自前で書くコード向けの規約(import順序・戻り値型の明示など)は適用しない。
+    // `src/hooks/use-mobile.ts` は `sidebar` の追加時にCLIが一緒に生成するもので、
+    // 同じく再生成のたびに書き換わるためここに含める。
     name: "fire-fire/shadcn-generated",
-    files: ["src/components/ui/**"],
+    files: ["src/components/ui/**", "src/hooks/use-mobile.ts"],
     rules: {
       "import/order": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "@typescript-eslint/consistent-type-definitions": "off",
       "react/jsx-no-leaked-render": "off",
+      "react-hooks/set-state-in-effect": "off",
       "func-style": "off",
+      "no-param-reassign": "off",
       eqeqeq: "off",
     },
   },
