@@ -230,6 +230,31 @@ export const MFA_VERIFICATION_MESSAGES: Record<MfaVerificationFailureReason, str
 export const MFA_VERIFY_NO_SESSION_NOTICE =
   "ログインからやり直してください。ログイン画面に戻ります...";
 
+/**
+ * A6でリセットメールの送信操作が完了したときのメッセージ。
+ *
+ * 未登録のメールアドレスや、Googleのみで作成されたパスワード未設定のアカウントでも
+ * 同じ文言を出す(docs/screen-requirements-auth.md A6)。そのため「送信しました」と
+ * 断定しつつも宛先は「入力されたメールアドレス」に留め、登録の有無に触れない。
+ */
+export const PASSWORD_RESET_SENT_MESSAGE =
+  "入力されたメールアドレス宛にパスワード再設定用のメールを送信しました。メールに記載のリンクから手続きを進めてください。";
+
+/**
+ * A6でリセットメールを送信できなかったときのメッセージ。
+ *
+ * 未登録のメールアドレスはここに現れない(`src/lib/auth/password-reset.ts`が成功として返す)。
+ * 残るのはリクエストがFirebaseに届かなかった場合と、要求した本人の試行回数による制限のため、
+ * 存在の有無を伏せる方針と衝突せずに原因を伝えられる。
+ */
+export const PASSWORD_RESET_MESSAGES: Record<PasswordResetFailureReason, string> = {
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  unknown:
+    "パスワード再設定用のメールを送信できませんでした。しばらく待ってから再度お試しください。",
+};
+
 /** A3・A5の確認コードの桁数。認証アプリが表示するTOTPの既定値に合わせる */
 export const TOTP_CODE_LENGTH = 6;
 
