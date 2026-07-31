@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   buildImportSuccessMessage,
+  buildPartialImportNotice,
   CSV_IMPORT_FAILURE_MESSAGES,
   CSV_PARSE_FAILURE_MESSAGES,
   CSV_PREVIEW_ROW_LIMIT,
@@ -142,7 +143,18 @@ export const AssetBalanceImportPanel = ({
 
     if (!result.ok) {
       setStatus("previewing");
-      setErrorMessage(CSV_IMPORT_FAILURE_MESSAGES[result.reason]);
+
+      // 途中まで確定してしまった場合は、それを伏せずに次の行動まで伝える
+      const partial =
+        result.writtenCount > 0 && result.reason !== "history-write-failed"
+          ? ` ${buildPartialImportNotice(result.writtenCount)}`
+          : "";
+      setErrorMessage(`${CSV_IMPORT_FAILURE_MESSAGES[result.reason]}${partial}`);
+
+      if (result.writtenCount > 0) {
+        // 実際にデータは変わっているので、取込履歴の表示を取り直させる
+        onImported();
+      }
       return;
     }
 

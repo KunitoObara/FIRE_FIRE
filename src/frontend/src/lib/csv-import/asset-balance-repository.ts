@@ -137,6 +137,11 @@ export const buildImportPlan = async (
  *
  * 同じ日付のドキュメントは`merge`せず丸ごと置き換える。前回の取込にしか無かった資産種別が
  * 残っていると、その日の内訳が実際の保有状況とずれるため。
+ *
+ * `writeBatch`は1回に500件までなので、それを超える取込は複数回に分けて確定する。
+ * Firestoreには複数バッチをまたぐトランザクションが無く、途中で失敗するとそれまでの
+ * バッチは確定したまま残る。呼び出し側が「全部失敗した」と誤って伝えないよう、
+ * 失敗時も反映済みの件数を返す。同じ日付は上書きなので、取り込み直せば必ず揃う。
  */
 export const importAssetBalances = async (
   parsed: AssetBalanceParsed,
@@ -145,10 +150,11 @@ export const importAssetBalances = async (
   const context = resolveContext();
 
   if (!context.ok) {
-    return context;
+    return { ...context, writtenCount: 0 };
   }
 
   const { firestore, uid } = context;
+  let writtenCount = 0;
 
   try {
     for (const rows of chunk(parsed.rows, FIRESTORE_BATCH_LIMIT)) {
@@ -165,8 +171,14 @@ export const importAssetBalances = async (
 
       // 500件ごとの書き込みは順に確定させる(同時に投げても速くならず、失敗時の状態が読めない)
       await batch.commit();
+      writtenCount += rows.length;
     }
+  } catch (error) {
+    console.error("資産残高を取り込めませんでした", error);
+    return { ok: false, reason: toFailureReason(error), writtenCount };
+  }
 
+  try {
     // 履歴は資産残高の書き込みが終わってから残す。先に残すと、途中で失敗したときに
     // 反映されていない取込が履歴にだけ現れる
     const historyBatch = writeBatch(firestore);
@@ -179,12 +191,13 @@ export const importAssetBalances = async (
       importedAt: serverTimestamp(),
     });
     await historyBatch.commit();
-
-    return { ok: true, writtenCount: parsed.rows.length };
   } catch (error) {
-    console.error("資産残高を取り込めませんでした", error);
-    return { ok: false, reason: toFailureReason(error) };
+    // 資産残高そのものは全件入っている。履歴が欠けただけであることを区別して伝える
+    console.error("取込履歴を残せませんでした", error);
+    return { ok: false, reason: "history-write-failed", writtenCount };
   }
+
+  return { ok: true, writtenCount };
 };
 
 /** Firestoreの`Timestamp`をISO 8601の文字列にする。サーバー時刻が未確定の間は`null` */

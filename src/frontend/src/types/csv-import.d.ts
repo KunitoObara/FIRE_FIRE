@@ -50,6 +50,7 @@ declare global {
     | "too-large"
     | "empty-file"
     | "missing-column"
+    | "duplicate-column"
     | "no-data-rows"
     | "too-many-rows"
     | "invalid-date"
@@ -70,13 +71,25 @@ declare global {
     updatedCount: number;
   };
 
-  /** 取込実行の結果 */
+  /**
+   * 取込実行の結果。
+   *
+   * 500件を超える取込は`writeBatch`の上限で複数回に分けて確定するため、途中で失敗しても
+   * それまでのバッチはFirestoreに残る。失敗時も何件反映されたかを返し、画面が
+   * 「全部失敗した」と誤解させないようにする。
+   */
   type AssetBalanceImportResult =
-    { ok: true; writtenCount: number } | { ok: false; reason: CsvImportFailureReason };
+    | { ok: true; writtenCount: number }
+    | { ok: false; reason: CsvImportFailureReason; writtenCount: number };
 
   /** 取込実行・既存データ照会が失敗した理由 */
   type CsvImportFailureReason =
-    "signed-out" | "configuration-error" | "permission-denied" | "unknown";
+    | "signed-out"
+    | "configuration-error"
+    | "permission-denied"
+    /** 資産残高は反映できたが、取込履歴だけ残せなかった */
+    | "history-write-failed"
+    | "unknown";
 
   /** 直近の取込履歴の1件(B2の表示項目) */
   type CsvImportHistoryEntry = {

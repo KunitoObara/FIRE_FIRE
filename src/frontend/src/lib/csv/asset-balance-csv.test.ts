@@ -131,6 +131,16 @@ describe("parseAssetBalanceCsv", () => {
     expect(expectFailure(csv)).toBe("missing-column");
   });
 
+  /** マップのキーが衝突して片方の金額が黙って消えるのを防ぐ */
+  it("単位を落とすと同じ名前になる資産種別の列が2つあるCSVは取り込めない", () => {
+    const csv = [
+      '"日付","合計（円）","投資信託（円）","投資信託"',
+      '"2026/07/31","100","60","40"',
+    ].join("\n");
+
+    expect(expectFailure(csv)).toBe("duplicate-column");
+  });
+
   it("ヘッダーしか無いCSVは取り込めない", () => {
     expect(expectFailure('"日付","合計（円）"')).toBe("no-data-rows");
   });

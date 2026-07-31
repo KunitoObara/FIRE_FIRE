@@ -73,6 +73,8 @@ export const CSV_PARSE_FAILURE_MESSAGES: Record<CsvParseFailureReason, string> =
     "ファイルサイズが大きすぎます。マネーフォワードからエクスポートしたCSVを選択してください。",
   "empty-file": "ファイルが空です。マネーフォワードからエクスポートしたCSVを選択してください。",
   "missing-column": `CSVの形式を読み取れませんでした。「${ASSET_BALANCE_DATE_COLUMN}」と「${ASSET_BALANCE_TOTAL_COLUMN}」の列を持つ、マネーフォワードの「資産推移」エクスポート形式のファイルを選択してください。`,
+  "duplicate-column":
+    "同じ名前の資産種別の列が複数あります。どちらの金額を採用すべきか判断できないため取り込めません。",
   "no-data-rows": "取り込めるデータ行がありません。期間を指定してエクスポートし直してください。",
   "too-many-rows": `行数が多すぎます(上限${MAX_ASSET_BALANCE_ROWS.toLocaleString("ja-JP")}行)。期間を分けてエクスポートしてください。`,
   "invalid-date": `日付として読み取れない値があります(${CSV_DATE_FORMAT}形式である必要があります)。`,
@@ -88,8 +90,19 @@ export const CSV_IMPORT_FAILURE_MESSAGES: Record<CsvImportFailureReason, string>
   "signed-out": "ログイン状態が切れています。ログインし直してから取り込んでください。",
   "configuration-error": "Firebaseの設定が読み込めないため取り込めません。",
   "permission-denied": "このデータへの書き込みが許可されていません。ログインし直してください。",
+  "history-write-failed":
+    "資産残高は反映しましたが、取込履歴を残せませんでした。データは取り込めているため、取り込み直す必要はありません。",
   unknown: "取込に失敗しました。時間をおいて再度お試しください。",
 };
+
+/**
+ * 途中まで反映された状態で失敗したときに添える説明。
+ *
+ * 500件を超える取込は複数回に分けて確定するため、失敗しても手前のバッチは残る。
+ * 「失敗した=何も変わっていない」と受け取られると、実際の状態と食い違う。
+ */
+export const buildPartialImportNotice = (writtenCount: number): string =>
+  `${writtenCount.toLocaleString("ja-JP")}件はすでに反映されています。同じファイルを取り込み直すと残りも揃います(同じ日付は上書きされます)。`;
 
 /** 取込完了トーストの文言(DESIGN.md 7章でB2に割り当てたsonnerで出す) */
 export const buildImportSuccessMessage = (writtenCount: number): string =>

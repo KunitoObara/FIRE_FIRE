@@ -159,9 +159,48 @@ describe("AssetBalanceImportPanel", () => {
     expect(screen.queryByTestId("csv-import-summary")).not.toBeInTheDocument();
   });
 
+  /**
+   * 500件超の取込は複数バッチに分かれ、途中で失敗しても手前は確定済みで残る。
+   * 「失敗した=何も変わっていない」と受け取られると実際の状態と食い違う。
+   */
+  it("途中まで反映されて失敗した場合は、反映済みの件数と次の行動を伝える", async () => {
+    const user = userEvent.setup();
+    const onImported = vi.fn();
+    importAssetBalances.mockResolvedValue({ ok: false, reason: "unknown", writtenCount: 500 });
+    render(<AssetBalanceImportPanel onImported={onImported} />);
+
+    await selectFile(buildCsvFile(VALID_CSV));
+    await screen.findByTestId("csv-import-summary");
+    await user.click(screen.getByRole("button", { name: "取込を実行する" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("500件はすでに反映されています");
+    expect(alert).toHaveTextContent("取り込み直すと残りも揃います");
+    // データは変わっているので取込履歴を取り直させる
+    expect(onImported).toHaveBeenCalledOnce();
+  });
+
+  it("履歴だけ残せなかった場合は、取り込み直す必要が無いことを伝える", async () => {
+    const user = userEvent.setup();
+    importAssetBalances.mockResolvedValue({
+      ok: false,
+      reason: "history-write-failed",
+      writtenCount: 2,
+    });
+    render(<AssetBalanceImportPanel onImported={vi.fn()} />);
+
+    await selectFile(buildCsvFile(VALID_CSV));
+    await screen.findByTestId("csv-import-summary");
+    await user.click(screen.getByRole("button", { name: "取込を実行する" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("取り込み直す必要はありません");
+    expect(alert).not.toHaveTextContent("残りも揃います");
+  });
+
   it("取込に失敗したらプレビューを残したまま理由を出す", async () => {
     const user = userEvent.setup();
-    importAssetBalances.mockResolvedValue({ ok: false, reason: "signed-out" });
+    importAssetBalances.mockResolvedValue({ ok: false, reason: "signed-out", writtenCount: 0 });
     render(<AssetBalanceImportPanel onImported={vi.fn()} />);
 
     await selectFile(buildCsvFile(VALID_CSV));

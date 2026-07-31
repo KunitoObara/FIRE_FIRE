@@ -79,16 +79,27 @@ const toLineNumber = (dataRowIndex: number): number => dataRowIndex + 2;
 
 type AssetTypeColumn = { index: number; name: string };
 
-/** ヘッダー行から、日付・合計・資産種別それぞれの列位置を決める */
+type AssetBalanceHeader = {
+  dateIndex: number;
+  totalIndex: number;
+  assetTypeColumns: AssetTypeColumn[];
+};
+
+/**
+ * ヘッダー行から、日付・合計・資産種別それぞれの列位置を決める。
+ *
+ * 資産種別は名前をキーにしたマップに入れるため、単位を落とした結果同じ名前になる列が
+ * 2つあると片方の金額が黙って消える。それは取り込んでよい状態ではないので理由を返して弾く。
+ */
 const readHeader = (
   header: string[],
-): { dateIndex: number; totalIndex: number; assetTypeColumns: AssetTypeColumn[] } | undefined => {
+): { ok: true; header: AssetBalanceHeader } | { ok: false; reason: CsvParseFailureReason } => {
   const trimmed = header.map((column) => column.trim());
   const dateIndex = trimmed.indexOf(ASSET_BALANCE_DATE_COLUMN);
   const totalIndex = trimmed.indexOf(ASSET_BALANCE_TOTAL_COLUMN);
 
   if (dateIndex === -1 || totalIndex === -1) {
-    return undefined;
+    return { ok: false, reason: "missing-column" };
   }
 
   const assetTypeColumns = trimmed
@@ -98,13 +109,19 @@ const readHeader = (
         column.index !== dateIndex && column.index !== totalIndex && column.name.length > 0,
     );
 
-  return { dateIndex, totalIndex, assetTypeColumns };
+  const uniqueNames = new Set(assetTypeColumns.map((column) => column.name));
+
+  if (uniqueNames.size !== assetTypeColumns.length) {
+    return { ok: false, reason: "duplicate-column" };
+  }
+
+  return { ok: true, header: { dateIndex, totalIndex, assetTypeColumns } };
 };
 
 /** 1データ行を`AssetBalanceRow`にする。金額・日付が読めない場合は理由を返す */
 const readRow = (
   cells: string[],
-  header: { dateIndex: number; totalIndex: number; assetTypeColumns: AssetTypeColumn[] },
+  header: AssetBalanceHeader,
 ): { ok: true; row: AssetBalanceRow } | { ok: false; reason: CsvParseFailureReason } => {
   const date = parseDate(cells[header.dateIndex]);
 
@@ -151,11 +168,13 @@ export const parseAssetBalanceCsv = (text: string): AssetBalanceParseResult => {
     return { ok: false, reason: "empty-file" };
   }
 
-  const header = readHeader(headerCells);
+  const headerResult = readHeader(headerCells);
 
-  if (header === undefined) {
-    return { ok: false, reason: "missing-column" };
+  if (!headerResult.ok) {
+    return { ok: false, reason: headerResult.reason };
   }
+
+  const { header } = headerResult;
 
   if (dataRows.length === 0) {
     return { ok: false, reason: "no-data-rows" };
@@ -201,7 +220,7 @@ export const parseAssetBalanceCsv = (text: string): AssetBalanceParseResult => {
   return {
     ok: true,
     parsed: {
-      assetTypes: header.assetTypeColumns.map((column) => column.name),
+      assetTypes: header.assetTypeColumns.map((column: AssetTypeColumn) => column.name),
       rows,
       periodFrom,
       periodTo,

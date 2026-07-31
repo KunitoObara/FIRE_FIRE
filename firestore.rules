@@ -57,7 +57,9 @@ service cloud.firestore {
       match /csvImports/{importId} {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId)
-          && request.resource.data.typeId is string
+          // 取込種別は画面のタブ(src/constants/csv-import.ts)と対応する2値に限る。
+          // 種別を増やすときはここも足す
+          && request.resource.data.typeId in ['asset-balance', 'transaction']
           && request.resource.data.fileName is string
           && request.resource.data.rowCount is number
           && request.resource.data.rowCount >= 0
