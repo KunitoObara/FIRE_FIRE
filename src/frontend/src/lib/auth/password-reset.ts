@@ -1,6 +1,11 @@
 import { FirebaseError } from "firebase/app";
-import { sendPasswordResetEmail } from "firebase/auth";
+import {
+  confirmPasswordReset,
+  sendPasswordResetEmail,
+  verifyPasswordResetCode,
+} from "firebase/auth";
 
+import { toActionCodeFailureReason } from "@/lib/auth/action-code";
 import { FirebaseConfigurationError, getFirebaseAuth } from "@/lib/firebase/client";
 
 /**
@@ -69,6 +74,70 @@ export const requestPasswordReset = async (email: string): Promise<PasswordReset
     const reason = toFailureReason(error);
     if (reason === "unknown") {
       console.error("パスワード再設定用のメールを送信できませんでした", error);
+    }
+    return { ok: false, reason };
+  }
+};
+
+/**
+ * リセットメールのリンクに含まれるワンタイムコードを検証する(A7の初期表示)。
+ *
+ * 入力欄を出す前にリンクの有効性を確かめ、期限切れ・使用済みのリンクで
+ * パスワードを入力させてから失敗させることのないようにする。
+ * 成功時に返るメールアドレスは、変更対象のアカウントの確認表示に使う。
+ */
+export const verifyPasswordResetLink = async (
+  oobCode: string,
+): Promise<PasswordResetCodeResult> => {
+  try {
+    // 設定値が不足していると`FirebaseConfigurationError`を投げる。これも
+    // `configuration-error`として画面に返したいので、取得はtryの中に置く
+    const auth = getFirebaseAuth();
+
+    const email = await verifyPasswordResetCode(auth, oobCode);
+    return { ok: true, email };
+  } catch (error) {
+    const reason = toActionCodeFailureReason(error);
+    if (reason === "unknown") {
+      console.error("パスワード再設定リンクを検証できませんでした", error);
+    }
+    return { ok: false, reason };
+  }
+};
+
+/**
+ * 新しいパスワードを確定する(A7「パスワードを再設定する」)。
+ *
+ * パスワードポリシーの正となる強制はIdentity Platform側にあるため
+ * (docs/auth-login-requirements.md 3.2)、画面側の検証を通っていても
+ * `password-policy-violation`が返りうる。
+ *
+ * 成功してもサインイン状態にはならない。A4でログインし直してもらう仕様のため
+ * (docs/screen-requirements-auth.md A7)、ここではサインインを試みない。
+ */
+export const completePasswordReset = async (
+  oobCode: string,
+  newPassword: string,
+): Promise<PasswordResetConfirmResult> => {
+  try {
+    const auth = getFirebaseAuth();
+
+    await confirmPasswordReset(auth, oobCode, newPassword);
+    return { ok: true };
+  } catch (error) {
+    // Identity Platform側のパスワードポリシー違反だけは、リンクの状態ではなく
+    // 入力値の問題としてパスワード欄に返す必要があるため先に判定する
+    if (
+      error instanceof FirebaseError &&
+      (error.code === "auth/weak-password" ||
+        error.code === "auth/password-does-not-meet-requirements")
+    ) {
+      return { ok: false, reason: "password-policy-violation" };
+    }
+
+    const reason = toActionCodeFailureReason(error);
+    if (reason === "unknown") {
+      console.error("パスワードを再設定できませんでした", error);
     }
     return { ok: false, reason };
   }
