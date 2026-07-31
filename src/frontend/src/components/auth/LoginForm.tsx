@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
+import { DevDashboardShortcut } from "@/components/auth/DevDashboardShortcut";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -145,6 +146,8 @@ export const LoginForm = (): JSX.Element => {
             サインアップ
           </Link>
         </p>
+
+        <DevDashboardShortcut />
       </CardContent>
     </Card>
   );

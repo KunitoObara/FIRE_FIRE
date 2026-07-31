@@ -66,6 +66,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | アプリID |
 | `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` | Authエミュレータの接続先。**既定で有効**(`http://127.0.0.1:9099`) |
 | `NEXT_PUBLIC_FIREBASE_FUNCTIONS_EMULATOR_URL` | Functionsエミュレータの接続先。**既定で有効**(`http://127.0.0.1:5001`)。2FAリカバリーコードの発行・検証で使う |
+| `NEXT_PUBLIC_BYPASS_APP_ACCESS_GUARD` | 【開発時のみ】ログイン後の画面の認証ガードを迂回する。既定は `false`(下記「ログイン後の画面をローカルで開く」) |
 
 `.env.local` は `.gitignore` で除外済み。コミットしない(`.env.example` のみコミットする)。
 
@@ -110,6 +111,29 @@ http://localhost:3000/reset-password?oobCode=<コピーした値>
 ```
 
 メールのリンクからA7に到達する経路そのものは、アクションURLの設定が必要なため `fire-fire-dev` で確認する([docs/ci-cd-setup.md](../../docs/ci-cd-setup.md) 12章)。
+
+#### ログイン後の画面(B1〜B10)をローカルで開く
+
+エミュレータでは2FA(TOTP)を登録できず「2FA登録済み」の状態を作れないため、実際にログインしても
+必ずA3 2FA登録画面で止まり、ログイン後の画面には到達できない(下記「ローカルで確認できないもの」)。
+画面の見た目や遷移をローカルで確認したいときは、`.env.local` で次の値を有効にする。
+
+```
+NEXT_PUBLIC_BYPASS_APP_ACCESS_GUARD=true
+```
+
+有効にすると次の2つが変わる。
+
+- ログイン画面(A4)に「開発用: ログインせずダッシュボードへ」の導線が出る
+- ログイン後の画面の一番上に、迂回中であることを示す赤い帯が常時表示される
+
+**これは認証ガードを飛ばすだけで、サインインはしていない**(`auth.currentUser` は `null` のまま)。
+ログイン・2FA・セッションまわりの挙動そのものを確認する用途には使えないので、その場合は
+`false` に戻すか `fire-fire-dev` で確認する。
+
+本番ビルド(`NODE_ENV=production`)では、この値に関係なく迂回は無効になる。Next.jsが
+`process.env.NODE_ENV` をビルド時にリテラルへ置き換えるため、迂回する側の分岐は本番の成果物に残らない
+(`src/constants/dev.ts`)。
 
 #### ローカルで確認できないもの
 

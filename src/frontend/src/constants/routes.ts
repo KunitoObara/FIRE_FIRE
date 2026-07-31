@@ -29,5 +29,19 @@ export const RESET_PASSWORD_PATH = "/reset-password";
  * (docs/CODING_STANDARDS.md 3章)に沿って、参照が無くても削除しない。
  */
 export const AUTH_ACTION_PATH = "/auth/action";
-/** B1 ダッシュボード画面。別カードで実装するため、現時点では遷移先が存在しない。 */
+/** B1 ダッシュボード画面。ログイン後のトップ画面 */
 export const DASHBOARD_PATH = "/dashboard";
+/** B2 CSV取込画面 */
+export const CSV_IMPORT_PATH = "/csv-import";
+/** B3 収支明細一覧画面 */
+export const TRANSACTIONS_PATH = "/transactions";
+/** B4 資産分類マスタ設定画面 */
+export const ASSET_CATEGORIES_PATH = "/asset-categories";
+/** B5 不動産一覧画面 */
+export const REAL_ESTATE_PATH = "/real-estate";
+/** B8 FIRE目標設定画面 */
+export const FIRE_GOAL_PATH = "/fire-goal";
+/** B9 想定利回り・リスク設定画面 */
+export const ASSUMPTION_SETTINGS_PATH = "/assumptions";
+/** B10 アカウント設定画面 */
+export const ACCOUNT_SETTINGS_PATH = "/account";
