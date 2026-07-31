@@ -20,4 +20,10 @@ declare global {
     message: string;
     satisfiedBy: (password: string) => boolean;
   };
+
+  /** パスワードポリシーの充足状況リストのProps(A1・A7) */
+  type PasswordPolicyChecklistProps = {
+    /** 入力中のパスワード。1文字ごとに充足状況を評価し直す */
+    password: string;
+  };
 }

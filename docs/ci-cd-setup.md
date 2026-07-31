@@ -468,13 +468,56 @@ Auth エミュレータは Google プロバイダを**モック**で提供し、
 | A3 の一覧表示・ダウンロード、A5 の切り替えと失敗表示 | `src/frontend` のユニットテスト（`npm run test`） |
 | 発行 → 使用 → TOTP 解除 → A3 で再登録の通し | `develop` マージ後に `fire-fire-dev` |
 
-## 12. 今後の検討事項（オープン課題）
+## 12. メールリンクのアクション URL を自前の画面に向ける
+
+`fire-fire-dev` / `fire-fire-prod` の**両方**で実施する。この設定を入れるまで、パスワードリセットメールのリンクは Firebase 標準のリセット画面を開き、**A7（パスワード再設定画面）には到達しない**。
+
+### 12.1 アクション URL の性質
+
+Firebase が送るメール（パスワード再設定・メールアドレス確認）のリンク先は、**プロジェクトに 1 つだけ**設定できる。テンプレートごとには分けられず、どのメールのリンクも同じ URL に `mode` / `oobCode` などのクエリ付きで届く。
+
+```
+https://<ホスト>/auth/action?mode=resetPassword&oobCode=XXXX&apiKey=...&lang=ja
+```
+
+そのためアプリ側は `/auth/action` を共通の受け口とし、`mode` で振り分ける（`src/frontend/src/app/(auth)/auth/action/page.tsx`）。
+
+| `mode` | 遷移先 |
+|---|---|
+| `resetPassword` | `/reset-password?oobCode=...`（**A7**） |
+| `verifyEmail` | その場で確認を適用し結果を表示（**A2** 側のタブはポーリングで A3 へ進む） |
+| その他 | 「このリンクは処理できませんでした」と表示 |
+
+**`verifyEmail` を同じ受け口で扱うのは必須**。アクション URL を切り替えると確認メールのリンクもこの URL に来るため、`resetPassword` だけを実装するとメールアドレス確認（A2）が機能しなくなる。
+
+### 12.2 コンソールで設定する
+
+Firebase コンソール → Authentication → **Templates** タブ → 任意のテンプレート（「パスワードの再設定」など）の編集（鉛筆アイコン）→ **アクション URL をカスタマイズ**。
+
+| プロジェクト | 設定値 |
+|---|---|
+| `fire-fire-dev` | `https://<dev の App Hosting ドメイン>/auth/action` |
+| `fire-fire-prod` | `https://<prod の App Hosting ドメイン>/auth/action` |
+
+保存後、他のテンプレート（メールアドレスの確認）にも同じ URL が反映されていることを確認する。ドメインは 10.3 の**承認済みドメイン**にも登録されている必要がある。
+
+### 12.3 動作確認
+
+Auth エミュレータはコンソールの設定を読まないため、**ローカルではリンクを踏んでも A7 には来ない**。ローカルで A7 を確認するときは、エミュレータのログに出力されるリンクから `oobCode` の値を取り出し、次の URL を直接開く。
+
+```
+http://localhost:3000/reset-password?oobCode=<コピーした値>
+```
+
+メールのリンクから A7 に到達する経路そのものは、`develop` マージ後に `fire-fire-dev` で確認する。
+
+## 13. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
 - `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
-## 13. 参考リンク
+## 14. 参考リンク
 
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)
@@ -483,3 +526,4 @@ Auth エミュレータは Google プロバイダを**モック**で提供し、
 - [Firebase Authentication: TOTP 多要素認証をウェブアプリに追加する](https://firebase.google.com/docs/auth/web/totp-mfa)
 - [Firebase Authentication: Google ログインをウェブアプリに追加する](https://firebase.google.com/docs/auth/web/google-signin)
 - [Firebase Authentication: 複数の認証プロバイダをアカウントにリンクする](https://firebase.google.com/docs/auth/web/account-linking)
+- [Firebase Authentication: メールアクションハンドラをカスタマイズする](https://firebase.google.com/docs/auth/custom-email-handler)
