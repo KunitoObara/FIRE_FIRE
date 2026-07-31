@@ -12,6 +12,57 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ユーザー自身の資産データ(docs/fire-asset-management-requirements.md 5章)。
+    //
+    // B2 CSV取込はクライアントSDKから直接書き込む。認証状態はブラウザ側のFirebase SDKが
+    // 持っていてサーバー側から`uid`を特定できないため、アクセス制御はここが唯一の砦になる
+    // (画面側の`AppAccessGuard`は表示制御であって保護ではない)。
+    //
+    // メール未確認のアカウントを弾くのは、アドレスの所有者ではない相手が作った
+    // アカウントに資産データを溜めさせないため(A2でメール確認を必須にしているのと同じ理由)。
+    //
+    // 2FA(TOTP)はアプリの必須要件だが、ここでは`sign_in_second_factor`を要求しない。
+    // Authエミュレータが TOTP を実装しておらずローカルでこの請求を持つトークンを作れないため、
+    // 要求するとデータを扱う画面がすべてエミュレータで動かせなくなる
+    // (docs/ci-cd-setup.md 11章と同じ制約)。2FAの強制は認証フロー側で行う。
+    function isOwner(userId) {
+      return request.auth != null
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true;
+    }
+
+    match /users/{userId} {
+      // 親ドキュメント自体は使わない。配下だけを許可し、ここは既定の拒否のままにする。
+
+      // 資産残高推移CSVから取り込んだ日次の資産残高。
+      // ドキュメントIDは集計日(`yyyy-MM-dd`)で、同じ日付の再取込は上書きになる。
+      //
+      // `create`と`update`を`write`でまとめない。`write`は削除も含むが、削除では
+      // `request.resource`が存在せず下の検証式が評価できないため、意図が読めないまま
+      // 削除だけが落ちる。許可する操作は1つずつ書く。
+      match /assetSnapshots/{date} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && request.resource.data.date is string
+          // ドキュメントIDと中身の日付がずれた資産残高を作らせない
+          && request.resource.data.date == date
+          && request.resource.data.total is number
+          && request.resource.data.byType is map;
+        // 資産残高を消す画面はまだ無い。必要になった時点でここに許可を書く
+        allow delete: if false;
+      }
+
+      // 取込履歴(B2の「直近の取込履歴」)。取り消し・改ざんの余地を残さないよう、
+      // 追加と参照だけを許し、更新・削除は禁じる。
+      match /csvImports/{importId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.rowCount is number
+          && request.resource.data.rowCount >= 0;
+        allow update, delete: if false;
+      }
+    }
+
     // 上記以外も既定で拒否する。コレクションを追加するときは、
     // ここへ意図した許可を書くまで誰も読み書きできない状態から始める。
     match /{document=**} {

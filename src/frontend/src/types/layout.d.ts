@@ -12,6 +12,11 @@ declare global {
     children: ReactNode;
   };
 
+  /** TanStack QueryのプロバイダのProps */
+  type QueryProviderProps = {
+    children: ReactNode;
+  };
+
   /** 判定中・遷移待ちに出す案内のProps */
   type AppAccessNoticeProps = {
     message: string;

@@ -66,6 +66,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | アプリID |
 | `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` | Authエミュレータの接続先。**既定で有効**(`http://127.0.0.1:9099`) |
 | `NEXT_PUBLIC_FIREBASE_FUNCTIONS_EMULATOR_URL` | Functionsエミュレータの接続先。**既定で有効**(`http://127.0.0.1:5001`)。2FAリカバリーコードの発行・検証で使う |
+| `NEXT_PUBLIC_FIREBASE_FIRESTORE_EMULATOR_URL` | Firestoreエミュレータの接続先。**既定で有効**(`http://127.0.0.1:8080`)。B2のCSV取込がクライアントSDKから直接書き込む先 |
 | `NEXT_PUBLIC_BYPASS_APP_ACCESS_GUARD` | 【開発時のみ】ログイン後の画面の認証ガードを迂回する。既定は `false`(下記「ログイン後の画面をローカルで開く」) |
 
 `.env.local` は `.gitignore` で除外済み。コミットしない(`.env.example` のみコミットする)。
@@ -143,6 +144,7 @@ NEXT_PUBLIC_BYPASS_APP_ACCESS_GUARD=true
 - 実際に送信される確認メール・パスワードリセットメールの文面と到達、およびメール内リンクからA7・A2の受け口(`/auth/action`)へ届く経路
 - TOTPによる2FA、Blocking Functions経由のログイン通知メール
 - 2FAリカバリーコードの発行(A3)と使用(A5)。2FAを登録した状態を作れないため通しで試せない(下記)
+- B2 CSV取込の「取込を実行する」(Firestoreへの書き込み)。上の認証ガード迂回はサインインしていないため `auth.currentUser` が `null` で、書き込みは「ログイン状態が切れています」で止まる。ファイル選択・パース・プレビュー・エラー表示まではローカルで確認できる
 
 A3(2FA登録画面)はエミュレータではQRコードを発行できず、TOTPの有効化を促すエラー表示になる。
 エミュレータがSMSの多要素認証しか実装しておらず、TOTPの登録要求を `auth/invalid-argument`
