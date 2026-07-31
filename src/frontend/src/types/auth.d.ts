@@ -5,6 +5,7 @@ import type { z } from "zod";
 
 import type { forgotPasswordSchema } from "@/schemas/forgot-password";
 import type { loginSchema } from "@/schemas/login";
+import type { resetPasswordSchema } from "@/schemas/reset-password";
 import type { signupSchema } from "@/schemas/signup";
 
 // 認証(A1〜A7)関連の型。import を持つため既にモジュールであり、
@@ -325,6 +326,113 @@ declare global {
     | "unknown";
 
   type PasswordResetResult = { ok: true } | { ok: false; reason: PasswordResetFailureReason };
+
+  /**
+   * A7パスワード再設定フォームの入力値。
+   * 同じ形を手で書き直すと実際の検証内容とずれるため、zodスキーマから導出する。
+   */
+  type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+
+  /**
+   * メール内リンクのワンタイムコード(oobCode)を扱えなかった理由。
+   * Firebaseのエラーコードをそのまま画面に持ち込まないための境界(`src/lib/auth/action-code.ts`)。
+   */
+  type ActionCodeFailureReason =
+    /**
+     * リンクが無効・期限切れ・使用済み。A7では解決できないため、A6から取り直してもらう。
+     * リンクの持ち主のアカウントが削除されている場合も、利用者から見た対処は同じなのでここに含める
+     */
+    | "invalid-action-code"
+    /** 管理コンソール等でアカウントが無効化されている */
+    | "user-disabled"
+    | "too-many-requests"
+    | "configuration-error"
+    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    | "network-error"
+    | "unknown";
+
+  /** A7でリセットリンク(oobCode)を検証できなかった理由 */
+  type PasswordResetCodeFailureReason = ActionCodeFailureReason;
+
+  /**
+   * リセットリンクの検証結果。
+   * `email`は「どのアカウントのパスワードを変更するのか」の確認表示に使う。
+   */
+  type PasswordResetCodeResult =
+    { ok: true; email: string } | { ok: false; reason: PasswordResetCodeFailureReason };
+
+  /** A7で新しいパスワードを確定できなかった理由 */
+  type PasswordResetConfirmFailureReason =
+    /** 検証を通ったあとにリンクが失効した(別タブで使用済み・有効期限切れ) */
+    | "invalid-action-code"
+    /** Identity Platform側のパスワードポリシーで弾かれた */
+    | "password-policy-violation"
+    | "user-disabled"
+    | "too-many-requests"
+    | "configuration-error"
+    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    | "network-error"
+    | "unknown";
+
+  type PasswordResetConfirmResult =
+    { ok: true } | { ok: false; reason: PasswordResetConfirmFailureReason };
+
+  /**
+   * 再設定の失敗のうち、特定の入力項目にもリンクの状態にも紐づかず、
+   * フォーム全体のエラーとして表示するもの。
+   */
+  type PasswordResetConfirmFormLevelFailureReason = Extract<
+    PasswordResetConfirmFailureReason,
+    "too-many-requests" | "configuration-error" | "network-error" | "unknown"
+  >;
+
+  /** A7が表示に使う状態。リンクの検証結果と、再設定完了後の表示をひとまとめに扱う */
+  type ResetPasswordState =
+    /** リンクを検証中。入力欄はまだ出さない */
+    | { status: "verifying" }
+    /** リンクが有効。`email`は変更対象のアカウントの確認表示に使う */
+    | { status: "ready"; email: string }
+    /** リンクが使えない。A7では解決できないためA6への導線を出す */
+    | { status: "link-error"; reason: PasswordResetCodeFailureReason }
+    /** 再設定完了。完了メッセージを出したのちA4へ遷移する */
+    | { status: "completed" };
+
+  /**
+   * A7パスワード再設定フォームのProps。
+   * `oobCode`はリセットメールのリンクに含まれるワンタイムコード(欠落時はnull)。
+   */
+  type ResetPasswordFormProps = {
+    oobCode: string | null;
+  };
+
+  /** メールアドレス確認リンク(`mode=verifyEmail`)を適用できなかった理由 */
+  type EmailVerificationApplyFailureReason = ActionCodeFailureReason;
+
+  type EmailVerificationApplyResult =
+    { ok: true } | { ok: false; reason: EmailVerificationApplyFailureReason };
+
+  /** メールアドレス確認リンクを適用する画面の状態 */
+  type EmailVerificationApplyState =
+    | { status: "applying" }
+    | { status: "applied" }
+    | { status: "failed"; reason: EmailVerificationApplyFailureReason };
+
+  /** メールアドレス確認リンクを適用する画面のProps */
+  type VerifyEmailActionNoticeProps = {
+    oobCode: string | null;
+  };
+
+  /**
+   * アクションURL(`/auth/action`)が`mode`から決める振る舞い。
+   * FIRE-FIREが送るメールはパスワード再設定と確認メールの2種類のみで、
+   * それ以外(`recoverEmail`等)は`unsupported`として案内だけを出す。
+   */
+  type EmailActionTarget =
+    /** A7へ引き渡す。`path`は`oobCode`を引き継いだ遷移先 */
+    | { kind: "reset-password"; path: string }
+    /** その場でメールアドレスの確認を適用する */
+    | { kind: "verify-email"; oobCode: string | null }
+    | { kind: "unsupported" };
 
   /** 発行したリカバリーコードの一覧表示のProps(A3。B10の再発行でも使う想定) */
   type RecoveryCodeListProps = {

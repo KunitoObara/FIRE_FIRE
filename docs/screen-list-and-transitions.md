@@ -27,6 +27,8 @@
 
 Googleによるソーシャルログイン([auth-login-requirements.md](./auth-login-requirements.md) 3.8)の開始導線は、A1・A4に「Googleで続ける」ボタンとして追加する(新規画面は設けない)。Googleログイン後も2FAは必須のため、A3・A5はメール/パスワード経由と共通の画面を通る。
 
+Firebaseが送るメール(パスワード再設定・メールアドレス確認)のリンク先は、プロジェクトに1つしか設定できない共通のアクションURL(`/auth/action`)となる。ここは `mode` に応じてA7へ引き渡すか、メールアドレスの確認を適用して結果だけを表示する受け口であり、独立した画面IDは設けない(設定手順は [ci-cd-setup.md](./ci-cd-setup.md) 12章)。
+
 ### 2.2 ダッシュボード・データ管理系画面
 
 各画面の詳細要件は [screen-requirements-dashboard.md](./screen-requirements-dashboard.md) を参照。
@@ -90,7 +92,8 @@ flowchart TD
     Login -->|パスワードを忘れた| Forgot[A6 パスワードをお忘れの方画面]
     Login -->|アカウントをお持ちでない方| Signup
     Forgot -->|メール内リンクで再設定へ| ResetPw[A7 パスワード再設定画面]
-    ResetPw -->|再設定完了| Login
+    ResetPw -->|再設定完了(完了メッセージ表示後)| Login
+    ResetPw -->|リンクが無効・期限切れ| Forgot
 ```
 
 ### 3.2 ソーシャルログイン(Google)フロー

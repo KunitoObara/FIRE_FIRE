@@ -255,6 +255,95 @@ export const PASSWORD_RESET_MESSAGES: Record<PasswordResetFailureReason, string>
     "パスワード再設定用のメールを送信できませんでした。しばらく待ってから再度お試しください。",
 };
 
+/**
+ * Identity Platform側のパスワードポリシーで弾かれたときのメッセージ(A1・A7で共通)。
+ *
+ * 画面側の検証(`src/constants/password.ts`)を通っていてもサーバー側で弾かれることはある。
+ * どの条件に反したかはFirebaseの応答から特定しきれないため、条件一覧の再確認を促すに留める。
+ */
+export const PASSWORD_POLICY_VIOLATION_MESSAGE = "パスワードがパスワードポリシーを満たしていません";
+
+/**
+ * A7でリセットリンクが使えないときの見出し。
+ *
+ * 期限切れ・使用済み・形式不正はまとめて扱う(`src/lib/auth/action-code.ts`)。
+ * 最も多いのは期限切れのため、その言い方を代表とする。
+ */
+export const PASSWORD_RESET_LINK_ERROR_TITLES: Record<PasswordResetCodeFailureReason, string> = {
+  "invalid-action-code": "リンクの有効期限が切れています",
+  "user-disabled": "このアカウントは利用できません",
+  "too-many-requests": "リンクを確認できませんでした",
+  "configuration-error": "リンクを確認できませんでした",
+  "network-error": "リンクを確認できませんでした",
+  unknown: "リンクを確認できませんでした",
+};
+
+/** A7でリセットリンクが使えないときの説明。いずれもA6から取り直せば先へ進める */
+export const PASSWORD_RESET_LINK_ERROR_MESSAGES: Record<PasswordResetCodeFailureReason, string> = {
+  "invalid-action-code":
+    "このパスワード再設定リンクは無効か、有効期限が切れています。お手数ですが再度リセットメールをリクエストしてください。",
+  "user-disabled": "このアカウントは現在ご利用いただけません。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  unknown: "リンクを確認できませんでした。しばらく待ってから再度お試しください。",
+};
+
+/**
+ * A7で再設定を確定できなかったときのメッセージ。
+ *
+ * リンクの失効・アカウント無効化はリンクのエラー表示へ切り替える扱い、
+ * ポリシー違反はパスワード欄へのインラインエラーの扱いのため、ここには含めない。
+ */
+export const PASSWORD_RESET_CONFIRM_MESSAGES: Record<
+  PasswordResetConfirmFormLevelFailureReason,
+  string
+> = {
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  unknown: "パスワードを再設定できませんでした。しばらく待ってから再度お試しください。",
+};
+
+/** A7で再設定が完了したときのメッセージ */
+export const PASSWORD_RESET_COMPLETED_MESSAGE =
+  "パスワードを再設定しました。新しいパスワードでログインしてください。";
+
+/**
+ * A7の完了メッセージを表示してからA4へ自動遷移するまでの待ち時間(ミリ秒)。
+ *
+ * 完了したことを読み取れる程度には留め、待たされたと感じる前に移す。
+ * 待ちきれない場合のために「今すぐログイン画面へ」の導線も併置する。
+ */
+export const PASSWORD_RESET_COMPLETE_REDIRECT_MS = 3_000;
+
+/** メールアドレス確認リンク(`mode=verifyEmail`)を適用できたときのメッセージ */
+export const EMAIL_VERIFICATION_APPLIED_MESSAGE =
+  "メールアドレスの確認が完了しました。サインアップの手続きを行っていたタブでは、そのまま2段階認証の登録に進みます。";
+
+/** メールアドレス確認リンクを適用できなかったときのメッセージ */
+export const EMAIL_VERIFICATION_APPLY_MESSAGES: Record<
+  EmailVerificationApplyFailureReason,
+  string
+> = {
+  "invalid-action-code":
+    "この確認リンクは無効か、有効期限が切れています。既に確認が完了している場合もあります。ログインし直しても確認を求められる場合は、確認メールを再送してください。",
+  "user-disabled": "このアカウントは現在ご利用いただけません。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  unknown: "メールアドレスの確認を完了できませんでした。しばらく待ってから再度お試しください。",
+};
+
+/**
+ * 対応していない`mode`でアクションURLに到達したときのメッセージ。
+ *
+ * FIRE-FIREが送るメールはパスワード再設定と確認メールの2種類のみのため、通常は起きない。
+ * リンクの一部が欠けた場合や、将来メールの種類が増えた場合にここへ来る。
+ */
+export const UNSUPPORTED_EMAIL_ACTION_MESSAGE =
+  "このリンクは処理できませんでした。メール本文のリンクをもう一度開き直してください。";
+
 /** A3・A5の確認コードの桁数。認証アプリが表示するTOTPの既定値に合わせる */
 export const TOTP_CODE_LENGTH = 6;
 
