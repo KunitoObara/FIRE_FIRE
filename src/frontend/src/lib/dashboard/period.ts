@@ -3,7 +3,7 @@ import { parseISO, startOfDay, subYears } from "date-fns";
 import { DASHBOARD_PERIODS } from "@/constants/dashboard";
 
 /**
- * 総資産推移を表示期間で絞り込む(B1の表示期間切替)。
+ * 資産推移を表示期間で絞り込む(B1の表示期間切替)。
  *
  * 境界は「現在からN年前の同日以降」とし、その日ちょうどの点は含める。
  * 「全期間」は絞り込まずそのまま返す。
