@@ -25,6 +25,12 @@ service cloud.firestore {
     // Authエミュレータが TOTP を実装しておらずローカルでこの請求を持つトークンを作れないため、
     // 要求するとデータを扱う画面がすべてエミュレータで動かせなくなる
     // (docs/ci-cd-setup.md 11章と同じ制約)。2FAの強制は認証フロー側で行う。
+    // アプリが日付を持つ書式(`yyyy-MM-dd`。src/constants/csv-import.ts の STORED_DATE_FORMAT)。
+    // 資産残高のドキュメントIDにも使うため、形の崩れた日付を作らせない
+    function isIsoDate(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
     function isOwner(userId) {
       return request.auth != null
         && request.auth.uid == userId
@@ -43,10 +49,16 @@ service cloud.firestore {
       match /assetSnapshots/{date} {
         allow read: if isOwner(userId);
         allow create, update: if isOwner(userId)
-          && request.resource.data.date is string
+          // 想定外のフィールドを混ぜて書けないようにする。B1がこのデータを直接集計する
+          // ようになったとき、読み出し側で形を疑わずに済むようにしておく
+          && request.resource.data.keys().hasOnly(['date', 'total', 'byType', 'importedAt'])
+          && isIsoDate(request.resource.data.date)
           // ドキュメントIDと中身の日付がずれた資産残高を作らせない
           && request.resource.data.date == date
           && request.resource.data.total is number
+          // `byType`は資産種別が動的に増減するマップなので、キーは列挙できない。
+          // ルールに繰り返しが無く値をすべて検査することもできないため、
+          // 個々の金額が数値であることはパース側(src/lib/csv/asset-balance-csv.ts)で担保する
           && request.resource.data.byType is map;
         // 資産残高を消す画面はまだ無い。必要になった時点でここに許可を書く
         allow delete: if false;
@@ -57,14 +69,17 @@ service cloud.firestore {
       match /csvImports/{importId} {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(
+            ['typeId', 'fileName', 'rowCount', 'periodFrom', 'periodTo', 'importedAt']
+          )
           // 取込種別は画面のタブ(src/constants/csv-import.ts)と対応する2値に限る。
           // 種別を増やすときはここも足す
           && request.resource.data.typeId in ['asset-balance', 'transaction']
           && request.resource.data.fileName is string
           && request.resource.data.rowCount is number
           && request.resource.data.rowCount >= 0
-          && request.resource.data.periodFrom is string
-          && request.resource.data.periodTo is string;
+          && isIsoDate(request.resource.data.periodFrom)
+          && isIsoDate(request.resource.data.periodTo);
         allow update, delete: if false;
       }
     }

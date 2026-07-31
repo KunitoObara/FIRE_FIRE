@@ -102,6 +102,15 @@ const readHeader = (
     return { ok: false, reason: "missing-column" };
   }
 
+  // 日付・合計が複数あると`indexOf`が拾わなかった方が資産種別として扱われる。
+  // 資産種別名の重複と同じく、どの列を採るべきか決められないので弾く
+  const isDuplicated = (columnName: string): boolean =>
+    trimmed.indexOf(columnName) !== trimmed.lastIndexOf(columnName);
+
+  if (isDuplicated(ASSET_BALANCE_DATE_COLUMN) || isDuplicated(ASSET_BALANCE_TOTAL_COLUMN)) {
+    return { ok: false, reason: "duplicate-column" };
+  }
+
   const assetTypeColumns = trimmed
     .map((name, index) => ({ index, name: toAssetTypeName(name) }))
     .filter(

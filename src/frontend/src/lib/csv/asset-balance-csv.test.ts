@@ -141,6 +141,18 @@ describe("parseAssetBalanceCsv", () => {
     expect(expectFailure(csv)).toBe("duplicate-column");
   });
 
+  it("日付の列が2つあるCSVは取り込めない", () => {
+    const csv = ['"日付","合計（円）","日付"', '"2026/07/31","100","2026/07/31"'].join("\n");
+
+    expect(expectFailure(csv)).toBe("duplicate-column");
+  });
+
+  it("合計の列が2つあるCSVは取り込めない", () => {
+    const csv = ['"日付","合計（円）","合計（円）"', '"2026/07/31","100","100"'].join("\n");
+
+    expect(expectFailure(csv)).toBe("duplicate-column");
+  });
+
   it("ヘッダーしか無いCSVは取り込めない", () => {
     expect(expectFailure('"日付","合計（円）"')).toBe("no-data-rows");
   });
