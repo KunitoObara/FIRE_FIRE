@@ -422,6 +422,18 @@ declare global {
     oobCode: string | null;
   };
 
+  /**
+   * アクションURL(`/auth/action`)が`mode`から決める振る舞い。
+   * FIRE-FIREが送るメールはパスワード再設定と確認メールの2種類のみで、
+   * それ以外(`recoverEmail`等)は`unsupported`として案内だけを出す。
+   */
+  type EmailActionTarget =
+    /** A7へ引き渡す。`path`は`oobCode`を引き継いだ遷移先 */
+    | { kind: "reset-password"; path: string }
+    /** その場でメールアドレスの確認を適用する */
+    | { kind: "verify-email"; oobCode: string | null }
+    | { kind: "unsupported" };
+
   /** 発行したリカバリーコードの一覧表示のProps(A3。B10の再発行でも使う想定) */
   type RecoveryCodeListProps = {
     /** 表示形(`XXXX-XXXX`)の平文コード */

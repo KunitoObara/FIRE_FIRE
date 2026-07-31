@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { VerifyEmailActionNotice } from "@/components/auth/VerifyEmailActionNotice";
 import { Card, CardContent } from "@/components/ui/card";
 import { UNSUPPORTED_EMAIL_ACTION_MESSAGE } from "@/constants/auth";
-import { RESET_PASSWORD_PATH } from "@/constants/routes";
+import { resolveEmailActionTarget } from "@/lib/auth/email-action-mode";
 import { firstQueryValue } from "@/lib/query-params";
 
 import type { Metadata } from "next";
@@ -24,17 +24,18 @@ const AuthActionPage = async ({
   searchParams,
 }: PageProps<"/auth/action">): Promise<JSX.Element> => {
   const params = await searchParams;
-  const mode = firstQueryValue(params.mode);
-  const oobCode = firstQueryValue(params.oobCode);
+  const target = resolveEmailActionTarget(
+    firstQueryValue(params.mode),
+    firstQueryValue(params.oobCode),
+  );
 
   // A7へは`oobCode`だけを引き継ぐ。リンク自体が壊れている場合もA7側で無効として案内する
-  if (mode === "resetPassword") {
-    const query = oobCode === null ? "" : `?oobCode=${encodeURIComponent(oobCode)}`;
-    redirect(`${RESET_PASSWORD_PATH}${query}`);
+  if (target.kind === "reset-password") {
+    redirect(target.path);
   }
 
-  if (mode === "verifyEmail") {
-    return <VerifyEmailActionNotice oobCode={oobCode} />;
+  if (target.kind === "verify-email") {
+    return <VerifyEmailActionNotice oobCode={target.oobCode} />;
   }
 
   // メールアドレスの変更(`recoverEmail`)は未実装のため、ここには来ない想定

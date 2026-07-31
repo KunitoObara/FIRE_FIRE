@@ -27,6 +27,17 @@ import { resetPasswordSchema } from "@/schemas/reset-password";
 import type { JSX } from "react";
 
 /**
+ * リンクの検証に失敗したとき、同じリンクで試し直す意味があるか。
+ *
+ * リンク自体が使えない(無効・期限切れ・アカウント無効化)場合はA6から取り直すほかないが、
+ * 通信エラーやレート制限では`oobCode`はまだ有効な可能性がある。確定時の失敗が
+ * その場で再試行できる(フォーム全体のエラー表示に留める)のと扱いを揃える。
+ * 設定不足は`.env.local`を直してからの読み込み直しが要るため、ここには含めない。
+ */
+const canRetryVerification = (reason: PasswordResetCodeFailureReason): boolean =>
+  reason === "network-error" || reason === "too-many-requests" || reason === "unknown";
+
+/**
  * A7 パスワード再設定画面(docs/screen-requirements-auth.md A7)。
  *
  * リセットメールのリンクから`oobCode`付きで到達する。入力欄を出す前にリンクを検証し、
@@ -57,6 +68,8 @@ export const ResetPasswordForm = ({ oobCode }: ResetPasswordFormProps): JSX.Elem
       : { status: "verifying" },
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 「再試行する」で検証をやり直すための世代番号。値が変わると検証のeffectが再実行される
+  const [verifyAttempt, setVerifyAttempt] = useState(0);
 
   // `watch()`はReact Compilerがメモ化できないため、購読には`useWatch`を使う
   const password = useWatch({ control, name: "password" });
@@ -87,7 +100,7 @@ export const ResetPasswordForm = ({ oobCode }: ResetPasswordFormProps): JSX.Elem
     return () => {
       cancelled = true;
     };
-  }, [oobCode]);
+  }, [oobCode, verifyAttempt]);
 
   // 完了メッセージを読み取れるだけ表示してからA4へ。戻る操作で完了表示に戻らないようreplaceする
   useEffect(() => {
@@ -103,6 +116,11 @@ export const ResetPasswordForm = ({ oobCode }: ResetPasswordFormProps): JSX.Elem
       clearTimeout(timeoutId);
     };
   }, [router, state.status]);
+
+  const handleRetryVerification = (): void => {
+    setState({ status: "verifying" });
+    setVerifyAttempt((attempt) => attempt + 1);
+  };
 
   const applyFailure = (reason: PasswordResetConfirmFailureReason): void => {
     switch (reason) {
@@ -169,8 +187,19 @@ export const ResetPasswordForm = ({ oobCode }: ResetPasswordFormProps): JSX.Elem
           </p>
         </CardHeader>
 
-        <CardContent>
-          <Button asChild className="w-full">
+        <CardContent className="flex flex-col gap-3">
+          {/* 一時的な失敗のときだけ、同じリンクでのやり直しを一次導線として出す */}
+          {canRetryVerification(state.reason) ? (
+            <Button type="button" className="w-full" onClick={handleRetryVerification}>
+              再試行する
+            </Button>
+          ) : null}
+
+          <Button
+            asChild
+            variant={canRetryVerification(state.reason) ? "outline" : "default"}
+            className="w-full"
+          >
             <Link href={FORGOT_PASSWORD_PATH}>パスワードをお忘れの方へ戻る</Link>
           </Button>
         </CardContent>

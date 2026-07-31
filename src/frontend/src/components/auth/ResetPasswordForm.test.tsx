@@ -96,15 +96,39 @@ describe("ResetPasswordForm", () => {
       expect(verifyPasswordResetLink).not.toHaveBeenCalled();
     });
 
-    it("接続不可のときはエミュレータ起動の確認を促す", async () => {
+    it("接続不可のときはエミュレータ起動の確認を促し、やり直せるようにする", async () => {
       verifyPasswordResetLink.mockResolvedValue({ ok: false, reason: "network-error" });
       render(<ResetPasswordForm oobCode="oob-code" />);
 
       expect(await screen.findByText(/firebase emulators:start/)).toBeInTheDocument();
-      // 再設定はできないが、リンクを取り直せば先へ進めるため導線は出す
+      // リンク自体はまだ有効な可能性があるため、同じリンクでの再試行を一次導線にする
+      expect(screen.getByRole("button", { name: "再試行する" })).toBeInTheDocument();
+      // 取り直したい場合のためにA6への導線も残す
       expect(
         screen.getByRole("link", { name: "パスワードをお忘れの方へ戻る" }),
       ).toBeInTheDocument();
+    });
+
+    it("「再試行する」で検証をやり直し、成功すれば入力欄を表示する", async () => {
+      const user = userEvent.setup();
+      verifyPasswordResetLink.mockResolvedValue({ ok: false, reason: "network-error" });
+      render(<ResetPasswordForm oobCode="oob-code" />);
+
+      const retryButton = await screen.findByRole("button", { name: "再試行する" });
+      verifyPasswordResetLink.mockResolvedValue({ ok: true, email: "user@example.com" });
+
+      await user.click(retryButton);
+
+      expect(await screen.findByLabelText("新パスワード")).toBeInTheDocument();
+      expect(verifyPasswordResetLink).toHaveBeenCalledTimes(2);
+    });
+
+    it("リンクが無効なときは再試行しても変わらないため、やり直しの導線を出さない", async () => {
+      verifyPasswordResetLink.mockResolvedValue({ ok: false, reason: "invalid-action-code" });
+      render(<ResetPasswordForm oobCode="oob-code" />);
+
+      await screen.findByRole("link", { name: "パスワードをお忘れの方へ戻る" });
+      expect(screen.queryByRole("button", { name: "再試行する" })).not.toBeInTheDocument();
     });
   });
 
