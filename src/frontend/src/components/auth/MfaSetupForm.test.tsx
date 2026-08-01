@@ -324,7 +324,7 @@ describe("MfaSetupForm", () => {
       expect(
         screen.getByRole("heading", { level: 1, name: "2段階認証の設定が完了しました" }),
       ).toBeInTheDocument();
-      expect(screen.getByRole("alert")).toHaveTextContent("firebase emulators:start");
+      expect(screen.getByRole("alert")).toHaveTextContent("ネットワーク接続を確認してください");
       expect(screen.getByText(/2段階認証の設定自体は完了しています/)).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "開始する" })).toHaveAttribute("href", "/dashboard");
 
@@ -370,11 +370,11 @@ describe("MfaSetupForm", () => {
   });
 
   describe("QRコードを生成できない場合", () => {
-    it("Firebaseに接続できないときはエミュレータ起動を促し、再取得できる", async () => {
+    it("Firebaseに接続できないときはネットワーク接続の確認を促し、再取得できる", async () => {
       startTotpEnrollment.mockResolvedValue({ ok: false, reason: "network-error" });
       await renderAndSettle();
 
-      expect(screen.getByRole("alert")).toHaveTextContent("firebase emulators:start");
+      expect(screen.getByRole("alert")).toHaveTextContent("ネットワーク接続を確認してください");
 
       startTotpEnrollment.mockResolvedValue(READY);
       await act(async () => {
@@ -429,13 +429,13 @@ describe("MfaSetupForm", () => {
       });
 
       expect(startTotpEnrollment).toHaveBeenCalledTimes(3);
-      expect(screen.getByRole("alert")).toHaveTextContent("firebase emulators:start");
+      expect(screen.getByRole("alert")).toHaveTextContent("ネットワーク接続を確認してください");
 
       // 遅れて解決した古い応答は捨てる(新しく判明したエラー表示を消さない)
       resolveEarlierRetry?.(READY);
       await settle();
 
-      expect(screen.getByRole("alert")).toHaveTextContent("firebase emulators:start");
+      expect(screen.getByRole("alert")).toHaveTextContent("ネットワーク接続を確認してください");
       expect(screen.queryByTestId("totp-qr-code")).not.toBeInTheDocument();
     });
   });

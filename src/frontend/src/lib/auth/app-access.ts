@@ -47,7 +47,6 @@ export const resolveAppAccessState = (user: User | null): ResolvedAppAccessState
  * 同じところで止まるため、専用の状態を通知して対処法を出させる。
  *
  * 開発時の迂回が有効な場合はFirebaseに一切触れずに`ready`を返す(`src/constants/dev.ts`)。
- * エミュレータではTOTPを登録できず、ローカルでは常に`mfa-required`になってしまうため。
  *
  * 戻り値は購読の解除関数。
  */

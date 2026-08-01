@@ -96,11 +96,11 @@ describe("ResetPasswordForm", () => {
       expect(verifyPasswordResetLink).not.toHaveBeenCalled();
     });
 
-    it("接続不可のときはエミュレータ起動の確認を促し、やり直せるようにする", async () => {
+    it("接続不可のときはネットワーク接続の確認を促し、やり直せるようにする", async () => {
       verifyPasswordResetLink.mockResolvedValue({ ok: false, reason: "network-error" });
       render(<ResetPasswordForm oobCode="oob-code" />);
 
-      expect(await screen.findByText(/firebase emulators:start/)).toBeInTheDocument();
+      expect(await screen.findByText(/ネットワーク接続を確認してください/)).toBeInTheDocument();
       // リンク自体はまだ有効な可能性があるため、同じリンクでの再試行を一次導線にする
       expect(screen.getByRole("button", { name: "再試行する" })).toBeInTheDocument();
       // 取り直したい場合のためにA6への導線も残す
