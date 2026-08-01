@@ -47,7 +47,7 @@
 ## 2. React / Next.js
 
 - **関数コンポーネントのみを使う**。クラスコンポーネントは使わない
-- **Server Componentsをデフォルトとし、`"use client"`は本当に必要な場合(state・effect・イベントハンドラ・ブラウザ専用API)のみ付与する**。TECH_STACK.md 1章のとおり、CSV取込のような重い処理はできる限りサーバー側(Server Components/Server Actions)に寄せる
+- **Server Componentsをデフォルトとし、`"use client"`は本当に必要な場合(state・effect・イベントハンドラ・ブラウザ専用API)のみ付与する**。TECH_STACK.md 1章のとおり、重い処理はできる限りサーバー側(Server Components/Server Actions)に寄せる。ただしB2のCSV取込はブラウザ側で完結させている(理由は下のミューテーションの項)
 - **Propsの型はコンポーネント名 + `Props`** で定義する(例: `DashboardCardProps`)。定義先は1章のとおり`src/types`配下のドメイン別ファイルで、コンポーネントのファイル内には書かない
 - **共通コンポーネント・hooksはnamed export、Next.jsが要求するpage/layout/route handlerのみdefault export** とする。named exportの方がエディタでのリネーム・参照追跡が安全なため
 - **Hooksのルールを厳守する**(条件分岐の中で呼ばない、依存配列を省略しない)。ESLintの`react-hooks/rules-of-hooks`・`react-hooks/exhaustive-deps`を警告放置しない
