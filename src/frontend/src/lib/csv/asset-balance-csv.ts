@@ -9,6 +9,7 @@ import {
   MAX_ASSET_BALANCE_ROWS,
   STORED_DATE_FORMAT,
 } from "@/constants/csv-import";
+import { csvTableSchema } from "@/schemas/csv-import";
 
 /**
  * マネーフォワードの「資産推移」CSVのパース(docs/screen-requirements-dashboard.md B2)。
@@ -169,9 +170,16 @@ export const parseAssetBalanceCsv = (text: string): AssetBalanceParseResult => {
     return { ok: false, reason: "empty-file" };
   }
 
-  // ヘッダーの重複や列数の揺れを自分で扱いたいので、配列のまま受け取る
-  const { data } = Papa.parse<string[]>(text, { skipEmptyLines: "greedy" });
-  const [headerCells, ...dataRows] = data;
+  // ヘッダーの重複や列数の揺れを自分で扱いたいので、配列のまま受け取る。
+  // papaparseの戻り値は型引数を渡しても実行時には保証されないため、外部入力として
+  // zodで形を確かめてから使う(CODING_STANDARDS.md 1章)
+  const table = csvTableSchema.safeParse(Papa.parse(text, { skipEmptyLines: "greedy" }).data);
+
+  if (!table.success) {
+    return { ok: false, reason: "unreadable" };
+  }
+
+  const [headerCells, ...dataRows] = table.data;
 
   if (headerCells === undefined) {
     return { ok: false, reason: "empty-file" };

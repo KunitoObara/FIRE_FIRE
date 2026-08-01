@@ -8,7 +8,6 @@ import {
   serverTimestamp,
   where,
   writeBatch,
-  Timestamp,
 } from "firebase/firestore";
 
 import { FIRESTORE_BATCH_LIMIT, IMPORT_HISTORY_LIMIT } from "@/constants/csv-import";
@@ -17,6 +16,7 @@ import {
   getFirebaseAuth,
   getFirebaseFirestore,
 } from "@/lib/firebase/client";
+import { csvImportHistoryDocumentSchema } from "@/schemas/csv-import";
 
 import type { Firestore } from "firebase/firestore";
 
@@ -200,22 +200,13 @@ export const importAssetBalances = async (
   return { ok: true, writtenCount };
 };
 
-/** Firestoreの`Timestamp`をISO 8601の文字列にする。サーバー時刻が未確定の間は`null` */
-const toIsoString = (value: unknown): string | null =>
-  value instanceof Timestamp ? value.toDate().toISOString() : null;
-
-/** 文字列以外が入っていた場合に画面を壊さないためのフォールバック付きの読み出し */
-const readString = (value: unknown, fallback: string): string =>
-  typeof value === "string" ? value : fallback;
-
-const readNumber = (value: unknown): number => (typeof value === "number" ? value : 0);
-
-/** 取込種別。現状書き込むのは資産残高推移だけなので、解釈できない値はそちらに寄せる */
-const readTypeId = (value: unknown): CsvImportTypeId =>
-  value === "transaction" ? "transaction" : "asset-balance";
-
 /**
  * 直近の取込履歴を新しい順に取得する(B2の表示項目「直近の取込履歴」)。
+ *
+ * Firestoreの生データは型が保証されない外部入力なので、zodスキーマを通してから画面へ渡す
+ * (CODING_STANDARDS.md 1章)。解釈できないドキュメントは履歴ごと落とさず、その1件だけを
+ * 飛ばす。履歴が読めないこと自体は取込の妨げにならず、1件の不整合で画面を空にする方が
+ * 情報が減るため。
  *
  * 書き込み直後は`importedAt`のサーバー時刻がまだ確定していないことがあるため、
  * 日時は`null`を許して呼び出し側で「取込中」相当の表示に落とす。
@@ -238,18 +229,17 @@ export const fetchImportHistory = async (): Promise<
       ),
     );
 
-    const entries = snapshot.docs.map((document) => {
-      const data = document.data();
+    const entries = snapshot.docs.flatMap((document) => {
+      const parsed = csvImportHistoryDocumentSchema.safeParse(document.data());
 
-      return {
-        id: document.id,
-        typeId: readTypeId(data.typeId),
-        fileName: readString(data.fileName, ""),
-        rowCount: readNumber(data.rowCount),
-        importedAt: toIsoString(data.importedAt),
-        periodFrom: readString(data.periodFrom, ""),
-        periodTo: readString(data.periodTo, ""),
-      };
+      if (!parsed.success) {
+        console.error("取込履歴を解釈できませんでした", document.id, parsed.error.issues);
+        return [];
+      }
+
+      const { importedAt, ...rest } = parsed.data;
+
+      return [{ id: document.id, ...rest, importedAt: importedAt?.toDate().toISOString() ?? null }];
     });
 
     return { ok: true, entries };

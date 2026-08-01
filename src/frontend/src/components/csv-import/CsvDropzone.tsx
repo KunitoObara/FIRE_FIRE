@@ -1,14 +1,12 @@
 "use client";
 
 import { Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CSV_FILE_ACCEPT } from "@/constants/csv-import";
 
 import type { DragEvent, JSX } from "react";
-
-const FILE_INPUT_ID = "csv-import-file";
 
 /**
  * CSVファイルの受け口(B2の入力項目「CSVファイル選択」)。
@@ -23,6 +21,9 @@ export const CsvDropzone = ({
 }: CsvDropzoneProps): JSX.Element => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  // 取込種別タブは`forceMount`で全て同時にマウントされたままになる(DESIGN.md 6章)。
+  // Phase 2で入出金明細タブにもこの受け口が付いたときにidが重複しないよう、固定値にしない
+  const fileInputId = useId();
 
   const handleFiles = (files: FileList | null): void => {
     const file = files?.item(0);
@@ -68,7 +69,7 @@ export const CsvDropzone = ({
       */}
       <input
         ref={inputRef}
-        id={FILE_INPUT_ID}
+        id={fileInputId}
         type="file"
         aria-label="CSVファイル"
         accept={CSV_FILE_ACCEPT}
