@@ -120,7 +120,7 @@ NEXT_PUBLIC_BYPASS_APP_ACCESS_GUARD=true
 `process.env.NODE_ENV` をビルド時にリテラルへ置き換えるため、迂回する側の分岐は本番の成果物に残らない
 (`src/constants/dev.ts`)。
 
-#### ローカルで確認できないもの
+#### ローカルで確認できるようになったもの / 残る制約
 
 `fire-fire-dev`に直結しているため、Identity Platform側で強制されるパスワードポリシー、TOTPによる
 2FA登録・ログイン、Google連携(A8)、2FAリカバリーコードの発行(A3)・使用(A5)、B2 CSV取込の実際の
