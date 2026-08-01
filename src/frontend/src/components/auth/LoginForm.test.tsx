@@ -9,6 +9,7 @@ import type { UserEvent } from "@testing-library/user-event";
 const replace = vi.fn();
 const signInWithEmail =
   vi.fn<(email: string, password: string, rememberMe: boolean) => Promise<SignInResult>>();
+const consumeLoggedOutNotice = vi.fn<() => boolean>();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
@@ -17,6 +18,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/auth/sign-in", () => ({
   signInWithEmail: (email: string, password: string, rememberMe: boolean) =>
     signInWithEmail(email, password, rememberMe),
+}));
+
+vi.mock("@/lib/auth/logout-notice", () => ({
+  consumeLoggedOutNotice: () => consumeLoggedOutNotice(),
 }));
 
 const PASSWORD = "Passw0rd!";
@@ -38,6 +43,23 @@ describe("LoginForm", () => {
     replace.mockReset();
     signInWithEmail.mockReset();
     signInWithEmail.mockResolvedValue({ ok: true, next: "mfa-verify" });
+    consumeLoggedOutNotice.mockReset();
+    consumeLoggedOutNotice.mockReturnValue(false);
+  });
+
+  describe("「ログアウトしました」の表示(docs/screen-requirements-auth.md A4)", () => {
+    it("ログアウト直後は表示する", () => {
+      consumeLoggedOutNotice.mockReturnValue(true);
+      render(<LoginForm />);
+
+      expect(screen.getByRole("status")).toHaveTextContent("ログアウトしました。");
+    });
+
+    it("ガードによる差し戻しやセッション期限切れ等の通常表示では出さない", () => {
+      render(<LoginForm />);
+
+      expect(screen.queryByText("ログアウトしました。")).not.toBeInTheDocument();
+    });
   });
 
   it("画面タイトルと各導線を表示する", () => {

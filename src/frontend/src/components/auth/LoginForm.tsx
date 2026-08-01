@@ -15,6 +15,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input";
 import { SIGN_IN_MESSAGES, SIGN_IN_NEXT_PATHS } from "@/constants/auth";
 import { FORGOT_PASSWORD_PATH, SIGNUP_PATH } from "@/constants/routes";
+import { consumeLoggedOutNotice } from "@/lib/auth/logout-notice";
 import { signInWithEmail } from "@/lib/auth/sign-in";
 import { loginSchema } from "@/schemas/login";
 
@@ -51,6 +52,10 @@ export const LoginForm = (): JSX.Element => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 自分でログアウトした直後の1回だけ出す。ガードによる差し戻しやセッション期限切れでは
+  // このフラグが立たないため出ない。読み出しと同時に消費されるため、初期化関数は一度だけ呼ぶ
+  // (docs/screen-requirements-auth.md A4)
+  const [showLoggedOutNotice] = useState(() => consumeLoggedOutNotice());
 
   const handleValidSubmit = async (values: LoginFormValues): Promise<void> => {
     clearErrors("root");
@@ -78,6 +83,12 @@ export const LoginForm = (): JSX.Element => {
       </CardHeader>
 
       <CardContent>
+        {showLoggedOutNotice ? (
+          <p role="status" className="mb-5 rounded-lg bg-primary/10 px-4 py-2 text-sm text-primary">
+            ログアウトしました。
+          </p>
+        ) : null}
+
         <form noValidate onSubmit={handleSubmit(handleValidSubmit)}>
           <FieldGroup>
             <Field>

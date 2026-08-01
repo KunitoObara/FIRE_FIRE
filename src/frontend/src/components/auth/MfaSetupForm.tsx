@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
 import { RecoveryCodeList } from "@/components/auth/RecoveryCodeList";
 import { TotpQrCode } from "@/components/auth/TotpQrCode";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import {
 } from "@/lib/auth/mfa-enrollment";
 import { issueRecoveryCodes } from "@/lib/auth/mfa-recovery";
 import { downloadRecoveryCodes } from "@/lib/auth/recovery-code-file";
+import { performSignOut } from "@/lib/auth/sign-out";
 
 import type { FormEvent, JSX } from "react";
 
@@ -56,6 +58,7 @@ export const MfaSetupForm = (): JSX.Element => {
   const [enrollFailure, setEnrollFailure] = useState<TotpEnrollmentDisplayFailureReason | null>(
     null,
   );
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
   // 再取得は前回の生成が終わる前にも押せる。遅れて解決した古い応答が新しい結果を
   // 上書きしないよう、最後に開始した生成だけを採用する
@@ -387,7 +390,31 @@ export const MfaSetupForm = (): JSX.Element => {
             </Button>
           ) : null}
         </form>
+
+        {/*
+          QRコードを表示している登録前の状態でのみ出す。検証成功後(リカバリーコード表示中)は
+          出さない — 平文のコードが手に入る最後の機会で、保管前に離脱させないため
+          (docs/screen-requirements-auth.md A3)
+        */}
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          別のアカウントを使う場合は、
+          <button
+            type="button"
+            className="underline underline-offset-4"
+            onClick={() => setIsLogoutDialogOpen(true)}
+          >
+            別のアカウントでログイン
+          </button>
+        </p>
       </CardContent>
+
+      <LogoutConfirmDialog
+        variant="auth-flow"
+        pendingStep="mfa-required"
+        open={isLogoutDialogOpen}
+        onOpenChange={setIsLogoutDialogOpen}
+        onConfirm={performSignOut}
+      />
     </Card>
   );
 };

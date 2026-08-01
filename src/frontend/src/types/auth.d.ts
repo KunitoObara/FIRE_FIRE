@@ -479,4 +479,33 @@ declare global {
 
   /** 画面へ進ませずに認証系画面へ戻す状態 */
   type AppAccessRedirectState = Exclude<ResolvedAppAccessState, "ready">;
+
+  /**
+   * ログアウト(`signOut()`)に失敗した理由(docs/screen-requirements-account.md 2章)。
+   * `signOut()`はローカルのセッション破棄が主で、失敗はほぼ通信断か原因不明のいずれかに絞られる。
+   */
+  type SignOutFailureReason = "network-error" | "unknown";
+
+  type SignOutResult = { ok: true } | { ok: false; reason: SignOutFailureReason };
+
+  /**
+   * ログアウト確認ダイアログのProps(共通ヘッダー・A2・A3で共通のコンポーネント)。
+   *
+   * 見出し・ボタン・実行内容は呼び出し元によらず同一で、注記の文言だけを`variant`で出し分ける
+   * (docs/screen-requirements-account.md 2章の表)。A2・A3の時点ではTOTPが未登録で
+   * 「再ログインには確認コードが必要」が事実と異なるため、共通ヘッダー版とは別の注記にする。
+   */
+  type LogoutConfirmDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    /** ログアウトの実行。キャッシュ初期化の要否は呼び出し元ごとに異なるため関数で受け取る */
+    onConfirm: () => Promise<SignOutResult>;
+  } & (
+    | { variant: "header" }
+    | {
+        variant: "auth-flow";
+        /** A2は「メールアドレスの確認」、A3は「2FAの登録」が未完了である旨を伝える */
+        pendingStep: Extract<AppAccessRedirectState, "email-unverified" | "mfa-required">;
+      }
+  );
 }
