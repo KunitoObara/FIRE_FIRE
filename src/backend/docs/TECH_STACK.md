@@ -16,7 +16,7 @@
 ## 3. データストア/ストレージ
 
 - **Cloud Firestore**: セキュリティルールは`firestore.rules`に定義し、[firestore-rules-review](../../../.claude/skills/firestore-rules-review/SKILL.md)スキルでユーザー単位のアクセス制御を都度確認する
-- **Firebase Storage**: マネーフォワードCSVアップロードファイルの保管
+- **Firebase Storage**: 現時点で用途なし。B2のCSV取込はブラウザ上でパースして数値だけをFirestoreへ保存し、**生ファイルは保管しない**方針にしたため(理由は[要件定義書](../../../docs/fire-asset-management-requirements.md) 4.2)。`storage.rules`は全拒否のままにしてある
 
 ## 4. 認証
 

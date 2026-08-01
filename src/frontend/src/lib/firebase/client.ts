@@ -1,5 +1,6 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 import { z } from "zod";
 
@@ -7,6 +8,7 @@ import { FIREBASE_FUNCTIONS_REGION } from "@/constants/firebase";
 
 import type { FirebaseApp } from "firebase/app";
 import type { Auth } from "firebase/auth";
+import type { Firestore } from "firebase/firestore";
 import type { Functions } from "firebase/functions";
 
 /**
@@ -38,6 +40,7 @@ const firebaseEnvSchema = z.object({
 
 let cachedApp: FirebaseApp | undefined;
 let cachedAuth: Auth | undefined;
+let cachedFirestore: Firestore | undefined;
 let cachedFunctions: Functions | undefined;
 
 /**
@@ -100,6 +103,34 @@ export const getFirebaseAuth = (): Auth => {
 
   cachedAuth = auth;
   return auth;
+};
+
+/**
+ * Cloud Firestoreのインスタンスを取得する。
+ *
+ * B2 CSV取込の書き込みはクライアントSDKから直接行い、他人のデータに触れないことは
+ * `firestore.rules`のユーザー単位の判定で担保する
+ * (docs/fire-asset-management-requirements.md 5章のセキュリティ方針)。
+ * 認証はブラウザ側のFirebase SDKが持つため、サーバー側からは`uid`を特定できない。
+ *
+ * `NEXT_PUBLIC_FIREBASE_FIRESTORE_EMULATOR_URL` が設定されていればFirestoreエミュレータへ繋ぐ
+ * (Auth・Functionsと同じく`.env.example`では既定で有効)。
+ */
+export const getFirebaseFirestore = (): Firestore => {
+  if (cachedFirestore) {
+    return cachedFirestore;
+  }
+
+  const firestore = getFirestore(getFirebaseApp());
+
+  const emulatorUrl = process.env.NEXT_PUBLIC_FIREBASE_FIRESTORE_EMULATOR_URL;
+  if (emulatorUrl) {
+    const { hostname, port } = new URL(emulatorUrl);
+    connectFirestoreEmulator(firestore, hostname, Number(port));
+  }
+
+  cachedFirestore = firestore;
+  return firestore;
 };
 
 /**

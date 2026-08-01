@@ -47,7 +47,7 @@
 ## 2. React / Next.js
 
 - **関数コンポーネントのみを使う**。クラスコンポーネントは使わない
-- **Server Componentsをデフォルトとし、`"use client"`は本当に必要な場合(state・effect・イベントハンドラ・ブラウザ専用API)のみ付与する**。TECH_STACK.md 1章のとおり、CSV取込のような重い処理はできる限りサーバー側(Server Components/Server Actions)に寄せる
+- **Server Componentsをデフォルトとし、`"use client"`は本当に必要な場合(state・effect・イベントハンドラ・ブラウザ専用API)のみ付与する**。TECH_STACK.md 1章のとおり、重い処理はできる限りサーバー側(Server Components/Server Actions)に寄せる。ただしB2のCSV取込はブラウザ側で完結させている(理由は下のミューテーションの項)
 - **Propsの型はコンポーネント名 + `Props`** で定義する(例: `DashboardCardProps`)。定義先は1章のとおり`src/types`配下のドメイン別ファイルで、コンポーネントのファイル内には書かない
 - **共通コンポーネント・hooksはnamed export、Next.jsが要求するpage/layout/route handlerのみdefault export** とする。named exportの方がエディタでのリネーム・参照追跡が安全なため
 - **Hooksのルールを厳守する**(条件分岐の中で呼ばない、依存配列を省略しない)。ESLintの`react-hooks/rules-of-hooks`・`react-hooks/exhaustive-deps`を警告放置しない
@@ -71,6 +71,8 @@
 
 - **内部遷移は必ず`next/link`の`<Link>`を使う**。`<a href="...">`や`router.push`だけに頼った素朴なフルリロードは行わない。外部サイトへのリンクのみ`<a>`でよい
 - **ミューテーション(保存・削除・CSV取込実行等)はServer Actionsを第一候補にする**。自作のRoute Handler + `fetch`は、Server Actionsで表現できない場合(外部Webhook受信等)にのみ使う
+  - **ただしFirestoreへの書き込みは現状クライアントSDKから直接行う**。認証状態をブラウザ側のFirebase SDKが持っており、サーバー側セッション(Cookie)を置いていないため、Server Actionからは書き込み先の`uid`を特定できない。保護は`firestore.rules`のユーザー単位の判定で行う(要件定義書5章の方針そのもの)。実例: `src/lib/csv-import/asset-balance-repository.ts`(B2 CSV取込)
+  - この制約を外すには、IDトークンをセッションCookieに載せてServer Action側でAdmin SDKに検証させる必要がある。導入するかは9章のオープン課題とする
 - **Server Actionの呼び出し側では`useActionState`でpending/エラー状態を扱う**。手動で`isLoading`のようなstateを都度定義しない
 - **サーバー専用処理を前提にしたブラウザ専用の外部ライブラリ(QRコード表示・チャート描画等)は`next/dynamic`で`ssr: false`指定して読み込む**。Server Componentからの直接importでビルドエラーになるのを防ぐ
 - **共有・ブックマーク可能であるべき表示状態(ダッシュボードの分類軸・期間フィルタ等)は`useSearchParams`でURLに持たせる**。コンポーネントのローカルstateだけに閉じ込めると、リンク共有やブラウザの戻る/進むで表示が再現できなくなる。URLに載せる必要のない一時的な状態のみZustandを使う(TECH_STACK.md 3章)
@@ -126,5 +128,6 @@
 ## 9. 今後の検討事項(オープン課題)
 
 - コミット前フック(husky + lint-staged)導入の要否
+- セッションCookieを導入してFirestoreへの書き込みをServer Actionsに寄せるかどうか(2章)。導入すればミューテーションの方針を1つに揃えられるが、IDトークンの受け渡し・失効・Admin SDKでの検証を自前で持つことになる
 - Airbnb設定とNext.js標準設定(`eslint-config-next`)の間でルールが競合した場合の優先順位の細部(現状はNext.js側を優先する方針のみ決定)
 - アンビエント宣言(1章)の運用範囲。型の定義元がコード上で追えず、名前空間もプロジェクト全体で共有されるため、ドメインが増えたときに型名の衝突・肥大化が起きないか様子を見る。問題が出た場合は`src/types`を通常のモジュール(`export type` + `import type`)に切り替えることを検討する
