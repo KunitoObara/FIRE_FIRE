@@ -79,6 +79,9 @@ export const getFirebaseApp = (): FirebaseApp => {
   //
   // 本番ビルド(NODE_ENV=production)では当然この照合をしない。Next.jsが`process.env.NODE_ENV`を
   // ビルド時にリテラルへ置き換えるため、この分岐自体が本番の成果物からは消える。
+  // 裏を返すと、ローカルで`npm run build && npm run start`したときもガードは効かない。
+  // NODE_ENVだけではデプロイ済みの本番と区別できないため、ここは受容する
+  // (日常的に使う`npm run dev`は必ずガードの側を通る)。
   if (
     process.env.NODE_ENV !== "production" &&
     parsed.data.projectId === PRODUCTION_FIREBASE_PROJECT_ID
