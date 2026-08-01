@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-**FIRE-FIRE** is a personal FIRE (Financial Independence, Retire Early) asset management web app. All authoritative specs live under `docs/` — the docs lead the code, so check them before assuming behaviour from what is implemented. Implementation has started with Phase 1 (auth): `src/frontend` is a working Next.js project (A1–A7 implemented), `src/backend` holds the 2FA recovery-code callables (`src/backend/src/mfa-recovery`) and is otherwise still a scaffold. See "Commands" below for the real build/lint/test commands.
+**FIRE-FIRE** is a personal FIRE (Financial Independence, Retire Early) asset management web app. All authoritative specs live under `docs/` — the docs lead the code, so check them before assuming behaviour from what is implemented. Implementation has started with Phase 1: `src/frontend` is a working Next.js project (A1–A7, B1 dashboard, and B2 CSV import implemented), `src/backend` holds the 2FA recovery-code callables (`src/backend/src/mfa-recovery`) and is otherwise still a scaffold. B1 still renders sample data — B2 writes real asset balances to Firestore, but wiring the dashboard to them is a separate card. See "Commands" below for the real build/lint/test commands.
 
 `docs/.env` is a real secrets file (excluded via `.gitignore`) — never read, print, or commit its contents.
 
@@ -37,7 +37,7 @@ There is no root-level package — run commands inside `src/frontend` or `src/ba
 
 Node.js 22 / npm is pinned via Volta in `src/frontend/package.json`.
 
-Running the frontend against auth needs `firebase emulators:start` (repo root) alongside `npm run dev`: `.env.local` points at the Auth emulator by default, so with the emulator down every auth call fails with `auth/network-request-failed`. The emulator prints the email-verification link to its own terminal instead of sending mail, and it does not persist data between restarts. Server-side password policy, real emails, TOTP MFA and login-notification Blocking Functions are not reproduced locally — verify those on `fire-fire-dev` after merging to `develop`. Because no local account can reach the TOTP-enrolled state, the recovery-code flow (A3 issue → A5 redeem) can only be exercised end to end there too, even though the functions/firestore emulators do run it (see [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §11 for what is covered by unit tests instead). Google sign-in is only *mocked* by the emulator (a dummy screen that accepts any address, no real Google auth), and the account-linking branch (`auth/account-exists-with-different-credential`) behaves differently there, so the A8 flow also has to be verified on `fire-fire-dev` — see [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §10.4. See [src/frontend/README.md](src/frontend/README.md) "セットアップ".
+Running the frontend against auth needs `firebase emulators:start` (repo root) alongside `npm run dev`: `.env.local` points at the Auth emulator by default, so with the emulator down every auth call fails with `auth/network-request-failed`. The emulator prints the email-verification link to its own terminal instead of sending mail, and it does not persist data between restarts. Server-side password policy, real emails, TOTP MFA and login-notification Blocking Functions are not reproduced locally — verify those on `fire-fire-dev` after merging to `develop`. Because no local account can reach the TOTP-enrolled state, the recovery-code flow (A3 issue → A5 redeem) can only be exercised end to end there too, even though the functions/firestore emulators do run it (see [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §11 for what is covered by unit tests instead). Google sign-in is only *mocked* by the emulator (a dummy screen that accepts any address, no real Google auth), and the account-linking branch (`auth/account-exists-with-different-credential`) behaves differently there, so the A8 flow also has to be verified on `fire-fire-dev` — see [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §10.4. The same TOTP limitation blocks B2's actual Firestore write: the guard bypass does not sign in, so `auth.currentUser` is `null` and the import stops at "ログイン状態が切れています" — file selection, parsing, preview and error handling *are* exercisable locally. See [src/frontend/README.md](src/frontend/README.md) "セットアップ".
 
 ## CI / deployment
 
@@ -58,7 +58,7 @@ The one-time cloud/GitHub-side setup is in [docs/ci-cd-setup.md](docs/ci-cd-setu
 | Backend | Serverless (Firebase) |
 | Auth | Firebase Authentication upgraded to **Identity Platform** (required for TOTP-based MFA) |
 | Data store | Cloud Firestore — schemas for master data (e.g. asset category axes) must stay extensible, not hardcoded |
-| File storage | Firebase Storage (CSV uploads) |
+| File storage | Firebase Storage — reserved for future use; **raw CSVs are not stored** (parsed in the browser, only the numbers reach Firestore — see §4.2 of the requirements doc) |
 | Hosting | Firebase App Hosting (decided — see [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md) §7) |
 
 See [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md) §0 for what "built as an SPA" concretely means here — it is not a static export; Next.js's server features stay in use.
