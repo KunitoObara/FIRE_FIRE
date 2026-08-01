@@ -37,7 +37,6 @@ const toFailureReason = (error: unknown): PasswordResetFailureReason => {
   switch (error.code) {
     case "auth/too-many-requests":
       return "too-many-requests";
-    // ローカル開発ではAuthエミュレータ未起動が主な原因になる
     case "auth/network-request-failed":
       return "network-error";
     default:
@@ -55,7 +54,6 @@ const toFailureReason = (error: unknown): PasswordResetFailureReason => {
  * 未登録のメールアドレスや、Googleのみで作成されたパスワード未設定のアカウントでは
  * メールは実際には送信されないが、戻り値は成功と区別しない。区別すると、そのアドレスが
  * 登録されているかどうかを外部から判定できてしまうため(A6の仕様)。
- * エミュレータではリセットリンクがエミュレータ側の端末に出力され、メールは飛ばない。
  */
 export const requestPasswordReset = async (email: string): Promise<PasswordResetResult> => {
   try {

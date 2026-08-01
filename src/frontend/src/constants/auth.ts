@@ -134,11 +134,10 @@ export const EMAIL_VERIFICATION_POLL_INTERVAL_MS = 5_000;
  * プロジェクト側でTOTP多要素認証が有効になっていないときに画面へ出すメッセージ。
  *
  * TOTP型2FAはIdentity Platformへのアップグレードと多要素認証の有効化が前提
- * (docs/auth-login-requirements.md 3.3)。Authエミュレータでも再現されないため、
- * ローカルで登録を試すとここに来る。開発者本人が使うアプリなので対処法をそのまま出す。
+ * (docs/auth-login-requirements.md 3.3)。開発者本人が使うアプリなので対処法をそのまま出す。
  */
 export const TOTP_NOT_ENABLED_MESSAGE =
-  "2段階認証(TOTP)がプロジェクトで有効になっていません。FirebaseプロジェクトをIdentity Platformへアップグレードし、多要素認証のTOTPを有効化してください(ローカルのAuthエミュレータでは登録できません)。";
+  "2段階認証(TOTP)がプロジェクトで有効になっていません。FirebaseプロジェクトをIdentity Platformへアップグレードし、多要素認証のTOTPを有効化してください。";
 
 /** A3で再認証が必要なほどセッションが古いときに画面へ出すメッセージ */
 export const REQUIRES_RECENT_LOGIN_MESSAGE =

@@ -51,7 +51,7 @@ declare global {
     /** 確認済み。A3へ進む */
     | { status: "verified" }
     | { status: "configuration-error" }
-    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    /** リクエストがFirebaseに届かない */
     | { status: "network-error" }
     | { status: "unknown-error" };
 
@@ -65,7 +65,7 @@ declare global {
   type ResendVerificationEmailFailureReason =
     | "too-many-requests"
     | "configuration-error"
-    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    /** リクエストがFirebaseに届かない */
     | "network-error"
     | "unknown";
 
@@ -98,7 +98,7 @@ declare global {
     | "totp-not-enabled"
     | "too-many-requests"
     | "configuration-error"
-    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    /** リクエストがFirebaseに届かない */
     | "network-error"
     | "unknown";
 
@@ -182,7 +182,7 @@ declare global {
     | "user-disabled"
     | "too-many-requests"
     | "configuration-error"
-    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    /** リクエストがFirebaseに届かない */
     | "network-error"
     | "unknown";
 
@@ -242,7 +242,7 @@ declare global {
     | "session-expired"
     | "too-many-requests"
     | "configuration-error"
-    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    /** リクエストがFirebaseに届かない */
     | "network-error"
     | "unknown";
 
@@ -321,7 +321,7 @@ declare global {
   type PasswordResetFailureReason =
     | "too-many-requests"
     | "configuration-error"
-    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    /** リクエストがFirebaseに届かない */
     | "network-error"
     | "unknown";
 
@@ -347,7 +347,7 @@ declare global {
     | "user-disabled"
     | "too-many-requests"
     | "configuration-error"
-    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    /** リクエストがFirebaseに届かない */
     | "network-error"
     | "unknown";
 
@@ -370,7 +370,7 @@ declare global {
     | "user-disabled"
     | "too-many-requests"
     | "configuration-error"
-    /** リクエストがFirebaseに届かない(ローカルではAuthエミュレータ未起動が主な原因) */
+    /** リクエストがFirebaseに届かない */
     | "network-error"
     | "unknown";
 

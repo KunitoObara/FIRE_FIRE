@@ -11,7 +11,7 @@ const SESSION_LOST_ERROR_CODES = ["auth/user-token-expired", "auth/user-not-foun
 const isSessionLost = (error: unknown): boolean =>
   error instanceof FirebaseError && SESSION_LOST_ERROR_CODES.includes(error.code);
 
-/** リクエストがFirebaseに届かなかったか。ローカルではAuthエミュレータ未起動が主な原因 */
+/** リクエストがFirebaseに届かなかったか */
 const isNetworkError = (error: unknown): boolean =>
   error instanceof FirebaseError && error.code === "auth/network-request-failed";
 
