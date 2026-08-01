@@ -8,7 +8,10 @@ import {
   TRANSACTIONS_PAGE_SIZE,
   USE_SAMPLE_TRANSACTIONS_DATA,
 } from "@/constants/transactions";
-import { resolveTransactionFilters } from "@/lib/transactions/filters";
+import {
+  buildTransactionsFilterBarKey,
+  resolveTransactionFilters,
+} from "@/lib/transactions/filters";
 import {
   filterTransactions,
   paginateTransactions,
@@ -49,6 +52,7 @@ const TransactionsPage = async (props: PageProps<"/transactions">): Promise<JSX.
   return (
     <>
       <TransactionsFilterBar
+        key={buildTransactionsFilterBarKey(resolvedFilters)}
         categories={data.categories}
         accounts={data.accounts}
         filters={resolvedFilters}

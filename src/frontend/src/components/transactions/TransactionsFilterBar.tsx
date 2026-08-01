@@ -37,6 +37,13 @@ const KEYWORD_INPUT_ID = "transactions-keyword";
  * (HTMLモック・docs/screen-requirements-dashboard.md B3の構成に合わせる)。複数条件を
  * 一度に変えられるのに1操作ごとにURLへ反映すると、変更のたびに一覧が再計算されて煩雑なため。
  * 並び替え・ページングはこのフォームと独立してURLへ即時反映する(TransactionsTable側)。
+ *
+ * 編集中のドラフト値は`useState(filters.xxx)`で初期値としてのみ受け取り、以後は自分の
+ * `handleSubmit`でしか更新しない。ブラウザの戻る/進む等、フォームの送信を経由せず`filters`
+ * (URL)が変わった場合は、呼び出し側(`page.tsx`)が`key`にfiltersの絞り込み条件を含めて
+ * TransactionsFilterBarごと再マウントさせることでドラフトをURLの内容に同期させる
+ * (`useEffect`でstateを追従させると`react-hooks/set-state-in-effect`に抵触するため、
+ * Reactが推奨する「keyでリセットする」方式を採る)。
  */
 export const TransactionsFilterBar = ({
   categories,

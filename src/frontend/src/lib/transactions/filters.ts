@@ -106,6 +106,22 @@ export const buildTransactionsHref = (filters: TransactionFilters): string => {
 };
 
 /**
+ * `TransactionsFilterBar`に渡す`key`を組み立てる。
+ *
+ * このフォームは編集中のドラフト値を`useState`の初期値としてのみ`filters`から受け取り、以後は
+ * 自分の送信でしか更新しない。ブラウザの戻る/進む等、フォームの送信を経由せず`filters`(URL)が
+ * 変わった場合にドラフトを追従させるため、この関数が返す値をkeyに渡してコンポーネントごと
+ * 再マウントさせる(Reactの「keyでstateをリセットする」パターン。`useEffect`でstateを
+ * 追従させる方式は`react-hooks/set-state-in-effect`に抵触するため採らない)。
+ *
+ * 並び替え・ページはこのフォームが管理しない値なので含めない。含めると、並び替えヘッダ
+ * (`buildTransactionSortHref`)やページングだけの遷移でも毎回フォームが再マウントされ、
+ * 無駄な描画が増える。
+ */
+export const buildTransactionsFilterBarKey = (filters: TransactionFilters): string =>
+  [filters.periodId, filters.category, filters.account, filters.keyword].join("|");
+
+/**
  * 並び替え列の見出しリンクを組み立てる。
  * 選択中の列を再度押すと昇順/降順を切り替え、別の列を押すと降順から始める。
  * 並び替えを変えると表示されるページの中身が変わるため、ページは1に戻す。

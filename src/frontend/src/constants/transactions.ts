@@ -66,7 +66,7 @@ export const TRANSACTIONS_CSV_IMPORT_LINK = {
 /** 取引データが1件も無いときの案内 */
 export const NO_TRANSACTIONS_EMPTY_STATE = {
   message: "入出金明細のデータがまだありません。CSVを取り込むと取引が表示されます。",
-  action: { label: "CSVを取り込む", href: CSV_IMPORT_PATH },
+  action: TRANSACTIONS_CSV_IMPORT_LINK,
 } as const;
 
 /** 絞り込み条件に一致する取引が無いときの表示 */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildTransactionsFilterBarKey,
   buildTransactionsHref,
   buildTransactionSortHref,
   resolveTransactionFilters,
@@ -149,6 +150,31 @@ describe("buildTransactionsHref", () => {
     ).toBe(
       "/transactions?period=1m&category=%E9%A3%9F%E8%B2%BB&account=%E7%8F%BE%E9%87%91&q=%E3%82%A4%E3%82%AA%E3%83%B3&sort=date&dir=desc&page=3",
     );
+  });
+});
+
+describe("buildTransactionsFilterBarKey", () => {
+  it("期間・費目・口座・キーワードのいずれかが変わるとkeyも変わる", () => {
+    const base = buildTransactionsFilterBarKey(baseFilters);
+
+    expect(buildTransactionsFilterBarKey({ ...baseFilters, periodId: "3m" })).not.toBe(base);
+    expect(buildTransactionsFilterBarKey({ ...baseFilters, category: "食費" })).not.toBe(base);
+    expect(buildTransactionsFilterBarKey({ ...baseFilters, account: "現金" })).not.toBe(base);
+    expect(buildTransactionsFilterBarKey({ ...baseFilters, keyword: "イオン" })).not.toBe(base);
+  });
+
+  /** 並び替え・ページはこのフォームが管理しない値なので、変わってもkeyは変えない */
+  it("並び替え・ページだけが変わってもkeyは変わらない", () => {
+    const base = buildTransactionsFilterBarKey(baseFilters);
+
+    expect(
+      buildTransactionsFilterBarKey({
+        ...baseFilters,
+        sortKey: "amount",
+        sortDirection: "asc",
+        page: 3,
+      }),
+    ).toBe(base);
   });
 });
 
