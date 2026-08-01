@@ -4,7 +4,7 @@ import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
 import { z } from "zod";
 
-import { FIREBASE_FUNCTIONS_REGION } from "@/constants/firebase";
+import { FIREBASE_FUNCTIONS_REGION, PRODUCTION_FIREBASE_PROJECT_ID } from "@/constants/firebase";
 
 import type { FirebaseApp } from "firebase/app";
 import type { Auth } from "firebase/auth";
@@ -70,6 +70,27 @@ export const getFirebaseApp = (): FirebaseApp => {
     const missingKeys = parsed.error.issues.map((issue) => issue.path.join(".")).join(", ");
     throw new FirebaseConfigurationError(
       `Firebaseの設定値が不足しています(${missingKeys})。.env.example をコピーして .env.local を作成し、Firebaseコンソールの値を設定してください。`,
+    );
+  }
+
+  // B0-1でエミュレータを廃止したため、接続先は`.env.local`の値だけで決まる。本番プロジェクトを
+  // 指したまま`npm run dev`すると、サインアップで本番に実アカウントが作られ、B2の取込が本番の
+  // Firestoreに書き込まれる。取り返しがつかないので、警告ではなく初期化ごと止める。
+  //
+  // 本番ビルド(NODE_ENV=production)では当然この照合をしない。Next.jsが`process.env.NODE_ENV`を
+  // ビルド時にリテラルへ置き換えるため、この分岐自体が本番の成果物からは消える。
+  if (
+    process.env.NODE_ENV !== "production" &&
+    parsed.data.projectId === PRODUCTION_FIREBASE_PROJECT_ID
+  ) {
+    // 画面には汎用の設定エラー(`FIREBASE_CONFIGURATION_MESSAGE`)しか出ないため、
+    // 実際の原因はコンソールにも出しておく
+    console.error(
+      `Firebaseの接続先が本番プロジェクト(${PRODUCTION_FIREBASE_PROJECT_ID})になっています。` +
+        `.env.local に fire-fire-dev(STG)の値を設定してください(src/frontend/README.md「セットアップ」)。`,
+    );
+    throw new FirebaseConfigurationError(
+      `.env.local が本番プロジェクト(${PRODUCTION_FIREBASE_PROJECT_ID})を指しています。ローカル開発では fire-fire-dev(STG)の値を設定してください。`,
     );
   }
 
