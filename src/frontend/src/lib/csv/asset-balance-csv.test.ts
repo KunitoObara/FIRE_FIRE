@@ -141,6 +141,24 @@ describe("parseAssetBalanceCsv", () => {
     expect(expectFailure(csv)).toBe("duplicate-column");
   });
 
+  /** 行末のカンマで空の列が増えるのはよくあるので、値が無ければ取り込みを止めない */
+  it("列名も値も空の列は無視して取り込める", () => {
+    const csv = ['"日付","合計（円）","投資信託（円）",""', '"2026/07/31","100","100",""'].join(
+      "\n",
+    );
+    const parsed = expectParsed(csv);
+
+    expect(parsed.assetTypes).toEqual(["投資信託"]);
+    expect(parsed.rows).toHaveLength(1);
+  });
+
+  /** 名前が無いことを理由に黙って捨てると、その分だけ内訳が実態とずれる */
+  it("列名の無い列に値が入っているCSVは取り込めない", () => {
+    const csv = ['"日付","合計（円）",""', '"2026/07/31","100","40"'].join("\n");
+
+    expect(expectFailure(csv)).toBe("unnamed-column");
+  });
+
   it("日付の列が2つあるCSVは取り込めない", () => {
     const csv = ['"日付","合計（円）","日付"', '"2026/07/31","100","2026/07/31"'].join("\n");
 

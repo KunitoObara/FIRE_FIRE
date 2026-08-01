@@ -84,6 +84,8 @@ type AssetBalanceHeader = {
   dateIndex: number;
   totalIndex: number;
   assetTypeColumns: AssetTypeColumn[];
+  /** 列名が空の列の位置。値が入っていないかを行ごとに確かめるために持つ */
+  unnamedIndexes: number[];
 };
 
 /**
@@ -112,20 +114,30 @@ const readHeader = (
     return { ok: false, reason: "duplicate-column" };
   }
 
-  const assetTypeColumns = trimmed
+  const namedColumns = trimmed
     .map((name, index) => ({ index, name: toAssetTypeName(name) }))
-    .filter(
-      (column) =>
-        column.index !== dateIndex && column.index !== totalIndex && column.name.length > 0,
-    );
+    .filter((column) => column.index !== dateIndex && column.index !== totalIndex);
 
+  const assetTypeColumns = namedColumns.filter((column) => column.name.length > 0);
   const uniqueNames = new Set(assetTypeColumns.map((column) => column.name));
 
   if (uniqueNames.size !== assetTypeColumns.length) {
     return { ok: false, reason: "duplicate-column" };
   }
 
-  return { ok: true, header: { dateIndex, totalIndex, assetTypeColumns } };
+  return {
+    ok: true,
+    header: {
+      dateIndex,
+      totalIndex,
+      assetTypeColumns,
+      // 名前の無い列。行末のカンマで空の列が1つ増えるだけなら無視してよいが、
+      // 値が入っているなら取り込めないので、行を読むときに中身を確かめる
+      unnamedIndexes: namedColumns
+        .filter((column) => column.name.length === 0)
+        .map((column) => column.index),
+    },
+  };
 };
 
 /** 1データ行を`AssetBalanceRow`にする。金額・日付が読めない場合は理由を返す */
@@ -155,6 +167,16 @@ const readRow = (
     }
 
     byType[column.name] = amount;
+  }
+
+  // 列名が無い列に値が入っていたら、どの資産種別として扱えばよいか決められない。
+  // 名前が無いことを理由に黙って捨てると、その分だけ内訳が実態とずれる
+  const hasUnnamedValue = header.unnamedIndexes.some(
+    (index) => (cells[index] ?? "").trim().length > 0,
+  );
+
+  if (hasUnnamedValue) {
+    return { ok: false, reason: "unnamed-column" };
   }
 
   return { ok: true, row: { date, total, byType } };

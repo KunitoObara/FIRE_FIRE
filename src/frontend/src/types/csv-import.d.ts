@@ -51,6 +51,7 @@ declare global {
     | "empty-file"
     | "missing-column"
     | "duplicate-column"
+    | "unnamed-column"
     | "no-data-rows"
     | "too-many-rows"
     | "invalid-date"

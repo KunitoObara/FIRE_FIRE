@@ -73,8 +73,9 @@ export const CSV_PARSE_FAILURE_MESSAGES: Record<CsvParseFailureReason, string> =
     "ファイルサイズが大きすぎます。マネーフォワードからエクスポートしたCSVを選択してください。",
   "empty-file": "ファイルが空です。マネーフォワードからエクスポートしたCSVを選択してください。",
   "missing-column": `CSVの形式を読み取れませんでした。「${ASSET_BALANCE_DATE_COLUMN}」と「${ASSET_BALANCE_TOTAL_COLUMN}」の列を持つ、マネーフォワードの「資産推移」エクスポート形式のファイルを選択してください。`,
-  "duplicate-column":
-    "同じ名前の資産種別の列が複数あります。どちらの金額を採用すべきか判断できないため取り込めません。",
+  "duplicate-column": `同じ名前の列が複数あります(「${ASSET_BALANCE_DATE_COLUMN}」「${ASSET_BALANCE_TOTAL_COLUMN}」または資産種別)。どちらの値を採用すべきか判断できないため取り込めません。`,
+  "unnamed-column":
+    "列名の無い列に値が入っています。どの資産種別として扱うか判断できないため取り込めません。",
   "no-data-rows": "取り込めるデータ行がありません。期間を指定してエクスポートし直してください。",
   "too-many-rows": `行数が多すぎます(上限${MAX_ASSET_BALANCE_ROWS.toLocaleString("ja-JP")}行)。期間を分けてエクスポートしてください。`,
   "invalid-date": `日付として読み取れない値があります(${CSV_DATE_FORMAT}形式である必要があります)。`,
