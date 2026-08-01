@@ -157,6 +157,19 @@ const readRow = (
     return { ok: false, reason: "invalid-amount" };
   }
 
+  // 列名が無い列に値が入っていたら、どの資産種別として扱えばよいか決められない。
+  // 名前が無いことを理由に黙って捨てると、その分だけ内訳が実態とずれる。
+  //
+  // 金額の読み取りより先に見る。列がずれたCSVは「読めない金額」も同時に生みやすく、
+  // 後に回すと本当の原因(列のずれ)ではなく金額の不正として案内してしまうため
+  const hasUnnamedValue = header.unnamedIndexes.some(
+    (index) => (cells[index] ?? "").trim().length > 0,
+  );
+
+  if (hasUnnamedValue) {
+    return { ok: false, reason: "unnamed-column" };
+  }
+
   const byType: Record<string, number> = {};
 
   for (const column of header.assetTypeColumns) {
@@ -167,16 +180,6 @@ const readRow = (
     }
 
     byType[column.name] = amount;
-  }
-
-  // 列名が無い列に値が入っていたら、どの資産種別として扱えばよいか決められない。
-  // 名前が無いことを理由に黙って捨てると、その分だけ内訳が実態とずれる
-  const hasUnnamedValue = header.unnamedIndexes.some(
-    (index) => (cells[index] ?? "").trim().length > 0,
-  );
-
-  if (hasUnnamedValue) {
-    return { ok: false, reason: "unnamed-column" };
   }
 
   return { ok: true, row: { date, total, byType } };

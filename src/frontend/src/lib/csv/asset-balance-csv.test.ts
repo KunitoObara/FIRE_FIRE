@@ -175,6 +175,15 @@ describe("parseAssetBalanceCsv", () => {
     expect(result).toMatchObject({ ok: false, reason: "unnamed-column", detail: "2行目" });
   });
 
+  /** 列がずれたCSVは読めない金額も同時に生みやすい。金額のせいだと案内すると原因を見誤る */
+  it("列名の無い列への値と読めない金額が同時にあるときは、列名の無い列を理由にする", () => {
+    const csv = ['"日付","合計（円）","","投資信託（円）"', '"2026/07/31","100","40","-"'].join(
+      "\n",
+    );
+
+    expect(expectFailure(csv)).toBe("unnamed-column");
+  });
+
   it("日付の列が2つあるCSVは取り込めない", () => {
     const csv = ['"日付","合計（円）","日付"', '"2026/07/31","100","2026/07/31"'].join("\n");
 
