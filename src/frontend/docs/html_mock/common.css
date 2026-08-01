@@ -427,6 +427,84 @@ body {
   flex-shrink: 0;
 }
 
+/* ---- 共通ヘッダーのユーザーメニュー(docs/screen-requirements-account.md 2章) ----
+   アバターを起点に開き、アカウント設定(B10)とログアウトを収める。
+   ログアウトの置き場所が他に無いため、アバターからB10へ直接リンクさせない。 */
+
+.user-menu {
+  position: relative;
+}
+
+.user-menu-trigger {
+  display: flex;
+  align-items: center;
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.user-menu-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.user-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 40;
+  width: 15rem;
+  padding: 0.375rem;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+  box-shadow: 0 8px 24px -6px rgb(0 0 0 / 0.18);
+}
+
+/* ログイン中のアカウントをログアウト前に確かめられるようにする */
+.user-menu-email {
+  padding: 0.5rem 0.625rem;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  word-break: break-all;
+  border-bottom: 1px solid hsl(var(--border));
+  margin-bottom: 0.375rem;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.user-menu-item:hover {
+  background-color: hsl(var(--accent));
+}
+
+/* ログアウトは破壊的操作ではないが、遷移項目と区別できる見た目にする */
+.user-menu-item-signout {
+  color: hsl(var(--destructive));
+  border-top: 1px solid hsl(var(--border));
+  margin-top: 0.375rem;
+  padding-top: 0.625rem;
+  border-radius: 0 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px);
+}
+
 /* ---- タブ ---- */
 
 .tab-row {

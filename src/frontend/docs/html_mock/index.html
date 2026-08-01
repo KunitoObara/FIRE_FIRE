@@ -51,6 +51,9 @@
         docs/screen-list-and-transitions.md の画面一覧・遷移図に基づくHTMLモックです。各カードから各画面を確認できます。
         認証系(A1〜A8)は中央寄せ1カラムレイアウト、ログイン後(B1〜B10)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
       </p>
+      <p class="text-sm text-slate-500 mt-2">
+        ログアウトは画面IDを持たない共通操作です(screen-list-and-transitions.md 2.6)。B1〜B10 のどの画面でも、ヘッダー右上のアバターからユーザーメニューを開いて実行できます。
+      </p>
     </header>
 
     <!-- 認証系画面 -->
@@ -102,6 +105,9 @@
       </div>
       <p class="text-xs text-slate-400 mt-3">
         Googleソーシャルログインの導線は A1・A4 に「Googleで続ける」ボタンとして追加しています(新規画面ではありません)。
+      </p>
+      <p class="text-xs text-slate-400 mt-2">
+        A2・A3 の「別のアカウントでログイン」は、サインイン済みだが手順が未完了の状態から抜けるためのログアウト導線です(screen-requirements-auth.md 3章)。ログアウト後は A4 に「ログアウトしました」が表示されます。
       </p>
     </section>
 
