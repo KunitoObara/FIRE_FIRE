@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -20,6 +21,7 @@ import {
   reloadEmailVerificationState,
   resendVerificationEmail,
 } from "@/lib/auth/email-verification";
+import { performSignOut } from "@/lib/auth/sign-out";
 import { cn } from "@/lib/utils";
 
 import type { JSX } from "react";
@@ -54,6 +56,7 @@ export const VerifyEmailNotice = (): JSX.Element => {
   const [isResending, setIsResending] = useState(false);
   const [feedback, setFeedback] = useState<ResendVerificationEmailFeedback | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
   // 確認状況の取得は間隔ポーリングとタブ復帰で並行しうる。遅れて解決した古い応答が
   // 新しい結果を上書きしないよう、最後に開始した取得だけを採用する
@@ -248,7 +251,31 @@ export const VerifyEmailNotice = (): JSX.Element => {
             サインアップからやり直してください
           </Link>
         </p>
+
+        {/*
+          サインイン済みだがメール未確認のため主要機能に進めず、ガードがこの画面へ差し戻す。
+          別のアカウントでログインし直す手段が他に無いため補助導線として置く
+          (docs/screen-requirements-auth.md 3章)
+        */}
+        <p className="mt-1 text-xs text-muted-foreground">
+          別のアカウントを使う場合は、
+          <button
+            type="button"
+            className="underline underline-offset-4"
+            onClick={() => setIsLogoutDialogOpen(true)}
+          >
+            別のアカウントでログイン
+          </button>
+        </p>
       </CardContent>
+
+      <LogoutConfirmDialog
+        variant="auth-flow"
+        pendingStep="email-unverified"
+        open={isLogoutDialogOpen}
+        onOpenChange={setIsLogoutDialogOpen}
+        onConfirm={performSignOut}
+      />
     </Card>
   );
 };

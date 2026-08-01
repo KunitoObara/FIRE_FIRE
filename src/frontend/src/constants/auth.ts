@@ -468,3 +468,35 @@ export const APP_ACCESS_REDIRECT_NOTICES: Record<AppAccessRedirectState, string>
 
 /** セッションの復元待ち(`checking`)の間に出しておく案内 */
 export const APP_ACCESS_CHECKING_NOTICE = "ログイン状態を確認しています...";
+
+/**
+ * ログアウト確認ダイアログ(docs/screen-requirements-account.md 2章)の見出し・ボタン文言。
+ * 呼び出し元(共通ヘッダー・A2・A3)によらず共通で、注記だけを出し分ける。
+ */
+export const LOGOUT_DIALOG_TITLE = "ログアウトしますか?";
+export const LOGOUT_DIALOG_CONFIRM_LABEL = "ログアウトする";
+export const LOGOUT_DIALOG_CANCEL_LABEL = "キャンセル";
+
+/** 共通ヘッダー(B1〜B10)から開いたときの注記。2FAは全ユーザー必須のため再ログインの条件を伝える */
+export const LOGOUT_DIALOG_HEADER_NOTE =
+  "次回のログインでは、パスワードに加えて認証アプリの確認コードの入力が必要です。";
+
+/**
+ * A2・A3の「別のアカウントでログイン」から開いたときの注記。
+ * この時点ではTOTPが未登録で共通ヘッダー版の文言が事実と異なるため、代わりに未完了の手順を伝える
+ * (docs/screen-requirements-account.md 2章の表)。
+ */
+export const LOGOUT_DIALOG_AUTH_FLOW_NOTES: Record<
+  Extract<AppAccessRedirectState, "email-unverified" | "mfa-required">,
+  string
+> = {
+  "email-unverified":
+    "ログアウトし、ログイン画面へ移動します。メールアドレスの確認はまだ完了していません。",
+  "mfa-required": "ログアウトし、ログイン画面へ移動します。2段階認証の登録はまだ完了していません。",
+};
+
+/** ログアウトに失敗したときにダイアログ内へ出すメッセージ */
+export const SIGN_OUT_MESSAGES: Record<SignOutFailureReason, string> = {
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  unknown: "ログアウトできませんでした。しばらく待ってから再度お試しください。",
+};

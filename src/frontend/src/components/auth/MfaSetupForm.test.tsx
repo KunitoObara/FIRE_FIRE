@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MfaSetupForm } from "@/components/auth/MfaSetupForm";
@@ -21,6 +21,12 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/auth/mfa-recovery", () => ({
   issueRecoveryCodes: () => issueRecoveryCodes(),
+}));
+
+const performSignOut = vi.fn<() => Promise<SignOutResult>>();
+
+vi.mock("@/lib/auth/sign-out", () => ({
+  performSignOut: () => performSignOut(),
 }));
 
 // ダウンロードはブラウザのAPIに依るため、ここでは呼び出しだけを確認する
@@ -101,6 +107,8 @@ describe("MfaSetupForm", () => {
     issueRecoveryCodes.mockReset();
     issueRecoveryCodes.mockResolvedValue({ ok: true, codes: RECOVERY_CODES });
     downloadRecoveryCodes.mockReset();
+    performSignOut.mockReset();
+    performSignOut.mockResolvedValue({ ok: true });
   });
 
   describe("表示項目", () => {
@@ -437,6 +445,53 @@ describe("MfaSetupForm", () => {
 
       expect(screen.getByRole("alert")).toHaveTextContent("ネットワーク接続を確認してください");
       expect(screen.queryByTestId("totp-qr-code")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("別のアカウントでログイン(docs/screen-requirements-auth.md 3章)", () => {
+    it("QRコード表示中は導線を出し、押下で未完了(2FAの登録)を伝える確認ダイアログを開く", async () => {
+      await renderAndSettle();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "別のアカウントでログイン" }));
+      });
+
+      expect(screen.getByRole("heading", { name: "ログアウトしますか?" })).toBeInTheDocument();
+      const dialog = within(screen.getByRole("alertdialog"));
+      expect(
+        dialog.getByText(
+          "ログアウトし、ログイン画面へ移動します。2段階認証の登録はまだ完了していません。",
+        ),
+      ).toBeInTheDocument();
+      expect(dialog.queryByText(/確認コード/)).not.toBeInTheDocument();
+    });
+
+    it("「ログアウトする」でログアウトを実行し、A4へ遷移する", async () => {
+      await renderAndSettle();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "別のアカウントでログイン" }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "ログアウトする" }));
+      });
+
+      expect(performSignOut).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenCalledWith("/login");
+    });
+
+    it("検証成功後(リカバリーコード表示中)は出さない。保管前に離脱させないため", async () => {
+      await renderAndSettle();
+
+      await enterCode("123456");
+      await clickSubmit();
+
+      expect(
+        screen.getByRole("heading", { level: 1, name: "2段階認証の設定が完了しました" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "別のアカウントでログイン" }),
+      ).not.toBeInTheDocument();
     });
   });
 });
