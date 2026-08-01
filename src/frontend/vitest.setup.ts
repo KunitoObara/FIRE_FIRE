@@ -32,6 +32,21 @@ Object.entries(elementStubs).forEach(([name, stub]) => {
   }
 });
 
+// jsdomはmatchMediaを実装していない。共通ヘッダーのSidebar(useIsMobile)等、幅の判定に
+// マウント時に使うコンポーネントが呼ぶため、呼ばれても落ちないだけのスタブを入れる。
+// 実際の判定結果(常に不一致)はテストの対象外。
+window.matchMedia ??= (query: string): MediaQueryList =>
+  ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }) as MediaQueryList;
+
 afterEach(() => {
   cleanup();
 });

@@ -11,6 +11,7 @@ import {
 const replace = vi.fn();
 const reloadEmailVerificationState = vi.fn<() => Promise<EmailVerificationState>>();
 const resendVerificationEmail = vi.fn<() => Promise<ResendVerificationEmailResult>>();
+const performSignOut = vi.fn<() => Promise<SignOutResult>>();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
@@ -19,6 +20,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/auth/email-verification", () => ({
   reloadEmailVerificationState: () => reloadEmailVerificationState(),
   resendVerificationEmail: () => resendVerificationEmail(),
+}));
+
+vi.mock("@/lib/auth/sign-out", () => ({
+  performSignOut: () => performSignOut(),
 }));
 
 const UNVERIFIED: EmailVerificationState = { status: "unverified", email: "user@example.com" };
@@ -80,6 +85,8 @@ describe("VerifyEmailNotice", () => {
     resendVerificationEmail.mockResolvedValue({ ok: true });
     reloadEmailVerificationState.mockReset();
     reloadEmailVerificationState.mockResolvedValue(UNVERIFIED);
+    performSignOut.mockReset();
+    performSignOut.mockResolvedValue({ ok: true });
   });
 
   afterEach(() => {
@@ -372,6 +379,54 @@ describe("VerifyEmailNotice", () => {
       await clickResend();
 
       expect(replace).toHaveBeenCalledWith("/signup");
+    });
+  });
+
+  describe("別のアカウントでログイン(docs/screen-requirements-auth.md 3章)", () => {
+    it("押下で確認ダイアログを開き、メールアドレス確認が未完了である旨を伝える(確認コードには触れない)", async () => {
+      await renderAndSettle();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "別のアカウントでログイン" }));
+      });
+
+      expect(screen.getByRole("heading", { name: "ログアウトしますか?" })).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "ログアウトし、ログイン画面へ移動します。メールアドレスの確認はまだ完了していません。",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/確認コード/)).not.toBeInTheDocument();
+    });
+
+    it("「ログアウトする」でログアウトを実行し、A4へ遷移する", async () => {
+      await renderAndSettle();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "別のアカウントでログイン" }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "ログアウトする" }));
+      });
+
+      expect(performSignOut).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenCalledWith("/login");
+    });
+
+    it("「キャンセル」ではログアウトせず、画面に留まる", async () => {
+      await renderAndSettle();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "別のアカウントでログイン" }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+      });
+
+      expect(performSignOut).not.toHaveBeenCalled();
+      expect(
+        screen.queryByRole("heading", { name: "ログアウトしますか?" }),
+      ).not.toBeInTheDocument();
     });
   });
 });
