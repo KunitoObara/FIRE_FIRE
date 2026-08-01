@@ -262,7 +262,7 @@ do
 done
 ```
 
-値は Firebase コンソール（プロジェクトの設定 → マイアプリ → ウェブアプリ）のものを使う。`NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` はローカル開発専用なので**登録しない**（デプロイ環境に設定するとエミュレータへ繋ごうとして認証が壊れる）。
+値は Firebase コンソール（プロジェクトの設定 → マイアプリ → ウェブアプリ）のものを使う。
 
 登録後、App Hosting のバックエンドから読めるように IAM を付与する。これを忘れるとビルドがシークレット解決で失敗する。
 
@@ -429,7 +429,7 @@ curl -s "https://identitytoolkit.googleapis.com/admin/v2/projects/fire-fire-dev/
 
 ### 9.4 動作確認
 
-Auth エミュレータは SMS の多要素認証しか実装しておらず、TOTP の登録要求を `auth/invalid-argument`（`Missing phoneEnrollmentInfo.`）で拒否する。そのため **A3 の登録成功はローカルでは確認できない**。`develop` マージ後に `fire-fire-dev` で QR コード表示 → 認証アプリ登録 → 検証成功までを確認する。
+フロントエンドはローカル開発でも Firebase Emulator を使わず `fire-fire-dev` に直接繋ぐため（[src/frontend/README.md](../src/frontend/README.md) 「セットアップ」、B0-1）、QR コード表示 → 認証アプリ登録 → 検証成功までローカルの `npm run dev` からそのまま確認できる。
 
 TOTP が未有効の場合、A3 は「2段階認証(TOTP)がプロジェクトで有効になっていません」というエラー表示になる。この文言が出たら本章の設定を疑う。
 
@@ -453,20 +453,18 @@ Authentication → Settings → **承認済みドメイン**に、App Hosting �
 
 ### 10.4 動作確認
 
-Auth エミュレータは Google プロバイダを**モック**で提供し、実際の Google 認証は行わない（任意のメールアドレスを入力できるダミー画面が開く）。連携分岐（`auth/account-exists-with-different-credential`）の挙動もエミュレータと本番で差があるため、**A8 の連携フローは `develop` マージ後に `fire-fire-dev` で確認する**。
+フロントエンドはローカル開発でも `fire-fire-dev` に直接繋ぐため（B0-1）、実際の Google 認証と連携分岐（`auth/account-exists-with-different-credential`）を含め、A8 の連携フローはローカルの `npm run dev` からそのまま確認できる。`localhost` は 10.3 の承認済みドメインに既定で登録済み。
 
 ## 11. 2FA リカバリーコードの動作確認
 
-リカバリーコード（[auth-login-requirements.md](./auth-login-requirements.md) 3.3）は Cloud Functions + Firestore で実装しているため、ローカルでは `firebase emulators:start` に functions と firestore が含まれている必要がある（`firebase.json` の既定で含まれる）。
-
-ただし **A3 の発行と A5 の使用は、エミュレータでは通しで確認できない**。Auth エミュレータが TOTP の登録に対応しておらず（9.4 と同じ理由）、2FA を登録した状態を作れないため。次の切り分けで確認する。
+リカバリーコード（[auth-login-requirements.md](./auth-login-requirements.md) 3.3）は Cloud Functions + Firestore で実装している。フロントエンドはローカル開発でも `fire-fire-dev` にデプロイ済みの Functions / Firestore に直接繋ぐため（B0-1）、発行 → 使用 → TOTP 解除 → A3 で再登録までの通しの確認もローカルの `npm run dev` から行える。次の切り分けも参考にする。
 
 | 確認対象 | 場所 |
 |---|---|
 | コード生成・正規化・scrypt ハッシュ照合 | `src/backend` のユニットテスト（`npm run test`） |
 | パスワード再検証の応答の解釈 | 同上（`fetch` を差し替えて検証） |
 | A3 の一覧表示・ダウンロード、A5 の切り替えと失敗表示 | `src/frontend` のユニットテスト（`npm run test`） |
-| 発行 → 使用 → TOTP 解除 → A3 で再登録の通し | `develop` マージ後に `fire-fire-dev` |
+| 発行 → 使用 → TOTP 解除 → A3 で再登録の通し | ローカルの `npm run dev`（`fire-fire-dev` に直結） |
 
 ## 12. メールリンクのアクション URL を自前の画面に向ける
 
@@ -503,13 +501,13 @@ Firebase コンソール → Authentication → **Templates** タブ → 任意�
 
 ### 12.3 動作確認
 
-Auth エミュレータはコンソールの設定を読まないため、**ローカルではリンクを踏んでも A7 には来ない**。ローカルで A7 を確認するときは、エミュレータのログに出力されるリンクから `oobCode` の値を取り出し、次の URL を直接開く。
+アクション URL はプロジェクトに 1 つだけで `fire-fire-dev` の App Hosting ドメインに固定されるため、フロントエンドがローカルの `fire-fire-dev` に直結していても（B0-1）**メールのリンクをそのまま踏むと `localhost` ではなく `fire-fire-dev` の画面が開く**。ローカルの画面(A7)で確認したいときは、届いたメールのリンクから `oobCode` の値を取り出し、次の URL を直接開く。
 
 ```
 http://localhost:3000/reset-password?oobCode=<コピーした値>
 ```
 
-メールのリンクから A7 に到達する経路そのものは、`develop` マージ後に `fire-fire-dev` で確認する。
+メールアドレス確認（A2）は確認状態が Firebase プロジェクト側で更新されるため、リンクを開いたブラウザが `fire-fire-dev` の画面でも、サインアップ元の `localhost` タブがポーリングで自動検知する。メールのリンクから直接 A7 に到達する経路そのもの（`localhost` をアクション URL に設定する経路）は用意していない。
 
 ## 13. 今後の検討事項（オープン課題）
 

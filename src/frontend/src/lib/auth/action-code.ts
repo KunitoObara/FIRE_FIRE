@@ -29,7 +29,6 @@ export const toActionCodeFailureReason = (error: unknown): ActionCodeFailureReas
       return "user-disabled";
     case "auth/too-many-requests":
       return "too-many-requests";
-    // ローカル開発ではAuthエミュレータ未起動が主な原因になる
     case "auth/network-request-failed":
       return "network-error";
     default:

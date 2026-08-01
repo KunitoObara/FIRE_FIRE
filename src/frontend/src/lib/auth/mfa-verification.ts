@@ -30,7 +30,6 @@ const toFailureReason = (error: unknown): MfaVerificationFailureReason | undefin
     return "too-many-requests";
   }
 
-  // ローカル開発ではAuthエミュレータ未起動が主な原因になる
   if (hasErrorCode(error, "auth/network-request-failed")) {
     return "network-error";
   }

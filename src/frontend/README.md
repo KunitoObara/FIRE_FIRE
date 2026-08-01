@@ -64,28 +64,15 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Storageバケット |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | メッセージング送信者ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | アプリID |
-| `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` | Authエミュレータの接続先。**既定で有効**(`http://127.0.0.1:9099`) |
-| `NEXT_PUBLIC_FIREBASE_FUNCTIONS_EMULATOR_URL` | Functionsエミュレータの接続先。**既定で有効**(`http://127.0.0.1:5001`)。2FAリカバリーコードの発行・検証で使う |
-| `NEXT_PUBLIC_FIREBASE_FIRESTORE_EMULATOR_URL` | Firestoreエミュレータの接続先。**既定で有効**(`http://127.0.0.1:8080`)。B2のCSV取込がクライアントSDKから直接書き込む先 |
 | `NEXT_PUBLIC_BYPASS_APP_ACCESS_GUARD` | 【開発時のみ】ログイン後の画面の認証ガードを迂回する。既定は `false`(下記「ログイン後の画面をローカルで開く」) |
+
+Firebaseの値は本番(`fire-fire-prod`)ではなく**`fire-fire-dev`(STG)のもの**を使う。`fire-fire-dev` はテスト用・開発用データが入っても本番に影響しないため、ローカル開発ではFirebase Emulatorを使わずSTGに直接繋ぐ方針にしている。サインアップすると`fire-fire-dev`に実アカウントが作られ、入力したアドレスへ実際に確認メールが送信される点に注意する。
+
+エミュレータを廃止したことで接続先は`.env.local`の値だけで決まるため、`NEXT_PUBLIC_FIREBASE_PROJECT_ID` に誤って `fire-fire-prod` を設定すると本番に実アカウント・実データが入ってしまう。これを防ぐため、**開発時に本番プロジェクトを指していた場合はFirebaseの初期化時点でエラーにして止める**(`src/lib/firebase/client.ts`)。本番ビルドではこの判定自体が成果物から消えるため影響しない。
 
 `.env.local` は `.gitignore` で除外済み。コミットしない(`.env.example` のみコミットする)。
 
-### 4. Firebaseエミュレータを起動する
-
-`.env.local` は既定でAuthエミュレータを向くため、**エミュレータを起動していないと認証が一切通らない**(サインアップが `auth/network-request-failed` で失敗する)。リポジトリルートで別ターミナルを開いて起動しておく。
-
-```bash
-firebase emulators:start
-```
-
-Emulator UI は <http://127.0.0.1:4000/auth> で、作成済みユーザーを確認・削除できる。
-
-エミュレータを使う理由は、本番のIdentity Platformに実アカウントが作られ、入力したアドレスへ実際に確認メールが飛ぶのを防ぐため。本番プロジェクトに対して手動で確認したいときだけ `.env.local` の `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` をコメントアウトする。
-
-> エミュレータは `--import` / `--export` を付けていないためデータを永続化しない。再起動すると作成済みユーザーは消えるので、同じメールアドレスで作り直せる。
-
-### 5. 開発サーバーを起動する
+### 4. 開発サーバーを起動する
 
 ```bash
 npm run dev
@@ -95,29 +82,28 @@ npm run dev
 
 #### 確認メール(A2)をローカルで開く
 
-エミュレータは確認メールを実際には送信せず、`firebase emulators:start` を実行しているターミナルに確認リンクを出力する。
-
-```
-i  To verify the email address you@example.com, follow this link: http://127.0.0.1:9099/emulator/action?mode=verifyEmail&lang=en&oobCode=...&apiKey=fake-api-key
-```
-
-このリンクをブラウザで開くと確認が完了し、A2の画面が数秒以内にA3(2FA登録画面)へ自動遷移する。
+サインアップした宛先に`fire-fire-dev`から実際に確認メールが届く。メール本文のリンクを開くと確認は完了する
+(リンク先はメールのアクションURL設定により`fire-fire-dev`のApp Hostingドメインになるが、確認自体は
+Firebaseプロジェクト側の状態更新のため、開いたブラウザがlocalhostと別でも構わない)。確認が完了すると、
+サインアップ元のlocalhostタブのA2画面がポーリングで数秒以内に検知し、A3(2FA登録画面)へ自動遷移する。
 
 #### パスワード再設定画面(A7)をローカルで開く
 
-リセットメールも同じくターミナルにリンクが出力されるが、**エミュレータのリンクはエミュレータ自身の再設定画面を指す**(Firebaseコンソールで設定するアクションURLをエミュレータは読まないため)。A7を確認するときは、出力されたリンクから `oobCode` の値をコピーして次のURLを直接開く。
+リセットメールのリンクも同じくアクションURL(`fire-fire-dev`のApp Hostingドメイン)を指すため、
+そのまま開くとSTGのデプロイ済み画面が開いてしまう。ローカルの画面(A7)で確認したいときは、
+届いたメールのリンクから `oobCode` の値をコピーして次のURLを直接開く。
 
 ```
 http://localhost:3000/reset-password?oobCode=<コピーした値>
 ```
 
-メールのリンクからA7に到達する経路そのものは、アクションURLの設定が必要なため `fire-fire-dev` で確認する([docs/ci-cd-setup.md](../../docs/ci-cd-setup.md) 12章)。
+アクションURLの設定手順は [docs/ci-cd-setup.md](../../docs/ci-cd-setup.md) 12章を参照。
 
 #### ログイン後の画面(B1〜B10)をローカルで開く
 
-エミュレータでは2FA(TOTP)を登録できず「2FA登録済み」の状態を作れないため、実際にログインしても
-必ずA3 2FA登録画面で止まり、ログイン後の画面には到達できない(下記「ローカルで確認できないもの」)。
-画面の見た目や遷移をローカルで確認したいときは、`.env.local` で次の値を有効にする。
+サインアップ → メール確認 → TOTP登録という一連の流れは`fire-fire-dev`に直結していれば実際に通しで
+確認できるが、画面の見た目や遷移だけを毎回それを経由せず素早く確認したいときは、`.env.local` で
+次の値を有効にする。
 
 ```
 NEXT_PUBLIC_BYPASS_APP_ACCESS_GUARD=true
@@ -136,24 +122,20 @@ NEXT_PUBLIC_BYPASS_APP_ACCESS_GUARD=true
 `process.env.NODE_ENV` をビルド時にリテラルへ置き換えるため、迂回する側の分岐は本番の成果物に残らない
 (`src/constants/dev.ts`)。
 
-#### ローカルで確認できないもの
+#### ローカルで確認できるようになったもの / 残る制約
 
-以下はエミュレータでは再現できないため、`develop` マージ後のステージング環境(`fire-fire-dev`)で確認する。
+`fire-fire-dev`に直結しているため、Identity Platform側で強制されるパスワードポリシー、TOTPによる
+2FA登録・ログイン、Google連携(A8)、2FAリカバリーコードの発行(A3)・使用(A5)、B2 CSV取込の実際の
+Firestore書き込みは、いずれもローカルで通しに確認できる。
 
-- Identity Platform側で強制するパスワードポリシー(エミュレータは強制しない)
-- 実際に送信される確認メール・パスワードリセットメールの文面と到達、およびメール内リンクからA7・A2の受け口(`/auth/action`)へ届く経路
-- TOTPによる2FA、Blocking Functions経由のログイン通知メール
-- 2FAリカバリーコードの発行(A3)と使用(A5)。2FAを登録した状態を作れないため通しで試せない(下記)
-- B2 CSV取込の「取込を実行する」(Firestoreへの書き込み)。上の認証ガード迂回はサインインしていないため `auth.currentUser` が `null` で、書き込みは「ログイン状態が切れています」で止まる。ファイル選択・パース・プレビュー・エラー表示まではローカルで確認できる
+残る制約はメールのアクションURLに起因するものだけ。パスワードリセット・メールアドレス確認のリンク先は
+プロジェクトに1つだけ設定でき、`fire-fire-dev`のApp Hostingドメインに固定している([docs/ci-cd-setup.md](../../docs/ci-cd-setup.md) 12章)。
+メール確認(A2)は確認状態がFirebaseプロジェクト側で更新されるためlocalhostのタブでも自動検知できるが、
+パスワード再設定(A7)はlocalhostの画面自体を開く必要があるため、上記「パスワード再設定画面(A7)をローカルで開く」の
+`oobCode`コピーの手順を使う。
 
-A3(2FA登録画面)はエミュレータではQRコードを発行できず、TOTPの有効化を促すエラー表示になる。
-エミュレータがSMSの多要素認証しか実装しておらず、TOTPの登録要求を `auth/invalid-argument`
-(`Missing phoneEnrollmentInfo.`)で拒否するため。登録が成功するところまでは `fire-fire-dev` で確認する。
-
-リカバリーコード(A3の発行・A5の「リカバリーコードを使う」)は Cloud Functions を経由するため、
-`firebase emulators:start` に functions と firestore が含まれている必要がある(`firebase.json` の既定で含まれる)。
-ただし上記のとおり2FAを登録した状態自体が作れないので、通しの確認は `fire-fire-dev` で行う
-(切り分けの一覧は [docs/ci-cd-setup.md](../../docs/ci-cd-setup.md) 11章)。
+ログイン通知メール(Identity Platform Blocking Functions経由)は未実装(`src/backend`はまだ2FAリカバリーコードの
+callableのみのスキャフォールド)。
 
 ## 利用可能なスクリプト
 
