@@ -12,6 +12,80 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ユーザー自身の資産データ(docs/fire-asset-management-requirements.md 5章)。
+    //
+    // B2 CSV取込はクライアントSDKから直接書き込む。認証状態はブラウザ側のFirebase SDKが
+    // 持っていてサーバー側から`uid`を特定できないため、アクセス制御はここが唯一の砦になる
+    // (画面側の`AppAccessGuard`は表示制御であって保護ではない)。
+    //
+    // メール未確認のアカウントを弾くのは、アドレスの所有者ではない相手が作った
+    // アカウントに資産データを溜めさせないため(A2でメール確認を必須にしているのと同じ理由)。
+    //
+    // 2FA(TOTP)はアプリの必須要件だが、ここでは`sign_in_second_factor`を要求しない。
+    // Authエミュレータが TOTP を実装しておらずローカルでこの請求を持つトークンを作れないため、
+    // 要求するとデータを扱う画面がすべてエミュレータで動かせなくなる
+    // (docs/ci-cd-setup.md 11章と同じ制約)。2FAの強制は認証フロー側で行う。
+    // アプリが日付を持つ書式(`yyyy-MM-dd`。src/constants/csv-import.ts の STORED_DATE_FORMAT)。
+    // 資産残高のドキュメントIDにも使うため、形の崩れた日付を作らせない
+    function isIsoDate(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isOwner(userId) {
+      return request.auth != null
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true;
+    }
+
+    match /users/{userId} {
+      // 親ドキュメント自体は使わない。配下だけを許可し、ここは既定の拒否のままにする。
+
+      // 資産残高推移CSVから取り込んだ日次の資産残高。
+      // ドキュメントIDは集計日(`yyyy-MM-dd`)で、同じ日付の再取込は上書きになる。
+      //
+      // `create`と`update`を`write`でまとめない。`write`は削除も含むが、削除では
+      // `request.resource`が存在せず下の検証式が評価できないため、意図が読めないまま
+      // 削除だけが落ちる。許可する操作は1つずつ書く。
+      match /assetSnapshots/{date} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          // 想定外のフィールドを混ぜて書けないようにする。B1がこのデータを直接集計する
+          // ようになったとき、読み出し側で形を疑わずに済むようにしておく
+          && request.resource.data.keys().hasOnly(['date', 'total', 'byType', 'importedAt'])
+          && isIsoDate(request.resource.data.date)
+          // ドキュメントIDと中身の日付がずれた資産残高を作らせない
+          && request.resource.data.date == date
+          && request.resource.data.total is number
+          && request.resource.data.importedAt is timestamp
+          // `byType`は資産種別が動的に増減するマップなので、キーは列挙できない。
+          // ルールに繰り返しが無く値をすべて検査することもできないため、
+          // 個々の金額が数値であることはパース側(src/lib/csv/asset-balance-csv.ts)で担保する
+          && request.resource.data.byType is map;
+        // 資産残高を消す画面はまだ無い。必要になった時点でここに許可を書く
+        allow delete: if false;
+      }
+
+      // 取込履歴(B2の「直近の取込履歴」)。取り消し・改ざんの余地を残さないよう、
+      // 追加と参照だけを許し、更新・削除は禁じる。
+      match /csvImports/{importId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(
+            ['typeId', 'fileName', 'rowCount', 'periodFrom', 'periodTo', 'importedAt']
+          )
+          // 取込種別は画面のタブ(src/constants/csv-import.ts)と対応する2値に限る。
+          // 種別を増やすときはここも足す
+          && request.resource.data.typeId in ['asset-balance', 'transaction']
+          && request.resource.data.fileName is string
+          && request.resource.data.rowCount is number
+          && request.resource.data.rowCount >= 0
+          && isIsoDate(request.resource.data.periodFrom)
+          && isIsoDate(request.resource.data.periodTo)
+          && request.resource.data.importedAt is timestamp;
+        allow update, delete: if false;
+      }
+    }
+
     // 上記以外も既定で拒否する。コレクションを追加するときは、
     // ここへ意図した許可を書くまで誰も読み書きできない状態から始める。
     match /{document=**} {
