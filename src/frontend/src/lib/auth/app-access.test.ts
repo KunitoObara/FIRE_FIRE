@@ -62,7 +62,6 @@ describe("subscribeToAppAccessState", () => {
   });
 
   /**
-   * エミュレータではTOTPを登録できず、ローカルでは常に`mfa-required`になってしまう。
    * 迂回中はFirebaseに触れずに`ready`を返す(Firebase未設定でも画面を開ける)。
    */
   it("開発時の迂回が有効なら、Firebaseを呼ばずにreadyを通知する", () => {

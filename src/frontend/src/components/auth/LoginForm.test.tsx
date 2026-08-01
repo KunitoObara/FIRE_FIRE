@@ -195,7 +195,7 @@ describe("LoginForm", () => {
       expect(replace).not.toHaveBeenCalled();
     });
 
-    it("接続不可のときはエミュレータ起動の確認を促す", async () => {
+    it("接続不可のときはネットワーク接続の確認を促す", async () => {
       const user = userEvent.setup();
       signInWithEmail.mockResolvedValue({ ok: false, reason: "network-error" });
       render(<LoginForm />);
@@ -203,7 +203,7 @@ describe("LoginForm", () => {
       await fillValidForm(user);
       await submit(user);
 
-      expect(await screen.findByText(/firebase emulators:start/)).toBeInTheDocument();
+      expect(await screen.findByText(/ネットワーク接続を確認してください/)).toBeInTheDocument();
       expect(replace).not.toHaveBeenCalled();
     });
 
