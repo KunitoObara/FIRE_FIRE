@@ -48,11 +48,14 @@
   </div>
 </div>
 
-<!-- ログアウトの確認ダイアログ(screen-requirements-account.md 2章)。B系の共通ヘッダーと同一のもの -->
+<!-- ログアウトの確認ダイアログ(screen-requirements-account.md 2章)。
+     コンポーネントはB系の共通ヘッダーと同一で、注記の文言だけを出し分ける。
+     この時点ではTOTPが未登録のため、共通ヘッダー版の「再ログインには認証アプリの
+     確認コードが必要」は事実と異なる。代わりに未完了の手順(メールアドレスの確認)を伝える。 -->
 <div id="logout-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4); z-index: 50;">
   <div class="card p-6 max-w-sm w-full text-left">
     <h3 class="text-base font-bold mb-2">ログアウトしますか?</h3>
-    <p class="text-sm text-slate-500 mb-5">現在のアカウント(taro.yamada@example.com)からログアウトし、ログイン画面へ移動します。</p>
+    <p class="text-sm text-slate-500 mb-5">現在のアカウント(taro.yamada@example.com)からログアウトし、ログイン画面へ移動します。メールアドレスの確認はまだ完了していません。</p>
     <div class="flex gap-3">
       <a href="a4-login.html?loggedOut=1" class="btn btn-primary flex-1">ログアウトする</a>
       <button class="btn btn-ghost" type="button" onclick="document.getElementById('logout-dialog').classList.add('hidden')">キャンセル</button>

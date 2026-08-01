@@ -21,7 +21,11 @@
     <!-- ログアウト直後の表示(screen-requirements-auth.md A4)。
          ログアウト完了専用の画面を設けず、操作の結果をここで伝える。直後の1回だけで、
          ガードによる差し戻しやセッション期限切れでA4へ来た場合は出さない。
-         モックでは ?loggedOut=1 付きで開いたときに表示する。 -->
+
+         下の ?loggedOut=1 は静的ファイル間で状態を渡せないモック都合の代用であり、
+         実装では踏襲しない。クエリで制御すると /login?loggedOut=1 を直接開くだけで
+         表示でき、リロードでも消えないため「直後の1回だけ」が成立しなくなる。
+         実装ではメモリ上の一過性の状態で判断する(screen-requirements-auth.md A4)。 -->
     <div id="logged-out-notice" class="alert alert-success mb-5 hidden">
       <span>ログアウトしました。</span>
     </div>
