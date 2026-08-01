@@ -159,6 +159,22 @@ describe("parseAssetBalanceCsv", () => {
     expect(expectFailure(csv)).toBe("unnamed-column");
   });
 
+  it("ヘッダーより列が多くても、余った列が空なら取り込める", () => {
+    const csv = ['"日付","合計（円）","投資信託（円）"', '"2026/07/31","100","100",""'].join("\n");
+
+    expect(expectParsed(csv).rows).toHaveLength(1);
+  });
+
+  /** 列がずれたCSVを、内訳が実態とずれたまま取り込まないようにする */
+  it("ヘッダーに無い列に値がある行を含むCSVは取り込めない", () => {
+    const csv = ['"日付","合計（円）","投資信託（円）"', '"2026/07/31","100","50","999"'].join(
+      "\n",
+    );
+    const result = parseAssetBalanceCsv(csv);
+
+    expect(result).toMatchObject({ ok: false, reason: "unnamed-column", detail: "2行目" });
+  });
+
   it("日付の列が2つあるCSVは取り込めない", () => {
     const csv = ['"日付","合計（円）","日付"', '"2026/07/31","100","2026/07/31"'].join("\n");
 

@@ -227,9 +227,19 @@ export const parseAssetBalanceCsv = (text: string): AssetBalanceParseResult => {
   const seenDates = new Set<string>();
 
   for (const [index, cells] of dataRows.entries()) {
-    // 末尾のカンマで空の列が1つ増えることはあるが、足りない行は形式が違う
+    // 列が足りない行は形式が違う
     if (cells.length < headerCells.length) {
       return { ok: false, reason: "missing-column", detail: `${toLineNumber(index)}行目` };
+    }
+
+    // ヘッダーより列が多い行。末尾のカンマで空の列が1つ増えるだけなら無視してよいが、
+    // 値が入っているなら対応する列名が無いということなので、列名が空の列と同じく弾く
+    const hasValueBeyondHeader = cells
+      .slice(headerCells.length)
+      .some((cell) => cell.trim().length > 0);
+
+    if (hasValueBeyondHeader) {
+      return { ok: false, reason: "unnamed-column", detail: `${toLineNumber(index)}行目` };
     }
 
     const result = readRow(cells, header);

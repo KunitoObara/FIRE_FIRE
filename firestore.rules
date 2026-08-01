@@ -56,6 +56,7 @@ service cloud.firestore {
           // ドキュメントIDと中身の日付がずれた資産残高を作らせない
           && request.resource.data.date == date
           && request.resource.data.total is number
+          && request.resource.data.importedAt is timestamp
           // `byType`は資産種別が動的に増減するマップなので、キーは列挙できない。
           // ルールに繰り返しが無く値をすべて検査することもできないため、
           // 個々の金額が数値であることはパース側(src/lib/csv/asset-balance-csv.ts)で担保する
@@ -79,7 +80,8 @@ service cloud.firestore {
           && request.resource.data.rowCount is number
           && request.resource.data.rowCount >= 0
           && isIsoDate(request.resource.data.periodFrom)
-          && isIsoDate(request.resource.data.periodTo);
+          && isIsoDate(request.resource.data.periodTo)
+          && request.resource.data.importedAt is timestamp;
         allow update, delete: if false;
       }
     }
