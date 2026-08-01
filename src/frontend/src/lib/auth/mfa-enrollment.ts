@@ -16,7 +16,7 @@ const SESSION_LOST_ERROR_CODES = ["auth/user-token-expired", "auth/user-not-foun
 const isSessionLost = (error: unknown): boolean =>
   error instanceof FirebaseError && SESSION_LOST_ERROR_CODES.includes(error.code);
 
-/** リクエストがFirebaseに届かなかったか。ローカルではAuthエミュレータ未起動が主な原因 */
+/** リクエストがFirebaseに届かなかったか */
 const isNetworkError = (error: unknown): boolean =>
   error instanceof FirebaseError && error.code === "auth/network-request-failed";
 
@@ -72,8 +72,7 @@ const toSharedFailureReason = (error: unknown): TotpEnrollmentStartFailureReason
   // Identity Platformへの未アップグレード、または多要素認証(TOTP)の未有効化。
   //
   // `auth/invalid-argument`もここに含める。TOTPの登録要求には利用者の入力が混ざらないため、
-  // 引数が不正と返るのは受け側がTOTPの登録に対応していない場合に限られる。実際、Authエミュレータは
-  // SMSの多要素認証しか実装しておらず、`Missing phoneEnrollmentInfo.`を添えてこのコードを返す。
+  // 引数が不正と返るのは受け側がTOTPの登録に対応していない場合に限られる。
   // 汎用の失敗として扱うと原因に辿り着けないので、有効化手順を案内する側に寄せる。
   if (
     hasErrorCode(error, "auth/operation-not-allowed") ||

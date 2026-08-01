@@ -57,5 +57,3 @@ env:
     availability:
       - BUILD
       - RUNTIME
-# NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL はローカル開発専用。
-# デプロイ環境で設定するとエミュレータへ繋ごうとして認証が壊れるため、ここには置かない。
