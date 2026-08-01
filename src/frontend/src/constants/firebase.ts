@@ -7,6 +7,15 @@
 export const FIREBASE_FUNCTIONS_REGION = "asia-northeast1";
 
 /**
+ * 本番のFirebaseプロジェクトID。
+ *
+ * ローカル開発の接続先が誤って本番になっていないかの判定にだけ使う
+ * (`src/lib/firebase/client.ts`)。B0-1でエミュレータを廃止し、接続先が`.env.local`の値だけで
+ * 決まるようになったため、この照合が本番への誤接続を止める唯一の砦になっている。
+ */
+export const PRODUCTION_FIREBASE_PROJECT_ID = "fire-fire-prod";
+
+/**
  * 2FAリカバリーコードを発行するcallable関数の名前(A3の登録完了時・B10の再発行)。
  * バックエンドのexport名(src/backend/src/mfa-recovery/functions.ts)と一致させる。
  */

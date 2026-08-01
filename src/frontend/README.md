@@ -68,6 +68,8 @@ cp .env.example .env.local
 
 Firebaseの値は本番(`fire-fire-prod`)ではなく**`fire-fire-dev`(STG)のもの**を使う。`fire-fire-dev` はテスト用・開発用データが入っても本番に影響しないため、ローカル開発ではFirebase Emulatorを使わずSTGに直接繋ぐ方針にしている。サインアップすると`fire-fire-dev`に実アカウントが作られ、入力したアドレスへ実際に確認メールが送信される点に注意する。
 
+エミュレータを廃止したことで接続先は`.env.local`の値だけで決まるため、`NEXT_PUBLIC_FIREBASE_PROJECT_ID` に誤って `fire-fire-prod` を設定すると本番に実アカウント・実データが入ってしまう。これを防ぐため、**開発時に本番プロジェクトを指していた場合はFirebaseの初期化時点でエラーにして止める**(`src/lib/firebase/client.ts`)。本番ビルドではこの判定自体が成果物から消えるため影響しない。
+
 `.env.local` は `.gitignore` で除外済み。コミットしない(`.env.example` のみコミットする)。
 
 ### 4. 開発サーバーを起動する
