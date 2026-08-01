@@ -92,14 +92,14 @@ describe("ForgotPasswordForm", () => {
   });
 
   describe("送信失敗", () => {
-    it("接続不可のときはエミュレータ起動の確認を促し、完了メッセージは出さない", async () => {
+    it("接続不可のときはネットワーク接続の確認を促し、完了メッセージは出さない", async () => {
       const user = userEvent.setup();
       requestPasswordReset.mockResolvedValue({ ok: false, reason: "network-error" });
       render(<ForgotPasswordForm />);
 
       await sendFor(user);
 
-      expect(await screen.findByText(/firebase emulators:start/)).toBeInTheDocument();
+      expect(await screen.findByText(/ネットワーク接続を確認してください/)).toBeInTheDocument();
       expect(screen.queryByText(SENT_MESSAGE)).not.toBeInTheDocument();
     });
 

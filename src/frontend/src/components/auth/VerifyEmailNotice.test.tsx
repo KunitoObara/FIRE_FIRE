@@ -202,11 +202,11 @@ describe("VerifyEmailNotice", () => {
       expect(replace).toHaveBeenCalledWith("/mfa-setup");
     });
 
-    it("Firebaseに接続できないときはエミュレータ起動を促し、確認は続ける", async () => {
+    it("Firebaseに接続できないときはネットワーク接続の確認を促し、確認は続ける", async () => {
       reloadEmailVerificationState.mockResolvedValue({ status: "network-error" });
       await renderAndSettle();
 
-      expect(screen.getByRole("alert")).toHaveTextContent("firebase emulators:start");
+      expect(screen.getByRole("alert")).toHaveTextContent("ネットワーク接続を確認してください");
 
       const callsAfterMount = reloadEmailVerificationState.mock.calls.length;
       await advance(EMAIL_VERIFICATION_POLL_INTERVAL_MS);
@@ -305,13 +305,13 @@ describe("VerifyEmailNotice", () => {
       expect(screen.getByText("確認メールを再送しました。")).toBeInTheDocument();
     });
 
-    it("Firebaseに接続できないときは再送エラーとしてエミュレータ起動を促し、すぐ再試行できる", async () => {
+    it("Firebaseに接続できないときは再送エラーとしてネットワーク接続の確認を促し、すぐ再試行できる", async () => {
       resendVerificationEmail.mockResolvedValue({ ok: false, reason: "network-error" });
       await renderAndSettle();
 
       await clickResend();
 
-      expect(screen.getByText(/firebase emulators:start/)).toBeInTheDocument();
+      expect(screen.getByText(/ネットワーク接続を確認してください/)).toBeInTheDocument();
       // 原因がローカル側にあるため、直したらすぐ試せるようクールダウンは置かない
       expect(screen.getByRole("button", { name: "確認メールを再送する" })).toBeEnabled();
     });

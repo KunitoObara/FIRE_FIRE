@@ -330,7 +330,7 @@ describe("SignupForm", () => {
       expect(push).not.toHaveBeenCalled();
     });
 
-    it("Firebaseに接続できないときはエミュレータ起動を促すエラーを表示する", async () => {
+    it("Firebaseに接続できないときはネットワーク接続の確認を促すエラーを表示する", async () => {
       const user = userEvent.setup();
       signUpWithEmail.mockResolvedValue({ ok: false, reason: "network-error" });
       render(<SignupForm />);
@@ -339,7 +339,7 @@ describe("SignupForm", () => {
       await submitAndAwaitConfirmation(user);
       await user.click(screen.getByRole("button", { name: "はい" }));
 
-      expect(await screen.findByText(/firebase emulators:start/)).toBeInTheDocument();
+      expect(await screen.findByText(/ネットワーク接続を確認してください/)).toBeInTheDocument();
       expect(push).not.toHaveBeenCalled();
     });
 

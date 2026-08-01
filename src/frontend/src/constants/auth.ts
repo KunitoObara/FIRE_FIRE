@@ -24,13 +24,9 @@ export const FIREBASE_CONFIGURATION_MESSAGE =
 
 /**
  * 認証リクエストがFirebaseに届かなかったときに画面へ出すメッセージ。
- *
- * `.env.local` は既定でAuthエミュレータ(127.0.0.1:9099)を向くため、ローカル開発では
- * 「エミュレータを起動していない」が最も多い原因になる。単なる通信エラーとして扱うと
- * 原因に辿り着けないので、確認先を具体的に示す(README「開発サーバーを起動する」参照)。
  */
 export const FIREBASE_NETWORK_ERROR_MESSAGE =
-  "Firebaseに接続できませんでした。ローカル開発ではリポジトリルートで `firebase emulators:start` を実行しているか、ネットワーク接続を確認してください。";
+  "Firebaseに接続できませんでした。ネットワーク接続を確認してください。";
 
 /**
  * Firebase側のレート制限(`auth/too-many-requests`)に当たったときのメッセージ。
@@ -138,11 +134,10 @@ export const EMAIL_VERIFICATION_POLL_INTERVAL_MS = 5_000;
  * プロジェクト側でTOTP多要素認証が有効になっていないときに画面へ出すメッセージ。
  *
  * TOTP型2FAはIdentity Platformへのアップグレードと多要素認証の有効化が前提
- * (docs/auth-login-requirements.md 3.3)。Authエミュレータでも再現されないため、
- * ローカルで登録を試すとここに来る。開発者本人が使うアプリなので対処法をそのまま出す。
+ * (docs/auth-login-requirements.md 3.3)。開発者本人が使うアプリなので対処法をそのまま出す。
  */
 export const TOTP_NOT_ENABLED_MESSAGE =
-  "2段階認証(TOTP)がプロジェクトで有効になっていません。FirebaseプロジェクトをIdentity Platformへアップグレードし、多要素認証のTOTPを有効化してください(ローカルのAuthエミュレータでは登録できません)。";
+  "2段階認証(TOTP)がプロジェクトで有効になっていません。FirebaseプロジェクトをIdentity Platformへアップグレードし、多要素認証のTOTPを有効化してください。";
 
 /** A3で再認証が必要なほどセッションが古いときに画面へ出すメッセージ */
 export const REQUIRES_RECENT_LOGIN_MESSAGE =
@@ -370,11 +365,10 @@ export const TOTP_FACTOR_DISPLAY_NAME = "認証アプリ";
  * Cloud Functions(callable)に到達できなかった・サーバー側で処理しきれなかったときのメッセージ。
  *
  * 通信不能とサーバー側の想定外エラーはSDK上どちらも`functions/internal`になり区別できない
- * (`src/lib/auth/mfa-recovery.ts`)。ローカル開発ではfunctionsエミュレータの未起動が
- * 最も多い原因になるため、確認先を具体的に示す。
+ * (`src/lib/auth/mfa-recovery.ts`)。
  */
 export const FUNCTIONS_UNAVAILABLE_MESSAGE =
-  "サーバー側の処理に接続できませんでした。ローカル開発ではリポジトリルートで `firebase emulators:start` を実行しているか、ネットワーク接続を確認してください。";
+  "サーバー側の処理に接続できませんでした。ネットワーク接続を確認してください。";
 
 /**
  * A3の2FA登録完了後・B10の再発行でリカバリーコードを発行できなかったときのメッセージ。
