@@ -15,8 +15,15 @@ describe("formatJpy", () => {
     expect(formatJpy(1_234.6)).toBe("¥ 1,235");
   });
 
-  it("負の金額はマイナス付きで表示する", () => {
-    expect(formatJpy(-1_200)).toBe("¥ -1,200");
+  /** 負債の残高など。同じ金額が画面によって別の書き方になると読み違いのもとになる */
+  it("負の金額はformatSignedJpyと同じ形で表示する", () => {
+    expect(formatJpy(-1_200)).toBe("- ¥ 1,200");
+    expect(formatJpy(-1_200)).toBe(formatSignedJpy(-1_200));
+  });
+
+  /** 残高に`+`が並ぶと増減を表しているように読めてしまう */
+  it("プラスの金額には符号を付けない", () => {
+    expect(formatJpy(1_200)).toBe("¥ 1,200");
   });
 });
 

@@ -13,8 +13,22 @@ const compactJpyFormatter = new Intl.NumberFormat("ja-JP", {
   maximumFractionDigits: 1,
 });
 
-/** `¥ 49,600,000` の形に整形する */
-export const formatJpy = (amount: number): string => `¥ ${jpyFormatter.format(Math.round(amount))}`;
+/**
+ * 残高や金額など、量そのものを表す値を `¥ 49,600,000` の形に整形する。
+ *
+ * 負の値(負債の残高など)は `- ¥ 84,200` とし、`formatSignedJpy`と見た目を揃える。
+ * 同じ金額が画面によって `¥ -84,200` と `- ¥ 84,200` に分かれると、桁の読み違いを
+ * 避けたい場面(DESIGN.md 1章)で余計な負荷になるため。
+ *
+ * プラスの符号を付けない点だけが`formatSignedJpy`との違いになる。残高に`+`が並ぶと
+ * 増減を表しているように読めてしまうため、符号自体が意味を持つ値にだけそちらを使う。
+ */
+export const formatJpy = (amount: number): string => {
+  const rounded = Math.round(amount);
+  const body = `¥ ${jpyFormatter.format(Math.abs(rounded))}`;
+
+  return rounded < 0 ? `- ${body}` : body;
+};
 
 /**
  * 収支のように符号自体が意味を持つ金額を `+ ¥ 134,700` の形に整形する。
