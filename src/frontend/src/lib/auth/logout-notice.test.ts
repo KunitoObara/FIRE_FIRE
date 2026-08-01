@@ -1,22 +1,31 @@
 import { describe, expect, it } from "vitest";
 
-import { consumeLoggedOutNotice, markLoggedOut } from "@/lib/auth/logout-notice";
+import { clearLoggedOutNotice, markLoggedOut, wasLoggedOut } from "@/lib/auth/logout-notice";
 
 describe("logout-notice", () => {
   it("立てていなければfalseを返す", () => {
-    expect(consumeLoggedOutNotice()).toBe(false);
+    clearLoggedOutNotice();
+
+    expect(wasLoggedOut()).toBe(false);
   });
 
   it("立てた後はtrueを返す", () => {
     markLoggedOut();
 
-    expect(consumeLoggedOutNotice()).toBe(true);
+    expect(wasLoggedOut()).toBe(true);
   });
 
-  it("読み出すと同時に消費し、以降はfalseを返す(直後の1回だけ)", () => {
+  it("読み出しだけでは消費しない(Strict Modeで複数回呼ばれても安全)", () => {
     markLoggedOut();
-    consumeLoggedOutNotice();
 
-    expect(consumeLoggedOutNotice()).toBe(false);
+    expect(wasLoggedOut()).toBe(true);
+    expect(wasLoggedOut()).toBe(true);
+  });
+
+  it("消費した後はfalseを返す(直後の1回だけ出す)", () => {
+    markLoggedOut();
+    clearLoggedOutNotice();
+
+    expect(wasLoggedOut()).toBe(false);
   });
 });

@@ -1,15 +1,19 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LoginForm } from "@/components/auth/LoginForm";
 
 import type { UserEvent } from "@testing-library/user-event";
 
+import type * as LogoutNoticeModule from "@/lib/auth/logout-notice";
+
 const replace = vi.fn();
 const signInWithEmail =
   vi.fn<(email: string, password: string, rememberMe: boolean) => Promise<SignInResult>>();
-const consumeLoggedOutNotice = vi.fn<() => boolean>();
+const wasLoggedOut = vi.fn<() => boolean>();
+const clearLoggedOutNotice = vi.fn<() => void>();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
@@ -20,8 +24,12 @@ vi.mock("@/lib/auth/sign-in", () => ({
     signInWithEmail(email, password, rememberMe),
 }));
 
-vi.mock("@/lib/auth/logout-notice", () => ({
-  consumeLoggedOutNotice: () => consumeLoggedOutNotice(),
+// `markLoggedOut`は実物のまま残す。Strict Modeの回帰テストは実物の`markLoggedOut`で
+// フラグを立て、`wasLoggedOut`/`clearLoggedOutNotice`もその場だけ実物に差し替えて使う
+vi.mock("@/lib/auth/logout-notice", async (importOriginal) => ({
+  ...(await importOriginal<typeof LogoutNoticeModule>()),
+  wasLoggedOut: () => wasLoggedOut(),
+  clearLoggedOutNotice: () => clearLoggedOutNotice(),
 }));
 
 const PASSWORD = "Passw0rd!";
@@ -43,22 +51,55 @@ describe("LoginForm", () => {
     replace.mockReset();
     signInWithEmail.mockReset();
     signInWithEmail.mockResolvedValue({ ok: true, next: "mfa-verify" });
-    consumeLoggedOutNotice.mockReset();
-    consumeLoggedOutNotice.mockReturnValue(false);
+    wasLoggedOut.mockReset();
+    wasLoggedOut.mockReturnValue(false);
+    clearLoggedOutNotice.mockReset();
   });
 
   describe("「ログアウトしました」の表示(docs/screen-requirements-auth.md A4)", () => {
     it("ログアウト直後は表示する", () => {
-      consumeLoggedOutNotice.mockReturnValue(true);
+      wasLoggedOut.mockReturnValue(true);
       render(<LoginForm />);
 
       expect(screen.getByRole("status")).toHaveTextContent("ログアウトしました。");
+    });
+
+    it("表示後は消費して、以降の再訪問では出さない", () => {
+      wasLoggedOut.mockReturnValue(true);
+      render(<LoginForm />);
+
+      expect(clearLoggedOutNotice).toHaveBeenCalledTimes(1);
     });
 
     it("ガードによる差し戻しやセッション期限切れ等の通常表示では出さない", () => {
       render(<LoginForm />);
 
       expect(screen.queryByText("ログアウトしました。")).not.toBeInTheDocument();
+      expect(clearLoggedOutNotice).not.toHaveBeenCalled();
+    });
+
+    /**
+     * `wasLoggedOut`(読み出し)と`clearLoggedOutNotice`(消費)を分けている理由そのものの回帰確認。
+     *
+     * 両者を1つの自己消費する関数にまとめて`useState`のレイジー初期化子に渡すと、
+     * React Strict Modeは初期化関数を2回呼ぶため(1回目の結果は破棄され、2回目の戻り値が
+     * コミットされる仕様)、1回目の呼び出しでフラグが消費され、2回目は必ずfalseを返してしまう
+     * (`src/lib/auth/logout-notice.ts`)。実物のモジュールを使い、Strict Modeで再現して
+     * 防げていることを確かめる。
+     */
+    it("Strict Modeでレイジー初期化子が2回呼ばれても表示する(回帰確認)", async () => {
+      const actual = await vi.importActual<typeof LogoutNoticeModule>("@/lib/auth/logout-notice");
+      wasLoggedOut.mockImplementation(actual.wasLoggedOut);
+      clearLoggedOutNotice.mockImplementation(actual.clearLoggedOutNotice);
+      actual.markLoggedOut();
+
+      render(
+        <StrictMode>
+          <LoginForm />
+        </StrictMode>,
+      );
+
+      expect(screen.getByRole("status")).toHaveTextContent("ログアウトしました。");
     });
   });
 

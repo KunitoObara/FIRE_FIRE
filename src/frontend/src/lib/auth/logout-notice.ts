@@ -9,6 +9,11 @@
  * `pending-login.ts`と同じくモジュールスコープの変数に置く。ページの再読み込みで必ず消え、
  * ガードによる差し戻しやセッション期限切れではこのフラグが立たないため、自分でログアウトした
  * 場合とそれ以外を区別できる。
+ *
+ * 読み出し(`wasLoggedOut`)と消費(`clearLoggedOutNotice`)を分けているのは、`pending-login.ts`の
+ * `getPendingLogin`と同じ理由による。読み出しを`useState`のレイジー初期化子で使う場合、
+ * React Strict Modeは初期化関数を2回呼ぶ(1回目の結果は破棄され、2回目の戻り値がコミットされる)。
+ * 読み出しと消費が同じ関数だと1回目の呼び出しでフラグが消費され、2回目は必ずfalseを返してしまう。
  */
 
 let loggedOut = false;
@@ -18,12 +23,10 @@ export const markLoggedOut = (): void => {
   loggedOut = true;
 };
 
-/**
- * フラグを読み出し、同時に消費する。
- * A4のマウント時に一度だけ呼ぶ。呼び出し後は再度trueを返さないため、リロードや再訪問では出ない。
- */
-export const consumeLoggedOutNotice = (): boolean => {
-  const wasLoggedOut = loggedOut;
+/** 副作用なく現在の値を読み出す。Strict Modeで複数回呼ばれても安全 */
+export const wasLoggedOut = (): boolean => loggedOut;
+
+/** 表示した後に消費する。以降の読み出しではfalseを返すため、再訪問時には出ない */
+export const clearLoggedOutNotice = (): void => {
   loggedOut = false;
-  return wasLoggedOut;
 };

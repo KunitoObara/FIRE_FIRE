@@ -1,7 +1,7 @@
 import { FirebaseError } from "firebase/app";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { consumeLoggedOutNotice } from "@/lib/auth/logout-notice";
+import { clearLoggedOutNotice, wasLoggedOut } from "@/lib/auth/logout-notice";
 import { clearPendingLogin, getPendingLogin, setPendingLogin } from "@/lib/auth/pending-login";
 import { performSignOut } from "@/lib/auth/sign-out";
 
@@ -33,7 +33,7 @@ describe("performSignOut", () => {
     signOut.mockResolvedValue(undefined);
     clearPendingLogin();
     // 前のテストで立てたままの一過性フラグを掃除する
-    consumeLoggedOutNotice();
+    clearLoggedOutNotice();
   });
 
   it("ローカルのセッションを破棄する", async () => {
@@ -53,7 +53,7 @@ describe("performSignOut", () => {
   it("成功時はA4に「ログアウトしました」を出すフラグを立てる", async () => {
     await performSignOut();
 
-    expect(consumeLoggedOutNotice()).toBe(true);
+    expect(wasLoggedOut()).toBe(true);
   });
 
   it("渡されたキャッシュ初期化のコールバックを成功時に呼ぶ(共通ヘッダーのqueryClient.clear())", async () => {
@@ -77,7 +77,7 @@ describe("performSignOut", () => {
 
       // サインイン状態は残ったままなので、途中の状態を巻き戻さない
       expect(getPendingLogin()).not.toBeNull();
-      expect(consumeLoggedOutNotice()).toBe(false);
+      expect(wasLoggedOut()).toBe(false);
     });
 
     it("その他の失敗はunknownとして返す", async () => {

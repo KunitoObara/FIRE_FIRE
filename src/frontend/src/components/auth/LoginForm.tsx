@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import { DevDashboardShortcut } from "@/components/auth/DevDashboardShortcut";
@@ -15,7 +15,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input";
 import { SIGN_IN_MESSAGES, SIGN_IN_NEXT_PATHS } from "@/constants/auth";
 import { FORGOT_PASSWORD_PATH, SIGNUP_PATH } from "@/constants/routes";
-import { consumeLoggedOutNotice } from "@/lib/auth/logout-notice";
+import { clearLoggedOutNotice, wasLoggedOut } from "@/lib/auth/logout-notice";
 import { signInWithEmail } from "@/lib/auth/sign-in";
 import { loginSchema } from "@/schemas/login";
 
@@ -53,9 +53,17 @@ export const LoginForm = (): JSX.Element => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   // 自分でログアウトした直後の1回だけ出す。ガードによる差し戻しやセッション期限切れでは
-  // このフラグが立たないため出ない。読み出しと同時に消費されるため、初期化関数は一度だけ呼ぶ
-  // (docs/screen-requirements-auth.md A4)
-  const [showLoggedOutNotice] = useState(() => consumeLoggedOutNotice());
+  // このフラグが立たないため出ない(docs/screen-requirements-auth.md A4)。
+  // `wasLoggedOut`は副作用の無い読み出しのため、Strict Modeでレイジー初期化子が2回
+  // 呼ばれても安全(`src/lib/auth/logout-notice.ts`)。消費(次回以降は出さない)は
+  // 別途effectで行う
+  const [showLoggedOutNotice] = useState(() => wasLoggedOut());
+
+  useEffect(() => {
+    if (showLoggedOutNotice) {
+      clearLoggedOutNotice();
+    }
+  }, [showLoggedOutNotice]);
 
   const handleValidSubmit = async (values: LoginFormValues): Promise<void> => {
     clearErrors("root");
