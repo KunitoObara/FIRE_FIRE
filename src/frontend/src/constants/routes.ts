@@ -39,6 +39,16 @@ export const TRANSACTIONS_PATH = "/transactions";
 export const ASSET_CATEGORIES_PATH = "/asset-categories";
 /** B5 不動産一覧画面 */
 export const REAL_ESTATE_PATH = "/real-estate";
+/** B7 不動産登録・編集画面(新規登録モード)。B5の「新規登録」ボタンから遷移する */
+export const REAL_ESTATE_NEW_PATH = `${REAL_ESTATE_PATH}/new`;
+/**
+ * B6 不動産詳細画面のパス。B5の物件行から物件IDを指定して遷移する。
+ *
+ * サイドバーに出さない画面はパスに物件IDが入るため、文字列の組み立てもここに置く
+ * (遷移先の形をコンポーネント側に散らさないため)。
+ */
+export const buildRealEstateDetailPath = (id: string): string =>
+  `${REAL_ESTATE_PATH}/${encodeURIComponent(id)}`;
 /** B8 FIRE目標設定画面 */
 export const FIRE_GOAL_PATH = "/fire-goal";
 /** B9 想定利回り・リスク設定画面 */
