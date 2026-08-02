@@ -1,6 +1,6 @@
-# force push 遮断フックの回帰テストケース。
+# 禁止コマンド遮断フックの回帰テストケース。
 # 形式: DENY|<コマンド> または ALLOW|<コマンド>
-# 実行: bash .claude/hooks/run-no-force-push-tests.sh
+# 実行: bash .claude/hooks/run-dangerous-command-tests.sh
 #
 # 判定ロジックは .claude/settings.json の PreToolUse フックが持つ。
 # ここには期待値だけを置く(ロジックを二重に書かない)。
@@ -54,3 +54,17 @@ ALLOW|git status --short
 ALLOW|git log --oneline
 ALLOW|npm run test
 ALLOW|npm run build -- --force
+
+# --- 拒否されるべき: docs/.env への Bash 経由アクセス ---
+# permissions.deny の Read(./docs/.env) は Read ツールしか塞げないため、
+# Bash 側はフックで見る。パスに言及するだけでも安全側で拒否する。
+DENY|cat docs/.env
+DENY|cat ./docs/.env
+DENY|grep API_KEY docs/.env
+DENY|source docs/.env
+DENY|cp docs/.env /tmp/x
+
+# --- 通すべき: docs 配下の他のファイル ---
+ALLOW|cat docs/development-workflow.md
+ALLOW|ls docs/
+ALLOW|cat src/frontend/.env.local

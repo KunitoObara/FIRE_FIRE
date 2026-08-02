@@ -1,10 +1,11 @@
 #!/bin/bash
-# force push 遮断フック(.claude/settings.json の PreToolUse)の回帰テスト。
+# 禁止コマンド遮断フック(.claude/settings.json の PreToolUse)の回帰テスト。
+# 対象は force push と docs/.env への Bash 経由アクセス。
 #
 # 判定ロジックは settings.json から取り出して実行する。テスト側にロジックを
 # 書き写すと本体と乖離するため。
 #
-# 実行: bash .claude/hooks/run-no-force-push-tests.sh
+# 実行: bash .claude/hooks/run-dangerous-command-tests.sh
 #
 # 注意: ケースは外部ファイルから読む。判定対象の綴りをこのスクリプト本文に
 # 直接書くと、スクリプトを実行するコマンド自体がフックに拒否される。
@@ -13,7 +14,7 @@ set -u
 
 here="$(cd "$(dirname "$0")" && pwd)"
 settings="$here/../settings.json"
-cases="$here/no-force-push-cases.txt"
+cases="$here/dangerous-command-cases.txt"
 hook="$(mktemp)"
 trap 'rm -f "$hook"' EXIT
 

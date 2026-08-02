@@ -205,13 +205,16 @@ Trello: <カードのURL>
 
 ### 設定による裏付け
 
-上のうち機械的に判定できるものは [.claude/settings.json](../.claude/settings.json) で封じてある。文書のルールだけに頼らないため。
+上のうち機械的に判定できるものには [.claude/settings.json](../.claude/settings.json) で歯止めをかけてある。文書のルールだけに頼らないため。ただし**すべてを塞げているわけではない**(後述の「限界」)。
 
 | 対象 | 手段 |
 |---|---|
-| `gh pr merge` / `firebase deploy` / `rm -rf` / `docs/.env` の読み取り | `permissions.deny` |
+| `gh pr merge` / `firebase deploy` / `rm -rf` | `permissions.deny` |
 | `git reset --hard` / `git clean -fd` | `permissions.ask`(作業中の変更を消すため、拒否ではなく都度確認) |
 | force push | `PreToolUse` フック |
+| `docs/.env` | `Read` ツールは `permissions.deny`、Bash 経由は `PreToolUse` フック |
+
+`docs/.env` を2段構えにしているのは、`permissions` のルールが**ツール単位**だから。`Read(./docs/.env)` は `Read` ツールしか塞がず、`cat docs/.env` や `grep API_KEY docs/.env` のような Bash 経由は素通りする。フック側はコマンド文字列に `docs/.env` が現れた時点で拒否する — パスに言及するだけのコマンドも巻き添えで拒否されるが、秘密情報なので安全側に倒している。
 
 force push だけ `deny` のパターン列挙ではなくフックにしてあるのは、**パターン列挙では網羅できないため**。`permissions` のパターンは前方一致なので `Bash(git push --force:*)` は `git push origin main --force` のようにフラグが末尾に来る形を拾えず、`git push origin +HEAD:develop` のような `+` 付きリフスペックによる強制更新は `--force` の文字列を一切含まない。
 
@@ -224,15 +227,27 @@ force push だけ `deny` のパターン列挙ではなくフックにしてあ�
    - `f` を含む短オプション。連結された形も対象(`-f`、`-fu`、`-uf`、`-qf`)
    - `+` で始まるトークン(`+main`、`+HEAD:develop`、`+feature/xxx:develop`)
 
-**既知の副作用**: 3条件のANDなので、`git` と `push` と force 系の綴りを**引数として含むだけ**のコマンド(例: このルール自体を説明する文章をコミットメッセージに渡す `git commit -m`)も拒否される。安全側に倒した挙動であり、その場合はファイル経由で渡す(`git commit -F <file>`)。
+**過剰に拒否される場合**: 3条件のANDなので、`git` と `push` と force 系の綴りを**引数として含むだけ**のコマンド(例: このルール自体を説明する文章をコミットメッセージに渡す `git commit -m`)も拒否される。安全側に倒した挙動であり、その場合はファイル経由で渡す(`git commit -F <file>`)。`docs/.env` の判定も同様に、パスに言及するだけで拒否される。
 
-判定内容を変えたときは、必ず回帰テストを流す。
+### 限界 — 「網羅している」前提で運用しない
+
+これらの歯止めは**本人がうっかり実行するのを防ぐためのもの**で、回避しようとする相手を止める仕組みではない。以下は既知の抜け道であり、塞いでいない。
+
+- **クォート分割・変数展開**。判定はコマンド文字列への正規表現一致なので、`git push origin main --for''ce` や `$(echo --force)` のように、静的な文字列としては `force` の並びが現れないが実行時に展開される書き方は検知できない。同じ限界は `docs/.env` の判定にもある
+- **綴りの揺れ**。`Bash(rm -rf:*)` は前方一致なので `rm -fr`、`rm --recursive --force`、フラグが末尾に来る形は拾えない
+- **git のエイリアス**。`.gitconfig` に `push` のエイリアス(例 `git p`)があると、`push` トークンが文字列に現れずフックをすり抜ける
+
+穴が見つかったら塞ぐが、**この仕組みを理由に破壊的な操作を注意せず実行してよいことにはならない**。最終的な歯止めは [8章](#8-claudeがやらないこと)のルールそのもの。
+
+### 回帰テスト
+
+判定内容を変えたときは必ず流す。
 
 ```bash
-bash .claude/hooks/run-no-force-push-tests.sh
+bash .claude/hooks/run-dangerous-command-tests.sh
 ```
 
-ケースは [.claude/hooks/no-force-push-cases.txt](../.claude/hooks/no-force-push-cases.txt) にあり、拒否側だけでなく**誤って拒否してはいけない側**(`git push -u origin feature/fire-fire-x0` のようにブランチ名へ `-f` を含むもの、`git push -n`、`npm run build -- --force` など)も含めてある。テストスクリプトは `.claude/settings.json` からフック本体を取り出して実行するので、判定ロジックの二重管理は起きない。
+ケースは [.claude/hooks/dangerous-command-cases.txt](../.claude/hooks/dangerous-command-cases.txt) にあり、拒否側だけでなく**誤って拒否してはいけない側**(`git push -u origin feature/fire-fire-x0` のようにブランチ名へ `-f` を含むもの、`git push -n`、`npm run build -- --force`、`cat docs/development-workflow.md` など)も含めてある。テストスクリプトは `.claude/settings.json` からフック本体を取り出して実行するので、判定ロジックの二重管理は起きない。
 
 ## 9. 前提と制約
 
