@@ -70,6 +70,14 @@ describe("RealEstateDetail", () => {
     expect(screen.getByText("2026/06/01")).toBeInTheDocument();
   });
 
+  /** 所在地はB7で任意入力(未入力可)なので、空でも区切りの「・」だけが残らないようにする */
+  it("所在地が未登録の収益物件では、見出しの下に区切りなしで収益物件とだけ出す", () => {
+    render(<RealEstateDetail property={{ ...rentalProperty, location: "" }} />);
+
+    expect(screen.getByText("収益物件")).toBeInTheDocument();
+    expect(screen.queryByText("・収益物件")).not.toBeInTheDocument();
+  });
+
   it("「編集」ボタンからB7 編集モードへ遷移できる", () => {
     render(<RealEstateDetail property={rentalProperty} />);
 

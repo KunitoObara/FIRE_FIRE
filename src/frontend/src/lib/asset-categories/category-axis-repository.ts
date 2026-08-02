@@ -12,11 +12,7 @@ import {
 } from "firebase/firestore";
 
 import { ASSET_TYPE_SCAN_LIMIT } from "@/constants/asset-categories";
-import {
-  FirebaseConfigurationError,
-  getFirebaseAuth,
-  getFirebaseFirestore,
-} from "@/lib/firebase/client";
+import { resolveFirestoreUserContext, toFirestoreFailureReason } from "@/lib/firebase/user-context";
 import {
   assetSnapshotAssetTypesSchema,
   categoryAxisDocumentSchema,
@@ -48,49 +44,6 @@ const assetSnapshotsRef = (firestore: Firestore, uid: string) =>
   collection(firestore, USERS_COLLECTION, uid, ASSET_SNAPSHOTS_COLLECTION);
 
 /**
- * ログイン中のユーザーとFirestoreをまとめて取り出す。
- * 未ログイン・設定不足はここで理由に変換し、呼び出し側では例外を扱わない。
- */
-const resolveContext = ():
-  | { ok: true; firestore: Firestore; uid: string }
-  | { ok: false; reason: AssetCategoryFailureReason } => {
-  try {
-    const { currentUser } = getFirebaseAuth();
-
-    if (currentUser === null) {
-      return { ok: false, reason: "signed-out" };
-    }
-
-    return { ok: true, firestore: getFirebaseFirestore(), uid: currentUser.uid };
-  } catch (error) {
-    if (error instanceof FirebaseConfigurationError) {
-      return { ok: false, reason: "configuration-error" };
-    }
-
-    console.error("Firestoreに接続できませんでした", error);
-    return { ok: false, reason: "unknown" };
-  }
-};
-
-/** Firestoreが投げたエラーを画面用の理由に読み替える */
-const toFailureReason = (error: unknown): AssetCategoryFailureReason => {
-  if (error instanceof FirebaseConfigurationError) {
-    return "configuration-error";
-  }
-
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "permission-denied"
-  ) {
-    return "permission-denied";
-  }
-
-  return "unknown";
-};
-
-/**
  * 登録済みの分類軸を登録順(古い順)に取得する。
  *
  * 登録順のインデックスがそのまま分類別内訳の色スロットに対応するため
@@ -100,7 +53,7 @@ export const fetchCategoryAxes = async (): Promise<
   | { ok: true; axes: AssetCategoryAxisDocument[] }
   | { ok: false; reason: AssetCategoryFailureReason }
 > => {
-  const context = resolveContext();
+  const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
     return context;
@@ -127,7 +80,7 @@ export const fetchCategoryAxes = async (): Promise<
     return { ok: true, axes };
   } catch (error) {
     console.error("分類軸を取得できませんでした", error);
-    return { ok: false, reason: toFailureReason(error) };
+    return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };
 
@@ -142,7 +95,7 @@ export const fetchCategoryAxes = async (): Promise<
  * 個人利用の規模ではこの上限に収まる。
  */
 export const fetchAssetTypeOptions = async (): Promise<AssetTypeOptionsResult> => {
-  const context = resolveContext();
+  const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
     return context;
@@ -174,7 +127,7 @@ export const fetchAssetTypeOptions = async (): Promise<AssetTypeOptionsResult> =
     };
   } catch (error) {
     console.error("資産種別の選択肢を取得できませんでした", error);
-    return { ok: false, reason: toFailureReason(error) };
+    return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };
 
@@ -182,7 +135,7 @@ export const fetchAssetTypeOptions = async (): Promise<AssetTypeOptionsResult> =
 export const createCategoryAxis = async (
   values: AssetCategoryAxisFormValues,
 ): Promise<SaveCategoryAxisResult> => {
-  const context = resolveContext();
+  const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
     return context;
@@ -198,7 +151,7 @@ export const createCategoryAxis = async (
     return { ok: true };
   } catch (error) {
     console.error("分類軸を登録できませんでした", error);
-    return { ok: false, reason: toFailureReason(error) };
+    return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };
 
@@ -212,7 +165,7 @@ export const updateCategoryAxis = async (
   id: string,
   values: AssetCategoryAxisFormValues,
 ): Promise<SaveCategoryAxisResult> => {
-  const context = resolveContext();
+  const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
     return context;
@@ -227,7 +180,7 @@ export const updateCategoryAxis = async (
     return { ok: true };
   } catch (error) {
     console.error("分類軸を更新できませんでした", error);
-    return { ok: false, reason: toFailureReason(error) };
+    return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };
 
@@ -240,7 +193,7 @@ export const updateCategoryAxis = async (
  * ブロックする(この関数まで進むのは削除可能な分類のときだけ)。
  */
 export const deleteCategoryAxis = async (id: string): Promise<DeleteCategoryAxisResult> => {
-  const context = resolveContext();
+  const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
     return context;
@@ -251,6 +204,6 @@ export const deleteCategoryAxis = async (id: string): Promise<DeleteCategoryAxis
     return { ok: true };
   } catch (error) {
     console.error("分類軸を削除できませんでした", error);
-    return { ok: false, reason: toFailureReason(error) };
+    return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };

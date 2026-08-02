@@ -31,6 +31,44 @@ service cloud.firestore {
       return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
     }
 
+    // 物件の金額(時価・ローン残高・賃貸収入・賃貸支出)。上限は
+    // src/frontend/src/constants/real-estate.ts の REAL_ESTATE_AMOUNT_MAX と揃える。
+    // マイナスの金額は入力側でも受け付けない(ローン完済済みの物件は0)
+    function isPropertyAmount(value) {
+      return value is number && value >= 0 && value <= 999999999999;
+    }
+
+    // 物件1件の中身(B7で保存する形)。作成・更新のどちらでも同じ形を要求する
+    function isValidProperty(property) {
+      return property.keys().hasAll(
+          ['name', 'location', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'createdAt']
+        )
+        && property.keys().hasOnly(
+          ['name', 'location', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'createdAt']
+        )
+        // 文字数の上限は src/frontend/src/constants/real-estate.ts と揃える
+        && property.name is string
+        && property.name.size() > 0
+        && property.name.size() <= 60
+        // 所在地は任意入力なので空文字を許す
+        && property.location is string
+        && property.location.size() <= 100
+        && isPropertyAmount(property.marketValue)
+        && isPropertyAmount(property.loanBalance)
+        // 最終更新日は入力項目ではなく保存時に付く日付(B7)。B6がこの値を表示するため形を崩させない
+        && isIsoDate(property.updatedAt)
+        // 収益物件でない物件は`rental`をnullで持つ。区分のフラグを別に持たず、
+        // この有無だけで収益物件かどうかが決まる(docs/screen-requirements-real-estate.md B6)
+        && (
+          property.rental == null || (
+            property.rental.keys().hasAll(['monthlyIncome', 'monthlyExpense'])
+            && property.rental.keys().hasOnly(['monthlyIncome', 'monthlyExpense'])
+            && isPropertyAmount(property.rental.monthlyIncome)
+            && isPropertyAmount(property.rental.monthlyExpense)
+          )
+        );
+    }
+
     function isOwner(userId) {
       return request.auth != null
         && request.auth.uid == userId
@@ -114,6 +152,24 @@ service cloud.firestore {
         // ルール側でも担保する。クライアント側の判定はscreen-requirements-dashboard.md B4参照)。
         // 先に編集で割り当てを解除すれば`assetTypeNames`が空になり削除できるようになる。
         allow delete: if isOwner(userId) && resource.data.assetTypeNames.size() == 0;
+      }
+
+      // 物件(B5 不動産一覧・B6 不動産詳細・B7 不動産登録/編集)。
+      // 資産残高と違いCSV由来ではなく、すべてB7の手入力なので、書ける形をここで縛る。
+      match /properties/{propertyId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidProperty(request.resource.data)
+          && request.resource.data.createdAt is timestamp;
+        // 一覧の並び順(登録順)が編集のたびに入れ替わらないよう、登録日時は編集で変えさせない
+        // (categoryAxesと同じ扱い)。`updateDoc`はドキュメント全体に対して評価されるため、
+        // クライアントが`createdAt`を送らなくても既存の値がここに現れる
+        allow update: if isOwner(userId)
+          && isValidProperty(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        // 物件を削除する画面はまだ無い(B5〜B7の要件に削除は含まれない)。
+        // 必要になった時点でここに許可を書く
+        allow delete: if false;
       }
     }
 

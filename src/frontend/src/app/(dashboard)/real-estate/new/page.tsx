@@ -1,4 +1,4 @@
-import { UnimplementedScreen } from "@/components/layout/UnimplementedScreen";
+import { RealEstateNewScreen } from "@/components/real-estate/RealEstateNewScreen";
 
 import type { Metadata } from "next";
 import type { JSX } from "react";
@@ -8,17 +8,11 @@ export const metadata: Metadata = {
 };
 
 /**
- * B7 不動産登録・編集画面(新規登録モード)のプレースホルダ。
+ * B7 不動産登録・編集画面(新規登録モード、docs/screen-requirements-real-estate.md B7)。
  *
- * B5の「新規登録」ボタンの遷移先が404にならないよう、画面だけ先に置いている。
- * 編集モード(既存物件の編集)のパスはこの画面を実装するカードで決める。
+ * B5の「新規登録」ボタンから遷移する。編集モードは`/real-estate/[id]/edit`にあり、
+ * フォーム本体(`RealEstateForm`)を両モードで共用する。
  */
-const RealEstateNewPage = (): JSX.Element => (
-  <UnimplementedScreen
-    screenId="B7"
-    screenName="不動産登録・編集画面"
-    purpose="物件基本情報・時価・ローン残高・(収益物件の場合)賃貸収入/支出を登録・編集する"
-  />
-);
+const RealEstateNewPage = (): JSX.Element => <RealEstateNewScreen />;
 
 export default RealEstateNewPage;
