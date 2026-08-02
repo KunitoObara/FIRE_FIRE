@@ -81,6 +81,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
       toast.success(formMode === "edit" ? "分類を更新しました" : "分類を追加しました");
       closeForm();
       void queryClient.invalidateQueries({ queryKey: CATEGORY_AXES_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: ASSET_TYPE_OPTIONS_QUERY_KEY });
     }
 
     return result;
@@ -94,6 +95,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
     if (result.ok) {
       toast.success("分類を削除しました");
       void queryClient.invalidateQueries({ queryKey: CATEGORY_AXES_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: ASSET_TYPE_OPTIONS_QUERY_KEY });
     }
 
     return result;
@@ -132,6 +134,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
           <CardContent>
             <h2 className="mb-4 text-sm font-semibold">分類を編集</h2>
             <AssetCategoryAxisForm
+              key={editingAxis.id}
               initialValues={{ name: editingAxis.name, assetTypeNames: editingAxis.assetTypeNames }}
               assetTypeOptions={assetTypeOptions}
               submitLabel="保存"
