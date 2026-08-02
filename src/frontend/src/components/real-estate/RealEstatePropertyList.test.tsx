@@ -10,6 +10,7 @@ const properties: RealEstateProperty[] = [
     location: "東京都渋谷区神南1-2-3",
     marketValue: 32_000_000,
     loanBalance: 18_400_000,
+    updatedAt: "2026-06-01",
   },
   {
     id: "chiba-house",
@@ -17,6 +18,7 @@ const properties: RealEstateProperty[] = [
     location: "千葉県市川市八幡7-8-9",
     marketValue: 18_000_000,
     loanBalance: 0,
+    updatedAt: "2026-04-02",
   },
 ];
 

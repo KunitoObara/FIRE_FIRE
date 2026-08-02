@@ -49,6 +49,14 @@ export const REAL_ESTATE_NEW_PATH = `${REAL_ESTATE_PATH}/new`;
  */
 export const buildRealEstateDetailPath = (id: string): string =>
   `${REAL_ESTATE_PATH}/${encodeURIComponent(id)}`;
+/**
+ * B7 不動産登録・編集画面(編集モード)のパス。B6の「編集」ボタンから遷移する。
+ *
+ * 新規登録モード(`REAL_ESTATE_NEW_PATH`)と別パスにしているのは、編集対象の物件IDが
+ * URLに必要なため。保存後の戻り先(B6)も同じIDで組み立てられる。
+ */
+export const buildRealEstateEditPath = (id: string): string =>
+  `${buildRealEstateDetailPath(id)}/edit`;
 /** B8 FIRE目標設定画面 */
 export const FIRE_GOAL_PATH = "/fire-goal";
 /** B9 想定利回り・リスク設定画面 */
