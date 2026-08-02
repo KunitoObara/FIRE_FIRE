@@ -11,11 +11,7 @@ import {
 } from "firebase/firestore";
 
 import { FIRESTORE_BATCH_LIMIT, IMPORT_HISTORY_LIMIT } from "@/constants/csv-import";
-import {
-  FirebaseConfigurationError,
-  getFirebaseAuth,
-  getFirebaseFirestore,
-} from "@/lib/firebase/client";
+import { resolveFirestoreUserContext, toFirestoreFailureReason } from "@/lib/firebase/user-context";
 import { csvImportHistoryDocumentSchema } from "@/schemas/csv-import";
 
 import type { Firestore } from "firebase/firestore";
@@ -45,49 +41,6 @@ const assetSnapshotsRef = (firestore: Firestore, uid: string) =>
 const csvImportsRef = (firestore: Firestore, uid: string) =>
   collection(firestore, USERS_COLLECTION, uid, CSV_IMPORTS_COLLECTION);
 
-/**
- * ログイン中のユーザーとFirestoreをまとめて取り出す。
- * 未ログイン・設定不足はここで理由に変換し、呼び出し側では例外を扱わない。
- */
-const resolveContext = ():
-  | { ok: true; firestore: Firestore; uid: string }
-  | { ok: false; reason: CsvImportFailureReason } => {
-  try {
-    const { currentUser } = getFirebaseAuth();
-
-    if (currentUser === null) {
-      return { ok: false, reason: "signed-out" };
-    }
-
-    return { ok: true, firestore: getFirebaseFirestore(), uid: currentUser.uid };
-  } catch (error) {
-    if (error instanceof FirebaseConfigurationError) {
-      return { ok: false, reason: "configuration-error" };
-    }
-
-    console.error("Firestoreに接続できませんでした", error);
-    return { ok: false, reason: "unknown" };
-  }
-};
-
-/** Firestoreが投げたエラーを画面用の理由に読み替える */
-const toFailureReason = (error: unknown): CsvImportFailureReason => {
-  if (error instanceof FirebaseConfigurationError) {
-    return "configuration-error";
-  }
-
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "permission-denied"
-  ) {
-    return "permission-denied";
-  }
-
-  return "unknown";
-};
-
 /** 500件ずつに区切る。`writeBatch`が1回で扱える書き込みの上限に合わせる */
 const chunk = <T>(items: T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(items.length / size) }, (_unused, index) =>
@@ -105,7 +58,7 @@ export const buildImportPlan = async (
 ): Promise<
   { ok: true; plan: AssetBalanceImportPlan } | { ok: false; reason: CsvImportFailureReason }
 > => {
-  const context = resolveContext();
+  const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
     return context;
@@ -128,7 +81,7 @@ export const buildImportPlan = async (
     };
   } catch (error) {
     console.error("既存の資産残高を照会できませんでした", error);
-    return { ok: false, reason: toFailureReason(error) };
+    return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };
 
@@ -147,7 +100,7 @@ export const importAssetBalances = async (
   parsed: AssetBalanceParsed,
   fileName: string,
 ): Promise<AssetBalanceImportResult> => {
-  const context = resolveContext();
+  const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
     return { ...context, writtenCount: 0 };
@@ -175,7 +128,7 @@ export const importAssetBalances = async (
     }
   } catch (error) {
     console.error("資産残高を取り込めませんでした", error);
-    return { ok: false, reason: toFailureReason(error), writtenCount };
+    return { ok: false, reason: toFirestoreFailureReason(error), writtenCount };
   }
 
   try {
@@ -214,7 +167,7 @@ export const importAssetBalances = async (
 export const fetchImportHistory = async (): Promise<
   { ok: true; entries: CsvImportHistoryEntry[] } | { ok: false; reason: CsvImportFailureReason }
 > => {
-  const context = resolveContext();
+  const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
     return context;
@@ -245,6 +198,6 @@ export const fetchImportHistory = async (): Promise<
     return { ok: true, entries };
   } catch (error) {
     console.error("取込履歴を取得できませんでした", error);
-    return { ok: false, reason: toFailureReason(error) };
+    return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };

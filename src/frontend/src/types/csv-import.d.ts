@@ -83,14 +83,16 @@ declare global {
     | { ok: true; writtenCount: number }
     | { ok: false; reason: CsvImportFailureReason; writtenCount: number };
 
-  /** 取込実行・既存データ照会が失敗した理由 */
+  /**
+   * 取込実行・既存データ照会が失敗した理由。
+   *
+   * Firestoreへのアクセス自体の失敗(`FirestoreAccessFailureReason`)に、B2固有の
+   * 「資産残高は反映できたが履歴だけ残せなかった」を足したもの。
+   */
   type CsvImportFailureReason =
-    | "signed-out"
-    | "configuration-error"
-    | "permission-denied"
+    | FirestoreAccessFailureReason
     /** 資産残高は反映できたが、取込履歴だけ残せなかった */
-    | "history-write-failed"
-    | "unknown";
+    | "history-write-failed";
 
   /** 直近の取込履歴の1件(B2の表示項目) */
   type CsvImportHistoryEntry = {
