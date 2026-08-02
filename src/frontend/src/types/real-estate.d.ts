@@ -61,9 +61,13 @@ declare global {
   };
 
   /**
-   * B6 不動産詳細画面・B7 編集モードのページのProps。
+   * B6 不動産詳細画面のページのProps。
    *
    * 動的セグメント`[id]`をNext.jsがPromiseで渡すため、画面側で`await`して取り出す。
+   *
+   * 同じ`[id]`配下にあるB7 編集モードは、まだ既存値をプリセットする実装が無く物件IDを
+   * 使っていないため、この型を受けていない。B7の実装時にこの型を共用するか編集モード用の
+   * Props型を分けるかを決める。
    */
   type RealEstateDetailPageProps = {
     params: Promise<{ id: string }>;
