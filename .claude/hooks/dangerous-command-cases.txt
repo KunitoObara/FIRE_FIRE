@@ -85,6 +85,21 @@ ASK|git clean --force -d
 ASK|git -C . clean -fd
 ASK|git clean -xfd
 
+# --- 拒否されるべき: API経由のマージ・書き込み ---
+# permissions.deny の Bash(gh pr merge:*) は前方一致なので、REST API を直接
+# 叩く形やグローバルオプションが挟まる形を拾えない。
+DENY|gh api repos/KunitoObara/private_room/pulls/44/merge -X PUT
+DENY|gh api repos/KunitoObara/private_room/pulls/44/merge
+DENY|gh pr merge 44
+DENY|gh -R KunitoObara/private_room pr merge 44
+DENY|gh api repos/KunitoObara/private_room/issues -X POST -f title=x
+
+# --- 通すべき: 読み取り専用の gh ---
+ALLOW|gh api repos/KunitoObara/private_room/pulls/44/comments
+ALLOW|gh pr view 44 --json mergeable
+ALLOW|gh pr checks 44
+ALLOW|gh run list --workflow claude-review.yml
+
 # --- 通すべき: 破壊しない reset / clean ---
 ALLOW|git reset HEAD~1
 ALLOW|git reset --soft HEAD~1

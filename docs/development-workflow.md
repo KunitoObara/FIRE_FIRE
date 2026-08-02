@@ -197,7 +197,7 @@ Trello: <カードのURL>
 
 ## 8. Claudeがやらないこと
 
-- **`gh pr merge` を実行しない**。マージはPOの判断
+- **マージしない**。`gh pr merge` も、`gh api` で `.../pulls/<番号>/merge` を叩くのも同じ。マージはPOの判断
 - **force push しない**
 - **`develop` / `main` へ直接pushしない**
 - **要件定義書とコードの食い違いを無断でどちらかに寄せない**。どちらが正かをユーザーに確認する(`screen-spec-drift-check` と同じ方針)
@@ -209,12 +209,18 @@ Trello: <カードのURL>
 
 | 対象 | 手段 | 判定 |
 |---|---|---|
-| `gh pr merge` / `firebase deploy` / `rm -rf` | `permissions.deny` | 拒否 |
-| `docs/.env` | `Read` ツールは `permissions.deny`、Bash 経由は `PreToolUse` フック | 拒否 |
+| `firebase deploy` / `rm -rf` | `permissions.deny` | 拒否 |
+| マージ(`gh pr merge`、`gh api` の `.../merge`、`gh api` の書き込み) | `permissions.deny` + `PreToolUse` フック | 拒否 |
+| `docs/.env` | `permissions.deny` + `PreToolUse` フック(Bash / Grep / Glob / Read) | 拒否 |
 | force push | `PreToolUse` フック | 拒否 |
 | `git reset --hard` / `git clean -f` 系 | `PreToolUse` フック | **確認**(作業中の変更を消すため、拒否ではなく都度確認) |
 
-`docs/.env` を2段構えにしているのは、`permissions` のルールが**ツール単位**だから。`Read(./docs/.env)` は `Read` ツールしか塞がず、`cat docs/.env` や `grep API_KEY docs/.env` のような Bash 経由は素通りする。フック側はコマンド文字列に `docs/.env` が現れた時点で拒否する — パスに言及するだけのコマンドも巻き添えで拒否されるが、秘密情報なので安全側に倒している。
+`permissions` のルールは**ツール単位・前方一致**なので、単体ではどれも穴が残る。フックを重ねているのはそのため。
+
+- **マージ** — `Bash(gh pr merge:*)` は `gh -R <repo> pr merge` のようにグローバルオプションが挟まる形を拾えず、そもそも `gh api repos/<owner>/<repo>/pulls/<番号>/merge -X PUT` と REST API を直接叩けば `gh pr merge` を通らずにマージできてしまう。フックは「`gh` トークン + `merge` トークン」で拒否し、あわせて `gh api` の `-X` / `--method` による書き込みも拒否する。`gh api` の allow はPRコメント取得だけに絞ってある
+- **`docs/.env`** — `Read(./docs/.env)` は `Read` ツールしか塞がない。`cat docs/.env` のような Bash 経由に加えて、**`Grep` は一致行を返すので内容が読める**。フックを Bash と Grep / Glob / Read の両方に掛けてあり、コマンド文字列やツール引数にパスが現れた時点で拒否する。パスに言及するだけのコマンドも巻き添えで拒否されるが、秘密情報なので安全側に倒している
+
+`git reset --hard` / `git clean` も `permissions.ask` ではなくフックで見る。前方一致では `git -C . reset --hard` のようにグローバルオプションが挟まる形や `git clean -df` のようなフラグ順序違いを拾えず、force push で見つかったのと同じ抜け方をするため。フックは「`git` トークンがある」+「`reset` トークンと `--hard`」/「`clean` トークンと force 系フラグ」で判定し、`permissionDecision: ask` を返す。`git reset --soft` や `git clean -n` は通す。
 
 `git reset --hard` / `git clean` も `permissions.ask` ではなくフックで見る。`permissions` のパターンは前方一致なので、`git -C . reset --hard` のようにグローバルオプションが挟まる形や `git clean -df` のようなフラグ順序違いを拾えず、force push で見つかったのと同じ抜け方をするため。フックは「`git` トークンがある」+「`reset` トークンと `--hard`」/「`clean` トークンと force 系フラグ」で判定し、`permissionDecision: ask` を返す。`git reset --soft` や `git clean -n` は通す。
 

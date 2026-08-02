@@ -49,6 +49,34 @@ while IFS='|' read -r want cmd; do
   fi
 done < "$cases"
 
+# Grep / Glob / Read 側のフック。Bash を経由しなくても Grep は一致行を返すため、
+# 秘密ファイルを対象にした検索は内容の読み出しになる。
+file_hook="$(mktemp)"
+trap 'rm -f "$hook" "$file_hook"' EXIT
+python3 -c "
+import json
+s = json.load(open('$settings'))
+h = [x for e in s['hooks']['PreToolUse'] if 'Grep' in e.get('matcher', '') for x in e['hooks']]
+open('$file_hook', 'w').write(h[0]['command'])
+"
+check_file_tool() {
+  # $1=期待値 $2=tool_name $3=tool_input(JSON)
+  got=ALLOW
+  [ -n "$(printf '{"tool_name":"%s","tool_input":%s}' "$2" "$3" | bash "$file_hook")" ] && got=DENY
+  if [ "$got" = "$1" ]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf 'FAIL  判定=%-5s 期待=%-5s  %s %s\n' "$got" "$1" "$2" "$3"
+  fi
+}
+check_file_tool DENY  Grep '{"pattern":"KEY","path":"docs/.env"}'
+check_file_tool DENY  Grep '{"pattern":"KEY","glob":"docs/.env*"}'
+check_file_tool DENY  Read '{"file_path":"/repo/docs/.env"}'
+check_file_tool ALLOW Grep '{"pattern":"KEY","path":"docs/"}'
+check_file_tool ALLOW Grep '{"pattern":"KEY","path":"src/frontend"}'
+check_file_tool ALLOW Read '{"file_path":"/repo/docs/development-workflow.md"}'
+
 # CI(GitHub Actions)では歯止めごと無効になること。
 # claude-review ジョブは settingSources に project を含むため、このフックを
 # 読み込んでしまう。歯止めの対象(秘密ファイル・ローカルのpush)はCIの
