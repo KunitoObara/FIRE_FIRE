@@ -1,4 +1,7 @@
-export {};
+import type { FieldError, UseFormRegisterReturn } from "react-hook-form";
+import type { z } from "zod";
+
+import type { realEstateFormSchema } from "@/schemas/real-estate";
 
 declare global {
   /**
@@ -26,7 +29,7 @@ declare global {
     id: string;
     /** 物件名 */
     name: string;
-    /** 所在地。B7で登録した住所をそのまま持ち、B5は簡略表記に落として表示する */
+    /** 所在地。B7で登録した住所をそのまま持ち、B5は簡略表記に落として表示する。任意入力(空文字可) */
     location: string;
     /** 時価(円)。手動更新の想定値(要件定義書 4.5) */
     marketValue: number;
@@ -49,6 +52,49 @@ declare global {
     updatedAt: string;
   };
 
+  /**
+   * B7で保存する物件の内容。
+   *
+   * `RealEstateProperty`との違いは、IDと最終更新日を含まないこと。どちらも入力項目ではなく
+   * 保存時に決まる値で(IDは採番、最終更新日は保存日)、リポジトリが埋める。
+   *
+   * 収益物件でない場合の`rental`は`undefined`ではなく`null`にする。Firestoreに
+   * 「収益物件ではない」と明示的に書き込み、前回の賃貸収入/支出を残さないため
+   * (docs/screen-requirements-real-estate.md B7)。
+   */
+  type RealEstatePropertyInput = {
+    name: string;
+    location: string;
+    marketValue: number;
+    loanBalance: number;
+    rental: RealEstateRental | null;
+  };
+
+  /** B7 不動産登録・編集フォームの入力値(`realEstateFormSchema`から導出) */
+  type RealEstateFormValues = z.infer<typeof realEstateFormSchema>;
+
+  /** B7のモード。新規登録と編集で見出し・保存処理・キャンセルの戻り先が変わる */
+  type RealEstateFormMode = "create" | "edit";
+
+  /** 物件一覧の取得結果(B5) */
+  type RealEstatePropertiesResult =
+    | { ok: true; properties: RealEstateProperty[] }
+    | { ok: false; reason: FirestoreAccessFailureReason };
+
+  /**
+   * 物件1件の取得結果(B6・B7 編集モード)。
+   *
+   * 該当が無い場合は失敗ではなく`property: null`で返す。削除済みの物件を開いたときに
+   * 「取得に失敗しました」ではなく「物件が見つかりません」を出し分けられるようにするため。
+   */
+  type RealEstatePropertyResult =
+    | { ok: true; property: RealEstateProperty | null }
+    | { ok: false; reason: FirestoreAccessFailureReason };
+
+  /** 物件の保存(登録・更新)結果。成功時のIDは保存後のB6への遷移に使う */
+  type SaveRealEstatePropertyResult =
+    { ok: true; id: string } | { ok: false; reason: FirestoreAccessFailureReason };
+
   /** 物件一覧(RealEstatePropertyList)のProps */
   type RealEstatePropertyListProps = {
     /** 表示順に並べた物件。並び替えの指定は要件に無いため、渡された順で表示する */
@@ -61,15 +107,11 @@ declare global {
   };
 
   /**
-   * B6 不動産詳細画面のページのProps。
+   * 物件IDを動的セグメント`[id]`で受ける画面のProps(B6 詳細・B7 編集モード)。
    *
-   * 動的セグメント`[id]`をNext.jsがPromiseで渡すため、画面側で`await`して取り出す。
-   *
-   * 同じ`[id]`配下にあるB7 編集モードは、まだ既存値をプリセットする実装が無く物件IDを
-   * 使っていないため、この型を受けていない。B7の実装時にこの型を共用するか編集モード用の
-   * Props型を分けるかを決める。
+   * Next.jsが`params`をPromiseで渡すため、画面側で`await`して取り出す。
    */
-  type RealEstateDetailPageProps = {
+  type RealEstatePropertyPageProps = {
     params: Promise<{ id: string }>;
   };
 
@@ -86,5 +128,40 @@ declare global {
    */
   type RealEstateRentalCardProps = {
     rental: RealEstateRental;
+  };
+
+  /**
+   * 物件IDを指定して1件を読む画面(B6 詳細・B7 編集モード)のProps。
+   *
+   * Firestoreの読み出しはブラウザ側でしかできないため、ページ(Server Component)は
+   * `params`からIDを取り出して渡すだけにし、取得はClient Component側で行う。
+   */
+  type RealEstatePropertyScreenProps = {
+    propertyId: string;
+  };
+
+  /**
+   * 金額入力欄(RealEstateForm内)のProps。
+   *
+   * 時価・ローン残高・賃貸収入・賃貸支出の4欄が同じ見た目・同じ入力方式になるよう、
+   * 欄ごとに`<Input>`の属性を書き並べずこのコンポーネントに寄せる。
+   */
+  type RealEstateAmountFieldProps = {
+    /** `<label for>`と紐づけるID。フォームのフィールド名をそのまま使う */
+    id: string;
+    label: string;
+    error?: FieldError;
+    registration: UseFormRegisterReturn;
+    disabled: boolean;
+  };
+
+  /** B7 不動産登録・編集フォームのProps */
+  type RealEstateFormProps = {
+    mode: RealEstateFormMode;
+    /** 新規登録は空値、編集は既存の登録値を渡す */
+    initialValues: RealEstateFormValues;
+    /** 「キャンセル」の戻り先(新規登録はB5、編集はB6) */
+    cancelHref: string;
+    onSubmit: (input: RealEstatePropertyInput) => Promise<SaveRealEstatePropertyResult>;
   };
 }

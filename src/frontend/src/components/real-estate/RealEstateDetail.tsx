@@ -152,6 +152,21 @@ const RealEstateBasicInfoCard = ({ property }: RealEstateDetailProps): JSX.Eleme
 );
 
 /**
+ * 物件名の直下に添える1行。
+ *
+ * 収益物件かどうかは賃貸収支カードの有無でも分かるが、それはスクロールしないと見えない
+ * ことがあるため、ここでも示す。所在地は任意入力(B7)で空のことがあるため、区切りの
+ * 「・」は両方が揃ったときにだけ入れる。
+ */
+const buildPropertySubtitle = (property: RealEstateProperty): string =>
+  [
+    toShortLocation(property.location),
+    property.rental === undefined ? "" : REAL_ESTATE_RENTAL_PROPERTY_LABEL,
+  ]
+    .filter((part) => part.length > 0)
+    .join("・");
+
+/**
  * B6 不動産詳細画面の本体(docs/screen-requirements-real-estate.md B6)。
  *
  * 入力項目を持たない参照専用の画面で、操作は「編集」ボタン(B7 編集モード)と
@@ -170,14 +185,7 @@ export const RealEstateDetail = ({ property }: RealEstateDetailProps): JSX.Eleme
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
         <h2 className="text-lg font-bold">{property.name}</h2>
-        <p className="text-sm text-muted-foreground">
-          {toShortLocation(property.location)}
-          {/*
-            収益物件かどうかは賃貸収支カードの有無でも分かるが、それはスクロールしないと
-            見えないことがあるため、物件名の直下でも示す。
-          */}
-          {property.rental === undefined ? null : `・${REAL_ESTATE_RENTAL_PROPERTY_LABEL}`}
-        </p>
+        <p className="text-sm text-muted-foreground">{buildPropertySubtitle(property)}</p>
       </div>
       <Button asChild variant="outline" size="sm" className="shrink-0">
         <Link href={buildRealEstateEditPath(property.id)}>{REAL_ESTATE_EDIT_LABEL}</Link>

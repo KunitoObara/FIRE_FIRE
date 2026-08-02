@@ -1,22 +1,6 @@
-/** B5 不動産一覧画面・B6 不動産詳細画面で使う定数 */
+/** B5 不動産一覧画面・B6 不動産詳細画面・B7 不動産登録・編集画面で使う定数 */
 
 import { REAL_ESTATE_NEW_PATH, REAL_ESTATE_PATH } from "@/constants/routes";
-
-/**
- * サンプルデータを表示するかどうか。
- *
- * 物件を登録する画面(B7)がまだ無く、Firestoreに物件データが存在しないため、画面の見た目を
- * 確認できるようサンプルデータを流し込んでいる(`src/constants/transactions.ts`の
- * `USE_SAMPLE_TRANSACTIONS_DATA`と同じ考え方)。B7が実装されたら`false`にして
- * `src/lib/real-estate/sample-data.ts`ごと外す。
- *
- * `false`にすると一覧が空状態(B7への導線)になる。
- */
-export const USE_SAMPLE_REAL_ESTATE_DATA = true;
-
-/** サンプルデータ表示中であることを画面に明示する文言。実データと取り違えないためのもの */
-export const SAMPLE_REAL_ESTATE_DATA_NOTICE =
-  "表示中の物件はすべてサンプルです。不動産の登録(B7)実装後に実データへ切り替わります。";
 
 /**
  * 画面上部の説明文。
@@ -84,7 +68,7 @@ export const REAL_ESTATE_BACK_TO_LIST_LINK = {
 export const REAL_ESTATE_EDIT_LABEL = "編集";
 
 /**
- * 指定された物件が見つからないときの案内(B6の`not-found.tsx`)。
+ * 指定された物件が見つからないときの案内(B6・B7 編集モード)。
  *
  * 削除済みの物件をブックマークや履歴から開いた場合に出る。行き止まりにしないよう
  * 一覧への導線を添える。
@@ -94,3 +78,117 @@ export const REAL_ESTATE_NOT_FOUND = {
   message: "指定された物件は削除されたか、URLが正しくない可能性があります。",
   action: REAL_ESTATE_BACK_TO_LIST_LINK,
 } as const;
+
+/* ------------------------------------------------------------------ *
+ * B7 不動産登録・編集画面
+ * ------------------------------------------------------------------ */
+
+/** 画面の見出し。新規登録と編集で言い分ける(どちらのモードで開いているか一目で分かるように) */
+export const REAL_ESTATE_FORM_TITLES = {
+  create: "物件を登録",
+  edit: "物件情報を編集",
+} as const;
+
+/**
+ * 新規登録モードの初期値。
+ *
+ * 「収益物件として登録」は既定でオフにする。収益物件でない物件の方が一般的で、
+ * オンを既定にすると賃貸収入/支出が必須の状態から入力を始めることになるため。
+ */
+export const REAL_ESTATE_FORM_INITIAL_VALUES: RealEstateFormValues = {
+  name: "",
+  location: "",
+  marketValue: "",
+  loanBalance: "",
+  isRentalProperty: false,
+  rentalMonthlyIncome: "",
+  rentalMonthlyExpense: "",
+};
+
+/** 「保存」ボタン・「キャンセル」リンクのラベル */
+export const REAL_ESTATE_FORM_SUBMIT_LABEL = "保存";
+export const REAL_ESTATE_FORM_SUBMITTING_LABEL = "保存中...";
+export const REAL_ESTATE_FORM_CANCEL_LABEL = "キャンセル";
+
+/**
+ * 金額入力欄の見出し。単位を添えるのは、円単位で入力するのか万円単位なのかを
+ * 入力欄だけで判断できるようにするため(HTMLモックの表記に合わせる)。
+ */
+export const REAL_ESTATE_FORM_MARKET_VALUE_LABEL = `${REAL_ESTATE_MARKET_VALUE_LABEL}(円)`;
+export const REAL_ESTATE_FORM_LOAN_BALANCE_LABEL = `${REAL_ESTATE_LOAN_BALANCE_LABEL}(円)`;
+export const REAL_ESTATE_FORM_RENTAL_INCOME_LABEL = `${REAL_ESTATE_RENTAL_INCOME_LABEL}(月額・円)`;
+export const REAL_ESTATE_FORM_RENTAL_EXPENSE_LABEL = `${REAL_ESTATE_RENTAL_EXPENSE_LABEL}(月額・円)`;
+
+/**
+ * 「収益物件として登録」チェックボックスの文言。
+ *
+ * オンにすると賃貸収入・支出の入力欄が現れ、その有無がそのままB6の賃貸収支セクションの
+ * 表示有無になる(docs/screen-requirements-real-estate.md B6・B7)。
+ */
+export const REAL_ESTATE_FORM_RENTAL_TOGGLE_LABEL = "収益物件として登録(賃貸収入・支出を管理する)";
+
+/** 所在地が任意入力であることを入力欄に明示する。未入力でも保存できる */
+export const REAL_ESTATE_FORM_OPTIONAL_SUFFIX = "(任意)";
+
+/** 物件名の最大文字数。firestore.rulesの`properties`の検証と一致させる */
+export const REAL_ESTATE_NAME_MAX_LENGTH = 60;
+
+/** 所在地の最大文字数。firestore.rulesの`properties`の検証と一致させる */
+export const REAL_ESTATE_LOCATION_MAX_LENGTH = 100;
+
+/**
+ * 金額の上限(円)。firestore.rulesの`properties`の検証と一致させる。
+ *
+ * 桁の打ち間違い(0を余分に打つ・単位を取り違える)を弾くための歯止めであり、
+ * 個人が保有する不動産の時価・ローン残高としては12桁で十分に収まる。
+ */
+export const REAL_ESTATE_AMOUNT_MAX = 999_999_999_999;
+
+/** 金額入力で受け付ける形式。カンマ区切り・全角数字は受け付けない(HTMLモックのエラー文言に対応) */
+export const REAL_ESTATE_AMOUNT_PATTERN = /^[0-9]+$/u;
+
+/** 物件名が未入力のときのエラー */
+export const REAL_ESTATE_NAME_REQUIRED_MESSAGE = `${REAL_ESTATE_NAME_LABEL}を入力してください。`;
+
+/** 物件名が長すぎるときのエラー */
+export const REAL_ESTATE_NAME_TOO_LONG_MESSAGE = `${REAL_ESTATE_NAME_LABEL}は${REAL_ESTATE_NAME_MAX_LENGTH}文字以内で入力してください。`;
+
+/** 所在地が長すぎるときのエラー(所在地は未入力を許すため必須エラーは無い) */
+export const REAL_ESTATE_LOCATION_TOO_LONG_MESSAGE = `${REAL_ESTATE_LOCATION_LABEL}は${REAL_ESTATE_LOCATION_MAX_LENGTH}文字以内で入力してください。`;
+
+/** 金額欄が未入力のときのエラー。どの欄かが分かるよう項目名を添える */
+export const buildRealEstateAmountRequiredMessage = (label: string): string =>
+  `${label}を入力してください。`;
+
+/** 金額欄にカンマ・全角数字などが入っているときのエラー(HTMLモックの文言に合わせる) */
+export const REAL_ESTATE_AMOUNT_FORMAT_MESSAGE = "半角数字のみ入力してください。";
+
+/** 金額が上限を超えたときのエラー */
+export const REAL_ESTATE_AMOUNT_TOO_LARGE_MESSAGE = "金額は12桁以内で入力してください。";
+
+/** 保存完了のトースト(DESIGN.md 3章のsonner) */
+export const REAL_ESTATE_SAVED_MESSAGES = {
+  create: "物件を登録しました",
+  edit: "物件情報を更新しました",
+} as const;
+
+/** 物件の取得・保存が失敗したときの文言(B4の`CATEGORY_AXIS_FAILURE_MESSAGES`と同じ考え方) */
+export const REAL_ESTATE_FAILURE_MESSAGES: Record<FirestoreAccessFailureReason, string> = {
+  "signed-out": "ログイン状態が切れています。ログインし直してから操作してください。",
+  "configuration-error": "Firebaseの設定が読み込めないため操作できません。",
+  "permission-denied": "この操作は許可されていません。ログインし直すか、画面を更新してください。",
+  unknown: "操作に失敗しました。時間をおいて再度お試しください。",
+};
+
+/** 物件一覧のキャッシュキー(TanStack Query) */
+export const REAL_ESTATE_PROPERTIES_QUERY_KEY = ["real-estate-properties"] as const;
+
+/**
+ * 物件1件のキャッシュキー(TanStack Query)。
+ *
+ * B6 詳細・B7 編集モードが同じ物件を引くため、物件IDまで含めて分ける。
+ */
+export const buildRealEstatePropertyQueryKey = (id: string): readonly [string, string] => [
+  "real-estate-property",
+  id,
+];

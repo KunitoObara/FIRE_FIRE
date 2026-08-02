@@ -23,9 +23,13 @@ declare global {
     assetTypeNames: string[];
   };
 
-  /** 分類軸の取得・作成・更新・削除が失敗した理由 */
-  type AssetCategoryFailureReason =
-    "signed-out" | "configuration-error" | "permission-denied" | "unknown";
+  /**
+   * 分類軸の取得・作成・更新・削除が失敗した理由。
+   *
+   * B4に固有の失敗は無く、Firestoreへのアクセス自体の失敗と一致する。画面側の文言
+   * (`CATEGORY_AXIS_FAILURE_MESSAGES`)がB4の言い回しを持つため、名前だけ分けている。
+   */
+  type AssetCategoryFailureReason = FirestoreAccessFailureReason;
 
   /** 分類軸の保存(作成・更新)結果 */
   type SaveCategoryAxisResult = { ok: true } | { ok: false; reason: AssetCategoryFailureReason };
