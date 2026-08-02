@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr merge *)",
+      "Bash(git push --force:*)",
+      "Bash(git push --force *)",
+      "Bash(git push -f:*)",
+      "Bash(git push -f *)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push --force-with-lease *)",
+      "Bash(firebase deploy:*)",
+      "Bash(firebase deploy *)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -rf *)",
+      "Read(./docs/.env)",
+      "Read(./docs/.env.*)"
+    ],
+    "ask": [
+      "Bash(git reset --hard:*)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean -fd:*)",
+      "Bash(git clean -fd *)"
+    ],
+    "allow": [
+      "mcp__trello__get_lists",
+      "mcp__trello__get_board_labels",
+      "mcp__trello__get_board_members",
+      "mcp__trello__get_cards_by_list_id",
+      "mcp__trello__get_card",
+      "mcp__trello__get_card_comments",
+      "mcp__trello__get_card_history",
+      "mcp__trello__get_checklist_items",
+      "mcp__trello__get_acceptance_criteria",
+      "mcp__trello__move_card",
+      "mcp__trello__add_comment",
+      "mcp__trello__add_card_to_list",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ]
+  }
+}
