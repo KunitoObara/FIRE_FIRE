@@ -207,14 +207,16 @@ Trello: <カードのURL>
 
 上のうち機械的に判定できるものには [.claude/settings.json](../.claude/settings.json) で歯止めをかけてある。文書のルールだけに頼らないため。ただし**すべてを塞げているわけではない**(後述の「限界」)。
 
-| 対象 | 手段 |
-|---|---|
-| `gh pr merge` / `firebase deploy` / `rm -rf` | `permissions.deny` |
-| `git reset --hard` / `git clean -fd` | `permissions.ask`(作業中の変更を消すため、拒否ではなく都度確認) |
-| force push | `PreToolUse` フック |
-| `docs/.env` | `Read` ツールは `permissions.deny`、Bash 経由は `PreToolUse` フック |
+| 対象 | 手段 | 判定 |
+|---|---|---|
+| `gh pr merge` / `firebase deploy` / `rm -rf` | `permissions.deny` | 拒否 |
+| `docs/.env` | `Read` ツールは `permissions.deny`、Bash 経由は `PreToolUse` フック | 拒否 |
+| force push | `PreToolUse` フック | 拒否 |
+| `git reset --hard` / `git clean -f` 系 | `PreToolUse` フック | **確認**(作業中の変更を消すため、拒否ではなく都度確認) |
 
 `docs/.env` を2段構えにしているのは、`permissions` のルールが**ツール単位**だから。`Read(./docs/.env)` は `Read` ツールしか塞がず、`cat docs/.env` や `grep API_KEY docs/.env` のような Bash 経由は素通りする。フック側はコマンド文字列に `docs/.env` が現れた時点で拒否する — パスに言及するだけのコマンドも巻き添えで拒否されるが、秘密情報なので安全側に倒している。
+
+`git reset --hard` / `git clean` も `permissions.ask` ではなくフックで見る。`permissions` のパターンは前方一致なので、`git -C . reset --hard` のようにグローバルオプションが挟まる形や `git clean -df` のようなフラグ順序違いを拾えず、force push で見つかったのと同じ抜け方をするため。フックは「`git` トークンがある」+「`reset` トークンと `--hard`」/「`clean` トークンと force 系フラグ」で判定し、`permissionDecision: ask` を返す。`git reset --soft` や `git clean -n` は通す。
 
 force push だけ `deny` のパターン列挙ではなくフックにしてあるのは、**パターン列挙では網羅できないため**。`permissions` のパターンは前方一致なので `Bash(git push --force:*)` は `git push origin main --force` のようにフラグが末尾に来る形を拾えず、`git push origin +HEAD:develop` のような `+` 付きリフスペックによる強制更新は `--force` の文字列を一切含まない。
 
@@ -247,7 +249,7 @@ CIで無効にして安全なのは、歯止めの対象がそこに存在しな
 これらの歯止めは**本人がうっかり実行するのを防ぐためのもの**で、回避しようとする相手を止める仕組みではない。以下は既知の抜け道であり、塞いでいない。
 
 - **クォート分割・変数展開**。判定はコマンド文字列への正規表現一致なので、`git push origin main --for''ce` や `$(echo --force)` のように、静的な文字列としては `force` の並びが現れないが実行時に展開される書き方は検知できない。同じ限界は `docs/.env` の判定にもある
-- **綴りの揺れ**。`Bash(rm -rf:*)` は前方一致なので `rm -fr`、`rm --recursive --force`、フラグが末尾に来る形は拾えない
+- **綴りの揺れ**。`Bash(rm -rf:*)` は前方一致なので `rm -fr`、`rm --recursive --force`、フラグが末尾に来る形は拾えない。`permissions` に残っている前方一致ルールはすべて同じ限界を持つ(フックに寄せたものは除く)
 - **git のエイリアス**。`.gitconfig` に `push` のエイリアス(例 `git p`)があると、`push` トークンが文字列に現れずフックをすり抜ける
 
 穴が見つかったら塞ぐが、**この仕組みを理由に破壊的な操作を注意せず実行してよいことにはならない**。最終的な歯止めは [8章](#8-claudeがやらないこと)のルールそのもの。

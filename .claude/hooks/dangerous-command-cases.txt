@@ -1,5 +1,8 @@
 # 禁止コマンド遮断フックの回帰テストケース。
-# 形式: DENY|<コマンド> または ALLOW|<コマンド>
+# 形式: DENY|<コマンド> / ASK|<コマンド> / ALLOW|<コマンド>
+#   DENY  = 実行させない
+#   ASK   = 実行前に必ず確認を出す
+#   ALLOW = 素通りさせる
 # 実行: bash .claude/hooks/run-dangerous-command-tests.sh
 #
 # 判定ロジックは .claude/settings.json の PreToolUse フックが持つ。
@@ -68,3 +71,23 @@ DENY|cp docs/.env /tmp/x
 ALLOW|cat docs/development-workflow.md
 ALLOW|ls docs/
 ALLOW|cat src/frontend/.env.local
+
+# --- 確認を出すべき: 未コミットの変更を壊す操作 ---
+# permissions.ask の前方一致では、グローバルオプションが挟まる形や
+# フラグの順序違いを拾えないため、フック側で判定する。
+ASK|git reset --hard
+ASK|git reset --hard HEAD~1
+ASK|git -C . reset --hard
+ASK|git -c core.pager=cat reset --hard
+ASK|git clean -fd
+ASK|git clean -df
+ASK|git clean --force -d
+ASK|git -C . clean -fd
+ASK|git clean -xfd
+
+# --- 通すべき: 破壊しない reset / clean ---
+ALLOW|git reset HEAD~1
+ALLOW|git reset --soft HEAD~1
+ALLOW|git reset --mixed
+ALLOW|git clean -n
+ALLOW|git clean --dry-run

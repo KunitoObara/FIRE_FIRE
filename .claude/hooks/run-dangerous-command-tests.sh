@@ -35,7 +35,12 @@ fail=0
 while IFS='|' read -r want cmd; do
   case "$want" in ''|'#'*) continue ;; esac
   payload=$(CMD="$cmd" python3 -c 'import json,os;print(json.dumps({"tool_name":"Bash","tool_input":{"command":os.environ["CMD"]}}))')
-  if [ -n "$(printf '%s' "$payload" | bash "$hook")" ]; then got=DENY; else got=ALLOW; fi
+  out=$(printf '%s' "$payload" | bash "$hook")
+  if [ -z "$out" ]; then
+    got=ALLOW
+  else
+    got=$(OUT="$out" python3 -c 'import json,os;print(json.loads(os.environ["OUT"])["hookSpecificOutput"]["permissionDecision"].upper())')
+  fi
   if [ "$got" = "$want" ]; then
     pass=$((pass + 1))
   else

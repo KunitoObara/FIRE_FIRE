@@ -8,10 +8,6 @@
       "Read(./docs/.env)",
       "Read(./docs/.env.*)"
     ],
-    "ask": [
-      "Bash(git reset --hard:*)",
-      "Bash(git clean -fd:*)"
-    ],
     "allow": [
       "mcp__trello__get_lists",
       "mcp__trello__get_board_labels",
@@ -46,7 +42,7 @@
           {
             "type": "command",
             "statusMessage": "禁止コマンドをチェック中",
-            "command": "[ -n \"${GITHUB_ACTIONS:-}\" ] && exit 0; d() { printf '%s' \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"permissionDecision\\\":\\\"deny\\\",\\\"permissionDecisionReason\\\":\\\"$1\\\"}}\"; exit 0; }; c=$(jq -r '.tool_input.command'); printf '%s' \"$c\" | grep -Eq 'docs/\\.env' && d 'docs/.env は秘密情報です。読み取り・出力・コミットのいずれも禁止です(CLAUDE.md)。パスに言及するだけのコマンドも安全側で拒否しています。'; printf '%s' \"$c\" | grep -Eq '(^|[^[:alnum:]_.-])git([^[:alnum:]_.-]|$)' || exit 0; printf '%s' \"$c\" | grep -Eq '(^|[^[:alnum:]_.-])push([^[:alnum:]_.-]|$)' || exit 0; printf '%s' \"$c\" | grep -Eq '(^|[[:space:]])--force(-with-lease)?([[:space:]=]|$)|(^|[[:space:]])-[[:alnum:]]*f[[:alnum:]]*([[:space:]]|$)|[[:space:]]\\+[^[:space:]]+' && d 'force push は禁止です(docs/development-workflow.md 8章)。--force / --force-with-lease / f を含む短オプション / + 付きリフスペックのいずれも対象です。'; exit 0"
+            "command": "[ -n \"${GITHUB_ACTIONS:-}\" ] && exit 0\nr() { printf '%s' \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"permissionDecision\\\":\\\"$1\\\",\\\"permissionDecisionReason\\\":\\\"$2\\\"}}\"; exit 0; }\nc=$(jq -r '.tool_input.command')\nm() { printf '%s' \"$c\" | grep -Eq \"$1\"; }\nG='(^|[^[:alnum:]_.-])git([^[:alnum:]_.-]|$)'\nF='(^|[[:space:]])--force(-with-lease)?([[:space:]=]|$)|(^|[[:space:]])-[[:alnum:]]*f[[:alnum:]]*([[:space:]]|$)'\nm 'docs/\\.env' && r deny 'docs/.env は秘密情報です。読み取り・出力・コミットのいずれも禁止です(CLAUDE.md)。パスに言及するだけのコマンドも安全側で拒否しています。'\nm \"$G\" || exit 0\nm '(^|[^[:alnum:]_.-])push([^[:alnum:]_.-]|$)' && { m \"$F|[[:space:]]\\+[^[:space:]]+\" && r deny 'force push は禁止です(docs/development-workflow.md 8章)。--force / --force-with-lease / f を含む短オプション / + 付きリフスペックのいずれも対象です。'; }\nm '(^|[^[:alnum:]_.-])reset([^[:alnum:]_.-]|$)' && m '(^|[[:space:]])--hard([[:space:]]|$)' && r ask '未コミットの変更が失われます。実行してよいか確認してください(docs/development-workflow.md 8章)。'\nm '(^|[^[:alnum:]_.-])clean([^[:alnum:]_.-]|$)' && m \"$F\" && r ask '追跡外のファイルが削除されます。実行してよいか確認してください(docs/development-workflow.md 8章)。'\nexit 0\n"
           }
         ]
       }
