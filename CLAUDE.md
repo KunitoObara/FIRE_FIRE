@@ -51,7 +51,7 @@ Work is driven by cards on the private Trello board **FIRE-FIRE**, reached throu
 | `/card-ship` | Run the CI commands and the relevant project skills → commit → push → open the PR against `develop` → move the card to 確認中 |
 | `/card-review` | Wait for CI and claude-review → fix findings, **max 3 rounds** → past that, fix only CI failures / security / data-loss / broken-screen findings and file the rest as new backlog cards |
 
-Merging is the PO's call: **never run `gh pr merge`**. `.claude/settings.json` denies it, along with force-push, `firebase deploy`, `rm -rf`, and reading `docs/.env`. The card reaches 完了 on the next `/card-start`, which detects the merge.
+Merging is the PO's call: **never run `gh pr merge`**. `.claude/settings.json` denies it, along with `firebase deploy`, `rm -rf`, and reading `docs/.env`; force-push is blocked by a `PreToolUse` hook instead, because prefix patterns cannot catch trailing `--force` or `+refspec` pushes. The card reaches 完了 on the next `/card-start`, which detects the merge.
 
 ## CI / deployment
 

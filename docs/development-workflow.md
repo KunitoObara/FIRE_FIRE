@@ -197,10 +197,30 @@ Trello: <カードのURL>
 
 ## 8. Claudeがやらないこと
 
-- **`gh pr merge` を実行しない**。マージはPOの判断。`.claude/settings.json` の `permissions.deny` でも封じてある
+- **`gh pr merge` を実行しない**。マージはPOの判断
+- **force push しない**
 - **`develop` / `main` へ直接pushしない**
 - **要件定義書とコードの食い違いを無断でどちらかに寄せない**。どちらが正かをユーザーに確認する(`screen-spec-drift-check` と同じ方針)
 - **`docs/.env` を読まない・出力しない**
+
+### 設定による裏付け
+
+上のうち機械的に判定できるものは [.claude/settings.json](../.claude/settings.json) で封じてある。文書のルールだけに頼らないため。
+
+| 対象 | 手段 |
+|---|---|
+| `gh pr merge` / `firebase deploy` / `rm -rf` / `docs/.env` の読み取り | `permissions.deny` |
+| `git reset --hard` / `git clean -fd` | `permissions.ask`(作業中の変更を消すため、拒否ではなく都度確認) |
+| force push | `PreToolUse` フック |
+
+force push だけ `deny` のパターン列挙ではなくフックにしてあるのは、**パターン列挙では網羅できないため**。`permissions` のパターンは前方一致なので `Bash(git push --force:*)` は `git push origin main --force` のようにフラグが末尾に来る形を拾えず、`git push origin +HEAD:develop` のような `+` 付きリフスペックによる強制更新は `--force` の文字列を一切含まない。フックは以下をコマンド文字列全体に対する正規表現で判定する。
+
+- 独立したトークンとしての `--force` / `-f` / `--force-with-lease`(`--force=x` のような `=` 続きも含む)
+- `+` で始まるトークン(`+main`、`+HEAD:develop`、`+feature/xxx:develop`)
+
+**既知の副作用**: フックはコマンド文字列全体を見るため、`git push` と force 系の綴りを**引数として含むだけ**のコマンド(例: このルール自体をテストするスクリプト)も拒否される。安全側に倒した挙動であり、その場合はコマンドを分割するかファイル経由で渡す。
+
+判定内容を変えたときは、`git push -u origin <branch>` のような通常のpushや、`feature/fire-fire-x0` のようにブランチ名へ `-f` を含むケースが誤って拒否されないことを必ず確認する。
 
 ## 9. 前提と制約
 
