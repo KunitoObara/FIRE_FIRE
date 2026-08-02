@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   CATEGORY_AXIS_FAILURE_MESSAGES,
+  CATEGORY_AXIS_NAME_REQUIRED_MESSAGE,
+  CATEGORY_AXIS_NAME_TOO_LONG_MESSAGE,
   NO_ASSET_TYPE_OPTIONS_NOTICE,
 } from "@/constants/asset-categories";
 import { categoryAxisFormSchema } from "@/schemas/asset-categories";
@@ -37,7 +39,7 @@ export const AssetCategoryAxisForm = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const toggleAssetType = (assetTypeName: string, checked: boolean): void => {
+  const handleAssetTypeToggle = (assetTypeName: string, checked: boolean): void => {
     setAssetTypeNames((current) =>
       checked ? [...current, assetTypeName] : current.filter((name_) => name_ !== assetTypeName),
     );
@@ -47,7 +49,12 @@ export const AssetCategoryAxisForm = ({
     const parsed = categoryAxisFormSchema.safeParse({ name, assetTypeNames });
 
     if (!parsed.success) {
-      setNameError("分類名を1〜40文字で入力してください。");
+      const nameIssue = parsed.error.issues.find((issue) => issue.path[0] === "name");
+      setNameError(
+        nameIssue?.code === "too_big"
+          ? CATEGORY_AXIS_NAME_TOO_LONG_MESSAGE
+          : CATEGORY_AXIS_NAME_REQUIRED_MESSAGE,
+      );
       return;
     }
 
@@ -99,7 +106,9 @@ export const AssetCategoryAxisForm = ({
                     id={checkboxId}
                     checked={assetTypeNames.includes(assetTypeName)}
                     disabled={submitting}
-                    onCheckedChange={(checked) => toggleAssetType(assetTypeName, checked === true)}
+                    onCheckedChange={(checked) =>
+                      handleAssetTypeToggle(assetTypeName, checked === true)
+                    }
                   />
                   <span>{assetTypeName}</span>
                 </label>

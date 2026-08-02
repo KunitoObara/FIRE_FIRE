@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AssetCategoryMasterScreen } from "@/components/asset-categories/AssetCategoryMasterScreen";
 
-import type { JSX } from "react";
+import type { RenderResult } from "@testing-library/react";
 
 const fetchCategoryAxes = vi.fn();
 const fetchAssetTypeOptions = vi.fn();
@@ -41,7 +41,7 @@ const NET_FINANCIAL_AXIS: AssetCategoryAxisDocument = {
 };
 
 /** `useQuery`を使うため、テストでも`QueryClientProvider`で包む必要がある */
-const renderScreen = (): JSX.Element =>
+const renderScreen = (): RenderResult =>
   render(
     <QueryClientProvider client={new QueryClient()}>
       <AssetCategoryMasterScreen />
@@ -57,7 +57,10 @@ describe("AssetCategoryMasterScreen", () => {
     deleteCategoryAxis.mockReset();
     toastSuccess.mockReset();
 
-    fetchCategoryAxes.mockResolvedValue({ ok: true, axes: [TOTAL_ASSETS_AXIS, NET_FINANCIAL_AXIS] });
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [TOTAL_ASSETS_AXIS, NET_FINANCIAL_AXIS],
+    });
     fetchAssetTypeOptions.mockResolvedValue({
       ok: true,
       assetTypeNames: ["預金・現金", "投資信託", "株式(現物)"],
@@ -110,7 +113,22 @@ describe("AssetCategoryMasterScreen", () => {
     await user.click(screen.getByRole("button", { name: "新規分類を追加" }));
     await user.click(screen.getByRole("button", { name: "保存" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("分類名を1〜40文字で入力してください");
+    expect(await screen.findByRole("alert")).toHaveTextContent("分類名を入力してください。");
+    expect(createCategoryAxis).not.toHaveBeenCalled();
+  });
+
+  it("分類名が上限文字数を超えるとエラーを出し、保存処理を呼ばない", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await screen.findByText("総資産");
+    await user.click(screen.getByRole("button", { name: "新規分類を追加" }));
+    await user.type(screen.getByLabelText("分類名"), "あ".repeat(41));
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "分類名は40文字以内で入力してください。",
+    );
     expect(createCategoryAxis).not.toHaveBeenCalled();
   });
 
