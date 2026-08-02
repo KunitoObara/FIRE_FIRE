@@ -70,9 +70,13 @@ const RealEstateValuationCard = ({ property }: RealEstateDetailProps): JSX.Eleme
               spread < 0 ? "bg-destructive/10" : "bg-success/10",
             )}
           >
-            <dt className={cn("text-xs", amountToneClass(spread))}>
+            {/*
+              ラベルには正負の色を付けない(賃貸収支カードと揃える)。値に必ず符号が付くので
+              色は補助でしかなく、ラベルまで色を変えると背景の色と合わせて主張が過剰になる。
+            */}
+            <dt className="text-xs text-muted-foreground">
               {REAL_ESTATE_SPREAD_LABEL}
-              <span className="ml-1 text-muted-foreground">({REAL_ESTATE_SPREAD_DESCRIPTION})</span>
+              <span className="ml-1">({REAL_ESTATE_SPREAD_DESCRIPTION})</span>
             </dt>
             {/*
               利ざやは残高と同じ「量」なので、プラス側に`+`を付けない(`formatJpy`)。
