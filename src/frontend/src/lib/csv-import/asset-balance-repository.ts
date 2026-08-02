@@ -154,6 +154,47 @@ export const importAssetBalances = async (
 };
 
 /**
+ * 直近の資産残高の総額を取得する(B8の参考表示「現在資産額」)。
+ *
+ * B2が取り込んだ資産残高のうち、集計日がいちばん新しい1件の`total`をそのまま返す。
+ * 読み出すのはB8だが、`assetSnapshots`を扱うのはこのファイルなのでここに置く。
+ *
+ * CSVを一度も取り込んでいないアカウントでは1件も無いため、失敗ではなく`total: null`を返す。
+ * 参考表示であって目標の設定を妨げるものではなく、呼び出し側で「未取込」として扱えるように
+ * するため。`total`だけを見るので履歴のようなzodスキーマは通さず、型だけを確かめる。
+ */
+export const fetchLatestAssetTotal = async (): Promise<CurrentAssetTotalResult> => {
+  const context = resolveFirestoreUserContext();
+
+  if (!context.ok) {
+    return context;
+  }
+
+  try {
+    const snapshot = await getDocs(
+      query(assetSnapshotsRef(context.firestore, context.uid), orderBy("date", "desc"), limit(1)),
+    );
+    const latest = snapshot.docs[0];
+
+    if (latest === undefined) {
+      return { ok: true, total: null };
+    }
+
+    const total: unknown = latest.get("total");
+
+    if (typeof total !== "number") {
+      console.error("資産残高の総額を解釈できませんでした", latest.id);
+      return { ok: true, total: null };
+    }
+
+    return { ok: true, total };
+  } catch (error) {
+    console.error("資産残高の総額を取得できませんでした", error);
+    return { ok: false, reason: toFirestoreFailureReason(error) };
+  }
+};
+
+/**
  * 直近の取込履歴を新しい順に取得する(B2の表示項目「直近の取込履歴」)。
  *
  * Firestoreの生データは型が保証されない外部入力なので、zodスキーマを通してから画面へ渡す
