@@ -14,3 +14,14 @@ const EMPTY_REAL_ESTATE_PROPERTIES: RealEstateProperty[] = [];
  */
 export const getRealEstateProperties = (): RealEstateProperty[] =>
   USE_SAMPLE_REAL_ESTATE_DATA ? SAMPLE_REAL_ESTATE_PROPERTIES : EMPTY_REAL_ESTATE_PROPERTIES;
+
+/**
+ * B6が表示する物件1件を、URLの物件IDから取得する。
+ *
+ * 該当が無ければ`undefined`を返し、404にするかどうかは呼び出す画面側に任せる
+ * (削除済みの物件をブックマークから開いた場合などが該当する)。
+ * Firestoreへの繋ぎ込み時には、ここを`users/{uid}/properties/{id}`のドキュメント取得に
+ * 差し替える(全件取得してから絞る形をそのまま残さない)。
+ */
+export const getRealEstateProperty = (id: string): RealEstateProperty | undefined =>
+  getRealEstateProperties().find((property) => property.id === id);
