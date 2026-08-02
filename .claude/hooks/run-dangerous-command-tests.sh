@@ -44,6 +44,20 @@ while IFS='|' read -r want cmd; do
   fi
 done < "$cases"
 
+# CI(GitHub Actions)では歯止めごと無効になること。
+# claude-review ジョブは settingSources に project を含むため、このフックを
+# 読み込んでしまう。歯止めの対象(秘密ファイル・ローカルのpush)はCIの
+# チェックアウトに存在しないのに、レビュー本文に禁止語が含まれるだけで
+# コメント投稿が拒否され、ジョブが落ちる。
+ci_case=$(grep -m1 '^DENY|' "$cases" | cut -d'|' -f2-)
+ci_payload=$(CMD="$ci_case" python3 -c 'import json,os;print(json.dumps({"tool_name":"Bash","tool_input":{"command":os.environ["CMD"]}}))')
+if [ -n "$(printf '%s' "$ci_payload" | GITHUB_ACTIONS=true bash "$hook")" ]; then
+  fail=$((fail + 1))
+  printf 'FAIL  GITHUB_ACTIONS=true でも拒否された: %s\n' "$ci_case"
+else
+  pass=$((pass + 1))
+fi
+
 echo "----"
 if [ "$fail" -eq 0 ]; then
   echo "全 $pass ケース一致"
