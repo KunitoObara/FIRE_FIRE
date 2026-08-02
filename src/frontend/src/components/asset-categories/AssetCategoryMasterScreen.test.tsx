@@ -103,6 +103,10 @@ describe("AssetCategoryMasterScreen", () => {
     expect(toastSuccess).toHaveBeenCalledWith("分類を追加しました");
     // 保存後はフォームを閉じる
     expect(screen.queryByLabelText("分類名")).not.toBeInTheDocument();
+    // 一覧だけでなく集計対象の選択肢も取り直す(レビュー指摘: コメントと実装の食い違い)
+    await waitFor(() => {
+      expect(fetchAssetTypeOptions).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("分類名が空のまま保存しようとするとエラーを出し、保存処理を呼ばない", async () => {
@@ -156,6 +160,41 @@ describe("AssetCategoryMasterScreen", () => {
       expect(updateCategoryAxis).toHaveBeenCalledWith("net-financial", {
         name: "純金融資産",
         assetTypeNames: ["預金・現金", "投資信託"],
+      });
+    });
+  });
+
+  /**
+   * 編集フォームを保存せずに別の分類軸へ切り替えた場合、フォームの入力状態が前の分類軸の
+   * ままにならないことを確かめる。`key`が無いとReactがフォームのstateを使い回し、
+   * 別の分類軸へ前の入力内容で上書き保存してしまう(レビュー指摘)。
+   */
+  it("保存せずに編集対象を切り替えると、フォームが切り替え先の値にリセットされる", async () => {
+    const user = userEvent.setup();
+    updateCategoryAxis.mockResolvedValue({ ok: true });
+    renderScreen();
+
+    const netFinancialRow = (await screen.findByText("純金融資産")).closest("li");
+    const totalAssetsRow = screen.getByText("総資産").closest("li");
+
+    if (netFinancialRow === null || totalAssetsRow === null) {
+      throw new Error("行が見つからない");
+    }
+
+    await user.click(within(netFinancialRow).getByRole("button", { name: "編集" }));
+    await user.clear(screen.getByLabelText("分類名"));
+    await user.type(screen.getByLabelText("分類名"), "書きかけの名前");
+
+    await user.click(within(totalAssetsRow).getByRole("button", { name: "編集" }));
+
+    expect(screen.getByLabelText("分類名")).toHaveValue("総資産");
+
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(updateCategoryAxis).toHaveBeenCalledWith("total-assets", {
+        name: "総資産",
+        assetTypeNames: [],
       });
     });
   });
