@@ -72,6 +72,22 @@ ALLOW|cat docs/development-workflow.md
 ALLOW|ls docs/
 ALLOW|cat src/frontend/.env.local
 
+# --- 拒否されるべき: 再帰的な強制削除 ---
+# permissions.deny の Bash(rm -rf:*) は前方一致なので、フラグ順序違いや
+# 末尾に来る形を拾えない。破壊力は作業ツリー丸ごとなのでフックでも見る。
+DENY|rm -rf /tmp/x
+DENY|rm -fr /tmp/x
+DENY|rm -Rf /tmp/x
+DENY|rm -r -f /tmp/x
+DENY|rm --recursive --force /tmp/x
+DENY|rm /tmp/x -rf
+
+# --- 通すべき: 強制と再帰が揃っていない削除 ---
+ALLOW|rm /tmp/x
+ALLOW|rm -f /tmp/x
+ALLOW|rm -r /tmp/emptydir
+ALLOW|rm -i /tmp/x
+
 # --- 確認を出すべき: 未コミットの変更を壊す操作 ---
 # permissions.ask の前方一致では、グローバルオプションが挟まる形や
 # フラグの順序違いを拾えないため、フック側で判定する。

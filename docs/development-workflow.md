@@ -211,7 +211,8 @@ Trello: <カードのURL>
 
 | 対象 | 手段 | 判定 |
 |---|---|---|
-| `firebase deploy` / `rm -rf` | `permissions.deny` | 拒否 |
+| `firebase deploy` | `permissions.deny` | 拒否 |
+| 再帰的な強制削除(`rm -rf` 系) | `permissions.deny` + `PreToolUse` フック | 拒否 |
 | マージ(`gh pr merge`、`gh api` の `.../merge`、`gh api` の書き込み) | `permissions.deny` + `PreToolUse` フック | 拒否 |
 | `docs/.env` | `permissions.deny` + `PreToolUse` フック(Bash / Grep / Glob / Read) | 拒否 |
 | force push | `PreToolUse` フック | 拒否 |
@@ -220,6 +221,7 @@ Trello: <カードのURL>
 `permissions` のルールは**ツール単位・前方一致**なので、単体ではどれも穴が残る。フックを重ねているのはそのため。
 
 - **マージ** — `Bash(gh pr merge:*)` は `gh -R <repo> pr merge` のようにグローバルオプションが挟まる形を拾えず、そもそも `gh api repos/<owner>/<repo>/pulls/<番号>/merge -X PUT` と REST API を直接叩けば `gh pr merge` を通らずにマージできてしまう。フックは「`gh` トークン + `merge` トークン」で拒否し、あわせて `gh api` の書き込みも拒否する。書き込みの判定は `-X` / `--method` だけでなく `-f` / `-F` / `--raw-field` / `--input` も見る — `gh api` はこれらを渡すとメソッド未指定でもPOSTになるため。`gh api` の allow はPRコメント取得だけに絞ってある
+- **再帰的な強制削除** — `Bash(rm -rf:*)` は前方一致なので `rm -fr`、`rm --recursive --force`、`rm /tmp/x -rf` のようにフラグが末尾に来る形を拾えない。破壊力は作業ツリー丸ごとなのでフックでも見る。判定は「`rm` トークン + force 系フラグ + 再帰フラグ」で、`rm -f`(再帰でない)や `rm -r`(強制でない)は通す
 - **`docs/.env`** — `Read(./docs/.env)` は `Read` ツールしか塞がない。`cat docs/.env` のような Bash 経由に加えて、**`Grep` は一致行を返すので内容が読める**。フックを Bash と Grep / Glob / Read の両方に掛けてあり、コマンド文字列やツール引数にパスが現れた時点で拒否する。パスに言及するだけのコマンドも巻き添えで拒否されるが、秘密情報なので安全側に倒している
 
 `git reset --hard` / `git clean` も `permissions.ask` ではなくフックで見る。`permissions` のパターンは前方一致なので、`git -C . reset --hard` のようにグローバルオプションが挟まる形や `git clean -df` のようなフラグ順序違いを拾えず、force push で見つかったのと同じ抜け方をするため。フックは「`git` トークンがある」+「`reset` トークンと `--hard`」/「`clean` トークンと force 系フラグ」で判定し、`permissionDecision: ask` を返す。`git reset --soft` や `git clean -n` は通す。
@@ -263,7 +265,7 @@ CIで無効にして安全なのは、歯止めの対象がそこに存在しな
 これらの歯止めは**本人がうっかり実行するのを防ぐためのもの**で、回避しようとする相手を止める仕組みではない。以下は既知の抜け道であり、塞いでいない。
 
 - **クォート分割・変数展開**。判定はコマンド文字列への正規表現一致なので、`git push origin main --for''ce` や `$(echo --force)` のように、静的な文字列としては `force` の並びが現れないが実行時に展開される書き方は検知できない。同じ限界は `docs/.env` の判定にもある
-- **綴りの揺れ**。`Bash(rm -rf:*)` は前方一致なので `rm -fr`、`rm --recursive --force`、フラグが末尾に来る形は拾えない。`permissions` に残っている前方一致ルールはすべて同じ限界を持つ(フックに寄せたものは除く)
+- **綴りの揺れ**。`permissions` に残っている前方一致ルール(`firebase deploy` など)は、フラグ順序違いや末尾に来る形を拾えない。フックに寄せたものは除く。`permissions.deny` 側に残してある前方一致ルールは、フックが壊れたときのフォールバックとして意図的に併記している
 - **git のエイリアス**。`.gitconfig` に `push` のエイリアス(例 `git p`)があると、`push` トークンが文字列に現れずフックをすり抜ける
 
 穴が見つかったら塞ぐが、**この仕組みを理由に破壊的な操作を注意せず実行してよいことにはならない**。最終的な歯止めは [8章](#8-claudeがやらないこと)のルールそのもの。
