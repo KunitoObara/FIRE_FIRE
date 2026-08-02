@@ -84,6 +84,32 @@ service cloud.firestore {
           && request.resource.data.importedAt is timestamp;
         allow update, delete: if false;
       }
+
+      // 分類軸(B4 資産分類マスタ設定画面)。総資産のように集計対象を1件も選ばない軸を
+      // 表せるよう、`assetTypeNames`は空配列を許可する(すべての資産種別が対象という意味になる)。
+      match /categoryAxes/{axisId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'createdAt'])
+          && request.resource.data.name is string
+          // 文字数の上限はsrc/constants/asset-categories.tsのCATEGORY_AXIS_NAME_MAX_LENGTHと揃える
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 40
+          && request.resource.data.assetTypeNames is list
+          && request.resource.data.createdAt is timestamp;
+        allow update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'createdAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 40
+          && request.resource.data.assetTypeNames is list
+          // 登録順が分類別内訳の色スロットに対応するため、登録日時は編集で変えさせない(DESIGN.md 3章)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        // 集計対象が1件以上割り当てられた分類の削除は禁止する(画面の要件そのものを
+        // ルール側でも担保する。クライアント側の判定はscreen-requirements-dashboard.md B4参照)。
+        // 先に編集で割り当てを解除すれば`assetTypeNames`が空になり削除できるようになる。
+        allow delete: if isOwner(userId) && resource.data.assetTypeNames.size() == 0;
+      }
     }
 
     // 上記以外も既定で拒否する。コレクションを追加するときは、
