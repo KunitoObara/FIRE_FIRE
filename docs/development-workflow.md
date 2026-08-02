@@ -217,10 +217,8 @@ Trello: <カードのURL>
 
 `permissions` のルールは**ツール単位・前方一致**なので、単体ではどれも穴が残る。フックを重ねているのはそのため。
 
-- **マージ** — `Bash(gh pr merge:*)` は `gh -R <repo> pr merge` のようにグローバルオプションが挟まる形を拾えず、そもそも `gh api repos/<owner>/<repo>/pulls/<番号>/merge -X PUT` と REST API を直接叩けば `gh pr merge` を通らずにマージできてしまう。フックは「`gh` トークン + `merge` トークン」で拒否し、あわせて `gh api` の `-X` / `--method` による書き込みも拒否する。`gh api` の allow はPRコメント取得だけに絞ってある
+- **マージ** — `Bash(gh pr merge:*)` は `gh -R <repo> pr merge` のようにグローバルオプションが挟まる形を拾えず、そもそも `gh api repos/<owner>/<repo>/pulls/<番号>/merge -X PUT` と REST API を直接叩けば `gh pr merge` を通らずにマージできてしまう。フックは「`gh` トークン + `merge` トークン」で拒否し、あわせて `gh api` の書き込みも拒否する。書き込みの判定は `-X` / `--method` だけでなく `-f` / `-F` / `--raw-field` / `--input` も見る — `gh api` はこれらを渡すとメソッド未指定でもPOSTになるため。`gh api` の allow はPRコメント取得だけに絞ってある
 - **`docs/.env`** — `Read(./docs/.env)` は `Read` ツールしか塞がない。`cat docs/.env` のような Bash 経由に加えて、**`Grep` は一致行を返すので内容が読める**。フックを Bash と Grep / Glob / Read の両方に掛けてあり、コマンド文字列やツール引数にパスが現れた時点で拒否する。パスに言及するだけのコマンドも巻き添えで拒否されるが、秘密情報なので安全側に倒している
-
-`git reset --hard` / `git clean` も `permissions.ask` ではなくフックで見る。前方一致では `git -C . reset --hard` のようにグローバルオプションが挟まる形や `git clean -df` のようなフラグ順序違いを拾えず、force push で見つかったのと同じ抜け方をするため。フックは「`git` トークンがある」+「`reset` トークンと `--hard`」/「`clean` トークンと force 系フラグ」で判定し、`permissionDecision: ask` を返す。`git reset --soft` や `git clean -n` は通す。
 
 `git reset --hard` / `git clean` も `permissions.ask` ではなくフックで見る。`permissions` のパターンは前方一致なので、`git -C . reset --hard` のようにグローバルオプションが挟まる形や `git clean -df` のようなフラグ順序違いを拾えず、force push で見つかったのと同じ抜け方をするため。フックは「`git` トークンがある」+「`reset` トークンと `--hard`」/「`clean` トークンと force 系フラグ」で判定し、`permissionDecision: ask` を返す。`git reset --soft` や `git clean -n` は通す。
 
@@ -235,7 +233,15 @@ force push だけ `deny` のパターン列挙ではなくフックにしてあ�
    - `f` を含む短オプション。連結された形も対象(`-f`、`-fu`、`-uf`、`-qf`)
    - `+` で始まるトークン(`+main`、`+HEAD:develop`、`+feature/xxx:develop`)
 
-**過剰に拒否される場合**: 3条件のANDなので、`git` と `push` と force 系の綴りを**引数として含むだけ**のコマンド(例: このルール自体を説明する文章をコミットメッセージに渡す `git commit -m`)も拒否される。安全側に倒した挙動であり、その場合はファイル経由で渡す(`git commit -F <file>`)。`docs/.env` の判定も同様に、パスに言及するだけで拒否される。
+**過剰に拒否される場合**: 判定はコマンド文字列全体を見るので、禁止対象の語を**引数として含むだけ**のコマンドも拒否される。安全側に倒した挙動。**本文はファイル経由で渡せば回避できる**。
+
+| 拒否される書き方 | 回避策 |
+|---|---|
+| `git commit -m "...force push..."` | `git commit -F <file>` |
+| `gh pr comment <番号> --body "...merge..."` | `gh pr comment <番号> --body-file <file>` |
+| `gh pr create --body "...--force..."` | `gh pr create --body-file <file>` |
+
+とくに `gh` + `merge` の判定はサブコマンドの位置を見ていないため、**レビュー対応の説明文で `merge` の語に触れるだけ**で引っかかる。`/card-review` はラウンドコメントを必ず `--body-file` で投稿すること。`docs/.env` の判定も同様に、パスに言及するだけで拒否される。
 
 ### CI では無効にしている
 

@@ -94,11 +94,23 @@ DENY|gh pr merge 44
 DENY|gh -R KunitoObara/private_room pr merge 44
 DENY|gh api repos/KunitoObara/private_room/issues -X POST -f title=x
 
+# gh api は -f / -F を渡すとメソッド未指定でもPOSTになる。-X の有無だけでは足りない。
+DENY|gh api repos/KunitoObara/private_room/issues/5 -f state=closed
+DENY|gh api repos/KunitoObara/private_room/labels -F name=bug
+DENY|gh api repos/KunitoObara/private_room/issues --input payload.json
+
+# 既知の誤検知(仕様として固定する)。
+# コメント本文に merge の語が入るだけで拒否される。サブコマンドの位置を見て
+# いないため。回避策は --body-file でのファイル渡し(下のALLOWケース)。
+DENY|gh pr comment 44 --body "merge conflict を解消した"
+
 # --- 通すべき: 読み取り専用の gh ---
 ALLOW|gh api repos/KunitoObara/private_room/pulls/44/comments
 ALLOW|gh pr view 44 --json mergeable
 ALLOW|gh pr checks 44
 ALLOW|gh run list --workflow claude-review.yml
+ALLOW|gh pr comment 44 --body-file /tmp/round.md
+ALLOW|gh pr create --base develop --title "X0 開発フローを整備" --body-file /tmp/body.md
 
 # --- 通すべき: 破壊しない reset / clean ---
 ALLOW|git reset HEAD~1
