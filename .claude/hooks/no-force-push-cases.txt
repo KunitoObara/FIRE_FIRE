@@ -1,0 +1,56 @@
+# force push 遮断フックの回帰テストケース。
+# 形式: DENY|<コマンド> または ALLOW|<コマンド>
+# 実行: bash .claude/hooks/run-no-force-push-tests.sh
+#
+# 判定ロジックは .claude/settings.json の PreToolUse フックが持つ。
+# ここには期待値だけを置く(ロジックを二重に書かない)。
+
+# --- 拒否されるべき: フラグが先頭 ---
+DENY|git push --force
+DENY|git push -f
+DENY|git push --force-with-lease origin develop
+DENY|git push --force=x
+
+# --- 拒否されるべき: フラグが末尾(前方一致では拾えない形) ---
+DENY|git push origin main --force
+DENY|git push origin main -f
+DENY|git push --quiet --force origin main
+
+# --- 拒否されるべき: + 付きリフスペック(--force の文字列を含まない) ---
+DENY|git push origin +HEAD:develop
+DENY|git push origin +feature/xxx:develop
+DENY|git push origin +main
+
+# --- 拒否されるべき: git のグローバルオプションが間に挟まる形 ---
+DENY|git -C . push -f origin main
+DENY|git -c core.pager=cat push --force origin main
+DENY|git -C /tmp/repo push origin +main:main
+
+# --- 拒否されるべき: 連結された短オプション ---
+DENY|git push -fu origin main
+DENY|git push -uf origin main
+DENY|git push -qf origin main
+
+# --- 拒否されるべき: 複合コマンド ---
+DENY|cd src/frontend && git push --force
+
+# --- 通すべき: 通常の push ---
+ALLOW|git push
+ALLOW|git push origin develop
+ALLOW|git push -u origin feature/fire-fire-x0
+ALLOW|git -C . push -u origin feature/fire-fire-x0
+
+# --- 通すべき: ブランチ名や引数に f 系の綴りを含むだけ ---
+ALLOW|git push origin my-feature
+ALLOW|git commit -m "fix: -f flag docs"
+ALLOW|grep -f patterns.txt notes.md
+
+# --- 通すべき: force ではない短オプション・ロングオプション ---
+ALLOW|git push -n origin develop
+ALLOW|git push --dry-run origin develop
+
+# --- 通すべき: push と無関係 ---
+ALLOW|git status --short
+ALLOW|git log --oneline
+ALLOW|npm run test
+ALLOW|npm run build -- --force

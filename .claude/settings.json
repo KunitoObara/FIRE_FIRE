@@ -29,8 +29,10 @@
       "Bash(gh pr checks:*)",
       "Bash(gh pr diff:*)",
       "Bash(gh pr list:*)",
+      "Bash(gh pr comment:*)",
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
+      "Bash(gh api repos/KunitoObara/private_room/pulls/:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)"
@@ -44,7 +46,7 @@
           {
             "type": "command",
             "statusMessage": "force push をチェック中",
-            "command": "c=$(jq -r '.tool_input.command'); case \"$c\" in *'git push'*) ;; *) exit 0 ;; esac; printf '%s' \"$c\" | grep -Eq '(^|[[:space:]])(-f|--force|--force-with-lease)([[:space:]=]|$)|[[:space:]]\\+[^[:space:]]+' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"force push は禁止です(docs/development-workflow.md 8章)。--force / -f / --force-with-lease と + 付きリフスペックのいずれも対象です。\"}}'; exit 0"
+            "command": "c=$(jq -r '.tool_input.command'); printf '%s' \"$c\" | grep -Eq '(^|[^[:alnum:]_.-])git([^[:alnum:]_.-]|$)' || exit 0; printf '%s' \"$c\" | grep -Eq '(^|[^[:alnum:]_.-])push([^[:alnum:]_.-]|$)' || exit 0; printf '%s' \"$c\" | grep -Eq '(^|[[:space:]])--force(-with-lease)?([[:space:]=]|$)|(^|[[:space:]])-[[:alnum:]]*f[[:alnum:]]*([[:space:]]|$)|[[:space:]]\\+[^[:space:]]+' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"force push は禁止です(docs/development-workflow.md 8章)。--force / --force-with-lease / f を含む短オプション / + 付きリフスペックのいずれも対象です。\"}}'; exit 0"
           }
         ]
       }

@@ -213,14 +213,26 @@ Trello: <カードのURL>
 | `git reset --hard` / `git clean -fd` | `permissions.ask`(作業中の変更を消すため、拒否ではなく都度確認) |
 | force push | `PreToolUse` フック |
 
-force push だけ `deny` のパターン列挙ではなくフックにしてあるのは、**パターン列挙では網羅できないため**。`permissions` のパターンは前方一致なので `Bash(git push --force:*)` は `git push origin main --force` のようにフラグが末尾に来る形を拾えず、`git push origin +HEAD:develop` のような `+` 付きリフスペックによる強制更新は `--force` の文字列を一切含まない。フックは以下をコマンド文字列全体に対する正規表現で判定する。
+force push だけ `deny` のパターン列挙ではなくフックにしてあるのは、**パターン列挙では網羅できないため**。`permissions` のパターンは前方一致なので `Bash(git push --force:*)` は `git push origin main --force` のようにフラグが末尾に来る形を拾えず、`git push origin +HEAD:develop` のような `+` 付きリフスペックによる強制更新は `--force` の文字列を一切含まない。
 
-- 独立したトークンとしての `--force` / `-f` / `--force-with-lease`(`--force=x` のような `=` 続きも含む)
-- `+` で始まるトークン(`+main`、`+HEAD:develop`、`+feature/xxx:develop`)
+フックはコマンド文字列全体を3つの条件のANDで判定する。**`git push` という連続した文字列は探さない** — `git -C . push -f origin main` や `git -c core.pager=cat push --force` のようにグローバルオプションが間に挟まる形を取りこぼすため。
 
-**既知の副作用**: フックはコマンド文字列全体を見るため、`git push` と force 系の綴りを**引数として含むだけ**のコマンド(例: このルール自体をテストするスクリプト)も拒否される。安全側に倒した挙動であり、その場合はコマンドを分割するかファイル経由で渡す。
+1. `git` がトークンとして現れる
+2. `push` がトークンとして現れる
+3. force を意味する綴りが現れる
+   - `--force` / `--force-with-lease`(`--force=x` のような `=` 続きも含む)
+   - `f` を含む短オプション。連結された形も対象(`-f`、`-fu`、`-uf`、`-qf`)
+   - `+` で始まるトークン(`+main`、`+HEAD:develop`、`+feature/xxx:develop`)
 
-判定内容を変えたときは、`git push -u origin <branch>` のような通常のpushや、`feature/fire-fire-x0` のようにブランチ名へ `-f` を含むケースが誤って拒否されないことを必ず確認する。
+**既知の副作用**: 3条件のANDなので、`git` と `push` と force 系の綴りを**引数として含むだけ**のコマンド(例: このルール自体を説明する文章をコミットメッセージに渡す `git commit -m`)も拒否される。安全側に倒した挙動であり、その場合はファイル経由で渡す(`git commit -F <file>`)。
+
+判定内容を変えたときは、必ず回帰テストを流す。
+
+```bash
+bash .claude/hooks/run-no-force-push-tests.sh
+```
+
+ケースは [.claude/hooks/no-force-push-cases.txt](../.claude/hooks/no-force-push-cases.txt) にあり、拒否側だけでなく**誤って拒否してはいけない側**(`git push -u origin feature/fire-fire-x0` のようにブランチ名へ `-f` を含むもの、`git push -n`、`npm run build -- --force` など)も含めてある。テストスクリプトは `.claude/settings.json` からフック本体を取り出して実行するので、判定ロジックの二重管理は起きない。
 
 ## 9. 前提と制約
 
