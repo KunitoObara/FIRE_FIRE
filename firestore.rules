@@ -69,6 +69,20 @@ service cloud.firestore {
         );
     }
 
+    // FIRE目標の金額(目標資産額・想定年間支出額)。上限は
+    // src/frontend/src/constants/fire-goal.ts の FIRE_GOAL_AMOUNT_MAX と揃える。
+    // 使っていない方式の欄はnullで保存されるため、nullも許す。
+    // 0を許さないのは、目標資産額が0だと達成率(現在資産 ÷ 目標資産)が定義できないため
+    function isFireGoalAmount(value) {
+      return value == null || (value is number && value > 0 && value <= 999999999999);
+    }
+
+    // 逆算係数(%)。4%ルールなら4。0%は「年間支出額 ÷ 0」になり目標額を導けないため許さない。
+    // 上限は src/frontend/src/constants/fire-goal.ts の FIRE_GOAL_WITHDRAWAL_RATE_MAX と揃える
+    function isWithdrawalRate(value) {
+      return value == null || (value is number && value > 0 && value <= 100);
+    }
+
     function isOwner(userId) {
       return request.auth != null
         && request.auth.uid == userId
@@ -152,6 +166,33 @@ service cloud.firestore {
         // ルール側でも担保する。クライアント側の判定はscreen-requirements-dashboard.md B4参照)。
         // 先に編集で割り当てを解除すれば`assetTypeNames`が空になり削除できるようになる。
         allow delete: if isOwner(userId) && resource.data.assetTypeNames.size() == 0;
+      }
+
+      // FIRE目標(B8 FIRE目標設定画面)。ユーザーごとに1件で、ドキュメントIDは`fireGoal`固定。
+      // `settings`をコレクションにしているのは、Firestoreにドキュメント直下のサブドキュメントが
+      // 無いため(src/frontend/src/lib/fire-goal/fire-goal-repository.ts)。
+      // ここに書いていない`settings`配下のドキュメントは末尾の既定拒否で弾かれる。
+      match /settings/fireGoal {
+        allow read: if isOwner(userId);
+        // 初回設定も設定変更も`setDoc`でドキュメントを丸ごと置き換えるため、
+        // create/updateで同じ形を要求する
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'updatedAt']
+          )
+          && request.resource.data.keys().hasAll(
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'updatedAt']
+          )
+          // 有効な設定方式。src/frontend/src/types/fire-goal.d.ts の`FireGoalMode`と揃える
+          && request.resource.data.mode in ['direct', 'reverse']
+          // 使っていない方式の欄はnullで保存される。必須になるのは有効な方式の欄だけで、
+          // その判定は画面側(src/frontend/src/schemas/fire-goal.ts)が行う
+          && isFireGoalAmount(request.resource.data.targetAmount)
+          && isFireGoalAmount(request.resource.data.annualExpense)
+          && isWithdrawalRate(request.resource.data.withdrawalRate)
+          && request.resource.data.updatedAt is timestamp;
+        // FIRE目標を消す画面は無い。方式の切替も上書きで表せる
+        allow delete: if false;
       }
 
       // 物件(B5 不動産一覧・B6 不動産詳細・B7 不動産登録/編集)。
