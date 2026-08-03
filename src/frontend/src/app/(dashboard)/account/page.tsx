@@ -1,13 +1,13 @@
-import { UnimplementedScreen } from "@/components/layout/UnimplementedScreen";
+import { AccountSettingsScreen } from "@/components/account/AccountSettingsScreen";
 
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
-const AccountSettingsPage = (): JSX.Element => (
-  <UnimplementedScreen
-    screenId="B10"
-    screenName="アカウント設定画面"
-    purpose="ログイン後にパスワード変更・2FA再設定などのアカウント関連設定を行う"
-  />
-);
+export const metadata: Metadata = {
+  title: "アカウント設定 | FIRE-FIRE",
+};
+
+/** B10 アカウント設定画面(docs/screen-requirements-account.md B10) */
+const AccountSettingsPage = (): JSX.Element => <AccountSettingsScreen />;
 
 export default AccountSettingsPage;
