@@ -10,15 +10,23 @@ import {
   isRecoveryCodeFormat,
   normalizeRecoveryCode,
 } from "./recovery-code";
-import { consumeRecoveryCode, getRecoveryCodeStatus, replaceRecoveryCodes } from "./store";
+import {
+  consumeRecoveryCode,
+  deleteRecoveryCodes,
+  getRecoveryCodeStatus,
+  replaceRecoveryCodes,
+} from "./store";
 
-import type { UserRecord } from "firebase-admin/auth";
+import type { RecoveryCodeStatus } from "./store";
+import type { MultiFactorInfo, UserRecord } from "firebase-admin/auth";
 
 /**
  * 2FAリカバリーコードのCloud Functions(docs/auth-login-requirements.md 3.3)。
  *
  * - `generateMfaRecoveryCodes`: A3の2FA登録完了時とB10の再発行で呼ぶ。平文はここでしか返らない
  * - `getMfaRecoveryCodeStatus`: B10で残り本数を表示するために呼ぶ
+ * - `resetMfaEnrollment`: B10の「2FAを再設定する」で呼ぶ。本人確認のうえTOTP登録を解除し、
+ *   ユーザーをA3の再登録へ戻す
  * - `useMfaRecoveryCode`: A5で認証アプリを失ったときに呼ぶ。コードを1本消費してTOTP登録を解除し、
  *   ユーザーをA3の再登録へ戻す
  *
@@ -48,6 +56,14 @@ const useMfaRecoveryCodeInputSchema = z.object({
 });
 
 /**
+ * B10からの呼び出しに載る本人確認用のパスワード。
+ *
+ * A3(初回発行)はパスワードを送らないため任意にしてある。要否は入力の形ではなく
+ * サーバー側の状態(`hasLiveRecoveryCodes`・2FAの登録有無)で決める。
+ */
+const passwordConfirmationSchema = z.object({ password: z.string().min(1).optional() });
+
+/**
  * 画面が出し分けに使う失敗理由。
  *
  * `HttpsError`のメッセージは画面にそのまま出さないため、機械可読な理由を`details`に載せる
@@ -57,6 +73,8 @@ type RecoveryFailureReason =
   | "unauthenticated"
   | "email-unverified"
   | "mfa-not-enrolled"
+  /** 本人確認が要る操作なのにパスワードが送られてこなかった */
+  | "password-required"
   | "invalid-credential"
   | "invalid-recovery-code"
   | "no-recovery-codes"
@@ -75,36 +93,181 @@ const failure = (
 const hasEnrolledFactor = (user: UserRecord): boolean =>
   (user.multiFactor?.enrolledFactors.length ?? 0) > 0;
 
+/** 現在登録されている2要素目。本アプリが登録するのはTOTPだけなので先頭の1件を見る */
+const getEnrolledFactor = (user: UserRecord): MultiFactorInfo | undefined =>
+  user.multiFactor?.enrolledFactors[0];
+
+/**
+ * 保存済みのリカバリーコードが、いま登録されている2FAに対して有効かどうか。
+ *
+ * 有効なコードがある状態での発行は「再発行」であり、以前のコードを無効にしてしまう。
+ * セッションを乗っ取られた状態で実行されると正規の利用者の復旧手段だけが失われるため、
+ * この場合に限りパスワードでの本人確認を求める(docs/screen-requirements-account.md
+ * 「リカバリーコードの再発行」)。逆にA3の初回発行は本人確認を挟まない。
+ *
+ * 判定は発行日時と2FAの登録日時の前後で行う。2FAを解除するときにコードも消しているので
+ * (`deleteRecoveryCodes`)通常は「コードが無い=初回発行」で足りるが、削除に失敗して
+ * 古いコードが残った場合でも、いまの2FAより前に発行されたものは復旧手段として使えないため
+ * 初回発行として扱う。登録日時が読めないときだけは判定できないので、安全側に倒して本人確認を求める。
+ */
+const hasLiveRecoveryCodes = (status: RecoveryCodeStatus, factor: MultiFactorInfo): boolean => {
+  if (status.generatedAt === null) {
+    return false;
+  }
+
+  const enrolledAt =
+    factor.enrollmentTime === undefined ? Number.NaN : Date.parse(factor.enrollmentTime);
+
+  return Number.isNaN(enrolledAt) || status.generatedAt >= enrolledAt;
+};
+
+/**
+ * パスワードを再検証し、通らなければ`HttpsError`を投げる(B10の本人確認)。
+ *
+ * 2FA登録済みのアカウントではサインインが完了せず`mfa-required`が返るが、
+ * ここで確かめたいのは「パスワードが正しいこと」だけなので`signed-in`と同じ扱いにする。
+ *
+ * `user.email`が無いアカウントはパスワードで確認しようがない。Googleのみで作成した
+ * アカウントの扱いは連携アカウント管理(Trelloカード [A8-2])で決めるため、ここでは
+ * 資格情報の誤りと同じ扱いに寄せておく。
+ */
+const verifyPasswordOrThrow = async (user: UserRecord, password: string | undefined) => {
+  if (password === undefined) {
+    throw failure("failed-precondition", "password-required", "パスワードの入力が必要です");
+  }
+
+  const verification =
+    user.email === undefined
+      ? ({ status: "invalid-credential" } as const)
+      : await verifyPassword(IDENTITY_PLATFORM_WEB_API_KEY.value(), user.email, password);
+
+  switch (verification.status) {
+    case "mfa-required":
+    case "signed-in":
+      return;
+    case "invalid-credential":
+      throw failure("permission-denied", "invalid-credential", "パスワードが正しくありません");
+    case "too-many-requests":
+      throw failure("permission-denied", "too-many-requests", "試行回数が多すぎます");
+    default:
+      throw failure("unavailable", "unavailable", "認証基盤に接続できませんでした");
+  }
+};
+
+/**
+ * 2FAの解除に成功したあと、使い道の無くなったリカバリーコードを捨てる。
+ *
+ * 解除自体は既に済んでいるため、消せなくても呼び出し元は失敗にしない。残ってしまった場合も
+ * `hasLiveRecoveryCodes`が「いまの2FAより前に発行されたコード」と判定するので、
+ * 次の登録(A3)で本人確認を求めてしまうことはない。
+ */
+const discardRecoveryCodes = async (uid: string): Promise<void> => {
+  try {
+    await deleteRecoveryCodes(uid);
+  } catch (error) {
+    console.error("リカバリーコードを削除できませんでした", error);
+  }
+};
+
 /**
  * リカバリーコードを発行して平文を返す(A3の2FA登録完了時・B10の再発行)。
  *
  * 平文を返すのはこの応答の一度だけで、Firestoreにはハッシュしか残らない。
  * 既存のコードは無効になる(`replaceRecoveryCodes`)。
+ *
+ * いま登録されている2FAに対して有効なコードが既にある場合(=B10からの再発行)は、
+ * サインイン済みであることに加えてパスワードでの本人確認を求める(`hasLiveRecoveryCodes`)。
  */
-export const generateMfaRecoveryCodes = onCall(async (request) => {
-  const uid = request.auth?.uid;
+export const generateMfaRecoveryCodes = onCall(
+  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY] },
+  async (request) => {
+    const uid = request.auth?.uid;
 
-  if (uid === undefined) {
-    throw failure("unauthenticated", "unauthenticated", "サインインが必要です");
-  }
+    if (uid === undefined) {
+      throw failure("unauthenticated", "unauthenticated", "サインインが必要です");
+    }
 
-  const user = await getAuth().getUser(uid);
+    const input = passwordConfirmationSchema.safeParse(request.data ?? {});
 
-  // A3は「メール確認済み」「2FA登録済み」を満たした状態から呼ぶ。IDトークンの内容ではなく
-  // Admin SDKで取得した現在の状態で確かめる(登録直後のトークンには反映されていないため)
-  if (!user.emailVerified) {
-    throw failure("failed-precondition", "email-unverified", "メールアドレスの確認が必要です");
-  }
+    if (!input.success) {
+      throw new HttpsError("invalid-argument", "リクエストの形式が正しくありません");
+    }
 
-  if (!hasEnrolledFactor(user)) {
-    throw failure("failed-precondition", "mfa-not-enrolled", "2段階認証の登録が必要です");
-  }
+    const user = await getAuth().getUser(uid);
 
-  const codes = createRecoveryCodes();
-  await replaceRecoveryCodes(uid, await Promise.all(codes.map(createRecoveryCodeHash)));
+    // A3は「メール確認済み」「2FA登録済み」を満たした状態から呼ぶ。IDトークンの内容ではなく
+    // Admin SDKで取得した現在の状態で確かめる(登録直後のトークンには反映されていないため)
+    if (!user.emailVerified) {
+      throw failure("failed-precondition", "email-unverified", "メールアドレスの確認が必要です");
+    }
 
-  return { codes };
-});
+    const factor = getEnrolledFactor(user);
+
+    if (factor === undefined) {
+      throw failure("failed-precondition", "mfa-not-enrolled", "2段階認証の登録が必要です");
+    }
+
+    if (hasLiveRecoveryCodes(await getRecoveryCodeStatus(uid), factor)) {
+      await verifyPasswordOrThrow(user, input.data.password);
+    }
+
+    const codes = createRecoveryCodes();
+    await replaceRecoveryCodes(uid, await Promise.all(codes.map(createRecoveryCodeHash)));
+
+    return { codes };
+  },
+);
+
+/**
+ * 本人確認のうえ2FA(TOTP)の登録を解除する(B10「2FAを再設定する」)。
+ *
+ * 解除だけを行い、登録し直しはA3に任せる。2FAは全ユーザー必須なので
+ * (docs/auth-login-requirements.md 3.3)、解除した時点でログイン後画面のガードが
+ * A3へ送り、登録が済むまで主要機能に戻れない(`src/frontend/src/lib/auth/app-access.ts`)。
+ *
+ * クライアント側の`multiFactor().unenroll()`を使わないのは、2FA登録済みのユーザーの
+ * 再認証がパスワードだけでは完了せず、認証アプリの確認コードまで要求されるため。
+ * 本人確認はパスワードの再入力とする要件(docs/screen-requirements-account.md B10)に
+ * 合わせて、A5と同じくサーバー側でパスワードを再検証する。
+ *
+ * この呼び出しにはサインイン済みのIDトークンが要る。つまり2FAを通過したセッションが前提であり、
+ * パスワードだけで2FAを外せる経路にはならない。
+ */
+export const resetMfaEnrollment = onCall(
+  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY] },
+  async (request) => {
+    const uid = request.auth?.uid;
+
+    if (uid === undefined) {
+      throw failure("unauthenticated", "unauthenticated", "サインインが必要です");
+    }
+
+    const input = passwordConfirmationSchema.safeParse(request.data ?? {});
+
+    if (!input.success) {
+      throw new HttpsError("invalid-argument", "リクエストの形式が正しくありません");
+    }
+
+    const user = await getAuth().getUser(uid);
+
+    if (!hasEnrolledFactor(user)) {
+      throw failure("failed-precondition", "mfa-not-enrolled", "2段階認証が登録されていません");
+    }
+
+    await verifyPasswordOrThrow(user, input.data.password);
+
+    try {
+      await getAuth().updateUser(uid, { multiFactor: { enrolledFactors: null } });
+    } catch (error) {
+      console.error("2段階認証の登録を解除できませんでした", error);
+      throw failure("unavailable", "unenroll-failed", "2段階認証を解除できませんでした");
+    }
+
+    await discardRecoveryCodes(uid);
+
+    return { ok: true };
+  },
+);
 
 /**
  * リカバリーコードの発行状況を返す(B10の表示用)。
@@ -209,6 +372,11 @@ export const useMfaRecoveryCode = onCall(
       throw failure("unavailable", "unenroll-failed", "2段階認証を解除できませんでした");
     }
 
+    await discardRecoveryCodes(user.uid);
+
+    // `remainingCodes`は消費した時点で残っていた本数。上で解除に成功しているため、
+    // 残っていたコードもここで捨てている(2FAが無ければ使えない)。呼び出し元は
+    // 「解除できた」ことの確認にだけ使い、次に使えるコードの本数としては扱わない
     return { remainingCodes: consumed.remainingCodes };
   },
 );

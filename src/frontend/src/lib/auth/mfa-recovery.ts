@@ -3,12 +3,14 @@ import { z } from "zod";
 
 import {
   GENERATE_MFA_RECOVERY_CODES_FUNCTION,
+  GET_MFA_RECOVERY_CODE_STATUS_FUNCTION,
   USE_MFA_RECOVERY_CODE_FUNCTION,
 } from "@/constants/firebase";
-import { FirebaseConfigurationError, getFirebaseFunctions } from "@/lib/firebase/client";
+import { toCallableFailureReason } from "@/lib/auth/callable-error";
+import { getFirebaseFunctions } from "@/lib/firebase/client";
 
 /**
- * 2FAリカバリーコードの発行・使用(docs/auth-login-requirements.md 3.3)。
+ * 2FAリカバリーコードの発行・使用・発行状況の取得(docs/auth-login-requirements.md 3.3)。
  *
  * Identity Platformにバックアップコードの機能が無いため、発行も検証もCloud Functionsで行う
  * (src/backend/src/mfa-recovery/functions.ts)。この画面側モジュールはcallableの呼び出しと、
@@ -24,23 +26,24 @@ const useResponseSchema = z.object({
   remainingCodes: z.number().int().nonnegative(),
 });
 
-/**
- * callableのエラー。
- *
- * `code`はFirebaseが付ける`functions/*`のコード、`details.reason`はバックエンドが載せた
- * 機械可読な理由。`instanceof`に頼らずプロパティを検証するのは、SDKの実装(FunctionsError)に
- * 依存せずに済ませるため。
- */
-const callableErrorSchema = z.object({
-  code: z.string(),
-  details: z.object({ reason: z.string() }).optional(),
+const statusResponseSchema = z.object({
+  generatedAt: z.number().nullable(),
+  remainingCodes: z.number().int().nonnegative(),
+  totalCodes: z.number().int().nonnegative(),
 });
 
 /** バックエンドの`details.reason`として受け付ける値(発行) */
 const ISSUE_FAILURE_REASONS: readonly MfaRecoveryIssueFailureReason[] = [
+  "signed-out",
   "email-unverified",
   "mfa-not-enrolled",
+  "password-required",
+  "invalid-credential",
+  "too-many-requests",
 ];
+
+/** バックエンドの`details.reason`として受け付ける値(発行状況の取得) */
+const STATUS_FAILURE_REASONS: readonly MfaRecoveryStatusFailureReason[] = ["signed-out"];
 
 /** バックエンドの`details.reason`として受け付ける値(2FA解除) */
 const USE_FAILURE_REASONS: readonly MfaRecoveryUseFailureReason[] = [
@@ -54,39 +57,18 @@ const USE_FAILURE_REASONS: readonly MfaRecoveryUseFailureReason[] = [
 ];
 
 /**
- * バックエンドが返した理由を画面用の理由に読み替える。
- *
- * `unauthenticated`だけは名前が違う(画面側は他の画面と揃えて`signed-out`と呼ぶ)。
- * 未知の理由は`undefined`を返し、呼び出し側でFirebaseのエラーコードから決め直す。
- */
-const toIssueFailureReason = (reason: string): MfaRecoveryIssueFailureReason | undefined =>
-  reason === "unauthenticated"
-    ? "signed-out"
-    : ISSUE_FAILURE_REASONS.find((known) => known === reason);
-
-const toUseFailureReason = (reason: string): MfaRecoveryUseFailureReason | undefined =>
-  USE_FAILURE_REASONS.find((known) => known === reason);
-
-/**
- * `functions/*`のエラーコードから理由を決める。
- *
- * callableに到達できなかった場合もSDKは`functions/internal`を投げるため、
- * 通信不能とサーバー側の想定外エラーは区別せず`unavailable`に寄せる
- * (どちらも画面では「時間をおいて再試行」以外にできることが無い)。
- */
-const toFailureReasonFromCode = (code: string): "unavailable" | "unknown" =>
-  code === "functions/internal" || code === "functions/unavailable" ? "unavailable" : "unknown";
-
-/**
  * リカバリーコードを発行して平文を受け取る(A3の2FA登録完了時・B10の再発行)。
  *
  * 既に発行済みのコードは無効になる。平文が手に入るのはこの戻り値だけで、
  * 画面を離れると再取得できない(ユーザーには保存を促す)。
+ *
+ * 有効なコードが残っている状態での発行(=B10の再発行)はサーバー側が本人確認を求めるため、
+ * `password`を渡す。A3の初回発行では不要なので省略する。
  */
-export const issueRecoveryCodes = async (): Promise<MfaRecoveryIssueResult> => {
+export const issueRecoveryCodes = async (password?: string): Promise<MfaRecoveryIssueResult> => {
   try {
     const callable = httpsCallable(getFirebaseFunctions(), GENERATE_MFA_RECOVERY_CODES_FUNCTION);
-    const response = await callable();
+    const response = await callable(password === undefined ? {} : { password });
     const parsed = issueResponseSchema.safeParse(response.data);
 
     if (!parsed.success) {
@@ -96,27 +78,44 @@ export const issueRecoveryCodes = async (): Promise<MfaRecoveryIssueResult> => {
 
     return { ok: true, codes: parsed.data.codes };
   } catch (error) {
-    if (error instanceof FirebaseConfigurationError) {
-      return { ok: false, reason: "configuration-error" };
-    }
+    return {
+      ok: false,
+      reason: toCallableFailureReason(
+        error,
+        ISSUE_FAILURE_REASONS,
+        "リカバリーコードを発行できませんでした",
+      ),
+    };
+  }
+};
 
-    const parsed = callableErrorSchema.safeParse(error);
+/**
+ * リカバリーコードの発行状況(残り本数)を取得する(B10の表示)。
+ *
+ * Firestoreの`mfaRecoveryCodes`はセキュリティルールでクライアントからの参照を
+ * 全面的に拒否しているため、直接読まずcallableを通す。平文もハッシュも返らない。
+ */
+export const fetchRecoveryCodeStatus = async (): Promise<MfaRecoveryStatusResult> => {
+  try {
+    const callable = httpsCallable(getFirebaseFunctions(), GET_MFA_RECOVERY_CODE_STATUS_FUNCTION);
+    const response = await callable();
+    const parsed = statusResponseSchema.safeParse(response.data);
+
     if (!parsed.success) {
-      console.error("リカバリーコードを発行できませんでした", error);
+      console.error("リカバリーコードの発行状況を解釈できませんでした", parsed.error.issues);
       return { ok: false, reason: "unknown" };
     }
 
-    const reason =
-      parsed.data.details === undefined
-        ? undefined
-        : toIssueFailureReason(parsed.data.details.reason);
-
-    if (reason !== undefined) {
-      return { ok: false, reason };
-    }
-
-    console.error("リカバリーコードを発行できませんでした", parsed.data.code);
-    return { ok: false, reason: toFailureReasonFromCode(parsed.data.code) };
+    return { ok: true, status: parsed.data };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: toCallableFailureReason(
+        error,
+        STATUS_FAILURE_REASONS,
+        "リカバリーコードの発行状況を取得できませんでした",
+      ),
+    };
   }
 };
 
@@ -147,26 +146,13 @@ export const redeemRecoveryCode = async (
 
     return { ok: true, remainingCodes: parsed.data.remainingCodes };
   } catch (error) {
-    if (error instanceof FirebaseConfigurationError) {
-      return { ok: false, reason: "configuration-error" };
-    }
-
-    const parsed = callableErrorSchema.safeParse(error);
-    if (!parsed.success) {
-      console.error("リカバリーコードを検証できませんでした", error);
-      return { ok: false, reason: "unknown" };
-    }
-
-    const reason =
-      parsed.data.details === undefined
-        ? undefined
-        : toUseFailureReason(parsed.data.details.reason);
-
-    if (reason !== undefined) {
-      return { ok: false, reason };
-    }
-
-    console.error("リカバリーコードを検証できませんでした", parsed.data.code);
-    return { ok: false, reason: toFailureReasonFromCode(parsed.data.code) };
+    return {
+      ok: false,
+      reason: toCallableFailureReason(
+        error,
+        USE_FAILURE_REASONS,
+        "リカバリーコードを検証できませんでした",
+      ),
+    };
   }
 };

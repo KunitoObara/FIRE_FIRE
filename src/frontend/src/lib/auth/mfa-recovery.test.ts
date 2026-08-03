@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GENERATE_MFA_RECOVERY_CODES_FUNCTION } from "@/constants/firebase";
-import { issueRecoveryCodes, redeemRecoveryCode } from "@/lib/auth/mfa-recovery";
+import {
+  GENERATE_MFA_RECOVERY_CODES_FUNCTION,
+  GET_MFA_RECOVERY_CODE_STATUS_FUNCTION,
+} from "@/constants/firebase";
+import {
+  fetchRecoveryCodeStatus,
+  issueRecoveryCodes,
+  redeemRecoveryCode,
+} from "@/lib/auth/mfa-recovery";
 import { FirebaseConfigurationError } from "@/lib/firebase/client";
 
 import type { Functions } from "firebase/functions";
@@ -58,6 +65,34 @@ describe("issueRecoveryCodes", () => {
     await expect(issueRecoveryCodes()).resolves.toEqual({ ok: false, reason: "unknown" });
   });
 
+  /** A3の初回発行では本人確認を求めないため、パスワードは載せない */
+  it("パスワードを渡さない場合は空のリクエストで呼ぶ", async () => {
+    callable.mockResolvedValue({ data: { codes: CODES } });
+
+    await issueRecoveryCodes();
+
+    expect(callable).toHaveBeenCalledWith({});
+  });
+
+  /** B10の再発行はサーバー側が本人確認を求める */
+  it("パスワードを渡した場合はリクエストに載せる", async () => {
+    callable.mockResolvedValue({ data: { codes: CODES } });
+
+    await issueRecoveryCodes("Passw0rd!");
+
+    expect(callable).toHaveBeenCalledWith({ password: "Passw0rd!" });
+  });
+
+  it.each([
+    ["failed-precondition", "password-required"],
+    ["permission-denied", "invalid-credential"],
+    ["permission-denied", "too-many-requests"],
+  ])("本人確認の失敗(%s / %s)はそのままの理由で返す", async (code, reason) => {
+    callable.mockRejectedValue(callableError(`functions/${code}`, reason));
+
+    await expect(issueRecoveryCodes("wrong")).resolves.toEqual({ ok: false, reason });
+  });
+
   it("Firebaseの設定不足は専用の理由で返す", async () => {
     getFirebaseFunctions.mockImplementation(() => {
       throw new FirebaseConfigurationError("設定不足");
@@ -91,6 +126,52 @@ describe("issueRecoveryCodes", () => {
     callable.mockRejectedValue(callableError("functions/invalid-argument"));
 
     await expect(issueRecoveryCodes()).resolves.toEqual({ ok: false, reason: "unknown" });
+  });
+});
+
+describe("fetchRecoveryCodeStatus", () => {
+  beforeEach(() => {
+    callable.mockReset();
+    httpsCallable.mockReset();
+    httpsCallable.mockReturnValue(callable);
+    getFirebaseFunctions.mockReset();
+    getFirebaseFunctions.mockReturnValue(functions);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("発行状況を取得するcallableを呼び、応答をそのまま返す", async () => {
+    const status = { generatedAt: 1_784_000_000_000, remainingCodes: 6, totalCodes: 8 };
+    callable.mockResolvedValue({ data: status });
+
+    await expect(fetchRecoveryCodeStatus()).resolves.toEqual({ ok: true, status });
+    expect(httpsCallable).toHaveBeenCalledWith(functions, GET_MFA_RECOVERY_CODE_STATUS_FUNCTION);
+  });
+
+  it("未発行(generatedAtがnull)も正常な応答として扱う", async () => {
+    callable.mockResolvedValue({ data: { generatedAt: null, remainingCodes: 0, totalCodes: 0 } });
+
+    await expect(fetchRecoveryCodeStatus()).resolves.toEqual({
+      ok: true,
+      status: { generatedAt: null, remainingCodes: 0, totalCodes: 0 },
+    });
+  });
+
+  it("応答の形が想定と違えば失敗として扱う", async () => {
+    callable.mockResolvedValue({ data: { remainingCodes: "6" } });
+
+    await expect(fetchRecoveryCodeStatus()).resolves.toEqual({ ok: false, reason: "unknown" });
+  });
+
+  it("セッションが無い場合はsigned-outとして返す", async () => {
+    callable.mockRejectedValue(callableError("functions/unauthenticated", "unauthenticated"));
+
+    await expect(fetchRecoveryCodeStatus()).resolves.toEqual({ ok: false, reason: "signed-out" });
+  });
+
+  it("到達できない失敗はunavailableに寄せる", async () => {
+    callable.mockRejectedValue(callableError("functions/internal"));
+
+    await expect(fetchRecoveryCodeStatus()).resolves.toEqual({ ok: false, reason: "unavailable" });
   });
 });
 

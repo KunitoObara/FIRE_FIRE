@@ -13,5 +13,6 @@ setGlobalOptions({ region: FUNCTIONS_REGION });
 export {
   generateMfaRecoveryCodes,
   getMfaRecoveryCodeStatus,
+  resetMfaEnrollment,
   useMfaRecoveryCode,
 } from "./mfa-recovery/functions";

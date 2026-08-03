@@ -249,6 +249,16 @@ declare global {
   type MfaVerificationResult = { ok: true } | { ok: false; reason: MfaVerificationFailureReason };
 
   /**
+   * Cloud Functions(callable)の失敗のうち、バックエンドの理由に依らず決まるもの
+   * (`src/lib/auth/callable-error.ts`)。どの呼び出しでも起こりうるため共通で持つ。
+   */
+  type CallableSharedFailureReason =
+    | "configuration-error"
+    /** callableに到達できない・サーバー側で処理しきれなかった */
+    | "unavailable"
+    | "unknown";
+
+  /**
    * A3(登録完了時)・B10(再発行)でリカバリーコードを発行できなかった理由。
    *
    * 発行はCloud Functions(callable)で行うため、失敗理由はFirebaseのエラーコードと、
@@ -262,10 +272,54 @@ declare global {
     | "email-unverified"
     /** 2FA(TOTP)が未登録。リカバリーコードだけ先に発行することはできない */
     | "mfa-not-enrolled"
-    | "configuration-error"
-    /** callableに到達できない・サーバー側で処理しきれなかった */
-    | "unavailable"
-    | "unknown";
+    /**
+     * 有効なコードが残っている状態での発行(=B10の再発行)なのに、
+     * 本人確認のパスワードが渡らなかった。A3の初回発行では起きない
+     */
+    | "password-required"
+    /** 本人確認のパスワードが誤り */
+    | "invalid-credential"
+    | "too-many-requests"
+    | CallableSharedFailureReason;
+
+  /** B10でリカバリーコードの発行状況を取得できなかった理由 */
+  type MfaRecoveryStatusFailureReason = "signed-out" | CallableSharedFailureReason;
+
+  /**
+   * リカバリーコードの発行状況(B10の表示用)。
+   * Firestoreを直接読めないためcallableの応答から受け取る(平文もハッシュも含まない)。
+   */
+  type MfaRecoveryStatus = {
+    /** 未発行なら`null`。それ以外はエポックミリ秒 */
+    generatedAt: number | null;
+    /** 未使用のコードの本数 */
+    remainingCodes: number;
+    /** 発行済みのコードの総数 */
+    totalCodes: number;
+  };
+
+  type MfaRecoveryStatusResult =
+    { ok: true; status: MfaRecoveryStatus } | { ok: false; reason: MfaRecoveryStatusFailureReason };
+
+  /**
+   * B10で2FA(TOTP)の登録を解除できなかった理由
+   * (`src/lib/auth/mfa-reset.ts`、src/backend/src/mfa-recovery/functions.ts)。
+   */
+  type MfaResetFailureReason =
+    /** セッションが無い(直接アクセス・サインアウト済み) */
+    | "signed-out"
+    /** 2FAが登録されていない。解除するものが無い */
+    | "mfa-not-enrolled"
+    /** 本人確認のパスワードが渡らなかった */
+    | "password-required"
+    /** 本人確認のパスワードが誤り */
+    | "invalid-credential"
+    | "too-many-requests"
+    /** 本人確認は通ったが、Identity Platform側で解除できなかった */
+    | "unenroll-failed"
+    | CallableSharedFailureReason;
+
+  type MfaResetResult = { ok: true } | { ok: false; reason: MfaResetFailureReason };
 
   /**
    * リカバリーコードの発行結果。
