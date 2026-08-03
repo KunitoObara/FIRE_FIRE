@@ -21,5 +21,11 @@ export const PRODUCTION_FIREBASE_PROJECT_ID = "fire-fire-prod";
  */
 export const GENERATE_MFA_RECOVERY_CODES_FUNCTION = "generateMfaRecoveryCodes";
 
+/** リカバリーコードの発行状況(残り本数・発行日時)を取得するcallable関数の名前(B10) */
+export const GET_MFA_RECOVERY_CODE_STATUS_FUNCTION = "getMfaRecoveryCodeStatus";
+
 /** リカバリーコードで2FA(TOTP)の登録を解除するcallable関数の名前(A5) */
 export const USE_MFA_RECOVERY_CODE_FUNCTION = "useMfaRecoveryCode";
+
+/** 本人確認のうえ2FA(TOTP)の登録を解除するcallable関数の名前(B10の「2FAを再設定する」) */
+export const RESET_MFA_ENROLLMENT_FUNCTION = "resetMfaEnrollment";

@@ -345,6 +345,24 @@ describe("MfaSetupForm", () => {
       expect(screen.getByText(RECOVERY_CODES[0])).toBeInTheDocument();
     });
 
+    /*
+      サーバー側では発行が成功したのに応答が届かなかった場合、コードは既に有効なので
+      再発行には本人確認が要る。A3にパスワード欄は無く何度押しても同じ結果になるため、
+      押せば直るように見える導線を出さずB10へ案内する
+    */
+    it("発行済み扱いで弾かれたら再発行ボタンを出さず、B10での再発行を案内する", async () => {
+      issueRecoveryCodes.mockResolvedValue({ ok: false, reason: "password-required" });
+      await enrollAndSettle();
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "アカウント設定画面から本人確認のうえ再発行してください",
+      );
+      expect(
+        screen.queryByRole("button", { name: "リカバリーコードを再発行する" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "開始する" })).toHaveAttribute("href", "/dashboard");
+    });
+
     it("発行時にセッションが失われていたらログイン画面へ遷移する", async () => {
       issueRecoveryCodes.mockResolvedValue({ ok: false, reason: "signed-out" });
       await enrollAndSettle();

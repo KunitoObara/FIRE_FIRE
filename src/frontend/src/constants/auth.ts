@@ -383,6 +383,16 @@ export const MFA_RECOVERY_ISSUE_MESSAGES: Record<
     "メールアドレスの確認が完了していないため、リカバリーコードを発行できません。",
   "mfa-not-enrolled":
     "2段階認証の登録が完了していないため、リカバリーコードを発行できません。設定をやり直してください。",
+  /*
+    パスワードを送らずに発行しようとしたが、サーバー側には有効なコードが既にあった。
+    A3では、発行自体はサーバー側で成功したのに応答が届かなかった場合にここへ来る。
+    その状況では画面にコードが出ていないので、B10で本人確認のうえ取り直してもらうほかない
+    (A3にパスワード欄は無く、同じ操作を繰り返しても結果は変わらない)。
+  */
+  "password-required":
+    "リカバリーコードは発行済みですが、この画面には表示できませんでした。アカウント設定画面から本人確認のうえ再発行してください。",
+  "invalid-credential": "パスワードが正しくありません。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   unavailable: FUNCTIONS_UNAVAILABLE_MESSAGE,
   unknown: "リカバリーコードを発行できませんでした。しばらく待ってから再度お試しください。",
