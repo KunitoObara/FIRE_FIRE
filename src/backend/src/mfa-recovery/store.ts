@@ -105,6 +105,18 @@ export const getRecoveryCodeStatus = async (uid: string): Promise<RecoveryCodeSt
 };
 
 /**
+ * 保存済みのコードを丸ごと捨てる(2FAの解除時)。
+ *
+ * リカバリーコードは2FA(TOTP)を失ったときの復旧手段なので、その2FAの登録が無くなれば
+ * 使い道が無い(`useMfaRecoveryCode`は2FA登録済みであることを要求する)。残しておくと、
+ * 次の登録(A3)の発行が「再発行」と区別できなくなり、本人確認の要否を誤判定する
+ * (`functions.ts`の`hasLiveRecoveryCodes`)。
+ */
+export const deleteRecoveryCodes = async (uid: string): Promise<void> => {
+  await recoveryCodesDocument(uid).delete();
+};
+
+/**
  * 入力されたコードを照合し、一致したら使用済みにする(A5のリカバリーコード検証)。
  *
  * 「照合 → 使用済みに更新」をトランザクションで囲む。同じコードで同時に2回呼ばれたときに
