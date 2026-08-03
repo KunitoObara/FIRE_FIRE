@@ -1,13 +1,13 @@
-import { UnimplementedScreen } from "@/components/layout/UnimplementedScreen";
+import { AssumptionSettingsScreen } from "@/components/assumptions/AssumptionSettingsScreen";
 
+import type { Metadata } from "next";
 import type { JSX } from "react";
 
-const AssumptionSettingsPage = (): JSX.Element => (
-  <UnimplementedScreen
-    screenId="B9"
-    screenName="想定利回り・リスク設定画面"
-    purpose="個別の資産・口座ごとに想定利回り・リスク値を手動設定する"
-  />
-);
+export const metadata: Metadata = {
+  title: "想定利回り・リスク設定 | FIRE-FIRE",
+};
+
+/** B9 想定利回り・リスク設定画面(docs/screen-requirements-fire-goal.md B9) */
+const AssumptionSettingsPage = (): JSX.Element => <AssumptionSettingsScreen />;
 
 export default AssumptionSettingsPage;
