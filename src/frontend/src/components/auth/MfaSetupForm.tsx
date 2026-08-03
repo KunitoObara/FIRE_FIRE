@@ -284,14 +284,21 @@ export const MfaSetupForm = (): JSX.Element => {
           </p>
           <p className="mt-3 text-sm text-muted-foreground">{MFA_RECOVERY_ISSUE_FAILURE_NOTICE}</p>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-6 w-full"
-            onClick={handleRecoveryCodeRetry}
-          >
-            リカバリーコードを再発行する
-          </Button>
+          {/*
+            `password-required`はサーバー側に有効なコードが既にある状態で、この画面から
+            もう一度発行しても本人確認を求められて同じ理由で失敗する(A3にパスワード欄は無い)。
+            押せば直るように見える導線を残さず、B10での再発行に委ねる
+          */}
+          {state.reason === "password-required" ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-6 w-full"
+              onClick={handleRecoveryCodeRetry}
+            >
+              リカバリーコードを再発行する
+            </Button>
+          )}
 
           <Button asChild className="mt-3 w-full">
             <Link href={DASHBOARD_PATH}>開始する</Link>
