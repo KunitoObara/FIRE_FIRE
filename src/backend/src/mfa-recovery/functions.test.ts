@@ -151,6 +151,28 @@ describe("generateMfaRecoveryCodes", () => {
     expect(verifyPassword).not.toHaveBeenCalled();
   });
 
+  /**
+   * B10は未発行の状態でも本人確認ダイアログを出す。素通しにすると
+   * 「本人確認のため入力してください」と言いながら確かめていないことになる
+   */
+  it("本人確認が必須でなくても、パスワードが渡されたら検証する", async () => {
+    verifyPassword.mockResolvedValue({ status: "invalid-credential" });
+
+    await expect(reasonOf(call(generateMfaRecoveryCodes, { password: "wrong" }))).resolves.toBe(
+      "invalid-credential",
+    );
+    expect(replaceRecoveryCodes).not.toHaveBeenCalled();
+  });
+
+  it("未発行でも正しいパスワードなら発行する", async () => {
+    const result = (await call(generateMfaRecoveryCodes, { password: "pw" })) as {
+      codes: string[];
+    };
+
+    expect(result.codes).toHaveLength(8);
+    expect(verifyPassword).toHaveBeenCalledWith(expect.anything(), "user@example.com", "pw");
+  });
+
   /** 登録日時が読めないときは「有効なコードがある」側に倒す */
   it("2FAの登録日時が取得できない場合はパスワードを要求する", async () => {
     getUser.mockResolvedValue({

@@ -177,6 +177,7 @@ const discardRecoveryCodes = async (uid: string): Promise<void> => {
  *
  * いま登録されている2FAに対して有効なコードが既にある場合(=B10からの再発行)は、
  * サインイン済みであることに加えてパスワードでの本人確認を求める(`hasLiveRecoveryCodes`)。
+ * 必須でない場合も、パスワードが渡されていれば必ず検証する。
  */
 export const generateMfaRecoveryCodes = onCall(
   { secrets: [IDENTITY_PLATFORM_WEB_API_KEY] },
@@ -207,7 +208,15 @@ export const generateMfaRecoveryCodes = onCall(
       throw failure("failed-precondition", "mfa-not-enrolled", "2段階認証の登録が必要です");
     }
 
-    if (hasLiveRecoveryCodes(await getRecoveryCodeStatus(uid), factor)) {
+    /*
+      パスワードが渡されたら、必須かどうかに関わらず必ず検証する。
+      B10は未発行の状態でも本人確認ダイアログを出すため、ここで素通しにすると
+      「本人確認のため入力してください」と言いながら実際には確かめていないことになる。
+    */
+    if (
+      input.data.password !== undefined ||
+      hasLiveRecoveryCodes(await getRecoveryCodeStatus(uid), factor)
+    ) {
       await verifyPasswordOrThrow(user, input.data.password);
     }
 
