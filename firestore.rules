@@ -195,6 +195,28 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // 想定利回り・リスク(B9 想定利回り・リスク設定画面)。ユーザーごとに1件で、
+      // ドキュメントIDは`assumptions`固定。資産種別ごとに1ドキュメントにしないのは、
+      // 資産種別名がCSVの列名そのもので`/`のようにドキュメントIDに使えない文字が
+      // 混じりうるため(src/frontend/src/lib/assumptions/assumption-repository.ts)。
+      match /settings/assumptions {
+        allow read: if isOwner(userId);
+        // 一覧の全行をまとめて`setDoc`で置き換えるため、create/updateで同じ形を要求する
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['entries', 'updatedAt'])
+          && request.resource.data.keys().hasAll(['entries', 'updatedAt'])
+          // `entries`は資産種別名をキーにしたマップで、資産種別が動的に増減するため
+          // キーを列挙できない。ルールに繰り返しが無く値をすべて検査することもできないため、
+          // 個々の想定利回り・リスクレベルの形はパース側(src/frontend/src/schemas/assumptions.ts)
+          // で担保し、ここでは件数だけ上限で歯止めをかける(`byType`と同じ扱い)。
+          // 上限は src/frontend/src/constants/assumptions.ts の ASSUMPTION_ENTRIES_MAX と揃える
+          && request.resource.data.entries is map
+          && request.resource.data.entries.size() <= 200
+          && request.resource.data.updatedAt is timestamp;
+        // 想定利回り・リスクを消す画面は無い。個々の資産種別の設定解除は上書きで表せる
+        allow delete: if false;
+      }
+
       // 物件(B5 不動産一覧・B6 不動産詳細・B7 不動産登録/編集)。
       // 資産残高と違いCSV由来ではなく、すべてB7の手入力なので、書ける形をここで縛る。
       match /properties/{propertyId} {

@@ -195,6 +195,62 @@ export const fetchLatestAssetTotal = async (): Promise<CurrentAssetTotalResult> 
 };
 
 /**
+ * 直近の資産残高を資産種別ごとに取得する(B9の表示項目「資産・口座一覧(名称、現在残高)」)。
+ *
+ * 集計日がいちばん新しい1件の`byType`をそのまま資産種別と残高の組にする。B9が設定対象と
+ * するのは要件定義書4.7の「資産クラス」で、アプリが持つ資産の粒度はCSVの資産種別列しか
+ * 無いため(口座単位のデータはマネーフォワードのCSVに含まれない)。
+ *
+ * 残高の多い順に並べる。金額の大きい資産種別ほど想定利回りが予測に効くため、先に目に
+ * 入る位置へ置く。`byType`はマップでキーの順序に意味が無く、そのままでは並びが定まらない。
+ *
+ * CSVを一度も取り込んでいないアカウントでは1件も無いため、失敗ではなく空配列を返す。
+ * 数値として読めない金額はその資産種別だけを飛ばす(残高が読めない行を出しても設定の
+ * 判断材料にならず、1件の不整合で一覧全体を空にする方が情報が減るため)。
+ */
+export const fetchLatestAssetBalances = async (): Promise<LatestAssetBalancesResult> => {
+  const context = resolveFirestoreUserContext();
+
+  if (!context.ok) {
+    return context;
+  }
+
+  try {
+    const snapshot = await getDocs(
+      query(assetSnapshotsRef(context.firestore, context.uid), orderBy("date", "desc"), limit(1)),
+    );
+    const latest = snapshot.docs[0];
+
+    if (latest === undefined) {
+      return { ok: true, balances: [] };
+    }
+
+    const byType: unknown = latest.get("byType");
+
+    if (typeof byType !== "object" || byType === null) {
+      console.error("資産種別ごとの残高を解釈できませんでした", latest.id);
+      return { ok: true, balances: [] };
+    }
+
+    const balances = Object.entries(byType).flatMap(([assetTypeName, balance]) => {
+      if (typeof balance !== "number") {
+        console.error("資産種別の残高を解釈できませんでした", latest.id, assetTypeName);
+        return [];
+      }
+
+      return [{ assetTypeName, balance }];
+    });
+
+    balances.sort((left, right) => right.balance - left.balance);
+
+    return { ok: true, balances };
+  } catch (error) {
+    console.error("資産種別ごとの残高を取得できませんでした", error);
+    return { ok: false, reason: toFirestoreFailureReason(error) };
+  }
+};
+
+/**
  * 直近の取込履歴を新しい順に取得する(B2の表示項目「直近の取込履歴」)。
  *
  * Firestoreの生データは型が保証されない外部入力なので、zodスキーマを通してから画面へ渡す
