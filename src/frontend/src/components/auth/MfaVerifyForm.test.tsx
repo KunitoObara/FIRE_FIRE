@@ -376,6 +376,27 @@ describe("MfaVerifyForm", () => {
       expect(replace).toHaveBeenCalledWith(MFA_SETUP_PATH);
     });
 
+    // 解除後のやり直しでサインインが成立するため、A8から来た場合はここで連携する
+    it("解除後のログインに成功したらGoogleアカウントの連携を試みる", async () => {
+      await renderAndSettle();
+
+      await submitRecoveryCode();
+
+      expect(linkPendingGoogleAccount).toHaveBeenCalled();
+      expect(linkPendingGoogleAccount.mock.invocationCallOrder[0]).toBeLessThan(
+        replace.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("解除後のログインに失敗したときは連携を試みない", async () => {
+      signInWithEmail.mockResolvedValue({ ok: false, reason: "network-error" });
+      await renderAndSettle();
+
+      await submitRecoveryCode();
+
+      expect(linkPendingGoogleAccount).not.toHaveBeenCalled();
+    });
+
     it("コードの誤りを伝え、入力をやり直せる", async () => {
       redeemRecoveryCode.mockResolvedValue({ ok: false, reason: "invalid-recovery-code" });
       await renderAndSettle();
