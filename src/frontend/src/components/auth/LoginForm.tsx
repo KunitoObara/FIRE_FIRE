@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { SIGN_IN_MESSAGES, SIGN_IN_NEXT_PATHS } from "@/constants/auth";
 import { FORGOT_PASSWORD_PATH, SIGNUP_PATH } from "@/constants/routes";
 import { clearLoggedOutNotice, wasLoggedOut } from "@/lib/auth/logout-notice";
+import { clearPendingGoogleLink } from "@/lib/auth/pending-google-link";
 import { signInWithEmail } from "@/lib/auth/sign-in";
 import { loginSchema } from "@/schemas/login";
 
@@ -73,6 +74,11 @@ export const LoginForm = (): JSX.Element => {
   const handleValidSubmit = async (values: LoginFormValues): Promise<void> => {
     clearErrors("root");
     setIsSubmitting(true);
+
+    // A8を途中で離脱しても連携待ちはメモリに残る(`pending-google-link.ts`)。A4からの
+    // 通常のログインはGoogle連携の意思表示ではないため、ここで捨てる。`signInWithEmail`側で
+    // 捨てないのは、A8のパスワード検証が同じ関数を通り、そこでは連携待ちを残す必要があるため
+    clearPendingGoogleLink();
 
     const result = await signInWithEmail(values.email, values.password, values.rememberMe);
 
