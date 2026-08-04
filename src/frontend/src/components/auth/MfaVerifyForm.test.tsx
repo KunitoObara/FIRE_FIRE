@@ -15,6 +15,7 @@ const redeemRecoveryCode =
   vi.fn<(email: string, password: string, code: string) => Promise<MfaRecoveryUseResult>>();
 const signInWithEmail =
   vi.fn<(email: string, password: string, rememberMe: boolean) => Promise<SignInResult>>();
+const linkPendingGoogleAccount = vi.fn<() => Promise<void>>();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
@@ -22,6 +23,10 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/auth/mfa-verification", () => ({
   verifyTotpForSignIn: (login: PendingLogin, code: string) => verifyTotpForSignIn(login, code),
+}));
+
+vi.mock("@/lib/auth/google-sign-in", () => ({
+  linkPendingGoogleAccount: () => linkPendingGoogleAccount(),
 }));
 
 vi.mock("@/lib/auth/mfa-recovery", () => ({
@@ -98,6 +103,8 @@ describe("MfaVerifyForm", () => {
     signInWithEmail.mockReset();
     // 2FA解除後のログインは、2FA未登録として扱われA3へ進む
     signInWithEmail.mockResolvedValue({ ok: true, next: "mfa-setup" });
+    linkPendingGoogleAccount.mockReset();
+    linkPendingGoogleAccount.mockResolvedValue(undefined);
     setPendingLogin({ ...PENDING_LOGIN });
   });
 
@@ -114,6 +121,16 @@ describe("MfaVerifyForm", () => {
       await renderAndSettle();
 
       expect(screen.getByRole("button", { name: "リカバリーコードを使う" })).toBeInTheDocument();
+    });
+
+    // Googleログイン経由では、FirebaseのMFAエラーにメールアドレスが載らないことがある
+    it("メールアドレスを引き継いでいないときは宛名を伏せて案内する", async () => {
+      setPendingLogin({ ...PENDING_LOGIN, email: "", password: undefined });
+
+      await renderAndSettle();
+
+      expect(screen.getByText("一次認証が完了しています")).toBeInTheDocument();
+      expect(codeInput()).toBeInTheDocument();
     });
 
     // 検証はサーバー側でパスワードによる一次認証の再確認を伴うため、
@@ -165,6 +182,28 @@ describe("MfaVerifyForm", () => {
 
       expect(replace).toHaveBeenCalledWith(DASHBOARD_PATH);
       expect(getPendingLogin()).toBeNull();
+    });
+
+    // A8から来た場合はここで初めてサインインが成立するため、続けてGoogleを連携する。
+    // 連携待ちが無い通常のログインでは`linkPendingGoogleAccount`側が何もしない
+    it("検証成功時にGoogleアカウントの連携を試みてから遷移する", async () => {
+      await renderAndSettle();
+
+      await submitCode();
+
+      expect(linkPendingGoogleAccount).toHaveBeenCalled();
+      expect(linkPendingGoogleAccount.mock.invocationCallOrder[0]).toBeLessThan(
+        replace.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("検証に失敗したときは連携を試みない", async () => {
+      verifyTotpForSignIn.mockResolvedValue({ ok: false, reason: "invalid-verification-code" });
+      await renderAndSettle();
+
+      await submitCode();
+
+      expect(linkPendingGoogleAccount).not.toHaveBeenCalled();
     });
 
     it("検証中は再送信できない", async () => {

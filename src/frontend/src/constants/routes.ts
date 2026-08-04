@@ -29,6 +29,13 @@ export const RESET_PASSWORD_PATH = "/reset-password";
  * (docs/CODING_STANDARDS.md 3章)に沿って、参照が無くても削除しない。
  */
 export const AUTH_ACTION_PATH = "/auth/action";
+/**
+ * A8 アカウント連携画面。
+ *
+ * A1・A4の「Googleで続ける」で、同一メールアドレスのパスワードアカウントが既にある場合
+ * (`auth/account-exists-with-different-credential`)にのみ到達する。
+ */
+export const LINK_ACCOUNT_PATH = "/link-account";
 /** B1 ダッシュボード画面。ログイン後のトップ画面 */
 export const DASHBOARD_PATH = "/dashboard";
 /** B2 CSV取込画面 */

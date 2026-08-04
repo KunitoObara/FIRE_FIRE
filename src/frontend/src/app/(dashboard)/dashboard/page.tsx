@@ -5,6 +5,7 @@ import { CategoryBreakdownCard } from "@/components/dashboard/CategoryBreakdownC
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
 import { FireProgressCard } from "@/components/dashboard/FireProgressCard";
+import { GoogleLinkFailureNotice } from "@/components/dashboard/GoogleLinkFailureNotice";
 import { NetWorthTrendCard } from "@/components/dashboard/NetWorthTrendCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -41,7 +42,7 @@ const formatLastImportedAt = (isoDateTime: string | null): string =>
  * (`src/constants/dashboard.ts`の`USE_SAMPLE_DASHBOARD_DATA`)。
  *
  * A8経由のログインで起こりうる「Googleアカウント連携の失敗通知」(同要件のB1)は、
- * 通知の発火元であるA8がまだ無いためこの画面では扱わない。A8の実装時に追加する。
+ * `GoogleLinkFailureNotice`がトーストで出す。連携失敗が無ければ何もしない。
  */
 const DashboardPage = async (props: PageProps<"/dashboard">): Promise<JSX.Element> => {
   const searchParams = await props.searchParams;
@@ -58,6 +59,8 @@ const DashboardPage = async (props: PageProps<"/dashboard">): Promise<JSX.Elemen
 
   return (
     <>
+      <GoogleLinkFailureNotice />
+
       <DashboardFilters
         axes={data.axes}
         selectedAxisId={selectedAxisId ?? ""}
