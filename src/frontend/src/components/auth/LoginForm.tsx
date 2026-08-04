@@ -4,9 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 
 import { DevDashboardShortcut } from "@/components/auth/DevDashboardShortcut";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +65,10 @@ export const LoginForm = (): JSX.Element => {
       clearLoggedOutNotice();
     }
   }, [showLoggedOutNotice]);
+
+  // Googleログインも「ログイン状態を保持する」の選択を引き継ぐ(docs/screen-requirements-auth.md A4の注記)。
+  // `watch()`はReact Compilerがメモ化できないため、購読には`useWatch`を使う
+  const rememberMe = useWatch({ control, name: "rememberMe" });
 
   const handleValidSubmit = async (values: LoginFormValues): Promise<void> => {
     clearErrors("root");
@@ -158,6 +163,8 @@ export const LoginForm = (): JSX.Element => {
             </Button>
           </FieldGroup>
         </form>
+
+        <GoogleSignInButton rememberMe={rememberMe} />
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           アカウントをお持ちでない方は{" "}

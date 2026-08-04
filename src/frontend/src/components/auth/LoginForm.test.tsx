@@ -12,6 +12,7 @@ import type * as LogoutNoticeModule from "@/lib/auth/logout-notice";
 const replace = vi.fn();
 const signInWithEmail =
   vi.fn<(email: string, password: string, rememberMe: boolean) => Promise<SignInResult>>();
+const signInWithGoogle = vi.fn<(rememberMe: boolean) => Promise<GoogleSignInResult>>();
 const wasLoggedOut = vi.fn<() => boolean>();
 const clearLoggedOutNotice = vi.fn<() => void>();
 
@@ -22,6 +23,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/auth/sign-in", () => ({
   signInWithEmail: (email: string, password: string, rememberMe: boolean) =>
     signInWithEmail(email, password, rememberMe),
+}));
+
+vi.mock("@/lib/auth/google-sign-in", () => ({
+  signInWithGoogle: (rememberMe: boolean) => signInWithGoogle(rememberMe),
 }));
 
 // `markLoggedOut`は実物のまま残す。Strict Modeの回帰テストは実物の`markLoggedOut`で
@@ -51,6 +56,8 @@ describe("LoginForm", () => {
     replace.mockReset();
     signInWithEmail.mockReset();
     signInWithEmail.mockResolvedValue({ ok: true, next: "mfa-verify" });
+    signInWithGoogle.mockReset();
+    signInWithGoogle.mockResolvedValue({ ok: true, next: "mfa-setup" });
     wasLoggedOut.mockReset();
     wasLoggedOut.mockReturnValue(false);
     clearLoggedOutNotice.mockReset();
@@ -185,6 +192,27 @@ describe("LoginForm", () => {
 
       await waitFor(() => {
         expect(signInWithEmail).toHaveBeenCalledWith("user@example.com", PASSWORD, false);
+      });
+    });
+  });
+
+  describe("Googleで続ける(docs/screen-requirements-auth.md 2章)", () => {
+    it("メール/パスワードのフォームとは別に導線を出す", () => {
+      render(<LoginForm />);
+
+      expect(screen.getByRole("button", { name: "Googleで続ける" })).toBeEnabled();
+    });
+
+    // 2FAありのログインでセッションが作られるのはA5だが、選択自体はこの画面で引き継ぐ
+    it("「ログイン状態を保持する」の選択を引き継ぐ", async () => {
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.click(screen.getByRole("checkbox", { name: "ログイン状態を保持する" }));
+      await user.click(screen.getByRole("button", { name: "Googleで続ける" }));
+
+      await waitFor(() => {
+        expect(signInWithGoogle).toHaveBeenCalledWith(false);
       });
     });
   });
