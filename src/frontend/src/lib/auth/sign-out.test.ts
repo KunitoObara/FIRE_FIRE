@@ -2,6 +2,11 @@ import { FirebaseError } from "firebase/app";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearLoggedOutNotice, wasLoggedOut } from "@/lib/auth/logout-notice";
+import {
+  clearPendingGoogleLink,
+  getPendingGoogleLink,
+  setPendingGoogleLink,
+} from "@/lib/auth/pending-google-link";
 import { clearPendingLogin, getPendingLogin, setPendingLogin } from "@/lib/auth/pending-login";
 import { performSignOut } from "@/lib/auth/sign-out";
 
@@ -32,6 +37,7 @@ describe("performSignOut", () => {
     signOut.mockReset();
     signOut.mockResolvedValue(undefined);
     clearPendingLogin();
+    clearPendingGoogleLink();
     // 前のテストで立てたままの一過性フラグを掃除する
     clearLoggedOutNotice();
   });
@@ -48,6 +54,19 @@ describe("performSignOut", () => {
     await performSignOut();
 
     expect(getPendingLogin()).toBeNull();
+  });
+
+  // メモリ上で引き回している認証途中の状態はログアウトで捨てる(docs/auth-login-requirements.md 3.9)
+  it("成功時は連携待ちのGoogle資格情報も捨てる(A8)", async () => {
+    setPendingGoogleLink({
+      credential: {} as PendingGoogleLink["credential"],
+      email: "user@example.com",
+      rememberMe: true,
+    });
+
+    await performSignOut();
+
+    expect(getPendingGoogleLink()).toBeNull();
   });
 
   it("成功時はA4に「ログアウトしました」を出すフラグを立てる", async () => {

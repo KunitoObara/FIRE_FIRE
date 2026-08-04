@@ -2,6 +2,7 @@ import { FirebaseError } from "firebase/app";
 import { signOut } from "firebase/auth";
 
 import { markLoggedOut } from "@/lib/auth/logout-notice";
+import { clearPendingGoogleLink } from "@/lib/auth/pending-google-link";
 import { clearPendingLogin } from "@/lib/auth/pending-login";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 
@@ -33,6 +34,9 @@ export const performSignOut = async (clearQueryCache?: () => void): Promise<Sign
 
   clearQueryCache?.();
   clearPendingLogin();
+  // 連携待ちのGoogle資格情報も破棄する。メモリ上で引き回している認証途中の状態は
+  // ログアウトで捨てる方針のため(docs/auth-login-requirements.md 3.9)
+  clearPendingGoogleLink();
   markLoggedOut();
 
   return { ok: true };

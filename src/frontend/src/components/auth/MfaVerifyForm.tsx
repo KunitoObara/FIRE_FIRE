@@ -21,6 +21,7 @@ import {
   TOTP_CODE_SLOT_INDEXES,
 } from "@/constants/auth";
 import { DASHBOARD_PATH, LOGIN_PATH } from "@/constants/routes";
+import { linkPendingGoogleAccount } from "@/lib/auth/google-sign-in";
 import { redeemRecoveryCode } from "@/lib/auth/mfa-recovery";
 import { verifyTotpForSignIn } from "@/lib/auth/mfa-verification";
 import { clearPendingLogin, getPendingLogin } from "@/lib/auth/pending-login";
@@ -86,6 +87,11 @@ export const MfaVerifyForm = (): JSX.Element => {
     const result = await verifyTotpForSignIn(pendingLogin, code);
 
     if (result.ok) {
+      // A8から来た場合のみ、この時点でサインインが成立するのでGoogleアカウントを連携する。
+      // 連携待ちが無い通常のログインでは何もしない(`google-sign-in.ts`)。
+      // 失敗してもログインは取り消さず、B1がトーストで通知する
+      await linkPendingGoogleAccount();
+
       // 検証セッションは役目を終えた。以降のログインは必ずA4からやり直す
       clearPendingLogin();
       // 二次認証まで終えた時点でA5に戻る意味はないため、履歴を残さず置き換える。
@@ -142,6 +148,11 @@ export const MfaVerifyForm = (): JSX.Element => {
       return;
     }
 
+    // A8から来た場合はこのやり直しでサインインが成立するため、確認コードでの検証成功時と
+    // 同じくGoogleアカウントを連携する。ここで連携しないと、預かった資格情報が使われないまま
+    // 残り続ける(docs/screen-requirements-auth.md A5)
+    await linkPendingGoogleAccount();
+
     // 解除できているので通常は`mfa-setup`(A3)に落ちる。判断は`signInWithEmail`に委ね、
     // 万一2FAが残っていた場合もその指示どおりの画面へ進める
     router.replace(SIGN_IN_NEXT_PATHS[signIn.next]);
@@ -174,8 +185,17 @@ export const MfaVerifyForm = (): JSX.Element => {
   const recoveryErrorMessage =
     recoveryFailure === null ? null : MFA_RECOVERY_USE_MESSAGES[recoveryFailure];
 
+  // Googleログイン経由では、Firebaseが投げるMFAのエラーにメールアドレスが載らないことがある
+  // (`src/lib/auth/google-sign-in.ts`)。その場合は宛名を伏せ、一次認証が済んだことだけを伝える
+  const signedInNotice =
+    pendingLogin.email === ""
+      ? "一次認証が完了しています"
+      : `${pendingLogin.email} として一次認証済みです`;
+
   // リカバリーコードの検証はパスワードでの一次認証を前提にする(サーバー側で再確認するため)。
-  // Googleログイン経由ではパスワードを引き継げないので、導線自体を出さない
+  // Googleのポップアップだけで一次認証を通った場合はパスワードを引き継げないので導線を出さない。
+  // A8経由はユーザーがパスワードを入力しているため引き継げており、A4からの経路と同じく出す
+  // (docs/screen-requirements-auth.md A5)
   const canUseRecoveryCode = pendingLogin.password !== undefined;
 
   if (isResignInFailed) {
@@ -206,9 +226,7 @@ export const MfaVerifyForm = (): JSX.Element => {
         </CardHeader>
 
         <CardContent>
-          <p className="text-center text-sm text-muted-foreground">
-            {pendingLogin.email} として一次認証済みです
-          </p>
+          <p className="text-center text-sm text-muted-foreground">{signedInNotice}</p>
 
           <form onSubmit={handleRecoverySubmit} className="mt-6">
             <Field>
@@ -272,9 +290,7 @@ export const MfaVerifyForm = (): JSX.Element => {
       </CardHeader>
 
       <CardContent>
-        <p className="text-center text-sm text-muted-foreground">
-          {pendingLogin.email} として一次認証済みです
-        </p>
+        <p className="text-center text-sm text-muted-foreground">{signedInNotice}</p>
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col items-center">
           <Label htmlFor="totp-code">認証アプリの確認コード({TOTP_CODE_LENGTH}桁)</Label>

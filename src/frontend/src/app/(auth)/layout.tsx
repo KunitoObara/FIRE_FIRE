@@ -1,7 +1,7 @@
 import type { JSX, ReactNode } from "react";
 
 /**
- * 認証系画面(A1〜A7)共通のシェル。
+ * 認証系画面(A1〜A8)共通のシェル。
  * DESIGN.md 5章のとおり、共通ヘッダー/サイドバーを持たない中央寄せ1カラムのレイアウトとする。
  */
 const AuthLayout = ({ children }: { children: ReactNode }): JSX.Element => (
