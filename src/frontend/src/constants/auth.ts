@@ -2,6 +2,7 @@
 
 import {
   DASHBOARD_PATH,
+  LINK_ACCOUNT_PATH,
   LOGIN_PATH,
   MFA_SETUP_PATH,
   MFA_VERIFY_PATH,
@@ -86,6 +87,83 @@ export const SIGN_IN_NEXT_PATHS: Record<SignInNextStep, string> = {
   "email-unverified": VERIFY_EMAIL_PATH,
   "mfa-setup": MFA_SETUP_PATH,
 };
+
+/**
+ * Googleログイン(A1・A4の共通導線)の通過後に進む先
+ * (docs/screen-requirements-auth.md 2章)。
+ *
+ * `link-account`以外はA4からの経路と同じ遷移先になる。
+ */
+export const GOOGLE_SIGN_IN_NEXT_PATHS: Record<GoogleSignInNextStep, string> = {
+  ...SIGN_IN_NEXT_PATHS,
+  "link-account": LINK_ACCOUNT_PATH,
+};
+
+/**
+ * Googleログインに失敗したときのメッセージ。
+ *
+ * ポップアップの取りやめ(`popup-closed`)はここに含めない。ユーザーが自分で閉じた場合に
+ * エラーを出さないのは要件どおりで、含めると出し忘れではなく出す方が既定になってしまう。
+ */
+export const GOOGLE_SIGN_IN_MESSAGES: Record<GoogleSignInDisplayFailureReason, string> = {
+  "popup-blocked":
+    "ポップアップがブロックされました。ブラウザの設定でポップアップを許可してから再度お試しください。",
+  "provider-disabled":
+    "Googleログインが有効になっていません。Firebaseコンソールで設定を確認してください。",
+  "unauthorized-domain":
+    "このドメインからのGoogleログインは許可されていません。Firebaseコンソールの承認済みドメインを確認してください。",
+  "user-disabled": "このアカウントは利用できません。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  unknown: "Googleログインに失敗しました。しばらく待ってから再度お試しください。",
+};
+
+/** A1で利用規約に同意していない間、「Googleで続ける」を押せない理由として出す文言 */
+export const GOOGLE_SIGN_IN_TERMS_REQUIRED_NOTICE =
+  "利用規約とプライバシーポリシーへの同意が必要です";
+
+/**
+ * A8の案内文(docs/screen-requirements-auth.md A8)。
+ *
+ * エラーではなく追加の手続きとして提示する。既存アカウントを乗っ取られたような
+ * 印象を与えないため、「できません」ではなく次に何が起きるかを書く。
+ */
+export const ACCOUNT_LINK_NOTICE =
+  "このメールアドレスは、すでにパスワードでご登録済みです。パスワードを入力すると、次回からGoogleでもログインできるようになります。";
+
+/**
+ * A8のパスワード検証に失敗したときのメッセージ。
+ *
+ * `invalid-credential`だけA4と文言を変えている。A8に到達している時点でそのメールアドレスの
+ * 登録は確定しており、A4のような曖昧化(「メールアドレスまたはパスワードが〜」)をしても
+ * 隠せる情報が無いうえ、入力欄はパスワードしか無いため誤解を招くだけになる。
+ */
+export const ACCOUNT_LINK_SIGN_IN_MESSAGES: Record<SignInFailureReason, string> = {
+  ...SIGN_IN_MESSAGES,
+  "invalid-credential": "パスワードが正しくありません。",
+};
+
+/**
+ * A8に連携待ちが無いとき(直接アクセス・リロード)に出す案内。
+ *
+ * Googleの資格情報はメモリ上でしか受け渡さないため、この状態はGoogleログインから
+ * やり直すほかない(`src/lib/auth/pending-google-link.ts`)。A5の同種の案内と同じく、
+ * 何かに失敗したわけではないので手順だけを伝える。
+ */
+export const ACCOUNT_LINK_NO_SESSION_NOTICE =
+  "Googleログインからやり直してください。ログイン画面に戻ります...";
+
+/**
+ * B1で出すGoogleアカウント連携の失敗通知
+ * (docs/screen-requirements-dashboard.md B1)。
+ *
+ * ログイン自体は成功していることが伝わる文言にする。やり直しの導線はB10の連携アカウント管理
+ * (未実装。Trelloカード [A8-2])だが、次にGoogleログインを試みれば再びA8に到達して
+ * 連携し直せるため、この通知だけでも行き止まりにはならない。
+ */
+export const GOOGLE_LINK_FAILURE_MESSAGE =
+  "Googleアカウントの連携ができませんでした。アカウント設定からやり直せます。";
 
 /**
  * A2で確認メールの再送に失敗したときのメッセージ。

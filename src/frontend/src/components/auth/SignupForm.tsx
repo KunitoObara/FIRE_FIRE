@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { PasswordPolicyChecklist } from "@/components/auth/PasswordPolicyChecklist";
 import {
@@ -24,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
+  GOOGLE_SIGN_IN_TERMS_REQUIRED_NOTICE,
   PASSWORD_MASK,
   PASSWORD_POLICY_VIOLATION_MESSAGE,
   SIGN_UP_FORM_LEVEL_MESSAGES,
@@ -71,6 +73,8 @@ export const SignupForm = (): JSX.Element => {
 
   // `watch()`はReact Compilerがメモ化できないため、購読には`useWatch`を使う
   const password = useWatch({ control, name: "password" });
+  // Googleで作成する場合も規約への同意は要る。同意前はポップアップを開かせない
+  const agreedToTerms = useWatch({ control, name: "agreedToTerms" });
 
   const applyFailure = (reason: SignUpFailureReason): void => {
     switch (reason) {
@@ -203,6 +207,10 @@ export const SignupForm = (): JSX.Element => {
             </Button>
           </FieldGroup>
         </form>
+
+        <GoogleSignInButton
+          blockedReason={agreedToTerms ? undefined : GOOGLE_SIGN_IN_TERMS_REQUIRED_NOTICE}
+        />
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           すでにアカウントをお持ちの方は{" "}

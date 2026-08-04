@@ -1,8 +1,9 @@
-import type { MultiFactorResolver, TotpSecret } from "firebase/auth";
+import type { MultiFactorResolver, OAuthCredential, TotpSecret } from "firebase/auth";
 import type { ReactNode } from "react";
 import type { FieldError, UseFormRegisterReturn } from "react-hook-form";
 import type { z } from "zod";
 
+import type { accountLinkSchema } from "@/schemas/account-link";
 import type { forgotPasswordSchema } from "@/schemas/forgot-password";
 import type { loginSchema } from "@/schemas/login";
 import type { resetPasswordSchema } from "@/schemas/reset-password";
@@ -358,6 +359,85 @@ declare global {
 
   /** A5の入力方法。認証アプリの確認コードと、リカバリーコードを切り替える */
   type MfaVerifyMode = "totp" | "recovery";
+
+  /**
+   * A1・A4の「Googleで続ける」で画面に出し分ける必要がある失敗理由
+   * (docs/screen-requirements-auth.md 2章)。
+   */
+  type GoogleSignInFailureReason =
+    /**
+     * ユーザーがポップアップを閉じた・別のポップアップに置き換えられた。
+     * 失敗ではなく取りやめのため、画面はエラーを出さず元の状態に戻す
+     */
+    | "popup-closed"
+    /** ブラウザにポップアップを塞がれた。ユーザーの操作で解消できるため専用の文言を出す */
+    | "popup-blocked"
+    /** Identity Platform側でGoogleプロバイダが有効化されていない(docs/ci-cd-setup.md 10章) */
+    | "provider-disabled"
+    /** 現在のホストが承認済みドメインに登録されていない(同 10.3) */
+    | "unauthorized-domain"
+    /** 管理コンソール等でアカウントが無効化されている */
+    | "user-disabled"
+    | "too-many-requests"
+    | "configuration-error"
+    /** リクエストがFirebaseに届かない */
+    | "network-error"
+    | "unknown";
+
+  /**
+   * Googleログインの通過後に進む先。
+   *
+   * `link-account`以外はA4からの経路と同じ(`SignInNextStep`)。Googleのメールアドレスは
+   * Google側で確認済みのため、通常`email-unverified`にはならない。
+   */
+  type GoogleSignInNextStep =
+    | SignInNextStep
+    /** 同一メールアドレスのパスワードアカウントが既にある。連携が要る(A8) */
+    | "link-account";
+
+  type GoogleSignInResult =
+    { ok: true; next: GoogleSignInNextStep } | { ok: false; reason: GoogleSignInFailureReason };
+
+  /**
+   * 画面にメッセージを出す必要があるGoogleログインの失敗理由。
+   * ポップアップの取りやめはエラー表示しないため除く(docs/screen-requirements-auth.md 2章)。
+   */
+  type GoogleSignInDisplayFailureReason = Exclude<GoogleSignInFailureReason, "popup-closed">;
+
+  /**
+   * A8での連携を待っているGoogleの資格情報。
+   *
+   * `credential`は短命なOAuthクレデンシャルで、永続化すると期限切れの資格情報で連携を
+   * 試みることになるため、`pending-login.ts`と同じくメモリ上でのみ受け渡す
+   * (docs/auth-login-requirements.md 3.8、`src/lib/auth/pending-google-link.ts`)。
+   */
+  type PendingGoogleLink = {
+    credential: OAuthCredential;
+    /** Googleから取得したメールアドレス。A8の確認表示とパスワード検証の両方に使う */
+    email: string;
+    /** A1・A4での「ログイン状態を保持する」の選択。A8のパスワード検証へ引き継ぐ */
+    rememberMe: boolean;
+  };
+
+  /**
+   * A8アカウント連携フォームの入力値。
+   * 同じ形を手で書き直すと実際の検証内容とずれるため、zodスキーマから導出する。
+   */
+  type AccountLinkFormValues = z.infer<typeof accountLinkSchema>;
+
+  /** A1・A4共通の「Googleで続ける」ボタンのProps(docs/screen-requirements-auth.md 2章) */
+  type GoogleSignInButtonProps = {
+    /**
+     * 「ログイン状態を保持する」の選択。A4はフォームの現在値を渡す。
+     * A1にはこの選択が無いため、省略時はA4の既定と揃えて保持する
+     */
+    rememberMe?: boolean;
+    /**
+     * 押下させない理由(A1の規約未同意)。渡すとボタンを無効化し、理由をボタンの下に出す。
+     * ポップアップを開いてから断るより、開く前に条件が分かる方が親切なため
+     */
+    blockedReason?: string;
+  };
 
   /**
    * A6パスワードをお忘れの方フォームの入力値。

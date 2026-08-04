@@ -4,9 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 
 import { DevDashboardShortcut } from "@/components/auth/DevDashboardShortcut";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { SIGN_IN_MESSAGES, SIGN_IN_NEXT_PATHS } from "@/constants/auth";
 import { FORGOT_PASSWORD_PATH, SIGNUP_PATH } from "@/constants/routes";
 import { clearLoggedOutNotice, wasLoggedOut } from "@/lib/auth/logout-notice";
+import { clearPendingGoogleLink } from "@/lib/auth/pending-google-link";
 import { signInWithEmail } from "@/lib/auth/sign-in";
 import { loginSchema } from "@/schemas/login";
 
@@ -65,9 +67,18 @@ export const LoginForm = (): JSX.Element => {
     }
   }, [showLoggedOutNotice]);
 
+  // Googleログインも「ログイン状態を保持する」の選択を引き継ぐ(docs/screen-requirements-auth.md A4の注記)。
+  // `watch()`はReact Compilerがメモ化できないため、購読には`useWatch`を使う
+  const rememberMe = useWatch({ control, name: "rememberMe" });
+
   const handleValidSubmit = async (values: LoginFormValues): Promise<void> => {
     clearErrors("root");
     setIsSubmitting(true);
+
+    // A8を途中で離脱しても連携待ちはメモリに残る(`pending-google-link.ts`)。A4からの
+    // 通常のログインはGoogle連携の意思表示ではないため、ここで捨てる。`signInWithEmail`側で
+    // 捨てないのは、A8のパスワード検証が同じ関数を通り、そこでは連携待ちを残す必要があるため
+    clearPendingGoogleLink();
 
     const result = await signInWithEmail(values.email, values.password, values.rememberMe);
 
@@ -158,6 +169,8 @@ export const LoginForm = (): JSX.Element => {
             </Button>
           </FieldGroup>
         </form>
+
+        <GoogleSignInButton rememberMe={rememberMe} />
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           アカウントをお持ちでない方は{" "}
