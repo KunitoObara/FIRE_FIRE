@@ -425,7 +425,7 @@ declare global {
    */
   type AccountLinkFormValues = z.infer<typeof accountLinkSchema>;
 
-  /** A8の「Googleで続ける」ボタンのProps(A1・A4で共通) */
+  /** A1・A4共通の「Googleで続ける」ボタンのProps(docs/screen-requirements-auth.md 2章) */
   type GoogleSignInButtonProps = {
     /**
      * 「ログイン状態を保持する」の選択。A4はフォームの現在値を渡す。

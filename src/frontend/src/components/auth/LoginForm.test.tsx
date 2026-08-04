@@ -4,6 +4,11 @@ import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LoginForm } from "@/components/auth/LoginForm";
+import {
+  clearPendingGoogleLink,
+  getPendingGoogleLink,
+  setPendingGoogleLink,
+} from "@/lib/auth/pending-google-link";
 
 import type { UserEvent } from "@testing-library/user-event";
 
@@ -61,6 +66,7 @@ describe("LoginForm", () => {
     wasLoggedOut.mockReset();
     wasLoggedOut.mockReturnValue(false);
     clearLoggedOutNotice.mockReset();
+    clearPendingGoogleLink();
   });
 
   describe("「ログアウトしました」の表示(docs/screen-requirements-auth.md A4)", () => {
@@ -201,6 +207,25 @@ describe("LoginForm", () => {
       render(<LoginForm />);
 
       expect(screen.getByRole("button", { name: "Googleで続ける" })).toBeEnabled();
+    });
+
+    // A8を離脱しても連携待ちはメモリに残る。A4からの通常のログインは連携の意思表示ではないため、
+    // ここで捨てないと後続のA5でそのログインに連携が紐づいてしまう
+    it("パスワードでのログイン試行時に連携待ちのGoogle資格情報を捨てる", async () => {
+      setPendingGoogleLink({
+        credential: {} as PendingGoogleLink["credential"],
+        email: "other@example.com",
+        rememberMe: true,
+      });
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await fillValidForm(user);
+      await submit(user);
+
+      await waitFor(() => {
+        expect(getPendingGoogleLink()).toBeNull();
+      });
     });
 
     // 2FAありのログインでセッションが作られるのはA5だが、選択自体はこの画面で引き継ぐ

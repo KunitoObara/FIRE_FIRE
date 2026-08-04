@@ -155,6 +155,10 @@ export const signInWithGoogle = async (rememberMe: boolean): Promise<GoogleSignI
  *
  * 成否によらず連携待ちは消費する。同じ資格情報での再試行は期待できず(短命なうえ、
  * `credential-already-in-use`は再試行しても結果が変わらない)、残すと次のログインに紛れ込むため。
+ *
+ * 連携先が「連携待ちと同じメールアドレスのアカウント」であることも確認する。A8を途中で
+ * 離脱しても連携待ちはメモリに残るため、無条件に連携すると別のアカウントへ資格情報を
+ * 付けてしまう経路が残る。A4は次のログイン試行で連携待ちを捨てるが、それだけに頼らない。
  */
 export const linkPendingGoogleAccount = async (): Promise<void> => {
   const pending = getPendingGoogleLink();
@@ -171,6 +175,19 @@ export const linkPendingGoogleAccount = async (): Promise<void> => {
       // 連携はサインイン成立後にしか呼ばれない想定。ここに来るのは想定外の状態
       console.error("連携先のサインイン済みアカウントがありません");
       markGoogleLinkFailed();
+      return;
+    }
+
+    // A8が連携するのは「同じメールアドレスの既存アカウント」に限られる。ここが一致しない
+    // ということは、A8を離脱したあと別のアカウントでログインし直した等で連携待ちが
+    // 残っていたということなので、連携せずに捨てる。実行してしまうと、A8で本人確認を
+    // 通していないアカウントにGoogleの資格情報が付き、以後そのGoogleアカウントで
+    // ログインできてしまう。
+    //
+    // B1の通知も出さない。連携を試みたのは今サインインした人ではないため、
+    // 「連携できませんでした」と伝えても心当たりが無い
+    if (user.email?.toLowerCase() !== pending.email.toLowerCase()) {
+      console.error("連携待ちのGoogleアカウントとサインイン中のアカウントが一致しません");
       return;
     }
 

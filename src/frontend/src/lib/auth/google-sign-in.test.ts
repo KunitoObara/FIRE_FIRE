@@ -226,7 +226,7 @@ describe("signInWithGoogle", () => {
 });
 
 describe("linkPendingGoogleAccount", () => {
-  const user = {} as User;
+  const user = { email: "user@example.com" } as User;
 
   beforeEach(() => {
     getFirebaseAuth.mockReset();
@@ -275,6 +275,36 @@ describe("linkPendingGoogleAccount", () => {
 
     expect(wasGoogleLinkFailed()).toBe(true);
     expect(getPendingGoogleLink()).toBeNull();
+  });
+
+  // A8を離脱したあと別のアカウントでログインすると連携待ちだけが残る。無条件に連携すると、
+  // A8で本人確認を通していないアカウントにGoogleの資格情報が付いてしまう
+  it("サインイン中のアカウントのメールアドレスが一致しなければ連携しない", async () => {
+    setPendingGoogleLink({
+      credential: googleCredential,
+      email: "other@example.com",
+      rememberMe: true,
+    });
+
+    await linkPendingGoogleAccount();
+
+    expect(linkWithCredential).not.toHaveBeenCalled();
+    // 連携を試みたのは今サインインした人ではないため、B1の通知も出さない
+    expect(wasGoogleLinkFailed()).toBe(false);
+    expect(getPendingGoogleLink()).toBeNull();
+  });
+
+  // Firebaseはメールアドレスを小文字で保持するとは限らない。大小の違いで弾かない
+  it("メールアドレスの大文字小文字は区別せず連携する", async () => {
+    setPendingGoogleLink({
+      credential: googleCredential,
+      email: "User@Example.com",
+      rememberMe: true,
+    });
+
+    await linkPendingGoogleAccount();
+
+    expect(linkWithCredential).toHaveBeenCalledWith(user, googleCredential);
   });
 
   it("サインイン済みのアカウントが無ければ通知フラグを立てる", async () => {
