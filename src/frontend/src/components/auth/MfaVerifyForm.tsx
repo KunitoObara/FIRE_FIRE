@@ -148,6 +148,11 @@ export const MfaVerifyForm = (): JSX.Element => {
       return;
     }
 
+    // A8から来た場合はこのやり直しでサインインが成立するため、確認コードでの検証成功時と
+    // 同じくGoogleアカウントを連携する。ここで連携しないと、預かった資格情報が使われないまま
+    // 残り続ける(docs/screen-requirements-auth.md A5)
+    await linkPendingGoogleAccount();
+
     // 解除できているので通常は`mfa-setup`(A3)に落ちる。判断は`signInWithEmail`に委ね、
     // 万一2FAが残っていた場合もその指示どおりの画面へ進める
     router.replace(SIGN_IN_NEXT_PATHS[signIn.next]);
@@ -188,7 +193,9 @@ export const MfaVerifyForm = (): JSX.Element => {
       : `${pendingLogin.email} として一次認証済みです`;
 
   // リカバリーコードの検証はパスワードでの一次認証を前提にする(サーバー側で再確認するため)。
-  // Googleログイン経由ではパスワードを引き継げないので、導線自体を出さない
+  // Googleのポップアップだけで一次認証を通った場合はパスワードを引き継げないので導線を出さない。
+  // A8経由はユーザーがパスワードを入力しているため引き継げており、A4からの経路と同じく出す
+  // (docs/screen-requirements-auth.md A5)
   const canUseRecoveryCode = pendingLogin.password !== undefined;
 
   if (isResignInFailed) {
