@@ -206,6 +206,75 @@ describe("MfaVerifyForm", () => {
       );
     });
 
+    // 同じresolverでは何度送り直してもsession-expiredになるため、再試行させない
+    it("検証セッションが切れたときは確認コードの入力と「検証する」を無効化する", async () => {
+      verifyTotpForSignIn.mockResolvedValue({ ok: false, reason: "session-expired" });
+      await renderAndSettle();
+
+      await submitCode();
+
+      expect(codeInput()).toBeDisabled();
+      expect(submitButton()).toBeDisabled();
+
+      // 無効化されていても送信経路が残っていないことまで確かめる
+      await enterCode("123456");
+      await clickSubmit();
+
+      expect(verifyTotpForSignIn).toHaveBeenCalledTimes(1);
+    });
+
+    // リカバリーコードの検証はresolverを使わずメール・パスワードで解除するため、期限切れでも成立する
+    it("検証セッションが切れてもリカバリーコードへの切り替えは残す", async () => {
+      verifyTotpForSignIn.mockResolvedValue({ ok: false, reason: "session-expired" });
+      await renderAndSettle();
+
+      await submitCode();
+
+      const switchButton = screen.getByRole("button", { name: "リカバリーコードを使う" });
+      expect(switchButton).toBeEnabled();
+
+      await act(async () => {
+        fireEvent.click(switchButton);
+      });
+
+      expect(recoveryCodeInput()).toBeEnabled();
+    });
+
+    // 切り替えでは検証セッションは戻らない。無効化が解けると無駄な再試行に戻ってしまう
+    it("リカバリーコードから戻っても期限切れの無効化を解かない", async () => {
+      verifyTotpForSignIn.mockResolvedValue({ ok: false, reason: "session-expired" });
+      await renderAndSettle();
+
+      await submitCode();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "リカバリーコードを使う" }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "認証アプリのコードに戻る" }));
+      });
+
+      expect(codeInput()).toBeDisabled();
+      expect(screen.getByRole("alert")).toHaveTextContent("検証の有効期限が切れました。");
+      expect(screen.getByRole("link", { name: "ログイン画面へ" })).toBeInTheDocument();
+    });
+
+    // 入力し直しで解消しうる失敗まで止めると、その場でのやり直しができなくなる
+    it("期限切れ以外の失敗では入力を無効化しない", async () => {
+      verifyTotpForSignIn.mockResolvedValue({
+        ok: false,
+        reason: "invalid-verification-code",
+      });
+      await renderAndSettle();
+
+      await submitCode();
+
+      expect(codeInput()).toBeEnabled();
+
+      await enterCode("123456");
+      expect(submitButton()).toBeEnabled();
+    });
+
     it("入力し直しで解消しうる失敗ではログイン画面への導線を出さない", async () => {
       verifyTotpForSignIn.mockResolvedValue({ ok: false, reason: "unknown" });
       await renderAndSettle();

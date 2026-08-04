@@ -64,10 +64,19 @@ export const MfaVerifyForm = (): JSX.Element => {
     }
   }, [pendingLogin, router]);
 
+  // 期限切れの検証セッションは同じresolverで何度送り直しても復活しない。
+  // 入力自体を止めて、A4からやり直す導線へ寄せる
+  const isSessionExpired = failure === "session-expired";
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
 
-    if (pendingLogin === null || code.length !== TOTP_CODE_LENGTH || isSubmitting) {
+    if (
+      pendingLogin === null ||
+      code.length !== TOTP_CODE_LENGTH ||
+      isSubmitting ||
+      isSessionExpired
+    ) {
       return;
     }
 
@@ -138,10 +147,15 @@ export const MfaVerifyForm = (): JSX.Element => {
     router.replace(SIGN_IN_NEXT_PATHS[signIn.next]);
   };
 
-  /** 確認コードとリカバリーコードの入力を切り替える。持ち越したエラーは消す */
+  /**
+   * 確認コードとリカバリーコードの入力を切り替える。持ち越したエラーは消す。
+   *
+   * 検証セッションの期限切れだけは残す。切り替えても検証セッションは戻らないため、
+   * ここで消すと確認コードの入力へ戻ったときに無効化が解けてしまう。
+   */
   const handleModeChange = (nextMode: MfaVerifyMode): void => {
     setMode(nextMode);
-    setFailure(null);
+    setFailure((current) => (current === "session-expired" ? current : null));
     setRecoveryFailure(null);
   };
 
@@ -276,7 +290,7 @@ export const MfaVerifyForm = (): JSX.Element => {
             pattern={REGEXP_ONLY_DIGITS}
             value={code}
             onChange={setCode}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isSessionExpired}
             aria-invalid={errorMessage !== null}
             aria-describedby="totp-code-error"
             containerClassName="mt-2"
@@ -295,7 +309,7 @@ export const MfaVerifyForm = (): JSX.Element => {
           <Button
             type="submit"
             className="mt-3 w-full"
-            disabled={isSubmitting || code.length !== TOTP_CODE_LENGTH}
+            disabled={isSubmitting || isSessionExpired || code.length !== TOTP_CODE_LENGTH}
           >
             {isSubmitting ? "検証中..." : "検証する"}
           </Button>
@@ -304,13 +318,17 @@ export const MfaVerifyForm = (): JSX.Element => {
             検証セッションの期限切れはA5で入力し直しても解消しない。
             他の失敗は確認コードの入れ直しで解消しうるため、この画面に留める
           */}
-          {failure === "session-expired" ? (
+          {isSessionExpired ? (
             <Button asChild variant="outline" className="mt-3 w-full">
               <Link href={LOGIN_PATH}>ログイン画面へ</Link>
             </Button>
           ) : null}
 
-          {/* 認証アプリを紛失した場合の代替手段。切替後の検証はA3で発行したコードで行う */}
+          {/*
+            認証アプリを紛失した場合の代替手段。切替後の検証はA3で発行したコードで行う。
+            こちらは検証セッション(resolver)を使わずメール・パスワードで解除するため、
+            期限切れの後でも成立する。A4へ往復させずに済むよう導線は残す
+          */}
           {canUseRecoveryCode ? (
             <Button
               type="button"
