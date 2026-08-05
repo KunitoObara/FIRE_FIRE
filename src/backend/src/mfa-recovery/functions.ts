@@ -127,9 +127,11 @@ const hasLiveRecoveryCodes = (status: RecoveryCodeStatus, factor: MultiFactorInf
  * 2FA登録済みのアカウントではサインインが完了せず`mfa-required`が返るが、
  * ここで確かめたいのは「パスワードが正しいこと」だけなので`signed-in`と同じ扱いにする。
  *
- * `user.email`が無いアカウントはパスワードで確認しようがない。Googleのみで作成した
- * アカウントの扱いは連携アカウント管理(Trelloカード [A8-2])で決めるため、ここでは
- * 資格情報の誤りと同じ扱いに寄せておく。
+ * `user.email`が無いアカウントはパスワードで確認しようがないため、資格情報の誤りと同じ扱いにする。
+ * 連携アカウント管理(B10)ではパスワードの解除を許しており、Googleのみのアカウントは
+ * この本人確認を通せない = 2FAの再設定もリカバリーコードの発行もできない状態になる。これは
+ * 承知のうえで、B10の解除確認ダイアログが実行前にその旨を伝える
+ * (docs/screen-requirements-account.md「メールアドレス / パスワードの解除」)。
  */
 const verifyPasswordOrThrow = async (user: UserRecord, password: string | undefined) => {
   if (password === undefined) {

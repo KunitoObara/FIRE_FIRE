@@ -2,6 +2,7 @@
 
 import {
   FIREBASE_CONFIGURATION_MESSAGE,
+  FIREBASE_NETWORK_ERROR_MESSAGE,
   FUNCTIONS_UNAVAILABLE_MESSAGE,
   TOO_MANY_REQUESTS_MESSAGE,
 } from "@/constants/auth";
@@ -74,6 +75,110 @@ export const MFA_RECOVERY_STATUS_MESSAGES: Record<MfaRecoveryStatusFailureReason
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   unavailable: FUNCTIONS_UNAVAILABLE_MESSAGE,
   unknown: "リカバリーコードの発行状況を取得できませんでした。時間をおいて再度お試しください。",
+};
+
+/** 「ログイン方法」セクション(docs/screen-requirements-account.md「連携アカウントの管理」) */
+export const LINKED_ACCOUNTS_TITLE = "ログイン方法";
+export const LINKED_ACCOUNTS_DESCRIPTION =
+  "このアカウントにログインできる方法です。最後の1つは解除できません。";
+
+export const LINKED_PROVIDER_LABELS: Record<LinkedProviderId, string> = {
+  password: "メールアドレス / パスワード",
+  "google.com": "Google",
+};
+
+export const LINKED_PROVIDER_LINKED_LABEL = "連携済み";
+export const LINKED_PROVIDER_NOT_LINKED_LABEL = "未連携";
+export const LINK_GOOGLE_LABEL = "Googleと連携する";
+export const LINK_GOOGLE_SUBMITTING_LABEL = "Googleで認証中...";
+export const UNLINK_PROVIDER_LABEL = "解除";
+
+/**
+ * 解除ボタンの読み上げ名。
+ * 行が複数あり、見た目の「解除」だけではどのログイン方法を指すのか音声では区別できないため。
+ */
+export const buildUnlinkProviderButtonLabel = (providerId: LinkedProviderId): string =>
+  `${LINKED_PROVIDER_LABELS[providerId]}の連携を解除`;
+
+/** 解除ボタンを無効化したときに併記する理由 */
+export const LAST_PROVIDER_NOTICE = "唯一のログイン方法のため解除できません";
+
+/**
+ * ログイン通知メールの宛先についての注記。
+ *
+ * 連携するGoogleアカウントは登録メールアドレスと違ってよいが、通知([auth-login-requirements.md]
+ * 3.6)の宛先は登録メールアドレスのまま変わらない。連携前から見えるよう、連携状況によらず出す。
+ */
+export const LINKED_ACCOUNTS_NOTIFICATION_NOTICE =
+  "ログイン通知メールの宛先は、連携したGoogleアカウントのメールアドレスではなく登録メールアドレスのままです。";
+
+export const GOOGLE_LINKED_MESSAGE =
+  "Googleアカウントを連携しました。次回からGoogleでもログインできます。";
+
+export const buildProviderUnlinkedMessage = (providerId: LinkedProviderId): string =>
+  `${LINKED_PROVIDER_LABELS[providerId]}での連携を解除しました。`;
+
+/**
+ * 連携解除の確認ダイアログの文言。
+ *
+ * パスワードだけ、解除するとログイン手段以外に失うものがある旨を書き足している。
+ * パスワードの再確認を伴う操作(2FAの再設定・リカバリーコードの発行・A5でのリカバリーコード
+ * 使用)はパスワードを持たないアカウントでは実行できず、しかもこのアプリにはパスワードを
+ * 後から設定し直す導線が無いため(docs/auth-login-requirements.md 8章のオープン課題)。
+ * 認証アプリを失ったときの復旧手段まで一緒に手放すことになるので、実行前に伝える。
+ */
+export const UNLINK_PROVIDER_DIALOG_TEXTS: Record<
+  LinkedProviderId,
+  { title: string; description: string }
+> = {
+  password: {
+    title: "メールアドレス / パスワードでのログインを解除しますか?",
+    description:
+      "解除するとパスワードではログインできなくなり、Googleでのログインのみになります。パスワードを後から設定し直すことはできず、2FAの再設定・リカバリーコードの発行・リカバリーコードでの復旧も使えなくなります。",
+  },
+  "google.com": {
+    title: "Googleとの連携を解除しますか?",
+    description:
+      "解除するとGoogleではログインできなくなります。メールアドレスとパスワードでのログインは引き続きご利用いただけます。",
+  },
+};
+
+export const UNLINK_PROVIDER_CONFIRM_LABEL = "解除する";
+export const UNLINK_PROVIDER_SUBMITTING_LABEL = "解除中...";
+export const UNLINK_PROVIDER_CANCEL_LABEL = "キャンセル";
+
+/** Googleを連携できなかったときのメッセージ */
+export const LINK_GOOGLE_MESSAGES: Record<LinkGoogleDisplayFailureReason, string> = {
+  "popup-blocked":
+    "ポップアップがブロックされました。ブラウザの設定でポップアップを許可してから再度お試しください。",
+  "credential-already-in-use":
+    "このGoogleアカウントは別のアカウントで既に使用されています。別のGoogleアカウントで連携してください。",
+  "provider-already-linked": "このアカウントには既にGoogleが連携されています。",
+  "requires-recent-login":
+    "セキュリティのため、ログインし直してから連携してください。いったんログアウトして再度ログインすると実行できます。",
+  "signed-out": ACCOUNT_SIGNED_OUT_MESSAGE,
+  "provider-disabled":
+    "Googleログインが有効になっていません。Firebaseコンソールで設定を確認してください。",
+  "unauthorized-domain":
+    "このドメインからのGoogleログインは許可されていません。Firebaseコンソールの承認済みドメインを確認してください。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  unknown: "Googleアカウントを連携できませんでした。時間をおいて再度お試しください。",
+};
+
+/** ログイン方法を解除できなかったときのメッセージ */
+export const UNLINK_PROVIDER_MESSAGES: Record<UnlinkProviderFailureReason, string> = {
+  // 画面はボタンを無効化して防ぐため、通常はここに来ない
+  "last-provider": "唯一のログイン方法のため解除できません。",
+  "not-linked": "このログイン方法は連携されていません。画面を開き直してください。",
+  "requires-recent-login":
+    "セキュリティのため、ログインし直してから解除してください。いったんログアウトして再度ログインすると実行できます。",
+  "signed-out": ACCOUNT_SIGNED_OUT_MESSAGE,
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  unknown: "連携を解除できませんでした。時間をおいて再度お試しください。",
 };
 
 /** 「2段階認証(2FA)」セクション */
