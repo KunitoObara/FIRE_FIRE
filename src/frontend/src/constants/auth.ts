@@ -159,7 +159,7 @@ export const ACCOUNT_LINK_NO_SESSION_NOTICE =
  * (docs/screen-requirements-dashboard.md B1)。
  *
  * ログイン自体は成功していることが伝わる文言にする。やり直しの導線はB10の連携アカウント管理
- * (未実装。Trelloカード [A8-2])だが、次にGoogleログインを試みれば再びA8に到達して
+ * (`LinkedAccountsCard`)。そこを開かなくても、次にGoogleログインを試みれば再びA8に到達して
  * 連携し直せるため、この通知だけでも行き止まりにはならない。
  */
 export const GOOGLE_LINK_FAILURE_MESSAGE =
