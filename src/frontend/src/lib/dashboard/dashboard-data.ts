@@ -67,7 +67,7 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
           axis.id,
           {
             netWorthSeries: buildAxisNetWorthSeries(snapshots, axis.assetTypeNames),
-            breakdown: latest === undefined ? [] : buildAxisBreakdown(latest, axis.assetTypeNames),
+            breakdown: latest ? buildAxisBreakdown(latest, axis.assetTypeNames) : [],
           },
         ]),
       ),

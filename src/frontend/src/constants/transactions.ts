@@ -6,9 +6,9 @@ import { CSV_IMPORT_PATH } from "@/constants/routes";
  * サンプルデータを表示するかどうか。
  *
  * 入出金明細CSVの取込(B2)がまだ無く、Firestoreに取引データが存在しないため、画面の見た目を
- * 確認できるようサンプルデータを流し込んでいる(`src/constants/dashboard.ts`の
- * `USE_SAMPLE_DASHBOARD_DATA`と同じ考え方)。入出金明細CSVの取込が実装されたら`false`にして
- * `src/lib/transactions/sample-data.ts`ごと外す。
+ * 確認できるようサンプルデータを流し込んでいる。入出金明細CSVの取込が実装されたら`false`に
+ * して`src/lib/transactions/sample-data.ts`ごと外す。B1が同じ形のフラグで暫定表示していたのを
+ * 実データ接続時に外したのと同じ手順になる(カード[B1-2])。
  *
  * `false`にすると一覧が空状態(CSV取込への導線)になる。
  */

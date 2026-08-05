@@ -27,7 +27,7 @@ import type { JSX } from "react";
 
 /** 直近CSV取込日時の表示。未取込のときは日時の代わりにその旨を出す */
 const formatLastImportedAt = (isoDateTime: string | null): string =>
-  isoDateTime === null ? NO_CSV_IMPORT_LABEL : format(parseISO(isoDateTime), "yyyy/MM/dd HH:mm");
+  isoDateTime ? format(parseISO(isoDateTime), "yyyy/MM/dd HH:mm") : NO_CSV_IMPORT_LABEL;
 
 /**
  * B1 ダッシュボード画面の本体(docs/screen-requirements-dashboard.md B1)。
@@ -49,13 +49,15 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
   const now = useMemo(() => new Date(), []);
 
   const result = dashboardQuery.data;
-  const data = result?.ok === true ? result.data : null;
+  const data = result?.ok ? result.data : null;
+  // 失敗の判定だけは真偽値の比較で行う。取得前(`undefined`)と失敗を区別する必要があるため
+  const failureReason = result !== undefined && !result.ok ? result.reason : null;
   const axes = data?.axes ?? [];
 
   const selectedAxisId = resolveAxisId(axisParam, axes);
   const selectedPeriodId = resolvePeriodId(periodParam);
   const selectedAxis = axes.find((axis) => axis.id === selectedAxisId);
-  const axisData = selectedAxisId === undefined ? undefined : data?.byAxis[selectedAxisId];
+  const axisData = selectedAxisId ? data?.byAxis[selectedAxisId] : undefined;
 
   const series = filterSeriesByPeriod(axisData?.netWorthSeries ?? [], selectedPeriodId, now);
   const slices = buildBreakdownSlices(axisData?.breakdown ?? [], data?.categories ?? []);
@@ -78,20 +80,20 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
         </div>
       ) : null}
 
-      {result?.ok === false ? (
+      {failureReason ? (
         <p role="alert" className="text-sm text-destructive">
-          {DASHBOARD_FAILURE_MESSAGES[result.reason]}
+          {DASHBOARD_FAILURE_MESSAGES[failureReason]}
         </p>
       ) : null}
 
-      {data === null ? null : (
+      {data ? (
         <>
           <p className="text-xs text-muted-foreground">
             直近CSV取込:{" "}
             <span className="tabular-nums">{formatLastImportedAt(data.lastImportedAt)}</span>
           </p>
 
-          {selectedAxis === undefined ? (
+          {!selectedAxis ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">資産の表示</CardTitle>
@@ -112,7 +114,7 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
 
           <CashflowSummaryCard cashflow={data.cashflow} />
         </>
-      )}
+      ) : null}
     </>
   );
 };

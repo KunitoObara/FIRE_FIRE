@@ -181,7 +181,7 @@ export const fetchLatestAssetTotal = async (): Promise<CurrentAssetTotalResult> 
     );
     const latest = snapshot.docs[0];
 
-    if (latest === undefined) {
+    if (!latest) {
       return { ok: true, total: null };
     }
 
@@ -226,7 +226,7 @@ export const fetchLatestAssetBalances = async (): Promise<LatestAssetBalancesRes
     );
     const latest = snapshot.docs[0];
 
-    if (latest === undefined) {
+    if (!latest) {
       return { ok: true, balances: [] };
     }
 
@@ -338,7 +338,7 @@ export const fetchLastImportedAt = async (): Promise<LastImportedAtResult> => {
     );
     const latest = snapshot.docs[0];
 
-    if (latest === undefined) {
+    if (!latest) {
       return { ok: true, lastImportedAt: null };
     }
 
