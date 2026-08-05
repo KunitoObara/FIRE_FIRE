@@ -53,7 +53,7 @@ export const UnlinkProviderDialog = ({
     // 失敗時はダイアログを開いたままエラーを出したいため、既定の自動クローズを止める
     event.preventDefault();
 
-    if (provider === null) {
+    if (!provider) {
       return;
     }
 
@@ -73,23 +73,23 @@ export const UnlinkProviderDialog = ({
   };
 
   return (
-    <AlertDialog open={provider !== null} onOpenChange={handleOpenChange}>
+    <AlertDialog open={!!provider} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {provider === null ? "" : UNLINK_PROVIDER_DIALOG_TEXTS[provider].title}
+            {provider ? UNLINK_PROVIDER_DIALOG_TEXTS[provider].title : ""}
           </AlertDialogTitle>
         </AlertDialogHeader>
 
         <AlertDialogDescription>
-          {provider === null ? "" : UNLINK_PROVIDER_DIALOG_TEXTS[provider].description}
+          {provider ? UNLINK_PROVIDER_DIALOG_TEXTS[provider].description : ""}
         </AlertDialogDescription>
 
-        {errorMessage === null ? null : (
+        {errorMessage ? (
           <p role="alert" className="text-sm text-destructive">
             {errorMessage}
           </p>
-        )}
+        ) : null}
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isSubmitting}>

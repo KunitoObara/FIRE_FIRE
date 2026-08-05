@@ -92,14 +92,14 @@ export const LinkedAccountsCard = (): JSX.Element => {
           ))}
         </ul>
 
-        {feedback === null ? null : (
+        {feedback ? (
           <p
             role={feedback.kind === "error" ? "alert" : "status"}
             className={feedback.kind === "error" ? "mt-4 text-sm text-destructive" : "mt-4 text-sm"}
           >
             {feedback.message}
           </p>
-        )}
+        ) : null}
 
         <p className="mt-4 text-xs text-muted-foreground">{LINKED_ACCOUNTS_NOTIFICATION_NOTICE}</p>
       </CardContent>

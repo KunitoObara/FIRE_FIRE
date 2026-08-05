@@ -124,7 +124,7 @@ export const linkGoogleAccount = async (): Promise<LinkGoogleResult> => {
   try {
     const user = getFirebaseAuth().currentUser;
 
-    if (user === null) {
+    if (!user) {
       return { ok: false, reason: "signed-out" };
     }
 
@@ -160,7 +160,7 @@ export const unlinkProvider = async (
   try {
     const user = getFirebaseAuth().currentUser;
 
-    if (user === null) {
+    if (!user) {
       return { ok: false, reason: "signed-out" };
     }
 

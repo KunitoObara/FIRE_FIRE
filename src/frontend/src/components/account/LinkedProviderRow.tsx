@@ -40,9 +40,9 @@ export const LinkedProviderRow = ({
 
       <div className="min-w-0">
         <p className="text-sm font-medium">{LINKED_PROVIDER_LABELS[provider.id]}</p>
-        {provider.email === null ? null : (
+        {provider.email ? (
           <p className="text-xs break-all text-muted-foreground">{provider.email}</p>
-        )}
+        ) : null}
       </div>
     </div>
 
