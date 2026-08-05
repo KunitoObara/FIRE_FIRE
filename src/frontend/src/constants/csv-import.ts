@@ -115,5 +115,15 @@ export const NO_IMPORT_HISTORY_LABEL = "取込履歴はまだありません。"
 /** 取込履歴の表示件数。「直近の取込履歴」なので種別ごとに最新のものが見えれば足りる */
 export const IMPORT_HISTORY_LIMIT = 5;
 
+/**
+ * B1が資産推移を組み立てるときに読む資産残高の上限件数。
+ *
+ * マネーフォワードの「資産推移」は当月が日次・それ以前は月末日のみなので、10年分でも
+ * 数百件にしかならない。上限は取込の上限(`MAX_ASSET_BALANCE_ROWS`)と揃え、日次で
+ * 蓄積し続けたアカウントでも読み込みが青天井にならないための歯止めとして置く。
+ * 新しい日付から順に読むため、上限に達しても切り落とされるのは古い側だけになる。
+ */
+export const ASSET_SNAPSHOT_SCAN_LIMIT = MAX_ASSET_BALANCE_ROWS;
+
 /** 取込履歴のキャッシュキー(TanStack Query) */
 export const IMPORT_HISTORY_QUERY_KEY = ["csv-imports"] as const;

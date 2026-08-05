@@ -17,6 +17,19 @@ import { z } from "zod";
 export const csvTableSchema = z.array(z.array(z.string()));
 
 /**
+ * 資産残高のドキュメント(`users/{uid}/assetSnapshots/{date}`)。
+ *
+ * `byType`のキーは資産種別名で、保有状況によって増減するため列挙できない。
+ * `firestore.rules`もマップであることしか検査できていない(繰り返しが書けないため)ので、
+ * 金額が数値かどうかは値を1件ずつ読む側で確かめる。ここでは`unknown`のまま受ける。
+ */
+export const assetSnapshotDocumentSchema = z.object({
+  date: z.string(),
+  total: z.number(),
+  byType: z.record(z.string(), z.unknown()),
+});
+
+/**
  * 取込履歴のドキュメント(`users/{uid}/csvImports/{importId}`)。
  *
  * 書き込むのはこのアプリ自身だが、`firestore.rules`が受け付ける形と読み出し側の期待が
