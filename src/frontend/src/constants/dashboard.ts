@@ -7,21 +7,6 @@ import {
   TRANSACTIONS_PATH,
 } from "@/constants/routes";
 
-/**
- * サンプルデータを表示するかどうか。
- *
- * B2 CSV取込・B4 資産分類マスタ・B8 FIRE目標がまだ無く、Firestoreに実データが存在しないため、
- * 画面の見た目を確認できるようサンプルデータを流し込んでいる。データの繋ぎ込みが済んだら
- * `false`にして`src/lib/dashboard/sample-data.ts`ごと外す。
- *
- * `false`にすると全ウィジェットが空状態(取込・設定への導線)になる。
- */
-export const USE_SAMPLE_DASHBOARD_DATA = true;
-
-/** サンプルデータ表示中であることを画面に明示する文言。実データと取り違えないためのもの */
-export const SAMPLE_DASHBOARD_DATA_NOTICE =
-  "表示中の数値はすべてサンプルです。CSV取込(B2)の実装後に実データへ切り替わります。";
-
 /** 表示期間切替の選択肢(docs/screen-requirements-dashboard.md B1) */
 export const DASHBOARD_PERIODS: DashboardPeriod[] = [
   { id: "1y", label: "1年", years: 1 },
@@ -93,3 +78,19 @@ export const CSV_IMPORT_LINK = { label: "CSVを取り込む", href: CSV_IMPORT_P
 
 /** 到達予測日が算出できていないときの表示 */
 export const NO_PROJECTED_DATE_LABEL = "算出できません";
+
+/** ダッシュボードの表示データのキャッシュキー(TanStack Query) */
+export const DASHBOARD_DATA_QUERY_KEY = ["dashboard-data"] as const;
+
+/**
+ * 表示データを取得できなかったときの文言。
+ *
+ * 取得に失敗した場合はウィジェットの空状態を出さない。データはあるのに「まだありません」と
+ * 読める表示になるのを避けるため、失敗は失敗として出す(B5 不動産一覧と同じ扱い)。
+ */
+export const DASHBOARD_FAILURE_MESSAGES: Record<FirestoreAccessFailureReason, string> = {
+  "signed-out": "ログイン状態が切れています。ログインし直してから表示してください。",
+  "configuration-error": "Firebaseの設定が読み込めないため表示できません。",
+  "permission-denied": "このデータの参照が許可されていません。ログインし直してください。",
+  unknown: "データを取得できませんでした。時間をおいて再度お試しください。",
+};

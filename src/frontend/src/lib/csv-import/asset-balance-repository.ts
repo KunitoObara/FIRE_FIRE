@@ -1,4 +1,5 @@
 import {
+  Timestamp,
   collection,
   doc,
   getDocs,
@@ -10,9 +11,13 @@ import {
   writeBatch,
 } from "firebase/firestore";
 
-import { FIRESTORE_BATCH_LIMIT, IMPORT_HISTORY_LIMIT } from "@/constants/csv-import";
+import {
+  ASSET_SNAPSHOT_SCAN_LIMIT,
+  FIRESTORE_BATCH_LIMIT,
+  IMPORT_HISTORY_LIMIT,
+} from "@/constants/csv-import";
 import { resolveFirestoreUserContext, toFirestoreFailureReason } from "@/lib/firebase/user-context";
-import { csvImportHistoryDocumentSchema } from "@/schemas/csv-import";
+import { assetSnapshotDocumentSchema, csvImportHistoryDocumentSchema } from "@/schemas/csv-import";
 
 import type { Firestore } from "firebase/firestore";
 
@@ -246,6 +251,105 @@ export const fetchLatestAssetBalances = async (): Promise<LatestAssetBalancesRes
     return { ok: true, balances };
   } catch (error) {
     console.error("資産種別ごとの残高を取得できませんでした", error);
+    return { ok: false, reason: toFirestoreFailureReason(error) };
+  }
+};
+
+/**
+ * 資産残高を日付の昇順で取得する(B1の資産推移グラフ・分類別内訳)。
+ *
+ * 分類軸ごとの集計は`byType`を資産種別で足し合わせて行うため、期間や分類軸で絞らず
+ * 蓄積分をまとめて読み、集計と期間の絞り込みは呼び出し側(`src/lib/dashboard`)で行う。
+ * 分類軸を切り替えるたびに読み直さずに済み、Firestoreの読み取り回数も1回で済む。
+ *
+ * 読む件数は`ASSET_SNAPSHOT_SCAN_LIMIT`で打ち切る。新しい日付から順に読むので、
+ * 上限に達した場合に欠けるのは古い側(「全期間」の左端)だけになる。
+ *
+ * 数値として読めない金額はその資産種別だけを飛ばす。1件の不整合で推移全体を空にする方が
+ * 情報が減るため(`fetchLatestAssetBalances`と同じ扱い)。
+ */
+export const fetchAssetSnapshots = async (): Promise<AssetSnapshotsResult> => {
+  const context = resolveFirestoreUserContext();
+
+  if (!context.ok) {
+    return context;
+  }
+
+  try {
+    const snapshot = await getDocs(
+      query(
+        assetSnapshotsRef(context.firestore, context.uid),
+        orderBy("date", "desc"),
+        limit(ASSET_SNAPSHOT_SCAN_LIMIT),
+      ),
+    );
+
+    const snapshots = snapshot.docs.flatMap((document) => {
+      const parsed = assetSnapshotDocumentSchema.safeParse(document.data());
+
+      if (!parsed.success) {
+        console.error("資産残高を解釈できませんでした", document.id, parsed.error.issues);
+        return [];
+      }
+
+      const byType = Object.entries(parsed.data.byType).flatMap(([assetTypeName, amount]) => {
+        if (typeof amount !== "number") {
+          console.error("資産種別の残高を解釈できませんでした", document.id, assetTypeName);
+          return [];
+        }
+
+        return [[assetTypeName, amount] as const];
+      });
+
+      return [
+        { date: parsed.data.date, total: parsed.data.total, byType: Object.fromEntries(byType) },
+      ];
+    });
+
+    // 取得は新しい順(上限を新しい側から数えるため)だが、推移は古い順に描くので並べ直す
+    snapshots.reverse();
+
+    return { ok: true, snapshots };
+  } catch (error) {
+    console.error("資産残高を取得できませんでした", error);
+    return { ok: false, reason: toFirestoreFailureReason(error) };
+  }
+};
+
+/**
+ * 直近CSV取込日時を取得する(B1の表示項目「直近CSV取込日時」)。
+ *
+ * B2の履歴一覧(`fetchImportHistory`)と同じコレクションだが、B1が要るのは最新の1件の
+ * 日時だけなので、表示件数分を読まずに`limit(1)`で引く。
+ *
+ * 書き込み直後は`importedAt`のサーバー時刻がまだ確定していないことがあるため、
+ * 日時が読めない場合は未取込と同じ`null`に倒す。次の取得では確定した値が返る。
+ */
+export const fetchLastImportedAt = async (): Promise<LastImportedAtResult> => {
+  const context = resolveFirestoreUserContext();
+
+  if (!context.ok) {
+    return context;
+  }
+
+  try {
+    const snapshot = await getDocs(
+      query(csvImportsRef(context.firestore, context.uid), orderBy("importedAt", "desc"), limit(1)),
+    );
+    const latest = snapshot.docs[0];
+
+    if (latest === undefined) {
+      return { ok: true, lastImportedAt: null };
+    }
+
+    const importedAt: unknown = latest.get("importedAt");
+
+    return {
+      ok: true,
+      lastImportedAt: importedAt instanceof Timestamp ? importedAt.toDate().toISOString() : null,
+    };
+  } catch (error) {
+    console.error("直近CSV取込日時を取得できませんでした", error);
     return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };
