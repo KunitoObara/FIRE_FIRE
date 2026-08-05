@@ -425,6 +425,12 @@ declare global {
    */
   type AccountLinkFormValues = z.infer<typeof accountLinkSchema>;
 
+  /** GoogleのブランドマークのProps。大きさだけ呼び出し側で変えられるようにする */
+  type GoogleIconProps = {
+    /** Tailwindのサイズ指定。省略時はボタン内に置く前提の`size-4` */
+    className?: string;
+  };
+
   /** A1・A4共通の「Googleで続ける」ボタンのProps(docs/screen-requirements-auth.md 2章) */
   type GoogleSignInButtonProps = {
     /**
