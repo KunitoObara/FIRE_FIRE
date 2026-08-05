@@ -55,11 +55,11 @@ export const buildAxisNetWorthSeries = (
   const byMonth = new Map<string, AssetSnapshot>();
 
   // 呼び出し側の並び順に依存しないよう、ここで日付の昇順に並べ直してから畳み込む
-  const ordered = [...snapshots].sort((left, right) => left.date.localeCompare(right.date));
-
-  for (const snapshot of ordered) {
-    byMonth.set(format(parseISO(snapshot.date), MONTH_KEY_FORMAT), snapshot);
-  }
+  [...snapshots]
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .forEach((snapshot) => {
+      byMonth.set(format(parseISO(snapshot.date), MONTH_KEY_FORMAT), snapshot);
+    });
 
   return [...byMonth.values()].map((snapshot) => ({
     date: snapshot.date,
@@ -99,8 +99,8 @@ export const buildAxisBreakdown = (
  * もう保有していない種別が色スロット(8つ)を占め、現在の内訳が「その他」に押し出される。
  */
 export const collectAssetCategories = (snapshot: AssetSnapshot | undefined): AssetCategory[] =>
-  snapshot === undefined
-    ? []
-    : Object.keys(snapshot.byType)
+  snapshot
+    ? Object.keys(snapshot.byType)
         .sort((left, right) => left.localeCompare(right, "ja"))
-        .map((assetTypeName) => ({ id: assetTypeName, name: assetTypeName }));
+        .map((assetTypeName) => ({ id: assetTypeName, name: assetTypeName }))
+    : [];

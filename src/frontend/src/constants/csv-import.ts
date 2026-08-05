@@ -119,11 +119,14 @@ export const IMPORT_HISTORY_LIMIT = 5;
  * B1が資産推移を組み立てるときに読む資産残高の上限件数。
  *
  * マネーフォワードの「資産推移」は当月が日次・それ以前は月末日のみなので、10年分でも
- * 数百件にしかならない。上限は取込の上限(`MAX_ASSET_BALANCE_ROWS`)と揃え、日次で
- * 蓄積し続けたアカウントでも読み込みが青天井にならないための歯止めとして置く。
- * 新しい日付から順に読むため、上限に達しても切り落とされるのは古い側だけになる。
+ * 数百件にしかならない。日次で蓄積し続けたアカウントでも読み込みが青天井にならないための
+ * 歯止めとして置く。新しい日付から順に読むため、上限に達しても切り落とされるのは古い側だけ。
+ *
+ * 値は現状`MAX_ASSET_BALANCE_ROWS`と同じだが、そちらを参照せず独立した定数にしてある。
+ * 前者は「1回のCSV取込で許容する行数」(パース時のガード)、こちらは「蓄積済みの資産残高を
+ * 読み返す件数」(表示時の読み取りコストのガード)で、変えたくなる理由が別々のため。
  */
-export const ASSET_SNAPSHOT_SCAN_LIMIT = MAX_ASSET_BALANCE_ROWS;
+export const ASSET_SNAPSHOT_SCAN_LIMIT = 20_000;
 
 /** 取込履歴のキャッシュキー(TanStack Query) */
 export const IMPORT_HISTORY_QUERY_KEY = ["csv-imports"] as const;
