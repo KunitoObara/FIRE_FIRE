@@ -14,6 +14,9 @@ const fetchRecoveryCodeStatus = vi.fn();
 const issueRecoveryCodes = vi.fn();
 const resetMfaEnrollment = vi.fn();
 const downloadRecoveryCodes = vi.fn();
+const getLinkedProviders = vi.fn<() => LinkedProviderStatus[]>();
+const linkGoogleAccount = vi.fn();
+const unlinkProvider = vi.fn();
 const replace = vi.fn();
 
 vi.mock("@/lib/firebase/client", () => ({
@@ -41,11 +44,23 @@ vi.mock("@/lib/auth/recovery-code-file", () => ({
   downloadRecoveryCodes: (...args: unknown[]) => downloadRecoveryCodes(...args),
 }));
 
+vi.mock("@/lib/auth/linked-providers", () => ({
+  getLinkedProviders: () => getLinkedProviders(),
+  linkGoogleAccount: () => linkGoogleAccount(),
+  unlinkProvider: (...args: unknown[]) => unlinkProvider(...args),
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
 }));
 
 const CODES = ["7F2K-9QRT", "M3XZ-2LDS"];
+
+/** 連携状況。パスワードとGoogleの両方が連携済みの状態を既定にする */
+const linkedProviders = (google: boolean, password = true): LinkedProviderStatus[] => [
+  { id: "password", isLinked: password, email: password ? "taro.yamada@example.com" : null },
+  { id: "google.com", isLinked: google, email: google ? "taro.yamada@gmail.com" : null },
+];
 
 const renderScreen = (): RenderResult =>
   render(
@@ -82,13 +97,17 @@ describe("AccountSettingsScreen", () => {
     });
     issueRecoveryCodes.mockResolvedValue({ ok: true, codes: CODES });
     resetMfaEnrollment.mockResolvedValue({ ok: true });
+    getLinkedProviders.mockReturnValue(linkedProviders(true));
+    linkGoogleAccount.mockResolvedValue({ ok: true });
+    unlinkProvider.mockResolvedValue({ ok: true });
   });
 
   describe("アカウント情報", () => {
     it("登録メールアドレスと2FA設定状況を表示する", async () => {
       renderScreen();
 
-      expect(await screen.findByText("taro.yamada@example.com")).toBeInTheDocument();
+      // 「ログイン方法」のパスワード行にも同じアドレスが出るため、ここでは件数を問わない
+      expect(await screen.findAllByText("taro.yamada@example.com")).not.toHaveLength(0);
       expect(screen.getByText("有効")).toBeInTheDocument();
     });
 
@@ -247,11 +266,129 @@ describe("AccountSettingsScreen", () => {
     });
   });
 
-  /** 連携アカウントの管理はTrelloカード [A8-2] のスコープ */
-  it("ログイン方法(Google連携)のセクションは出さない", async () => {
-    renderScreen();
+  describe("ログイン方法", () => {
+    it("連携状況とGoogleアカウントのメールアドレスを表示する", async () => {
+      renderScreen();
 
-    await screen.findByText("taro.yamada@example.com");
-    expect(screen.queryByText("ログイン方法")).not.toBeInTheDocument();
+      expect(await screen.findByText("ログイン方法")).toBeInTheDocument();
+      expect(screen.getByText("メールアドレス / パスワード")).toBeInTheDocument();
+      expect(screen.getByText("Google")).toBeInTheDocument();
+      expect(screen.getByText("taro.yamada@gmail.com")).toBeInTheDocument();
+      expect(screen.getAllByText("連携済み")).toHaveLength(2);
+    });
+
+    /** 通知メールの宛先は連携したGoogleアカウントではなく登録メールアドレスのまま(要件の制約) */
+    it("ログイン通知メールの宛先が変わらない旨を注記する", async () => {
+      renderScreen();
+
+      expect(
+        await screen.findByText(/ログイン通知メールの宛先は、連携したGoogleアカウント/),
+      ).toBeInTheDocument();
+    });
+
+    it("未連携なら連携ボタンを出し、成功したら画面内にメッセージを出す", async () => {
+      const user = userEvent.setup();
+      getLinkedProviders.mockReturnValue(linkedProviders(false));
+      renderScreen();
+
+      expect(await screen.findByText("未連携")).toBeInTheDocument();
+
+      getLinkedProviders.mockReturnValue(linkedProviders(true));
+      await user.click(screen.getByRole("button", { name: "Googleと連携する" }));
+
+      expect(await screen.findByText(/Googleアカウントを連携しました/)).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    /** 別のFIRE-FIREアカウントで使用済みのGoogleアカウントは連携できない(要件の制約) */
+    it("連携先が別アカウントで使用済みならエラーを画面内に出す", async () => {
+      const user = userEvent.setup();
+      getLinkedProviders.mockReturnValue(linkedProviders(false));
+      linkGoogleAccount.mockResolvedValue({ ok: false, reason: "credential-already-in-use" });
+      renderScreen();
+
+      await user.click(await screen.findByRole("button", { name: "Googleと連携する" }));
+
+      expect(
+        await screen.findByText(/このGoogleアカウントは別のアカウントで既に使用されています/),
+      ).toBeInTheDocument();
+    });
+
+    /** ポップアップを自分で閉じたのは取りやめであって失敗ではない */
+    it("ポップアップを閉じただけならエラーを出さない", async () => {
+      const user = userEvent.setup();
+      getLinkedProviders.mockReturnValue(linkedProviders(false));
+      linkGoogleAccount.mockResolvedValue({ ok: false, reason: "popup-closed" });
+      renderScreen();
+
+      await user.click(await screen.findByRole("button", { name: "Googleと連携する" }));
+
+      await waitFor(() => {
+        expect(linkGoogleAccount).toHaveBeenCalled();
+      });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("確認ダイアログを経て解除し、画面内にメッセージを出す", async () => {
+      const user = userEvent.setup();
+      renderScreen();
+
+      await user.click(await screen.findByRole("button", { name: "Googleの連携を解除" }));
+      expect(
+        screen.getByRole("heading", { name: "Googleとの連携を解除しますか?" }),
+      ).toBeInTheDocument();
+
+      getLinkedProviders.mockReturnValue(linkedProviders(false));
+      await user.click(screen.getByRole("button", { name: "解除する" }));
+
+      await waitFor(() => {
+        expect(unlinkProvider).toHaveBeenCalledWith("google.com");
+      });
+      expect(await screen.findByText(/Googleでの連携を解除しました/)).toBeInTheDocument();
+    });
+
+    /** パスワードの解除は戻せないため、失うものをダイアログで伝える */
+    it("パスワードの解除では復旧手段を失う旨を確認ダイアログに出す", async () => {
+      const user = userEvent.setup();
+      renderScreen();
+
+      await user.click(
+        await screen.findByRole("button", { name: "メールアドレス / パスワードの連携を解除" }),
+      );
+
+      expect(
+        screen.getByRole("heading", {
+          name: "メールアドレス / パスワードでのログインを解除しますか?",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/2FAの再設定・リカバリーコードの発行・リカバリーコードでの復旧も使えなく/),
+      ).toBeInTheDocument();
+    });
+
+    it("解除に失敗したらダイアログを閉じずにエラーを出す", async () => {
+      const user = userEvent.setup();
+      unlinkProvider.mockResolvedValue({ ok: false, reason: "requires-recent-login" });
+      renderScreen();
+
+      await user.click(await screen.findByRole("button", { name: "Googleの連携を解除" }));
+      await user.click(screen.getByRole("button", { name: "解除する" }));
+
+      expect(await screen.findByText(/ログインし直してから解除してください/)).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "Googleとの連携を解除しますか?" }),
+      ).toBeInTheDocument();
+    });
+
+    /** 要件の制約「最後に残った1つのログイン方法は解除できない」 */
+    it("ログイン方法が1つだけなら解除ボタンを無効化し、理由を併記する", async () => {
+      getLinkedProviders.mockReturnValue(linkedProviders(false));
+      renderScreen();
+
+      expect(
+        await screen.findByRole("button", { name: "メールアドレス / パスワードの連携を解除" }),
+      ).toBeDisabled();
+      expect(screen.getByText("唯一のログイン方法のため解除できません")).toBeInTheDocument();
+    });
   });
 });

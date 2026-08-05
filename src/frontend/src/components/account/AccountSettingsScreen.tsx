@@ -2,6 +2,7 @@
 
 import { AccountInfoCard } from "@/components/account/AccountInfoCard";
 import { AccountPasswordCard } from "@/components/account/AccountPasswordCard";
+import { LinkedAccountsCard } from "@/components/account/LinkedAccountsCard";
 import { MfaResetCard } from "@/components/account/MfaResetCard";
 import { RecoveryCodeCard } from "@/components/account/RecoveryCodeCard";
 import { hasEnrolledTotp } from "@/lib/auth/mfa-enrollment";
@@ -16,9 +17,9 @@ import type { JSX } from "react";
  * 現在のユーザーから引くため、Client Componentにしている。`AppAccessGuard`が
  * readyと判定した後にしか描画されないので、ここでの`currentUser`はサインイン済みを指す。
  *
- * 「ログイン方法」(Google連携の確認・追加・解除)はこの画面の要件に含まれるが、
- * Trelloカード [A8-2] 連携アカウント管理(B10)の範囲のためここでは扱わない
- * (docs/screen-requirements-account.md「連携アカウントの管理」の注記)。
+ * セクションの並びはモック(src/frontend/docs/html_mock/b10-account-settings.html)に合わせ、
+ * ログイン手段そのものの話(アカウント情報・パスワード・ログイン方法)を先に、
+ * 2FA関連(リカバリーコード・再設定)を後に置く。
  */
 export const AccountSettingsScreen = (): JSX.Element => {
   const user = getFirebaseAuth().currentUser;
@@ -30,6 +31,7 @@ export const AccountSettingsScreen = (): JSX.Element => {
         isMfaEnrolled={user === null ? false : hasEnrolledTotp(user)}
       />
       <AccountPasswordCard email={user?.email ?? null} />
+      <LinkedAccountsCard />
       <RecoveryCodeCard />
       <MfaResetCard />
     </div>
