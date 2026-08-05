@@ -30,6 +30,37 @@ declare global {
     byType: Record<string, number>;
   };
 
+  /**
+   * Firestoreに保存された資産残高の1日分(`users/{uid}/assetSnapshots/{date}`)。
+   *
+   * 中身は`AssetBalanceRow`と同じだが、CSVの1行(取込前)と保存済みの1日分(取込後)は
+   * 出所が違う。B1が読むのは後者だけなので、型を分けて取り違えを防ぐ。
+   */
+  type AssetSnapshot = {
+    /** 集計日(`yyyy-MM-dd`)。ドキュメントIDと同じ値 */
+    date: string;
+    /** CSVの「合計（円）」列の値 */
+    total: number;
+    /** 資産種別名をキーにした金額 */
+    byType: Record<string, number>;
+  };
+
+  /**
+   * 資産残高の取得結果(B1の資産推移グラフ・分類別内訳)。
+   *
+   * CSVを一度も取り込んでいないアカウントでは1件も無いため、失敗ではなく空配列を返す。
+   */
+  type AssetSnapshotsResult =
+    { ok: true; snapshots: AssetSnapshot[] } | { ok: false; reason: FirestoreAccessFailureReason };
+
+  /**
+   * 直近CSV取込日時の取得結果(B1の表示項目)。
+   * 未取込は失敗ではなく`lastImportedAt: null`で返す。
+   */
+  type LastImportedAtResult =
+    | { ok: true; lastImportedAt: string | null }
+    | { ok: false; reason: FirestoreAccessFailureReason };
+
   /** パースに成功した資産残高推移CSVの中身 */
   type AssetBalanceParsed = {
     /** CSVから検出した資産種別名。列の並び順を保つ(合計列は含まない) */

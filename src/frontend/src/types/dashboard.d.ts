@@ -31,9 +31,12 @@ declare global {
     name: string;
   };
 
-  /** 資産推移グラフの1点 */
+  /** 資産推移グラフの1点(月に1点) */
   type NetWorthPoint = {
-    /** 集計月の初日(`yyyy-MM-dd`) */
+    /**
+     * その月を代表する集計日(`yyyy-MM-dd`)。
+     * 月内でいちばん新しい資産残高の日付をそのまま使う(`buildAxisNetWorthSeries`)
+     */
     date: string;
     amount: number;
   };
@@ -98,6 +101,28 @@ declare global {
     byAxis: Record<string, AssetAxisData>;
     fireProgress: FireProgress | null;
     cashflow: CashflowSummary | null;
+  };
+
+  /**
+   * B1の表示データの取得結果。
+   *
+   * 「まだデータが無い」は失敗ではなく、空の`DashboardData`として`ok: true`で返る。
+   * 失敗は取得そのものができなかった場合だけを指す。
+   */
+  type DashboardDataResult =
+    { ok: true; data: DashboardData } | { ok: false; reason: FirestoreAccessFailureReason };
+
+  /**
+   * B1本体のProps。
+   *
+   * 分類軸・表示期間はURLのクエリパラメータで受け取る。`useSearchParams`はSuspense境界を
+   * 要求するため、値の取り出しはServer Component側(page.tsx)で行う(A7と同じ形)。
+   * 分類軸IDの妥当性はFirestoreから取得した分類軸が揃ってからでないと判断できないので、
+   * ここでは生の値のまま受ける。
+   */
+  type DashboardScreenProps = {
+    axisParam: string | string[] | undefined;
+    periodParam: string | string[] | undefined;
   };
 
   /** 分類軸・表示期間の切替UIのProps */
