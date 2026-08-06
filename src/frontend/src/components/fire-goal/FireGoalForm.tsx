@@ -159,7 +159,7 @@ export const FireGoalForm = ({
             タブ見出しより前に出す。読み上げは`FieldError`(role="alert")と競合しないよう
             polite(role="status")にし、インラインエラーの読み上げを妨げない。
           */}
-          {hiddenTabNotice !== null ? (
+          {hiddenTabNotice ? (
             <p
               role="status"
               className="mb-6 rounded-md border border-destructive/50 px-4 py-3 text-sm text-destructive"
@@ -214,7 +214,7 @@ export const FireGoalForm = ({
                     {...register("targetAmount")}
                   />
                   <FieldError errors={[errors.targetAmount]} />
-                  {directAchievementHint !== null ? (
+                  {directAchievementHint ? (
                     <FieldDescription>{directAchievementHint}</FieldDescription>
                   ) : null}
                 </Field>
@@ -259,14 +259,15 @@ export const FireGoalForm = ({
                 </Field>
 
                 {/*
-                  金額・達成率は`0`が正当な値なので、`!== null`で判定する。truthyかどうかで
-                  書くと、算出結果が0円のときにこの表示ごと消える(CODING_STANDARDS.md 2章)
+                  算出結果は数値なので`!== null`で判定する。`0`が正当な値であり、truthyかどうかで
+                  書くと年間支出額0円のときに表示ごと消える(CODING_STANDARDS.md 2章)。
+                  文言(達成率のヒント等)は空文字を取らないのでtruthyで判定してよい
                 */}
                 {calculatedTarget !== null ? (
                   <p className="rounded-md bg-muted px-4 py-3 text-sm">
                     {FIRE_GOAL_CALCULATED_TARGET_LABEL}{" "}
                     <strong className="tabular-nums">{formatJpy(calculatedTarget)}</strong>
-                    {reverseAchievementHint !== null ? (
+                    {reverseAchievementHint ? (
                       <span className="text-muted-foreground">({reverseAchievementHint})</span>
                     ) : null}
                   </p>
@@ -275,7 +276,7 @@ export const FireGoalForm = ({
             </TabsContent>
           </Tabs>
 
-          {saveError !== null ? (
+          {saveError ? (
             <p role="alert" className="mt-6 text-sm text-destructive">
               {saveError}
             </p>
