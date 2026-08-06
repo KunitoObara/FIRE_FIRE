@@ -289,7 +289,7 @@ export const MfaSetupForm = (): JSX.Element => {
             もう一度発行しても本人確認を求められて同じ理由で失敗する(A3にパスワード欄は無い)。
             押せば直るように見える導線を残さず、B10での再発行に委ねる
           */}
-          {state.reason === "password-required" ? null : (
+          {state.reason !== "password-required" ? (
             <Button
               type="button"
               variant="outline"
@@ -298,7 +298,7 @@ export const MfaSetupForm = (): JSX.Element => {
             >
               リカバリーコードを再発行する
             </Button>
-          )}
+          ) : null}
 
           <Button asChild className="mt-3 w-full">
             <Link href={DASHBOARD_PATH}>開始する</Link>

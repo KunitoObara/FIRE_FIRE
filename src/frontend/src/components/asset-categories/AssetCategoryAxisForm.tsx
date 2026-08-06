@@ -84,11 +84,11 @@ export const AssetCategoryAxisForm = ({
             aria-invalid={nameError !== null}
             onChange={(event) => setName(event.target.value)}
           />
-          {nameError === null ? null : (
+          {nameError ? (
             <p role="alert" className="text-sm text-destructive">
               {nameError}
             </p>
-          )}
+          ) : null}
         </FieldContent>
       </Field>
 
@@ -118,11 +118,11 @@ export const AssetCategoryAxisForm = ({
         )}
       </div>
 
-      {submitError === null ? null : (
+      {submitError ? (
         <p role="alert" className="text-sm text-destructive">
           {submitError}
         </p>
-      )}
+      ) : null}
 
       <div className="flex gap-3">
         <Button

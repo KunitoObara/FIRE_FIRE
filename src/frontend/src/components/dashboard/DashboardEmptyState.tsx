@@ -13,10 +13,10 @@ import type { JSX } from "react";
 export const DashboardEmptyState = ({ message, action }: DashboardEmptyStateProps): JSX.Element => (
   <div className="flex flex-col items-start gap-3 py-6">
     <p className="text-sm text-muted-foreground">{message}</p>
-    {action === undefined ? null : (
+    {action ? (
       <Button asChild variant="outline" size="sm">
         <Link href={action.href}>{action.label}</Link>
       </Button>
-    )}
+    ) : null}
   </div>
 );

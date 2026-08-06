@@ -183,16 +183,16 @@ export const AssetBalanceImportPanel = ({
           </p>
         ) : null}
 
-        {errorMessage === null ? null : (
+        {errorMessage ? (
           <div
             role="alert"
             className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
           >
             {errorMessage}
           </div>
-        )}
+        ) : null}
 
-        {parsed === null ? null : (
+        {parsed ? (
           <div className="flex flex-col gap-4">
             <div
               role="status"
@@ -205,13 +205,13 @@ export const AssetBalanceImportPanel = ({
                   {parsed.periodFrom}〜{parsed.periodTo}
                 </span>
                 )
-                {plan === null ? null : (
+                {plan ? (
                   <>
                     {" / "}
                     新規 <span className="tabular-nums">{plan.newCount}件</span>・上書き{" "}
                     <span className="tabular-nums">{plan.updatedCount}件</span>
                   </>
-                )}
+                ) : null}
               </p>
               <p className="mt-1 text-muted-foreground">
                 資産種別: {parsed.assetTypes.length === 0 ? "なし" : parsed.assetTypes.join("、")}
@@ -241,7 +241,7 @@ export const AssetBalanceImportPanel = ({
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );
