@@ -76,12 +76,12 @@ export const GoogleSignInButton = ({
       </Button>
 
       {/* 押せない理由(A1の規約未同意)は、ポップアップを開く前に分かるようボタンの下に出す */}
-      {blockedReason === undefined ? null : (
+      {blockedReason ? (
         <p className="mt-2 text-center text-sm text-muted-foreground">{blockedReason}</p>
-      )}
+      ) : null}
 
       <p role="alert" className="mt-2 min-h-5 text-center text-sm text-destructive">
-        {failure === null ? null : GOOGLE_SIGN_IN_MESSAGES[failure]}
+        {failure ? GOOGLE_SIGN_IN_MESSAGES[failure] : null}
       </p>
     </div>
   );

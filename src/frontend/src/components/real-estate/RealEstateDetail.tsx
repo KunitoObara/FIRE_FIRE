@@ -193,7 +193,7 @@ export const RealEstateDetail = ({ property }: RealEstateDetailProps): JSX.Eleme
     </div>
 
     <RealEstateValuationCard property={property} />
-    {property.rental === undefined ? null : <RealEstateRentalCard rental={property.rental} />}
+    {property.rental ? <RealEstateRentalCard rental={property.rental} /> : null}
     <RealEstateBasicInfoCard property={property} />
   </div>
 );
