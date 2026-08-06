@@ -107,12 +107,15 @@ export const FIRE_GOAL_WITHDRAWAL_RATE_RANGE_MESSAGE = `逆算係数は0より�
  * そのため切替後は「未使用の欄」ではなくなっており、文言も「未使用の入力です」ではなく
  * 何が起きたのかを説明する形にしてある。逆算の入力を使わずに保存し直す道も要るので、
  * 元のタブに戻して消す方法まで書く。
+ *
+ * 後半の手順は**実際に操作できる順**に並べる。誤りのある欄が見えているのは切替先のタブに
+ * いる間だけなので、「元のタブに戻してから消す」と書くと、そのままでは実行できない順序になる。
  */
 export const buildFireGoalHiddenTabNoticeMessage = (
   previousLabel: string,
   erroredLabel: string,
 ): string =>
-  `「${previousLabel}」で保存しようとしましたが、表示していなかった「${erroredLabel}」の入力に誤りがあるため保存できません。誤りを直すか、「${previousLabel}」に戻して「${erroredLabel}」の入力を消してから保存してください。`;
+  `「${previousLabel}」で保存しようとしましたが、表示していなかった「${erroredLabel}」の入力に誤りがあるため保存できません。誤りを直すか、「${erroredLabel}」の入力を消してから「${previousLabel}」に戻って保存してください。`;
 
 /** 「保存」ボタンのラベル */
 export const FIRE_GOAL_SUBMIT_LABEL = "保存";

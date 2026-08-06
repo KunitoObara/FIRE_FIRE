@@ -45,7 +45,7 @@ const typoInHiddenReverseTab = async (user: ReturnType<typeof userEvent.setup>):
 
 /** 切り替えの説明。文言そのものが対応内容なので、定数を参照せず期待値を直接書く */
 const hiddenTabNoticeText =
-  "「直接入力」で保存しようとしましたが、表示していなかった「年間支出額から逆算」の入力に誤りがあるため保存できません。誤りを直すか、「直接入力」に戻して「年間支出額から逆算」の入力を消してから保存してください。";
+  "「直接入力」で保存しようとしましたが、表示していなかった「年間支出額から逆算」の入力に誤りがあるため保存できません。誤りを直すか、「年間支出額から逆算」の入力を消してから「直接入力」に戻って保存してください。";
 
 describe("FireGoalForm", () => {
   beforeEach(() => {
@@ -193,6 +193,29 @@ describe("FireGoalForm", () => {
     await user.click(modeTab("直接入力"));
 
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  /** 説明文が案内する操作順(誤りのある欄を消す → 元のタブに戻る → 保存)が実際に通ること */
+  it("切り替え先の入力を消して元のタブに戻れば、元の方式のまま保存できる", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await typoInHiddenReverseTab(user);
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByRole("status")).toBeInTheDocument();
+
+    await user.clear(annualExpenseInput());
+    await user.click(modeTab("直接入力"));
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        mode: "direct",
+        targetAmount: 80_000_000,
+        annualExpense: null,
+        withdrawalRate: 4,
+      });
+    });
   });
 
   it("誤りを直して保存できたときは、切り替えの説明は消える", async () => {
