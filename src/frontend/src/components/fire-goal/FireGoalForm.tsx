@@ -11,12 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildFireGoalAchievementHint,
+  buildFireGoalHiddenTabNoticeMessage,
   FIRE_GOAL_AMOUNT_PATTERN,
   FIRE_GOAL_ANNUAL_EXPENSE_LABEL,
   FIRE_GOAL_CALCULATED_TARGET_LABEL,
   FIRE_GOAL_DIRECT_DESCRIPTION,
   FIRE_GOAL_FAILURE_MESSAGES,
   FIRE_GOAL_FIELDS,
+  FIRE_GOAL_MODE_LABELS,
   FIRE_GOAL_MODES,
   FIRE_GOAL_REVERSE_DESCRIPTION,
   FIRE_GOAL_SUBMIT_LABEL,
@@ -66,6 +68,9 @@ export const FireGoalForm = ({
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // 表示していなかったタブのエラーで保存が止まり、こちらからタブを切り替えたときだけ出す説明。
+  // タブが勝手に切り替わった理由が画面から読み取れないため添える
+  const [hiddenTabNotice, setHiddenTabNotice] = useState<string | null>(null);
 
   // `watch()`はReact Compilerがメモ化できないため、購読には`useWatch`を使う
   const mode = useWatch({ control, name: "mode" });
@@ -90,7 +95,7 @@ export const FireGoalForm = ({
 
     const rate = calculateAchievementRate(currentAssetTotal, target);
 
-    return rate === null ? null : buildFireGoalAchievementHint(formatPercent(rate));
+    return rate !== null ? buildFireGoalAchievementHint(formatPercent(rate)) : null;
   };
 
   const directAchievementHint = achievementHint(
@@ -100,6 +105,7 @@ export const FireGoalForm = ({
 
   const handleValidSubmit = async (values: FireGoalFormValues): Promise<void> => {
     setSaveError(null);
+    setHiddenTabNotice(null);
     setSaving(true);
 
     const result = await onSubmit(toFireGoal(values));
@@ -120,22 +126,48 @@ export const FireGoalForm = ({
    * 非表示タブの欄も、入力されている以上は形式を検証する(`fireGoalFormSchema`)。
    * 切り替えずに黙って止めると、押しても何も起きないボタンになるため。
    * 切り替えた先が保存される設定方式になるが、それは画面に見えているタブと一致する。
+   *
+   * 切り替えたときは、なぜそのタブに飛ばされたのかが分かる説明を添える。インラインエラーだけでは
+   * 「使うつもりのない方の入力が保存を止めている」ことが読み取れないため。
    */
   const handleInvalidSubmit = (formErrors: FieldErrors<FireGoalFormValues>): void => {
     const errored = FIRE_GOAL_FIELDS.filter((field) => formErrors[field.name] !== undefined);
     const hidden = errored.find((field) => field.mode !== mode);
 
     if (hidden === undefined || errored.some((field) => field.mode === mode)) {
+      // 表示中のタブにもエラーがあるなら、そのインラインエラーがそのまま理由になる
+      setHiddenTabNotice(null);
+
       return;
     }
 
     setValue("mode", hidden.mode);
+    setHiddenTabNotice(
+      buildFireGoalHiddenTabNoticeMessage(
+        FIRE_GOAL_MODE_LABELS[mode],
+        FIRE_GOAL_MODE_LABELS[hidden.mode],
+      ),
+    );
   };
 
   return (
     <Card className="max-w-2xl">
       <CardContent>
         <form noValidate onSubmit={handleSubmit(handleValidSubmit, handleInvalidSubmit)}>
+          {/*
+            タブの上に置く。切り替わったこと自体への補足なので、切替先のパネルの中ではなく
+            タブ見出しより前に出す。読み上げは`FieldError`(role="alert")と競合しないよう
+            polite(role="status")にし、インラインエラーの読み上げを妨げない。
+          */}
+          {hiddenTabNotice ? (
+            <p
+              role="status"
+              className="mb-6 rounded-md border border-destructive/50 px-4 py-3 text-sm text-destructive"
+            >
+              {hiddenTabNotice}
+            </p>
+          ) : null}
+
           <Tabs
             value={mode}
             onValueChange={(value) => {
@@ -145,6 +177,9 @@ export const FireGoalForm = ({
 
               if (selected !== undefined) {
                 setValue("mode", selected.id);
+                // 自分でタブを選び直した時点で「勝手に切り替わった」説明は用済み。
+                // 残すと、いま見ているタブと合わない案内が出たままになる
+                setHiddenTabNotice(null);
               }
             }}
             className="gap-6"
@@ -179,9 +214,9 @@ export const FireGoalForm = ({
                     {...register("targetAmount")}
                   />
                   <FieldError errors={[errors.targetAmount]} />
-                  {directAchievementHint === null ? null : (
+                  {directAchievementHint ? (
                     <FieldDescription>{directAchievementHint}</FieldDescription>
-                  )}
+                  ) : null}
                 </Field>
               </FieldGroup>
             </TabsContent>
@@ -223,24 +258,29 @@ export const FireGoalForm = ({
                   <FieldDescription>{FIRE_GOAL_WITHDRAWAL_RATE_HINT}</FieldDescription>
                 </Field>
 
-                {calculatedTarget === null ? null : (
+                {/*
+                  算出結果は数値なので`!== null`で判定する。`0`が正当な値であり、truthyかどうかで
+                  書くと年間支出額0円のときに表示ごと消える(CODING_STANDARDS.md 2章)。
+                  文言(達成率のヒント等)は空文字を取らないのでtruthyで判定してよい
+                */}
+                {calculatedTarget !== null ? (
                   <p className="rounded-md bg-muted px-4 py-3 text-sm">
                     {FIRE_GOAL_CALCULATED_TARGET_LABEL}{" "}
                     <strong className="tabular-nums">{formatJpy(calculatedTarget)}</strong>
-                    {reverseAchievementHint === null ? null : (
+                    {reverseAchievementHint ? (
                       <span className="text-muted-foreground">({reverseAchievementHint})</span>
-                    )}
+                    ) : null}
                   </p>
-                )}
+                ) : null}
               </FieldGroup>
             </TabsContent>
           </Tabs>
 
-          {saveError === null ? null : (
+          {saveError ? (
             <p role="alert" className="mt-6 text-sm text-destructive">
               {saveError}
             </p>
-          )}
+          ) : null}
 
           <Button type="submit" className="mt-6" disabled={saving}>
             {saving ? FIRE_GOAL_SUBMITTING_LABEL : FIRE_GOAL_SUBMIT_LABEL}
