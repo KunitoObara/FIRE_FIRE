@@ -303,6 +303,28 @@ done
 - ロールが `roles/secretmanager.admin` なのは、firebase-tools がデプロイ時にシークレットを読むだけでなく、**関数の実行用サービスアカウントへ `roles/secretmanager.secretAccessor` を自動付与する**（`setIamPolicy` を呼ぶ）ため。`viewer` や `secretVersionManager` には `setIamPolicy` が無く、2回目のエラーになる
 - gcloud を使わない場合は Cloud Console → Secret Manager → 対象シークレット → 権限 → アクセスを許可 で、上記のプリンシパルに「Secret Manager 管理者」を付与しても同じ
 
+### Cloud Functions 用のシークレット（`RESEND_API_KEY`）
+
+ログイン通知メール（[auth-login-requirements.md](./auth-login-requirements.md) 3.6）は Resend の HTTP API から送る。その API キーを登録する。**登録しないと functions のデプロイが「シークレットが存在しない」で失敗する。** キーの取得と送信ドメインの前提は 13 章にある。
+
+```bash
+firebase functions:secrets:set RESEND_API_KEY --project fire-fire-dev
+```
+
+- dev / prod それぞれのプロジェクトで実行する。値は同じ Resend アカウントのキーでよいが、どちらの環境からの通知かは**メールの件名**（本番以外は `[dev]` 付き）で見分ける
+- ローカルの Functions エミュレータでは未設定でよい。キーが空のときは送信を試みずログに残すだけになる（`src/backend/src/login-notification/mailer.ts`）
+
+デプロイ用サービスアカウントへの権限付与も `IDENTITY_PLATFORM_WEB_API_KEY` と同様に必要。
+
+```bash
+for PROJECT_ID in fire-fire-dev fire-fire-prod; do
+  gcloud secrets add-iam-policy-binding RESEND_API_KEY \
+    --project="$PROJECT_ID" \
+    --member="serviceAccount:github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.admin"
+done
+```
+
 ### Artifact Registry のクリーンアップポリシー
 
 Cloud Functions のコンテナイメージは Artifact Registry に蓄積する。firebase-tools は初回デプロイ時に自動削除ポリシーの設定を促すが、**CI は非対話のため確認プロンプトを出せず、関数のデプロイ自体は成功した状態でエラー終了する**（その結果、後続の App Hosting ロールアウトがスキップされる）。
@@ -509,13 +531,38 @@ http://localhost:3000/reset-password?oobCode=<コピーした値>
 
 メールアドレス確認（A2）は確認状態が Firebase プロジェクト側で更新されるため、リンクを開いたブラウザが `fire-fire-dev` の画面でも、サインアップ元の `localhost` タブがポーリングで自動検知する。メールのリンクから直接 A7 に到達する経路そのもの（`localhost` をアクション URL に設定する経路）は用意していない。
 
-## 13. 今後の検討事項（オープン課題）
+## 13. ログイン通知メール（Resend）の準備
+
+ログイン通知（[auth-login-requirements.md](./auth-login-requirements.md) 3.6 / 3.8）は Blocking Function `sendLoginNotification` が Resend の HTTP API を叩いて送る。API キーの発行だけが repo の外の作業で、**Identity Platform 側へのトリガー登録は `firebase deploy --only functions` が自動で行う**（コンソールでの登録操作は不要）。
+
+### 13.1 API キーを発行する
+
+1. <https://resend.com> でアカウントを作る。ログイン通知の宛先になるメールアドレスで登録する（次項の制約のため）
+2. API Keys → Create API Key。権限は **Sending access** で足りる
+3. 発行された `re_` で始まるキーを、5 章の手順で dev / prod 双方の Secret Manager に登録する
+
+### 13.2 送信元ドメインと宛先の制約
+
+送信元は Resend の共有ドメイン `onboarding@resend.dev` を使う（`src/backend/src/login-notification/mailer.ts` の定数）。DNS 設定なしで送れる代わりに、**宛先は Resend アカウントの登録メールアドレスに限られる**。利用者が開発者 1 人である現状は制約にならないが、他のユーザーへ送る必要が出た時点で所有ドメインの検証（SPF/DKIM）と定数の差し替えが要る（[auth-login-requirements.md](./auth-login-requirements.md) 8 章のオープン課題）。
+
+### 13.3 動作確認
+
+フロントエンドはローカル開発でも `fire-fire-dev` に直結するため（B0-1）、`npm run dev` からログインすれば実際に通知が届く。
+
+- 件名が `[FIRE-FIRE][dev] ログインがありました (パスワード)` / `(Google)` になっていること。ログイン方法が両方とも正しく出るかは、A4 のパスワードログインと「Googleで続ける」の両方で確かめる
+- **prod への初回デプロイ後は、本番のログインで件名に `[dev]` が付かないこと**を必ず確認する。環境の判定は実行環境のプロジェクト ID（`GCLOUD_PROJECT` 等、無ければ `FIREBASE_CONFIG`）に依存しており、どれも読めない場合は安全側に倒して本番以外として扱う。つまり設定漏れは「本番の通知に `[dev]` が付いたまま」という形で現れる
+- 本文の日時が JST、IP アドレスとブラウザが実際の環境と一致していること
+- 2FA を登録済みのアカウントで、**確認コードを入力する前には届かない**こと。`beforeUserSignedIn` は第 2 要素の検証後に発火するため、第 1 要素だけ通った時点では送られない
+
+届かない場合は Cloud Functions のログ（`sendLoginNotification`）を見る。`RESEND_API_KEYが未設定` の警告が出ていればシークレットの登録漏れ、`メールを送信できませんでした` とステータスコードが出ていれば Resend 側の拒否（宛先制約か無効なキー）。**通知の失敗はログインを妨げない**設計なので、ログインが成功していても送信は失敗していることがある。
+
+## 14. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
 - `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
-## 14. 参考リンク
+## 15. 参考リンク
 
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)
@@ -525,3 +572,5 @@ http://localhost:3000/reset-password?oobCode=<コピーした値>
 - [Firebase Authentication: Google ログインをウェブアプリに追加する](https://firebase.google.com/docs/auth/web/google-signin)
 - [Firebase Authentication: 複数の認証プロバイダをアカウントにリンクする](https://firebase.google.com/docs/auth/web/account-linking)
 - [Firebase Authentication: メールアクションハンドラをカスタマイズする](https://firebase.google.com/docs/auth/custom-email-handler)
+- [Firebase Authentication: ブロッキング関数で拡張する](https://firebase.google.com/docs/auth/extend-with-blocking-functions)
+- [Resend: Send with Node.js / REST API](https://resend.com/docs/api-reference/emails/send-email)
