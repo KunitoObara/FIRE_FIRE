@@ -147,8 +147,9 @@ Firestore書き込みは、いずれもローカルで通しに確認できる�
 パスワード再設定(A7)はlocalhostの画面自体を開く必要があるため、上記「パスワード再設定画面(A7)をローカルで開く」の
 `oobCode`コピーの手順を使う。
 
-ログイン通知メール(Identity Platform Blocking Functions経由)は未実装(`src/backend`はまだ2FAリカバリーコードの
-callableのみのスキャフォールド)。
+ログイン通知メール(Identity Platform Blocking Functions経由)も同様にローカルで確認できる。関数は
+`fire-fire-dev`側で発火するため、ローカルの`npm run dev`からログインしても通知が届く。本番の通知と混ざらない
+よう、件名には`[dev]`が付く(準備と動作確認の手順は[docs/ci-cd-setup.md](../../docs/ci-cd-setup.md) 13章)。
 
 ## 利用可能なスクリプト
 
