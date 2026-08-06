@@ -37,9 +37,33 @@ import type { AuthBlockingEvent } from "firebase-functions/identity";
  */
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 
-/** 実行中のFirebaseプロジェクトID。開発環境からの通知を見分けるために本文へ載せる */
-const currentProjectId = (): string =>
-  process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? process.env.FIREBASE_PROJECT_ID ?? "";
+/**
+ * 実行中のFirebaseプロジェクトID。開発環境からの通知を見分けるために本文へ載せる。
+ *
+ * 実行環境によって設定される変数が違うため順に見る。`FIREBASE_CONFIG`はFirebaseが
+ * デプロイ時に設定するJSONで、環境変数側が空でもここからプロジェクトIDを拾える。
+ *
+ * どれも読めなければ空文字を返し、`message.ts`は本番以外として扱う。取り違える方向を
+ * 「本番の通知に`[dev]`が付く」側に倒してある。逆(開発環境の通知が本番の見た目で届く)より、
+ * 気づいたときの実害が小さいため。実際に本番で`[dev]`が付かないことは
+ * docs/ci-cd-setup.md 13.3 の手順で確認する。
+ */
+const currentProjectId = (): string => {
+  const fromEnv =
+    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? process.env.GCP_PROJECT;
+
+  if (fromEnv !== undefined && fromEnv !== "") {
+    return fromEnv;
+  }
+
+  try {
+    const config = JSON.parse(process.env.FIREBASE_CONFIG ?? "{}") as { projectId?: string };
+    return config.projectId ?? "";
+  } catch (error) {
+    console.error("FIREBASE_CONFIGを解釈できませんでした", error);
+    return "";
+  }
+};
 
 /**
  * ログイン1回ぶんの通知を送る。

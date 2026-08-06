@@ -38,6 +38,10 @@ describe("notifyLogin", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sendMail.mockResolvedValue({ status: "sent" });
+    // プロジェクトIDの読み取り元は複数あるため、判定に使うものだけを残す
+    delete process.env.GOOGLE_CLOUD_PROJECT;
+    delete process.env.GCP_PROJECT;
+    delete process.env.FIREBASE_CONFIG;
     process.env.GCLOUD_PROJECT = "fire-fire-prod";
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -45,6 +49,7 @@ describe("notifyLogin", () => {
 
   afterEach(() => {
     delete process.env.GCLOUD_PROJECT;
+    delete process.env.FIREBASE_CONFIG;
     vi.restoreAllMocks();
   });
 
@@ -81,6 +86,33 @@ describe("notifyLogin", () => {
 
     expect(sendMail).toHaveBeenCalledTimes(1);
     expect(sentMessage().text).toContain("(JST)");
+  });
+
+  it("環境変数が無くてもFIREBASE_CONFIGからプロジェクトを判定する", async () => {
+    delete process.env.GCLOUD_PROJECT;
+    process.env.FIREBASE_CONFIG = JSON.stringify({ projectId: "fire-fire-prod" });
+
+    await notifyLogin(signInEvent());
+
+    expect(sentMessage().subject).not.toContain("[dev]");
+  });
+
+  it("プロジェクトを特定できない場合は本番扱いにしない", async () => {
+    delete process.env.GCLOUD_PROJECT;
+
+    await notifyLogin(signInEvent());
+
+    expect(sentMessage().subject).toContain("[dev]");
+  });
+
+  it("FIREBASE_CONFIGが壊れていても送信は行う", async () => {
+    delete process.env.GCLOUD_PROJECT;
+    process.env.FIREBASE_CONFIG = "{壊れたJSON";
+
+    await notifyLogin(signInEvent());
+
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(sentMessage().subject).toContain("[dev]");
   });
 
   it("メールアドレスが無いイベントでは送信しない", async () => {

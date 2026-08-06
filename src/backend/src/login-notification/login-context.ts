@@ -11,13 +11,15 @@ import type { AuthBlockingEvent } from "firebase-functions/identity";
  * ログイン方法の表示名。
  *
  * 3.8の要件は「パスワード / Google」を区別できることなので、その2つを日本語にする。
- * 将来プロバイダを増やしたときに黙って「不明」に落ちないよう、未知のIDはそのまま表示する。
+ * 本アプリが用意する一次認証はこの2つだけなので、対応表もその2つに閉じる。
+ *
+ * 増やすのは、対応するログイン手段を実際に足すとき。未知のIDは「不明」に落とさず
+ * そのまま表示するため(`resolveSignInMethodLabel`)、先回りして書いておく必要はない。
+ * 想定外の手段でのサインインは、生のIDが本文に出ることでかえって気づける。
  */
 const SIGN_IN_METHOD_LABELS: Record<string, string> = {
   password: "パスワード",
   "google.com": "Google",
-  // パスワードリセット後の自動サインイン等でメールリンクが使われた場合
-  emailLink: "メールリンク",
 };
 
 /** ログイン方法を特定できなかったときの表示 */
