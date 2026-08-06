@@ -16,3 +16,5 @@ export {
   resetMfaEnrollment,
   useMfaRecoveryCode,
 } from "./mfa-recovery/functions";
+
+export { sendLoginNotification } from "./login-notification/functions";
