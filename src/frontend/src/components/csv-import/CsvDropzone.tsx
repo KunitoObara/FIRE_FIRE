@@ -96,9 +96,9 @@ export const CsvDropzone = ({
       >
         ファイルを選択
       </Button>
-      {fileName === null ? null : (
+      {fileName ? (
         <p className="px-4 text-center text-xs text-muted-foreground">選択中: {fileName}</p>
-      )}
+      ) : null}
     </div>
   );
 };

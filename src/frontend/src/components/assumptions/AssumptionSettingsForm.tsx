@@ -119,7 +119,8 @@ export const AssumptionSettingsForm = ({
                     <TableRow key={field.id}>
                       <TableCell className="font-medium">{field.assetTypeName}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {balance === undefined ? null : formatJpy(balance)}
+                        {/* 残高は数値。`0`が正当な値なのでtruthyではなく`!== undefined`で判定する */}
+                        {balance !== undefined ? formatJpy(balance) : null}
                       </TableCell>
                       <TableCell>
                         <Input
@@ -174,11 +175,11 @@ export const AssumptionSettingsForm = ({
         </CardContent>
 
         <CardFooter className="flex-col items-start gap-3 border-t pt-6">
-          {saveError === null ? null : (
+          {saveError ? (
             <p role="alert" className="text-sm text-destructive">
               {saveError}
             </p>
-          )}
+          ) : null}
 
           <Button type="submit" disabled={saving}>
             {saving ? ASSUMPTIONS_SUBMITTING_LABEL : ASSUMPTIONS_SUBMIT_LABEL}

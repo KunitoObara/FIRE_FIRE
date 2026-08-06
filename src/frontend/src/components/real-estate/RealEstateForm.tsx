@@ -205,11 +205,11 @@ export const RealEstateForm = ({
               </div>
             ) : null}
 
-            {saveError === null ? null : (
+            {saveError ? (
               <p role="alert" className="text-sm text-destructive">
                 {saveError}
               </p>
-            )}
+            ) : null}
 
             <div className="flex gap-3">
               <Button type="submit" disabled={saving}>

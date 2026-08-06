@@ -84,11 +84,11 @@ export const DeleteCategoryAxisDialog = ({
             : axis !== null && buildDeleteCategoryAxisConfirmMessage(axis.name)}
         </AlertDialogDescription>
 
-        {errorMessage === null ? null : (
+        {errorMessage ? (
           <p role="alert" className="text-sm text-destructive">
             {errorMessage}
           </p>
-        )}
+        ) : null}
 
         <AlertDialogFooter>
           {blocked ? (
