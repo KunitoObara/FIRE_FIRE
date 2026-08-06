@@ -65,6 +65,20 @@ describe("AssumptionSettingsScreen", () => {
     expect(screen.getByText("¥ 2,140,000")).toBeInTheDocument();
   });
 
+  /**
+   * 残高欄の判定を`!== undefined`からtruthyに変えると、`0`がfalsyなのでこの行だけ金額が
+   * 消える。見た目には「取得できなかった資産」と区別が付かないため、0円を固定しておく
+   */
+  it("残高が0円の資産種別でも金額を出す", async () => {
+    fetchLatestAssetBalances.mockResolvedValue({
+      ok: true,
+      balances: [{ assetTypeName: "預金・現金", balance: 0 }],
+    });
+    renderScreen();
+
+    expect(await screen.findByText("¥ 0")).toBeInTheDocument();
+  });
+
   it("保存済みの想定利回り・リスクを一覧の初期値に入れる", async () => {
     fetchAssumptions.mockResolvedValue({
       ok: true,

@@ -75,8 +75,12 @@ export const GoogleSignInButton = ({
         {isSubmitting ? "Googleで認証中..." : "Googleで続ける"}
       </Button>
 
-      {/* 押せない理由(A1の規約未同意)は、ポップアップを開く前に分かるようボタンの下に出す */}
-      {blockedReason ? (
+      {/*
+        押せない理由(A1の規約未同意)は、ポップアップを開く前に分かるようボタンの下に出す。
+        判定は上の`disabled`と同じ`!== undefined`にする。同じpropをここだけtruthyで見ると、
+        空文字が渡ったときに「押せないのに理由が出ない」状態を作れてしまう
+      */}
+      {blockedReason !== undefined ? (
         <p className="mt-2 text-center text-sm text-muted-foreground">{blockedReason}</p>
       ) : null}
 
