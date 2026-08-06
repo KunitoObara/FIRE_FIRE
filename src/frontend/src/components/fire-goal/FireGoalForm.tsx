@@ -95,7 +95,7 @@ export const FireGoalForm = ({
 
     const rate = calculateAchievementRate(currentAssetTotal, target);
 
-    return rate === null ? null : buildFireGoalAchievementHint(formatPercent(rate));
+    return rate !== null ? buildFireGoalAchievementHint(formatPercent(rate)) : null;
   };
 
   const directAchievementHint = achievementHint(
@@ -159,14 +159,14 @@ export const FireGoalForm = ({
             タブ見出しより前に出す。読み上げは`FieldError`(role="alert")と競合しないよう
             polite(role="status")にし、インラインエラーの読み上げを妨げない。
           */}
-          {hiddenTabNotice === null ? null : (
+          {hiddenTabNotice !== null ? (
             <p
               role="status"
               className="mb-6 rounded-md border border-destructive/50 px-4 py-3 text-sm text-destructive"
             >
               {hiddenTabNotice}
             </p>
-          )}
+          ) : null}
 
           <Tabs
             value={mode}
@@ -214,9 +214,9 @@ export const FireGoalForm = ({
                     {...register("targetAmount")}
                   />
                   <FieldError errors={[errors.targetAmount]} />
-                  {directAchievementHint === null ? null : (
+                  {directAchievementHint !== null ? (
                     <FieldDescription>{directAchievementHint}</FieldDescription>
-                  )}
+                  ) : null}
                 </Field>
               </FieldGroup>
             </TabsContent>
@@ -258,24 +258,28 @@ export const FireGoalForm = ({
                   <FieldDescription>{FIRE_GOAL_WITHDRAWAL_RATE_HINT}</FieldDescription>
                 </Field>
 
-                {calculatedTarget === null ? null : (
+                {/*
+                  金額・達成率は`0`が正当な値なので、`!== null`で判定する。truthyかどうかで
+                  書くと、算出結果が0円のときにこの表示ごと消える(CODING_STANDARDS.md 2章)
+                */}
+                {calculatedTarget !== null ? (
                   <p className="rounded-md bg-muted px-4 py-3 text-sm">
                     {FIRE_GOAL_CALCULATED_TARGET_LABEL}{" "}
                     <strong className="tabular-nums">{formatJpy(calculatedTarget)}</strong>
-                    {reverseAchievementHint === null ? null : (
+                    {reverseAchievementHint !== null ? (
                       <span className="text-muted-foreground">({reverseAchievementHint})</span>
-                    )}
+                    ) : null}
                   </p>
-                )}
+                ) : null}
               </FieldGroup>
             </TabsContent>
           </Tabs>
 
-          {saveError === null ? null : (
+          {saveError !== null ? (
             <p role="alert" className="mt-6 text-sm text-destructive">
               {saveError}
             </p>
-          )}
+          ) : null}
 
           <Button type="submit" className="mt-6" disabled={saving}>
             {saving ? FIRE_GOAL_SUBMITTING_LABEL : FIRE_GOAL_SUBMIT_LABEL}
