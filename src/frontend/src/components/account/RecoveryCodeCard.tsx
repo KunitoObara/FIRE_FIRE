@@ -42,11 +42,11 @@ const RecoveryCodeStatusText = ({ status }: RecoveryCodeStatusTextProps): JSX.El
   return (
     <p className="text-sm">
       <span className="font-medium">{buildRecoveryCodeRemainingLabel(status)}</span>
-      {generatedAt === null ? null : (
+      {generatedAt ? (
         <span className="ml-3 text-muted-foreground">
           {buildRecoveryCodeGeneratedAtLabel(generatedAt)}
         </span>
-      )}
+      ) : null}
     </p>
   );
 };

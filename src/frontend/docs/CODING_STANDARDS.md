@@ -52,6 +52,16 @@
 - **共通コンポーネント・hooksはnamed export、Next.jsが要求するpage/layout/route handlerのみdefault export** とする。named exportの方がエディタでのリネーム・参照追跡が安全なため
 - **Hooksのルールを厳守する**(条件分岐の中で呼ばない、依存配列を省略しない)。ESLintの`react-hooks/rules-of-hooks`・`react-hooks/exhaustive-deps`を警告放置しない
 - **JSX内の条件レンダリングで`&&`を使う場合、左辺を明示的にbooleanへ変換する**。`count && <Badge />`のような書き方は`count`が`0`のときに`0`がそのまま描画されるバグを生むため、`count > 0 && <Badge />`のように比較演算子を使う
+- **三項演算子で条件レンダリングするときは、描画する側を先に置く**(`条件 ? (中身) : null`)。`条件 === null ? null : (中身)`と書くと「何を描画するのか」が後ろに回り、条件と中身の対応が読み取りにくい
+- **その判定は値の型で使い分ける**。文字列・オブジェクトはtruthyで判定してよいが、**数値は`!== null` / `!== undefined`と明示的に比較する**。`0`は正当な値でありながらfalsyなので、truthyで書くと0のときに表示ごと消える。上の`&&`の項と同じ落とし穴で、三項演算子でも同様に踏む
+
+  ```tsx
+  // 文字列 — truthyでよい
+  {saveError ? <p role="alert">{saveError}</p> : null}
+
+  // 数値 — 0を描画したいので明示的に比較する
+  {calculatedTarget !== null ? <strong>{formatJpy(calculatedTarget)}</strong> : null}
+  ```
 - **イベントハンドラは`handle`接頭辞**で命名する(例: `handleSubmit`, `handleCategoryChange`)。Props経由で渡すコールバックは`on`接頭辞(例: `onSave`)にする
 
 ### 関数はすべてアロー関数で書く
