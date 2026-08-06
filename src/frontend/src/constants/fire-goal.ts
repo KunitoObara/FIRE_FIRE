@@ -20,10 +20,29 @@ export const FIRE_GOAL_DIRECT_DESCRIPTION = "目標とする資産額をその�
 export const FIRE_GOAL_REVERSE_DESCRIPTION =
   "想定する年間支出額と逆算係数から、必要な資産額を自動で算出します。";
 
-/** 設定方式のタブ(HTMLモック b8-fire-goal.html のタブ見出しに合わせる) */
+/**
+ * 設定方式の表示名(HTMLモック b8-fire-goal.html のタブ見出しに合わせる)。
+ *
+ * タブ見出しと、方式を名指しする文言(`buildFireGoalHiddenTabNoticeMessage`)の両方から
+ * 参照する。同じ方式が場所によって別の呼び名になると、どのタブを指しているか読めなくなるため。
+ */
+export const FIRE_GOAL_MODE_LABELS: Record<FireGoalMode, string> = {
+  direct: "直接入力",
+  reverse: "年間支出額から逆算",
+};
+
+/** 設定方式のタブ */
 export const FIRE_GOAL_MODES: FireGoalModeOption[] = [
-  { id: "direct", label: "直接入力", description: FIRE_GOAL_DIRECT_DESCRIPTION },
-  { id: "reverse", label: "年間支出額から逆算", description: FIRE_GOAL_REVERSE_DESCRIPTION },
+  {
+    id: "direct",
+    label: FIRE_GOAL_MODE_LABELS.direct,
+    description: FIRE_GOAL_DIRECT_DESCRIPTION,
+  },
+  {
+    id: "reverse",
+    label: FIRE_GOAL_MODE_LABELS.reverse,
+    description: FIRE_GOAL_REVERSE_DESCRIPTION,
+  },
 ];
 
 /** 入力欄の見出し。単位を添えて、円単位なのか%なのかを入力欄だけで判断できるようにする */
@@ -77,6 +96,26 @@ export const FIRE_GOAL_WITHDRAWAL_RATE_FORMAT_MESSAGE = "半角数字で入力�
 
 /** 逆算係数が範囲外のときのエラー */
 export const FIRE_GOAL_WITHDRAWAL_RATE_RANGE_MESSAGE = `逆算係数は0より大きく${FIRE_GOAL_WITHDRAWAL_RATE_MAX}%以下で入力してください。`;
+
+/**
+ * 表示していなかったタブのエラーで保存が止まり、そのタブへ切り替えたときの説明(`FireGoalForm`)。
+ *
+ * 切り替え自体は以前から行っているが、画面には切替先のインラインエラーしか出ないため、
+ * 「使うつもりのない方の入力が原因で保存できていない」ことが読み取れなかった。
+ *
+ * 切り替えると`mode`もその方式に変わる(タブの選択状態が有効な設定方式そのもの)。
+ * そのため切替後は「未使用の欄」ではなくなっており、文言も「未使用の入力です」ではなく
+ * 何が起きたのかを説明する形にしてある。逆算の入力を使わずに保存し直す道も要るので、
+ * 元のタブに戻して消す方法まで書く。
+ *
+ * 後半の手順は**実際に操作できる順**に並べる。誤りのある欄が見えているのは切替先のタブに
+ * いる間だけなので、「元のタブに戻してから消す」と書くと、そのままでは実行できない順序になる。
+ */
+export const buildFireGoalHiddenTabNoticeMessage = (
+  previousLabel: string,
+  erroredLabel: string,
+): string =>
+  `「${previousLabel}」で保存しようとしましたが、表示していなかった「${erroredLabel}」の入力に誤りがあるため保存できません。誤りを直すか、「${erroredLabel}」の入力を消してから「${previousLabel}」に戻って保存してください。`;
 
 /** 「保存」ボタンのラベル */
 export const FIRE_GOAL_SUBMIT_LABEL = "保存";

@@ -31,6 +31,22 @@ const annualExpenseInput = (): HTMLElement => screen.getByLabelText("想定年�
 const withdrawalRateInput = (): HTMLElement => screen.getByLabelText("逆算係数(%)");
 const modeTab = (name: string): HTMLElement => screen.getByRole("tab", { name });
 
+/**
+ * 直接入力タブを表示したまま、非表示の逆算タブにだけ形式の誤りを残した状態を作る。
+ *
+ * この状態で保存すると、逆算タブのエラーで保存が止まり、フォームが逆算タブへ切り替える。
+ */
+const typoInHiddenReverseTab = async (user: ReturnType<typeof userEvent.setup>): Promise<void> => {
+  await user.click(modeTab("年間支出額から逆算"));
+  await user.type(annualExpenseInput(), "3,600,000");
+  await user.click(modeTab("直接入力"));
+  await user.type(targetAmountInput(), "80000000");
+};
+
+/** 切り替えの説明。文言そのものが対応内容なので、定数を参照せず期待値を直接書く */
+const hiddenTabNoticeText =
+  "「直接入力」で保存しようとしましたが、表示していなかった「年間支出額から逆算」の入力に誤りがあるため保存できません。誤りを直すか、「年間支出額から逆算」の入力を消してから「直接入力」に戻って保存してください。";
+
 describe("FireGoalForm", () => {
   beforeEach(() => {
     onSubmit.mockReset();
@@ -133,10 +149,7 @@ describe("FireGoalForm", () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.click(modeTab("年間支出額から逆算"));
-    await user.type(annualExpenseInput(), "3,600,000");
-    await user.click(modeTab("直接入力"));
-    await user.type(targetAmountInput(), "80000000");
+    await typoInHiddenReverseTab(user);
     await user.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
@@ -144,6 +157,89 @@ describe("FireGoalForm", () => {
     });
     expect(screen.getByText("半角数字のみ入力してください。")).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  /** 切り替わったこと自体は見えるが、なぜ飛ばされたのかが読み取れなかったため添える説明 */
+  it("非表示タブのエラーで切り替えたときは、切り替えた理由を説明する", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await typoInHiddenReverseTab(user);
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(hiddenTabNoticeText);
+  });
+
+  it("表示中のタブのエラーで止まったときは、タブ切替の説明を出さない", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(targetAmountInput(), "80,000,000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(await screen.findByText("半角数字のみ入力してください。")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  /** 自分でタブを選び直したあとも残ると、見ているタブと合わない案内になる */
+  it("自分でタブを選び直すと、切り替えの説明は消える", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await typoInHiddenReverseTab(user);
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByRole("status")).toBeInTheDocument();
+
+    await user.click(modeTab("直接入力"));
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  /** 説明文が案内する操作順(誤りのある欄を消す → 元のタブに戻る → 保存)が実際に通ること */
+  it("切り替え先の入力を消して元のタブに戻れば、元の方式のまま保存できる", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await typoInHiddenReverseTab(user);
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByRole("status")).toBeInTheDocument();
+
+    await user.clear(annualExpenseInput());
+    await user.click(modeTab("直接入力"));
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        mode: "direct",
+        targetAmount: 80_000_000,
+        annualExpense: null,
+        withdrawalRate: 4,
+      });
+    });
+  });
+
+  it("誤りを直して保存できたときは、切り替えの説明は消える", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await typoInHiddenReverseTab(user);
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(await screen.findByRole("status")).toBeInTheDocument();
+
+    // 切り替えられた先(逆算タブ)で誤りを直すと、その方式が有効な設定方式として保存される
+    await user.clear(annualExpenseInput());
+    await user.type(annualExpenseInput(), "3600000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        mode: "reverse",
+        targetAmount: 80_000_000,
+        annualExpense: 3_600_000,
+        withdrawalRate: 4,
+      });
+    });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("逆算タブでは入力しながら目標資産額を算出して見せる", async () => {
