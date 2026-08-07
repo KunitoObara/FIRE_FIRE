@@ -149,6 +149,7 @@ describe("AssetCategoryMasterScreen", () => {
     const user = userEvent.setup();
     updateCategoryAxis.mockResolvedValue({ ok: true });
     renderScreen();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
 
     const row = (await screen.findByText("純金融資産")).closest("li");
 
@@ -171,6 +172,8 @@ describe("AssetCategoryMasterScreen", () => {
         assetTypeNames: ["預金・現金", "投資信託"],
       });
     });
+    // 新規追加と同じくB1の表示データも無効化する(片方の分岐だけ外れても気づけるように)
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["dashboard-data"] });
   });
 
   /**

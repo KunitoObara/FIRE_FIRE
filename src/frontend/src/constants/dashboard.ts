@@ -88,6 +88,13 @@ export const DASHBOARD_DATA_QUERY_KEY = ["dashboard-data"] as const;
  * 取得に失敗した場合はウィジェットの空状態を出さない。データはあるのに「まだありません」と
  * 読める表示になるのを避けるため、失敗は失敗として出す(B5 不動産一覧と同じ扱い)。
  */
+export const DASHBOARD_FAILURE_MESSAGES: Record<FirestoreAccessFailureReason, string> = {
+  "signed-out": "ログイン状態が切れています。ログインし直してから表示してください。",
+  "configuration-error": "Firebaseの設定が読み込めないため表示できません。",
+  "permission-denied": "このデータの参照が許可されていません。ログインし直してください。",
+  unknown: "データを取得できませんでした。時間をおいて再度お試しください。",
+};
+
 /**
  * 表示データの組み立て自体が例外で落ちたときの文言。
  *
@@ -103,10 +110,3 @@ export const DASHBOARD_RETRY_LABEL = "再試行する";
 
 /** 再試行の実行中に見せる文言 */
 export const DASHBOARD_RETRYING_LABEL = "再試行中…";
-
-export const DASHBOARD_FAILURE_MESSAGES: Record<FirestoreAccessFailureReason, string> = {
-  "signed-out": "ログイン状態が切れています。ログインし直してから表示してください。",
-  "configuration-error": "Firebaseの設定が読み込めないため表示できません。",
-  "permission-denied": "このデータの参照が許可されていません。ログインし直してください。",
-  unknown: "データを取得できませんでした。時間をおいて再度お試しください。",
-};

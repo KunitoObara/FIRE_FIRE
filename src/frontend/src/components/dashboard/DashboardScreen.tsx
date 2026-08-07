@@ -63,6 +63,13 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
   const dashboardQuery = useQuery({
     queryKey: DASHBOARD_DATA_QUERY_KEY,
     queryFn: fetchDashboardData,
+    /*
+      自動リトライはしない。`fetchDashboardData`はFirestoreの失敗を`ok: false`として
+      「解決」させるので、ここへ例外が届くのは集計が壊れたデータで落ちたときだけ。
+      同じ入力で何度やっても同じ例外になり、既定の3回(指数バックオフ)は原因の分からない
+      スケルトンを数秒延ばして読み取りを4倍にするだけになる。やり直しは再試行ボタンに委ねる
+    */
+    retry: false,
   });
 
   // 期間の絞り込みの基準時刻。レンダーのたびに進むと同じ表示が揺れるため1度だけ決める
