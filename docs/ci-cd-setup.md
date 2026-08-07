@@ -295,7 +295,9 @@ firebase apphosting:secrets:grantaccess \
 
 ### Cloud Functions 用のシークレット（`IDENTITY_PLATFORM_WEB_API_KEY`）
 
-2FA リカバリーコードの検証（`useMfaRecoveryCode`）と、B10 の本人確認（`resetMfaEnrollment`・`generateMfaRecoveryCodes` の再発行時）は、サーバー側から Identity Platform の REST API でパスワードを再確認する（[auth-login-requirements.md](./auth-login-requirements.md) 3.3、[screen-requirements-account.md](./screen-requirements-account.md) B10）。そのための Web API キーを Secret Manager に登録する。**登録しないと functions のデプロイが「シークレットが存在しない」で失敗する。**
+2FA リカバリーコードの検証（`useMfaRecoveryCode`）と、B10 の本人確認（`resetMfaEnrollment`・`unlinkPasswordProvider`・`generateMfaRecoveryCodes` の再発行時）は、サーバー側から Identity Platform の REST API でパスワードを再確認する（[auth-login-requirements.md](./auth-login-requirements.md) 3.3、[screen-requirements-account.md](./screen-requirements-account.md) B10）。そのための Web API キーを Secret Manager に登録する。**登録しないと functions のデプロイが「シークレットが存在しない」で失敗する。**
+
+本人確認を使う関数が増えても、参照するシークレットは同じ 1 件なので、この節の設定を追加でやり直す必要はない。
 
 ```bash
 firebase functions:secrets:set IDENTITY_PLATFORM_WEB_API_KEY --project fire-fire-dev

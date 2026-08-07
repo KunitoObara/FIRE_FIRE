@@ -1,7 +1,14 @@
 import { FirebaseError } from "firebase/app";
 import { GoogleAuthProvider, linkWithPopup, reload, unlink } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
 
-import { FirebaseConfigurationError, getFirebaseAuth } from "@/lib/firebase/client";
+import { UNLINK_PASSWORD_PROVIDER_FUNCTION } from "@/constants/firebase";
+import { toCallableFailureReason } from "@/lib/auth/callable-error";
+import {
+  FirebaseConfigurationError,
+  getFirebaseAuth,
+  getFirebaseFunctions,
+} from "@/lib/firebase/client";
 
 import type { User } from "firebase/auth";
 
@@ -146,6 +153,10 @@ export const linkGoogleAccount = async (): Promise<LinkGoogleResult> => {
 /**
  * 連携済みのログイン方法を解除する。
  *
+ * 扱うのは連携し直せるログイン方法だけで、パスワードは受け取らない
+ * (`ClientUnlinkableProviderId`)。パスワードの解除は本人確認を挟むため
+ * `unlinkPasswordProvider`を通す。
+ *
  * **最後に残った1つは解除しない。** Firebaseの`unlink`はログイン方法が無くなる解除も
  * そのまま通し、サインインする手段の無いアカウントが残ってしまうため、ここが唯一の歯止めになる
  * (docs/screen-requirements-account.md「連携アカウントの管理」の制約)。画面側でもボタンを
@@ -155,7 +166,7 @@ export const linkGoogleAccount = async (): Promise<LinkGoogleResult> => {
  * それがログイン方法である以上は「最後の1つ」の判定に含める必要がある。
  */
 export const unlinkProvider = async (
-  providerId: LinkedProviderId,
+  providerId: ClientUnlinkableProviderId,
 ): Promise<UnlinkProviderResult> => {
   try {
     const user = getFirebaseAuth().currentUser;
@@ -184,5 +195,52 @@ export const unlinkProvider = async (
     }
 
     return { ok: false, reason };
+  }
+};
+
+/** バックエンドの`details.reason`として受け付ける値 */
+const UNLINK_PASSWORD_FAILURE_REASONS: readonly UnlinkPasswordFailureReason[] = [
+  "signed-out",
+  "not-linked",
+  "last-provider",
+  "password-required",
+  "invalid-credential",
+  "too-many-requests",
+  "unlink-failed",
+];
+
+/**
+ * 本人確認のうえ、メールアドレス / パスワードでのログインを解除する
+ * (docs/screen-requirements-account.md「メールアドレス / パスワードの解除」)。
+ *
+ * Googleの解除と違いクライアントSDKの`unlink`を使わない。パスワードの解除は事実上やり直せず、
+ * 2FAの再設定・リカバリーコードの発行/再発行・A5での復旧まで一緒に失う操作のため、
+ * 確認ダイアログではなくパスワードの再入力を求める。その検証はサーバー側でなければ行えない
+ * (2FA登録済みのユーザーはクライアントSDKの再認証がパスワードだけでは完了しない)ので、
+ * 検証と解除をまとめてcallableで行う(`src/backend/src/linked-providers/functions.ts`)。
+ */
+export const unlinkPasswordProvider = async (password: string): Promise<UnlinkPasswordResult> => {
+  try {
+    const callable = httpsCallable(getFirebaseFunctions(), UNLINK_PASSWORD_PROVIDER_FUNCTION);
+    await callable({ password });
+
+    // 解除はサーバー側(Admin SDK)で行うため、`currentUser.providerData`は古いままになる。
+    // 取り直さないと一覧が「解除できていない」ように見える
+    const user = getFirebaseAuth().currentUser;
+
+    if (user !== null) {
+      await refreshProviderData(user);
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: toCallableFailureReason(
+        error,
+        UNLINK_PASSWORD_FAILURE_REASONS,
+        "パスワードでのログインを解除できませんでした",
+      ),
+    };
   }
 };
