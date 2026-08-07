@@ -17,7 +17,7 @@ import {
   SIGN_IN_NEXT_PATHS,
 } from "@/constants/auth";
 import { FORGOT_PASSWORD_PATH, LOGIN_PATH } from "@/constants/routes";
-import { linkPendingGoogleAccount } from "@/lib/auth/google-sign-in";
+import { linkPendingGoogleAccount, resolveNextStepAfterLink } from "@/lib/auth/google-sign-in";
 import { clearPendingGoogleLink, getPendingGoogleLink } from "@/lib/auth/pending-google-link";
 import { signInWithEmail } from "@/lib/auth/sign-in";
 import { accountLinkSchema } from "@/schemas/account-link";
@@ -36,7 +36,9 @@ import type { JSX } from "react";
  * 連携を実行するタイミングは2つある。
  * - 2FA登録済み — パスワード検証だけではサインインが成立しないため、A5の検証成功後に実行する
  *   (`MfaVerifyForm`が`linkPendingGoogleAccount`を呼ぶ)
- * - 2FA未登録 — パスワード検証の時点でサインインが成立するため、その場で実行してからA3/A2へ進む
+ * - 2FA未登録 — パスワード検証の時点でサインインが成立するため、その場で実行してからA3/A2へ進む。
+ *   このときA3とA2のどちらへ進むかは、連携の実行後に`emailVerified`を取り直してから決める
+ *   (連携によって確認済みに変わりうるため)
  *
  * 連携の失敗はログインを取り消す理由にならないため、A8へは戻さずそのまま先へ進み、
  * B1のトーストで通知する(docs/screen-requirements-dashboard.md B1)。
@@ -100,7 +102,9 @@ export const AccountLinkForm = (): JSX.Element => {
     // 失敗してもログインは取り消さず、B1で通知する
     await linkPendingGoogleAccount();
 
-    router.replace(SIGN_IN_NEXT_PATHS[result.next]);
+    // `result.next`は連携前の`emailVerified`で決まっている。連携で確認済みに変わりうるため、
+    // 遷移先は連携後の状態から決め直す(`resolveNextStepAfterLink`)
+    router.replace(SIGN_IN_NEXT_PATHS[await resolveNextStepAfterLink(result.next)]);
   };
 
   /** 「連携せずにログインへ戻る」。連携待ちを残すと次のログインに紛れ込むため捨てる */

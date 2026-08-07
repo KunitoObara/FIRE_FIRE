@@ -2,7 +2,11 @@ import { FirebaseError } from "firebase/app";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearGoogleLinkFailureNotice, wasGoogleLinkFailed } from "@/lib/auth/google-link-notice";
-import { linkPendingGoogleAccount, signInWithGoogle } from "@/lib/auth/google-sign-in";
+import {
+  linkPendingGoogleAccount,
+  resolveNextStepAfterLink,
+  signInWithGoogle,
+} from "@/lib/auth/google-sign-in";
 import {
   clearPendingGoogleLink,
   getPendingGoogleLink,
@@ -36,6 +40,11 @@ const setPersistence = vi.fn<(auth: Auth, persistence: unknown) => Promise<void>
 const signInWithPopup = vi.fn<(auth: Auth, provider: unknown) => Promise<UserCredential>>();
 const linkWithCredential = vi.fn<(user: User, credential: OAuthCredential) => Promise<unknown>>();
 const credentialFromError = vi.fn<(error: unknown) => OAuthCredential | null>();
+const reloadEmailVerificationState = vi.fn<() => Promise<EmailVerificationState>>();
+
+vi.mock("@/lib/auth/email-verification", () => ({
+  reloadEmailVerificationState: () => reloadEmailVerificationState(),
+}));
 
 // 実際のクラスは`instanceof`判定に使うため、差し替えるのは関数だけにする
 vi.mock("@/lib/firebase/client", async (importOriginal) => ({
@@ -319,5 +328,44 @@ describe("linkPendingGoogleAccount", () => {
 
     expect(linkWithCredential).not.toHaveBeenCalled();
     expect(wasGoogleLinkFailed()).toBe(true);
+  });
+});
+
+describe("resolveNextStepAfterLink", () => {
+  beforeEach(() => {
+    reloadEmailVerificationState.mockReset();
+  });
+
+  // 連携するGoogleアカウントのメールアドレスはGoogle側で確認済みのため、
+  // 連携前は未確認だったアカウントがここで確認済みに変わりうる
+  it("連携後に確認済みになっていればA3へ送る", async () => {
+    reloadEmailVerificationState.mockResolvedValue({ status: "verified" });
+
+    await expect(resolveNextStepAfterLink("email-unverified")).resolves.toBe("mfa-setup");
+  });
+
+  it("連携後も未確認ならA2へ送る", async () => {
+    reloadEmailVerificationState.mockResolvedValue({ status: "unverified", email: null });
+
+    await expect(resolveNextStepAfterLink("email-unverified")).resolves.toBe("email-unverified");
+  });
+
+  // 確認済みだった場合も読み直す。連携でfalseへ戻ることは無いが、判断の入口を1本にしておく
+  it("連携前が確認済みでも読み直した結果を使う", async () => {
+    reloadEmailVerificationState.mockResolvedValue({ status: "verified" });
+
+    await expect(resolveNextStepAfterLink("mfa-setup")).resolves.toBe("mfa-setup");
+  });
+
+  // 誤ってA2へ送ってもA2自身のポーリングが確認済みを検知してA3へ進めるため、ここでは止めない
+  it.each<EmailVerificationState>([
+    { status: "network-error" },
+    { status: "configuration-error" },
+    { status: "unknown-error" },
+    { status: "signed-out" },
+  ])("取り直せなければ連携前の判断を使う($status)", async (state) => {
+    reloadEmailVerificationState.mockResolvedValue(state);
+
+    await expect(resolveNextStepAfterLink("email-unverified")).resolves.toBe("email-unverified");
   });
 });

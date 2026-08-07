@@ -7,6 +7,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 
+import { reloadEmailVerificationState } from "@/lib/auth/email-verification";
 import { markGoogleLinkFailed } from "@/lib/auth/google-link-notice";
 import {
   clearPendingGoogleLink,
@@ -198,5 +199,42 @@ export const linkPendingGoogleAccount = async (): Promise<void> => {
     // 成立しているため扱いは同じ(docs/screen-requirements-dashboard.md B1)
     console.error("Googleアカウントを連携できませんでした", error);
     markGoogleLinkFailed();
+  }
+};
+
+/**
+ * A8で連携を実行したあとの遷移先を決め直す(2FA未登録の分岐)。
+ *
+ * A8のパスワード検証が返す`next`は**連携前**の`emailVerified`で決まっている。連携する
+ * GoogleアカウントのメールアドレスはGoogle側で確認済みのため、連携によってこれがtrueへ
+ * 変わりうる。読み直さずにそのまま使うと、確認済みになったユーザーを不要なA2へ送ってしまう。
+ *
+ * Identity Platformが実際にtrueへ変えるかは、その挙動を前提にせず**毎回読み直して**判断する。
+ * どちらの挙動でも遷移先が正しくなり、Identity Platform側が将来変わっても壊れないため
+ * (docs/screen-requirements-auth.md A8)。
+ *
+ * 取り直せなかった場合(通信失敗・設定不足・セッション消失)は連携前の判断をそのまま使う。
+ * 誤りうるのは「本当は確認済みなのにA2へ送る」側だけで、これはA2自身が確認状況を
+ * ポーリングしているため確認済みになった時点で自動的にA3へ進む(`VerifyEmailNotice`)。
+ * 逆向き(本当は未確認なのにA3へ送る)は起きない — `mfa-setup`が返るのは連携前が確認済み
+ * だった場合に限られ、連携で未確認へ戻ることは無いため。行き止まりにならない以上、
+ * ここで取得失敗を理由にユーザーを止める理由が無い。
+ *
+ * A1〜A8は`AppAccessGuard`(`(dashboard)`レイアウト、B1〜B10のみ)の外側にあるので、
+ * 差し戻しをガードに期待してはいけない。上記のA2のポーリングを消すとここが行き止まりになる。
+ */
+export const resolveNextStepAfterLink = async (
+  beforeLink: SignInNextStep,
+): Promise<SignInNextStep> => {
+  const state = await reloadEmailVerificationState();
+
+  switch (state.status) {
+    case "verified":
+      // A8のこの分岐に来ている時点で2FAは未登録と分かっている
+      return "mfa-setup";
+    case "unverified":
+      return "email-unverified";
+    default:
+      return beforeLink;
   }
 };

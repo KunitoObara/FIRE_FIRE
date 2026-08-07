@@ -23,6 +23,7 @@ const replace = vi.fn();
 const signInWithEmail =
   vi.fn<(email: string, password: string, rememberMe: boolean) => Promise<SignInResult>>();
 const linkPendingGoogleAccount = vi.fn<() => Promise<void>>();
+const resolveNextStepAfterLink = vi.fn<(beforeLink: SignInNextStep) => Promise<SignInNextStep>>();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
@@ -35,6 +36,7 @@ vi.mock("@/lib/auth/sign-in", () => ({
 
 vi.mock("@/lib/auth/google-sign-in", () => ({
   linkPendingGoogleAccount: () => linkPendingGoogleAccount(),
+  resolveNextStepAfterLink: (beforeLink: SignInNextStep) => resolveNextStepAfterLink(beforeLink),
 }));
 
 // 画面は資格情報を連携関数へ渡すだけなので、テストでは替え玉で足りる
@@ -64,6 +66,9 @@ describe("AccountLinkForm", () => {
     signInWithEmail.mockResolvedValue({ ok: true, next: "mfa-verify" });
     linkPendingGoogleAccount.mockReset();
     linkPendingGoogleAccount.mockResolvedValue(undefined);
+    resolveNextStepAfterLink.mockReset();
+    // 既定は連携で確認状況が変わらなかった場合(連携前の判断をそのまま返す)
+    resolveNextStepAfterLink.mockImplementation((beforeLink) => Promise.resolve(beforeLink));
     setPendingGoogleLink({ ...PENDING_LINK });
   });
 
@@ -152,6 +157,7 @@ describe("AccountLinkForm", () => {
         expect(replace).toHaveBeenCalledWith(MFA_VERIFY_PATH);
       });
       expect(linkPendingGoogleAccount).not.toHaveBeenCalled();
+      expect(resolveNextStepAfterLink).not.toHaveBeenCalled();
       expect(getPendingGoogleLink()).not.toBeNull();
     });
 
@@ -170,7 +176,7 @@ describe("AccountLinkForm", () => {
     });
 
     // A4と同じく「メール未確認」を「2FA未登録」より優先する
-    it("メール未確認なら連携したうえでA2へ進む", async () => {
+    it("連携後もメール未確認なら連携したうえでA2へ進む", async () => {
       signInWithEmail.mockResolvedValue({ ok: true, next: "email-unverified" });
       const user = userEvent.setup();
       render(<AccountLinkForm />);
@@ -181,6 +187,26 @@ describe("AccountLinkForm", () => {
         expect(replace).toHaveBeenCalledWith(VERIFY_EMAIL_PATH);
       });
       expect(linkPendingGoogleAccount).toHaveBeenCalled();
+    });
+
+    // 遷移先は連携前の`emailVerified`ではなく、連携後に取り直した値で決める。
+    // GoogleのメールアドレスはGoogle側で確認済みのため、連携でtrueに変わりうる
+    it("連携でメール確認済みに変わったならA2を挟まずA3へ進む", async () => {
+      signInWithEmail.mockResolvedValue({ ok: true, next: "email-unverified" });
+      resolveNextStepAfterLink.mockResolvedValue("mfa-setup");
+      const user = userEvent.setup();
+      render(<AccountLinkForm />);
+
+      await submitPassword(user);
+
+      await waitFor(() => {
+        expect(replace).toHaveBeenCalledWith(MFA_SETUP_PATH);
+      });
+      expect(replace).not.toHaveBeenCalledWith(VERIFY_EMAIL_PATH);
+      // 連携を終える前に読み直しても、連携による変化を捉えられない
+      expect(linkPendingGoogleAccount.mock.invocationCallOrder[0]).toBeLessThan(
+        resolveNextStepAfterLink.mock.invocationCallOrder[0],
+      );
     });
 
     // 連携の成否はB1の通知フラグで伝わる。遷移してからでは通知が間に合わない
