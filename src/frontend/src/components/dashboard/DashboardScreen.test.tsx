@@ -144,6 +144,20 @@ describe("DashboardScreen", () => {
       "href",
       "/asset-categories",
     );
+    expect(screen.queryByText("分類別内訳(総資産)")).not.toBeInTheDocument();
+  });
+
+  /** FIRE達成度は目標資産額との比較で、分類軸を参照しない(要件B1) */
+  it("分類軸が1件も無くてもFIRE達成度は出す", async () => {
+    fetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: { ...data, axes: [], byAxis: {} },
+    });
+    renderScreen();
+
+    expect(await screen.findByText("FIRE達成度")).toBeInTheDocument();
+    expect(screen.getByText("¥ 80,000,000")).toBeInTheDocument();
+    expect(screen.getByText("¥ 11,400,000")).toBeInTheDocument();
   });
 
   it("CSV未取込なら取込日時の代わりにその旨を出す", async () => {
