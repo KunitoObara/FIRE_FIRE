@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FireGoalScreen } from "@/components/fire-goal/FireGoalScreen";
+import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 
 import type { RenderResult } from "@testing-library/react";
 
@@ -112,7 +113,7 @@ describe("FireGoalScreen", () => {
     expect(toastSuccess).toHaveBeenCalledWith("FIRE目標を保存しました");
     expect(push).toHaveBeenCalledWith("/dashboard");
     // 遷移先のB1が古い目標でゲージを描かないよう、表示データも無効化する
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["dashboard-data"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
   });
 
   it("保存に失敗したら遷移しない", async () => {
