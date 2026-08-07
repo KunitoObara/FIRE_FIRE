@@ -93,7 +93,9 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
             <span className="tabular-nums">{formatLastImportedAt(data.lastImportedAt)}</span>
           </p>
 
-          {!selectedAxis ? (
+          {selectedAxis ? (
+            <NetWorthTrendCard axisName={selectedAxis.name} series={series} />
+          ) : (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">資産の表示</CardTitle>
@@ -102,15 +104,18 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
                 <DashboardEmptyState {...NO_ASSET_AXIS_EMPTY_STATE} />
               </CardContent>
             </Card>
-          ) : (
-            <>
-              <NetWorthTrendCard axisName={selectedAxis.name} series={series} />
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <CategoryBreakdownCard axisName={selectedAxis.name} slices={slices} />
-                <FireProgressCard fireProgress={data.fireProgress} />
-              </div>
-            </>
           )}
+
+          {/*
+            FIRE達成度は目標資産額と直近の資産総額の比較で、分類軸を参照していない(同要件B1)。
+            分類軸が未登録でも隠さず、内訳の空状態と並べて出す
+          */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {selectedAxis ? (
+              <CategoryBreakdownCard axisName={selectedAxis.name} slices={slices} />
+            ) : null}
+            <FireProgressCard fireProgress={data.fireProgress} />
+          </div>
 
           <CashflowSummaryCard cashflow={data.cashflow} />
         </>
