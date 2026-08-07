@@ -255,16 +255,20 @@ force push だけ `deny` のパターン列挙ではなくフックにしてあ�
 
 とくに `gh` + `merge` の判定はサブコマンドの位置を見ていないため、**レビュー対応の説明文で `merge` の語に触れるだけ**で引っかかる。`/card-review` はラウンドコメントを必ず `--body-file` で投稿すること。`docs/.env` の判定も同様に、パスに言及するだけで拒否される(`docs/.env.example` への言及は除く)。
 
-### CI では無効にしている
+### claude-review ジョブでだけ無効にしている
 
-フックは `GITHUB_ACTIONS` が設定されていれば何もせず終了する。**リポジトリにコミットした `.claude/settings.json` は、リポジトリをチェックアウトする他の Claude Code 実行にも読み込まれる**ため。
+フックは `GITHUB_ACTIONS` と `CLAUDE_GUARD_DISABLE` の**両方**が設定されているときだけ何もせず終了する。`CLAUDE_GUARD_DISABLE` を渡しているのは [.github/workflows/claude-review.yml](../.github/workflows/claude-review.yml) の `review` ジョブだけ。
 
-実際に claude-review ジョブがこれで落ちた(PR #44)。同ジョブのSDKオプションは `settingSources: ["user", "project", "local"]` で project を含むので、このフックがレビュー実行にも適用される。レビュー本文で `docs/.env` や `git push --force` に**言及した**だけで、それを引数に持つ `gh pr comment` が拒否され、`permission_denials_count: 13` で失敗した。
+無効化する口が要るのは、**リポジトリにコミットした `.claude/settings.json` が、リポジトリをチェックアウトする他の Claude Code 実行にも読み込まれる**ため。実際に claude-review ジョブがこれで落ちた(PR #44)。同ジョブのSDKオプションは `settingSources: ["user", "project", "local"]` で project を含むので、このフックがレビュー実行にも適用される。レビュー本文で `docs/.env` や `git push --force` に**言及した**だけで、それを引数に持つ `gh pr comment` が拒否され、`permission_denials_count: 13` で失敗した。
 
-CIで無効にして安全なのは、歯止めの対象がそこに存在しないから。
+このジョブで無効にして安全なのは、歯止めの対象がそこに存在しないから。
 
 - `docs/.env` は `.gitignore` の `.env` / `.env.*` で除外されており、チェックアウトに含まれない
 - claude-review の権限は `contents: read` で、そもそもpushできない
+
+**`GITHUB_ACTIONS` だけを見る形にはしない。** その条件はジョブの権限を見ておらず、`develop` / `main` へのpushや自動修正コミットを行う書き込み権限つきのワークフローが将来 `settingSources` に project を含む形で走ると、そのジョブでも歯止めがまるごと消える。ワークフロー側で明示的に変数を渡す形にしてあるのは、**ワークフローを増やすたびに「この歯止めを外してよいか」を意識せざるを得なくするため**。歯止めを必要とする権限を持つワークフローには、この変数を渡してはならない。
+
+**`CLAUDE_GUARD_DISABLE` だけを見る形にもしない。** シェルの初期化ファイルなどに残っていると、手元の実行でも歯止めが消えてしまう。AND にすればどちらの穴も塞げる。
 
 **設定に新しい歯止めを足すときは、レビュージョブを巻き込まないかを必ず考えること。** リポジトリの設定ファイルはローカル専用ではない。
 
@@ -287,6 +291,8 @@ bash .claude/hooks/run-dangerous-command-tests.sh
 ```
 
 ケースは [.claude/hooks/dangerous-command-cases.txt](../.claude/hooks/dangerous-command-cases.txt) にあり、拒否側だけでなく**誤って拒否してはいけない側**(`git push -u origin feature/fire-fire-x0` のようにブランチ名へ `-f` を含むもの、`git push -n`、`npm run build -- --force`、`cat docs/development-workflow.md` など)も含めてある。テストスクリプトは `.claude/settings.json` からフック本体を取り出して実行するので、判定ロジックの二重管理は起きない。
+
+無効化の条件も同じスクリプトが見ている。`GITHUB_ACTIONS` と `CLAUDE_GUARD_DISABLE` が揃ったときだけ素通りし、**片方だけ・空文字・どちらも無しでは歯止めが効いたまま**であることを、Bash 側と Grep / Glob / Read 側の両方のフックについて確かめる。
 
 ## 9. 前提と制約
 
