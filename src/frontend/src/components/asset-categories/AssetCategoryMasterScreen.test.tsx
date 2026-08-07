@@ -121,6 +121,26 @@ describe("AssetCategoryMasterScreen", () => {
     expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
   });
 
+  /**
+   * 選択肢は `assetSnapshots` を走査するぶん一覧より遅く終わり得る。読み込み中に保存できると、
+   * 集計対象を選べないまま「すべての資産種別が対象」の軸ができる(B4-2)
+   */
+  it("集計対象を読み込んでいるあいだは、CSV未取込の案内を出さず保存もさせない", async () => {
+    const user = userEvent.setup();
+    // 解決しないPromiseで読み込み中のまま止める
+    fetchAssetTypeOptions.mockReturnValue(new Promise(() => {}));
+    renderScreen();
+
+    await screen.findByText("総資産");
+    await user.click(screen.getByRole("button", { name: "新規分類を追加" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "集計対象の選択肢を読み込んでいます...",
+    );
+    expect(screen.queryByText(/CSVを取り込むと選択できるようになります/u)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  });
+
   it("新規分類を追加して保存すると、一覧を取り直して完了を通知する", async () => {
     const user = userEvent.setup();
     createCategoryAxis.mockResolvedValue({ ok: true });

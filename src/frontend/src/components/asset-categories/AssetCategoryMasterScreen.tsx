@@ -29,6 +29,31 @@ import type { JSX } from "react";
 const EMPTY_FORM_VALUES: AssetCategoryAxisFormValues = { name: "", assetTypeNames: [] };
 
 /**
+ * 集計対象の選択肢の状態を1つの値にまとめる。
+ *
+ * 空配列に倒すと「読み込み中」「取得失敗」「CSV未取込」が同じ見た目になり、
+ * 案内の文言と保存の可否がずれる(B4-1・B4-2)。3つを型で分けて持たせる。
+ */
+const resolveAssetTypeOptionsState = (
+  result: AssetTypeOptionsResult | undefined,
+): AssetTypeOptionsState => {
+  /*
+    結果がまだ無いあいだが読み込み中。`isPending`は見ない — `fetchAssetTypeOptions`は
+    失敗も`ok: false`として解決するので結果が`undefined`のままなのは取得中だけで、
+    両方を見ると同じ状態を2つの条件で書くことになる(レビュー指摘)
+  */
+  if (result === undefined) {
+    return { status: "loading" };
+  }
+
+  if (!result.ok) {
+    return { status: "error", message: CATEGORY_AXIS_LOAD_FAILURE_MESSAGES[result.reason] };
+  }
+
+  return { status: "ready", assetTypeNames: result.assetTypeNames };
+};
+
+/**
  * B4 資産分類マスタ設定画面の本体(docs/screen-requirements-dashboard.md B4)。
  *
  * 一覧・新規追加フォーム・編集フォーム・削除ダイアログをまとめる。Firestoreへの読み書きは
@@ -60,13 +85,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
   const axes = axesResult?.ok === true ? axesResult.axes : [];
   const axesFailureReason = axesResult !== undefined && !axesResult.ok ? axesResult.reason : null;
 
-  const assetTypeOptionsResult = assetTypeOptionsQuery.data;
-  const assetTypeOptions =
-    assetTypeOptionsResult?.ok === true ? assetTypeOptionsResult.assetTypeNames : [];
-  const assetTypeOptionsError =
-    assetTypeOptionsResult !== undefined && !assetTypeOptionsResult.ok
-      ? CATEGORY_AXIS_LOAD_FAILURE_MESSAGES[assetTypeOptionsResult.reason]
-      : null;
+  const assetTypeOptions = resolveAssetTypeOptionsState(assetTypeOptionsQuery.data);
 
   const closeForm = (): void => {
     setFormMode("closed");
@@ -138,7 +157,6 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
             <AssetCategoryAxisForm
               initialValues={EMPTY_FORM_VALUES}
               assetTypeOptions={assetTypeOptions}
-              assetTypeOptionsError={assetTypeOptionsError}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
@@ -155,7 +173,6 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
               key={editingAxis.id}
               initialValues={{ name: editingAxis.name, assetTypeNames: editingAxis.assetTypeNames }}
               assetTypeOptions={assetTypeOptions}
-              assetTypeOptionsError={assetTypeOptionsError}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
