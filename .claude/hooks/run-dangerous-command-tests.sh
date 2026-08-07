@@ -74,7 +74,6 @@ check_file_tool DENY  Grep '{"pattern":"KEY","path":"docs/.env"}'
 check_file_tool DENY  Grep '{"pattern":"KEY","glob":"docs/.env*"}'
 check_file_tool DENY  Read '{"file_path":"/repo/docs/.env"}'
 check_file_tool DENY  Read '{"file_path":"/repo/docs/.env.local"}'
-check_file_tool DENY  Read '{"file_path":"/repo/docs/.env.example.bak"}'
 check_file_tool ALLOW Grep '{"pattern":"KEY","path":"docs/"}'
 check_file_tool ALLOW Grep '{"pattern":"KEY","path":"src/frontend"}'
 check_file_tool ALLOW Read '{"file_path":"/repo/docs/development-workflow.md"}'
@@ -82,6 +81,14 @@ check_file_tool ALLOW Read '{"file_path":"/repo/docs/development-workflow.md"}'
 # 外してあるので、Read ツールからも実際に読める。
 check_file_tool ALLOW Read '{"file_path":"/repo/docs/.env.example"}'
 check_file_tool ALLOW Grep '{"pattern":"KEY","path":"docs/.env.example"}'
+check_file_tool ALLOW Glob '{"pattern":"docs/.env.example"}'
+check_file_tool ALLOW Glob '{"pattern":"docs/*.md"}'
+# .example に見えて .example でない形。sed 式は Bash 側と同一だが、片方だけ
+# ずれたときに気づけるよう、境界条件は両側で同じだけ持たせる
+# (dangerous-command-cases.txt の対応するケースと対で見ること)。
+check_file_tool DENY  Read '{"file_path":"/repo/docs/.env.example.bak"}'
+check_file_tool DENY  Read '{"file_path":"/repo/docs/.env.exampleX"}'
+check_file_tool DENY  Glob '{"pattern":"docs/.env.*"}'
 
 # CI(GitHub Actions)では歯止めごと無効になること。
 # claude-review ジョブは settingSources に project を含むため、このフックを
