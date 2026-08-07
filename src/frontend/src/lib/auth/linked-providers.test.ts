@@ -1,7 +1,12 @@
 import { FirebaseError } from "firebase/app";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getLinkedProviders, linkGoogleAccount, unlinkProvider } from "@/lib/auth/linked-providers";
+import {
+  getLinkedProviders,
+  linkGoogleAccount,
+  unlinkPasswordProvider,
+  unlinkProvider,
+} from "@/lib/auth/linked-providers";
 import { FirebaseConfigurationError } from "@/lib/firebase/client";
 
 import type { Auth, User, UserCredential, UserInfo } from "firebase/auth";
@@ -17,14 +22,17 @@ const auth = {
 } as Auth;
 
 const getFirebaseAuth = vi.fn<() => Auth>();
+const getFirebaseFunctions = vi.fn();
 const linkWithPopup = vi.fn<(user: User, provider: unknown) => Promise<UserCredential>>();
 const unlink = vi.fn<(user: User, providerId: string) => Promise<User>>();
 const reload = vi.fn<(user: User) => Promise<void>>();
+const callable = vi.fn<(data: unknown) => Promise<unknown>>();
 
 // 実際のクラスは`instanceof`判定に使うため、差し替えるのは関数だけにする
 vi.mock("@/lib/firebase/client", async (importOriginal) => ({
   ...(await importOriginal<typeof FirebaseClientModule>()),
   getFirebaseAuth: () => getFirebaseAuth(),
+  getFirebaseFunctions: () => getFirebaseFunctions(),
 }));
 
 vi.mock("firebase/auth", () => ({
@@ -33,6 +41,16 @@ vi.mock("firebase/auth", () => ({
   reload: (user: User) => reload(user),
   unlink: (user: User, providerId: string) => unlink(user, providerId),
 }));
+
+vi.mock("firebase/functions", () => ({
+  httpsCallable: () => (data: unknown) => callable(data),
+}));
+
+/** callableが投げるエラーの形(`src/lib/auth/callable-error.ts`が読むのはこの2項目だけ) */
+const callableError = (code: string, reason?: string): unknown => ({
+  code,
+  ...(reason === undefined ? {} : { details: { reason } }),
+});
 
 /** 連携済みプロバイダだけを持つ`User`。判断に効くのは`providerData`のみ */
 const userWith = (...providerData: Partial<UserInfo>[]): User => ({ providerData }) as User;
@@ -57,6 +75,10 @@ beforeEach(() => {
   unlink.mockImplementation(async (user) => user);
   reload.mockReset();
   reload.mockResolvedValue(undefined);
+  callable.mockReset();
+  callable.mockResolvedValue({ data: { ok: true } });
+  getFirebaseFunctions.mockReset();
+  getFirebaseFunctions.mockReturnValue({});
   currentUser = userWith(passwordProvider, googleProvider);
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -199,5 +221,68 @@ describe("unlinkProvider", () => {
     unlink.mockRejectedValue(new Error("想定外"));
 
     await expect(unlinkProvider("google.com")).resolves.toEqual({ ok: false, reason: "unknown" });
+  });
+});
+
+/**
+ * パスワードの解除だけはクライアントSDKを使わず、本人確認と解除をまとめたcallableを通す
+ * (docs/screen-requirements-account.md「メールアドレス / パスワードの解除」)。
+ * 前提条件の判定はサーバー側にあるため、ここで見るのは受け渡しと理由の読み替えだけ。
+ */
+describe("unlinkPasswordProvider", () => {
+  it("パスワードをcallableへ渡し、ユーザー情報を取り直す", async () => {
+    await expect(unlinkPasswordProvider("Passw0rd!")).resolves.toEqual({ ok: true });
+    expect(callable).toHaveBeenCalledWith({ password: "Passw0rd!" });
+    expect(reload).toHaveBeenCalledWith(currentUser);
+  });
+
+  /** 解除はサーバー側で済んでいるため、取り直しの失敗で結果を巻き戻さない */
+  it("ユーザー情報を取り直せなくても成功として返す", async () => {
+    reload.mockRejectedValue(new Error("network"));
+
+    await expect(unlinkPasswordProvider("Passw0rd!")).resolves.toEqual({ ok: true });
+  });
+
+  it.each([
+    "not-linked",
+    "last-provider",
+    "password-required",
+    "invalid-credential",
+    "too-many-requests",
+    "unlink-failed",
+  ])("バックエンドの理由 %s をそのまま返す", async (reason) => {
+    callable.mockRejectedValue(callableError("functions/permission-denied", reason));
+
+    await expect(unlinkPasswordProvider("Passw0rd!")).resolves.toEqual({ ok: false, reason });
+  });
+
+  /** 未サインインは他の画面と同じ呼び方に揃える(`callable-error.ts`の読み替え) */
+  it("unauthenticatedはsigned-outとして返す", async () => {
+    callable.mockRejectedValue(callableError("functions/unauthenticated", "unauthenticated"));
+
+    await expect(unlinkPasswordProvider("Passw0rd!")).resolves.toEqual({
+      ok: false,
+      reason: "signed-out",
+    });
+  });
+
+  it("callableに到達できない場合はunavailableとして返す", async () => {
+    callable.mockRejectedValue(callableError("functions/internal"));
+
+    await expect(unlinkPasswordProvider("Passw0rd!")).resolves.toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+  });
+
+  it("Firebaseの設定不足は設定エラーとして返す", async () => {
+    getFirebaseFunctions.mockImplementation(() => {
+      throw new FirebaseConfigurationError("設定がありません");
+    });
+
+    await expect(unlinkPasswordProvider("Passw0rd!")).resolves.toEqual({
+      ok: false,
+      reason: "configuration-error",
+    });
   });
 });

@@ -17,6 +17,7 @@ const downloadRecoveryCodes = vi.fn();
 const getLinkedProviders = vi.fn<() => LinkedProviderStatus[]>();
 const linkGoogleAccount = vi.fn();
 const unlinkProvider = vi.fn();
+const unlinkPasswordProvider = vi.fn();
 const replace = vi.fn();
 
 vi.mock("@/lib/firebase/client", () => ({
@@ -48,6 +49,7 @@ vi.mock("@/lib/auth/linked-providers", () => ({
   getLinkedProviders: () => getLinkedProviders(),
   linkGoogleAccount: () => linkGoogleAccount(),
   unlinkProvider: (...args: unknown[]) => unlinkProvider(...args),
+  unlinkPasswordProvider: (...args: unknown[]) => unlinkPasswordProvider(...args),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -100,6 +102,7 @@ describe("AccountSettingsScreen", () => {
     getLinkedProviders.mockReturnValue(linkedProviders(true));
     linkGoogleAccount.mockResolvedValue({ ok: true });
     unlinkProvider.mockResolvedValue({ ok: true });
+    unlinkPasswordProvider.mockResolvedValue({ ok: true });
   });
 
   describe("アカウント情報", () => {
@@ -347,8 +350,8 @@ describe("AccountSettingsScreen", () => {
       expect(await screen.findByText(/Googleでの連携を解除しました/)).toBeInTheDocument();
     });
 
-    /** パスワードの解除は戻せないため、失うものをダイアログで伝える */
-    it("パスワードの解除では復旧手段を失う旨を確認ダイアログに出す", async () => {
+    /** パスワードの解除は戻せないため、失うものを伝えたうえで本人確認まで求める */
+    it("パスワードの解除では復旧手段を失う旨と本人確認をダイアログに出す", async () => {
       const user = userEvent.setup();
       renderScreen();
 
@@ -364,6 +367,56 @@ describe("AccountSettingsScreen", () => {
       expect(
         screen.getByText(/2FAの再設定・リカバリーコードの発行・リカバリーコードでの復旧も使えなく/),
       ).toBeInTheDocument();
+      expect(await screen.findByLabelText("パスワード")).toBeInTheDocument();
+    });
+
+    it("パスワードを確認したうえで解除し、画面内にメッセージを出す", async () => {
+      const user = userEvent.setup();
+      renderScreen();
+
+      getLinkedProviders.mockReturnValue(linkedProviders(true, false));
+      await confirmWithPassword(
+        user,
+        "メールアドレス / パスワードの連携を解除",
+        "確認して解除する",
+      );
+
+      await waitFor(() => {
+        expect(unlinkPasswordProvider).toHaveBeenCalledWith("Passw0rd!");
+      });
+      expect(
+        await screen.findByText(/メールアドレス \/ パスワードでの連携を解除しました/),
+      ).toBeInTheDocument();
+    });
+
+    /** 本人確認が通らないうちは解除しない。ダイアログを閉じず入力し直せるようにする */
+    it("パスワードが誤っていれば解除せずエラーを出す", async () => {
+      const user = userEvent.setup();
+      unlinkPasswordProvider.mockResolvedValue({ ok: false, reason: "invalid-credential" });
+      renderScreen();
+
+      await confirmWithPassword(
+        user,
+        "メールアドレス / パスワードの連携を解除",
+        "確認して解除する",
+      );
+
+      expect(await screen.findByText("パスワードが正しくありません。")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", {
+          name: "メールアドレス / パスワードでのログインを解除しますか?",
+        }),
+      ).toBeInTheDocument();
+    });
+
+    /** Googleの解除は連携し直せるため、本人確認は挟まない(要件どおり確認だけ) */
+    it("Googleの解除ではパスワードを求めない", async () => {
+      const user = userEvent.setup();
+      renderScreen();
+
+      await user.click(await screen.findByRole("button", { name: "Googleの連携を解除" }));
+
+      expect(screen.queryByLabelText("パスワード")).not.toBeInTheDocument();
     });
 
     it("解除に失敗したらダイアログを閉じずにエラーを出す", async () => {
