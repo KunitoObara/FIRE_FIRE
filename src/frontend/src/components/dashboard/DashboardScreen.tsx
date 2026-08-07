@@ -45,6 +45,15 @@ const resolveErrorMessage = (
   return unexpectedError ? DASHBOARD_UNEXPECTED_ERROR_MESSAGE : null;
 };
 
+/**
+ * その場でやり直す意味があるか。
+ *
+ * ログイン切れ・設定不備は再取得しても同じ結果にしかならず、文言で案内している
+ * 「ログインし直す」より先にボタンを押させてしまう。押せる導線は残さない。
+ */
+const isRetryable = (failureReason: FirestoreAccessFailureReason | null): boolean =>
+  failureReason !== "signed-out" && failureReason !== "configuration-error";
+
 /** 直近CSV取込日時の表示。未取込のときは日時の代わりにその旨を出す */
 const formatLastImportedAt = (isoDateTime: string | null): string =>
   isoDateTime ? format(parseISO(isoDateTime), "yyyy/MM/dd HH:mm") : NO_CSV_IMPORT_LABEL;
@@ -127,17 +136,19 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
         <div role="alert" className="flex flex-col items-start gap-3">
           <p className="text-sm text-destructive">{errorMessage}</p>
           {/* リロードしか手が無い状態にしない。一時的な失敗ならこの場で回復できる */}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={dashboardQuery.isFetching}
-            onClick={() => {
-              void dashboardQuery.refetch();
-            }}
-          >
-            {dashboardQuery.isFetching ? DASHBOARD_RETRYING_LABEL : DASHBOARD_RETRY_LABEL}
-          </Button>
+          {isRetryable(failureReason) ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={dashboardQuery.isFetching}
+              onClick={() => {
+                void dashboardQuery.refetch();
+              }}
+            >
+              {dashboardQuery.isFetching ? DASHBOARD_RETRYING_LABEL : DASHBOARD_RETRY_LABEL}
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
