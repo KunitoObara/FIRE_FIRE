@@ -14,6 +14,7 @@ import {
   ASSET_TYPE_OPTIONS_QUERY_KEY,
   CATEGORY_AXES_QUERY_KEY,
 } from "@/constants/asset-categories";
+import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 import {
   createCategoryAxis,
   deleteCategoryAxis,
@@ -82,6 +83,8 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
       closeForm();
       void queryClient.invalidateQueries({ queryKey: CATEGORY_AXES_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ASSET_TYPE_OPTIONS_QUERY_KEY });
+      // 分類軸はB1の軸セレクタと集計そのものを決めるので、B1の表示データも取り直させる
+      void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
     }
 
     return result;
@@ -96,6 +99,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
       toast.success("分類を削除しました");
       void queryClient.invalidateQueries({ queryKey: CATEGORY_AXES_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ASSET_TYPE_OPTIONS_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
     }
 
     return result;
