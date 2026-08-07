@@ -67,6 +67,25 @@ DENY|grep API_KEY docs/.env
 DENY|source docs/.env
 DENY|cp docs/.env /tmp/x
 
+# --- 拒否されるべき: .env の他のサフィックス ---
+# 除外するのは .example だけ。.gitignore が例外にしているのがこれ1つで、
+# .env.local / .env.sample などは依然 .env.* で無視される=秘密側の扱い。
+DENY|cat docs/.env.local
+DENY|cat docs/.env.production
+DENY|cat docs/.env.sample
+
+# --- 通すべき: コミット対象のテンプレート ---
+# .gitignore の `!.env.example` で除外対象から外してあるため、実際に追加されうる。
+ALLOW|cat docs/.env.example
+ALLOW|git add docs/.env.example
+ALLOW|diff docs/.env.example src/frontend/.env.example
+
+# --- 拒否されるべき: .example に見えて .example でないもの ---
+# 除外はパス境界で終わる .example だけに限る。判断がつかない形は安全側に倒す。
+DENY|cat docs/.env.example.bak
+DENY|cat docs/.env.exampleX
+DENY|cp docs/.env.example docs/.env
+
 # --- 通すべき: docs 配下の他のファイル ---
 ALLOW|cat docs/development-workflow.md
 ALLOW|ls docs/
