@@ -214,7 +214,7 @@ Trello: <カードのURL>
 | `firebase deploy` | `permissions.deny` | 拒否 |
 | 再帰的な強制削除(`rm -rf` 系) | `permissions.deny` + `PreToolUse` フック | 拒否 |
 | マージ(`gh pr merge`、`gh api` の `.../merge`、`gh api` の書き込み) | `permissions.deny` + `PreToolUse` フック | 拒否 |
-| `docs/.env` | `permissions.deny` + `PreToolUse` フック(Bash / Grep / Glob / Read) | 拒否 |
+| `docs/.env`(`.env.example` を除く) | `permissions.deny` + `PreToolUse` フック(Bash / Grep / Glob / Read) | 拒否 |
 | force push | `PreToolUse` フック | 拒否 |
 | `git reset --hard` / `git clean -f` 系 | `PreToolUse` フック | **確認**(作業中の変更を消すため、拒否ではなく都度確認) |
 
@@ -223,6 +223,14 @@ Trello: <カードのURL>
 - **マージ** — `Bash(gh pr merge:*)` は `gh -R <repo> pr merge` のようにグローバルオプションが挟まる形を拾えず、そもそも `gh api repos/<owner>/<repo>/pulls/<番号>/merge -X PUT` と REST API を直接叩けば `gh pr merge` を通らずにマージできてしまう。フックは「`gh` トークン + `merge` トークン」で拒否し、あわせて `gh api` の書き込みも拒否する。書き込みの判定は `-X` / `--method` だけでなく `-f` / `-F` / `--raw-field` / `--input` も見る — `gh api` はこれらを渡すとメソッド未指定でもPOSTになるため。`gh api` の allow はPRコメント取得だけに絞ってある
 - **再帰的な強制削除** — `Bash(rm -rf:*)` は前方一致なので `rm -fr`、`rm --recursive --force`、`rm /tmp/x -rf` のようにフラグが末尾に来る形を拾えない。破壊力は作業ツリー丸ごとなのでフックでも見る。判定は「`rm` トークン + force 系フラグ + 再帰フラグ」で、`rm -f`(再帰でない)や `rm -r`(強制でない)は通す
 - **`docs/.env`** — `Read(./docs/.env)` は `Read` ツールしか塞がない。`cat docs/.env` のような Bash 経由に加えて、**`Grep` は一致行を返すので内容が読める**。フックを Bash と Grep / Glob / Read の両方に掛けてあり、コマンド文字列やツール引数にパスが現れた時点で拒否する。パスに言及するだけのコマンドも巻き添えで拒否されるが、秘密情報なので安全側に倒している
+
+  唯一の例外が **`docs/.env.example`**。`.gitignore` は `.env` / `.env.*` で無視したうえで `!.env.example` だけを除外対象から外しており、テンプレートはコミット対象として追加されうる。部分一致のままだとこれを触るコマンドまで巻き添えで拒否されるため、フックは判定の前に `docs/.env.example` を**パス境界で終わる形のときだけ**取り除いてから `docs/.env` を探す。`docs/.env.example.bak` や `cp docs/.env.example docs/.env` は境界で終わらない/本体を指すので従来どおり拒否される。
+
+  **境界に `/` は含めない。** 含めると `cat docs/.env.example/../.env` のようにテンプレートをディレクトリに見立てて本体へ降りる形で、`docs/.env.example/` ごと除去されて判定対象から本体のパスが消え、素通りする(`docs/.env.example` が実際にディレクトリなら、この文字列は本体を指す)。境界として扱うのは空白・クォート・`&`・`;` のように**パスがそこで終わる**文字だけで、`/` は「まだ続く」文字として扱う。副作用として `ls docs/.env.example/` も拒否されるが、安全側に倒している。
+
+  除外するサフィックスは `.example` **だけ**にしてある。`.env.sample` や `.env.template` は `.gitignore` の例外に入っておらず、置かれれば秘密ファイル側の扱いになるため、通してしまうと守備範囲に穴が開く。
+
+  `permissions.deny` からは `Read(./docs/.env.*)` を外し、`Read(./docs/.env)` だけを残してある。`permissions` のパターンには否定が書けず、`deny` は `allow` より優先されるため、これを残したままだと `Read` ツールからテンプレートが読めない。サフィックス付きの判定はフックに一本化し、`permissions` 側のフォールバックは `docs/.env` 本体のみを守る、と割り切った(この割り切りが妥当なのは、`.env.local` のような派生ファイルが**まだ存在しない**ためでもある。増やすときはフックが効いていることを回帰テストで確かめること)
 
 `git reset --hard` / `git clean` も `permissions.ask` ではなくフックで見る。`permissions` のパターンは前方一致なので、`git -C . reset --hard` のようにグローバルオプションが挟まる形や `git clean -df` のようなフラグ順序違いを拾えず、force push で見つかったのと同じ抜け方をするため。フックは「`git` トークンがある」+「`reset` トークンと `--hard`」/「`clean` トークンと force 系フラグ」で判定し、`permissionDecision: ask` を返す。`git reset --soft` や `git clean -n` は通す。
 
@@ -245,7 +253,7 @@ force push だけ `deny` のパターン列挙ではなくフックにしてあ�
 | `gh pr comment <番号> --body "...merge..."` | `gh pr comment <番号> --body-file <file>` |
 | `gh pr create --body "...--force..."` | `gh pr create --body-file <file>` |
 
-とくに `gh` + `merge` の判定はサブコマンドの位置を見ていないため、**レビュー対応の説明文で `merge` の語に触れるだけ**で引っかかる。`/card-review` はラウンドコメントを必ず `--body-file` で投稿すること。`docs/.env` の判定も同様に、パスに言及するだけで拒否される。
+とくに `gh` + `merge` の判定はサブコマンドの位置を見ていないため、**レビュー対応の説明文で `merge` の語に触れるだけ**で引っかかる。`/card-review` はラウンドコメントを必ず `--body-file` で投稿すること。`docs/.env` の判定も同様に、パスに言及するだけで拒否される(`docs/.env.example` への言及は除く)。
 
 ### CI では無効にしている
 
