@@ -64,14 +64,12 @@ const data: DashboardData = {
 };
 
 /**
- * 失敗を試すテストがあるので再試行は切る。既定の3回リトライは待ち時間が入るだけで、
- * 画面の分岐の確認には何も足さない(本番の既定は変えていない)
+ * リトライはここでは切らない。画面側が`retry: false`を指定しており、既定のまま包んでも
+ * 失敗のテストが指数バックオフで待たされないことを、この形のまま確かめられる
  */
 const renderScreen = (props: Partial<DashboardScreenProps> = {}): RenderResult =>
   render(
-    <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-    >
+    <QueryClientProvider client={new QueryClient()}>
       <DashboardScreen axisParam={undefined} periodParam={undefined} {...props} />
     </QueryClientProvider>,
   );
