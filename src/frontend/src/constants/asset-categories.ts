@@ -1,5 +1,7 @@
 /** B4 資産分類マスタ設定画面で使う定数(docs/screen-requirements-dashboard.md B4) */
 
+import { FIRESTORE_QUERY_LIMIT_MAX } from "@/constants/firebase";
+
 /** 分類名の最大文字数。firestore.rulesの`categoryAxes`の検証と一致させる */
 export const CATEGORY_AXIS_NAME_MAX_LENGTH = 40;
 
@@ -7,8 +9,13 @@ export const CATEGORY_AXIS_NAME_MAX_LENGTH = 40;
  * 集計対象を読み込む対象範囲の上限(assetSnapshotsの走査件数)。
  * 資産残高は1日1行なので、10年分でもこの件数には収まる
  * (src/constants/csv-import.ts の`MAX_ASSET_BALANCE_ROWS`と同じ考え方)。
+ *
+ * 値は`FIRESTORE_QUERY_LIMIT_MAX`(Firestoreが`limit()`に許す最大値)そのもの。
+ * **これより大きい値は置けない。** 超えるとクエリが`invalid-argument`で拒否され、
+ * 選択肢が1件も出せなくなる(B1-3)。CSVを取り込んでいないアカウントと区別が付かない
+ * 空の選択肢になるため、取り込み済みでも集計対象を選べない状態になる。
  */
-export const ASSET_TYPE_SCAN_LIMIT = 20_000;
+export const ASSET_TYPE_SCAN_LIMIT = FIRESTORE_QUERY_LIMIT_MAX;
 
 /** 一覧に出す集計対象の名前の表示件数。超過分は「ほかN件」にまとめる */
 export const CATEGORY_AXIS_MEMBER_DISPLAY_LIMIT = 2;
