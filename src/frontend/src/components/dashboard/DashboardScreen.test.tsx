@@ -63,9 +63,15 @@ const data: DashboardData = {
   cashflow: null,
 };
 
+/**
+ * 失敗を試すテストがあるので再試行は切る。既定の3回リトライは待ち時間が入るだけで、
+ * 画面の分岐の確認には何も足さない(本番の既定は変えていない)
+ */
 const renderScreen = (props: Partial<DashboardScreenProps> = {}): RenderResult =>
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <DashboardScreen axisParam={undefined} periodParam={undefined} {...props} />
     </QueryClientProvider>,
   );
@@ -186,6 +192,50 @@ describe("DashboardScreen", () => {
       "このデータの参照が許可されていません。ログインし直してください。",
     );
     expect(screen.queryByText("資産推移(総資産)")).not.toBeInTheDocument();
+  });
+
+  /**
+   * 取得後の集計はリポジトリのtry/catchの外で走るので、壊れたデータが混じると
+   * `ok: false`ではなく例外になる。何も出ないまま終わらせない
+   */
+  it("取得が例外で落ちたらメッセージと再試行の導線を出す", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchDashboardData.mockRejectedValue(new Error("Invalid time value"));
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "データを表示できませんでした。再試行しても直らない場合は、取り込んだCSVのデータに問題がある可能性があります。",
+    );
+    expect(screen.getByRole("button", { name: "再試行する" })).toBeEnabled();
+    // 画面の文言では原因まで辿れないので、開発者向けの手掛かりを残す
+    expect(consoleError).toHaveBeenCalled();
+
+    consoleError.mockRestore();
+  });
+
+  it("「再試行する」で取得をやり直し、成功すれば表示に切り替わる", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const user = userEvent.setup();
+    fetchDashboardData.mockRejectedValueOnce(new Error("Invalid time value"));
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "再試行する" }));
+
+    expect(await screen.findByText("資産推移(総資産)")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    consoleError.mockRestore();
+  });
+
+  /** 取得失敗(`ok: false`)も、リロード以外の回復手段が無い状態にはしない */
+  it("取得に失敗したときも再試行できる", async () => {
+    const user = userEvent.setup();
+    fetchDashboardData.mockResolvedValueOnce({ ok: false, reason: "unknown" });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "再試行する" }));
+
+    expect(await screen.findByText("資産推移(総資産)")).toBeInTheDocument();
   });
 
   it("分類軸を切り替えるとURLのクエリを差し替える", async () => {
