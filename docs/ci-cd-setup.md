@@ -63,6 +63,21 @@ do
     --member="serviceAccount:$SA" --role="$role" --condition=None
 done
 
+# ログイン通知の Blocking Function（`sendLoginNotification`）のデプロイには、
+# Identity Platform の設定（テナント設定に相当）の書き換えが要る。既定のロールには
+# 含まれないため、必要な2権限だけのカスタムロールを作って付与する。
+# 付与しないと、関数の作成まで進んだあと 403 でデプロイが失敗する（13.4）。
+gcloud iam roles create firebaseAuthConfigWriter \
+  --project="$PROJECT_ID" \
+  --title="Firebase Auth Config Writer" \
+  --description="Blocking Functions の登録に必要な Identity Platform 設定の読み書き" \
+  --permissions=firebaseauth.configs.get,firebaseauth.configs.update \
+  --stage=GA
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA" \
+  --role="projects/$PROJECT_ID/roles/firebaseAuthConfigWriter" --condition=None
+
 # Workload Identity プール／プロバイダを作り、対象リポジトリからのみ引き受けられるよう条件を絞る
 gcloud iam workload-identity-pools create github \
   --project="$PROJECT_ID" --location=global --display-name="GitHub Actions"
@@ -533,7 +548,12 @@ http://localhost:3000/reset-password?oobCode=<コピーした値>
 
 ## 13. ログイン通知メール（Resend）の準備
 
-ログイン通知（[auth-login-requirements.md](./auth-login-requirements.md) 3.6 / 3.8）は Blocking Function `sendLoginNotification` が Resend の HTTP API を叩いて送る。API キーの発行だけが repo の外の作業で、**Identity Platform 側へのトリガー登録は `firebase deploy --only functions` が自動で行う**（コンソールでの登録操作は不要）。
+ログイン通知（[auth-login-requirements.md](./auth-login-requirements.md) 3.6 / 3.8）は Blocking Function `sendLoginNotification` が Resend の HTTP API を叩いて送る。repo の外の作業は 2 つある。
+
+1. Resend の API キーを発行し、Secret Manager に登録する（13.1 → 5 章）
+2. デプロイ用サービスアカウントに Identity Platform の設定書き換え権限を付与する（2 章のカスタムロール）
+
+**Identity Platform 側へのトリガー登録そのものは `firebase deploy --only functions` が自動で行う**ためコンソールでの登録操作は不要だが、その書き込みを CI のサービスアカウントが行う以上、2 の権限が要る。これが無いと 13.4 のエラーになる。
 
 ### 13.1 API キーを発行する
 
@@ -555,6 +575,24 @@ http://localhost:3000/reset-password?oobCode=<コピーした値>
 - 2FA を登録済みのアカウントで、**確認コードを入力する前には届かない**こと。`beforeUserSignedIn` は第 2 要素の検証後に発火するため、第 1 要素だけ通った時点では送られない
 
 届かない場合は Cloud Functions のログ（`sendLoginNotification`）を見る。`RESEND_API_KEYが未設定` の警告が出ていればシークレットの登録漏れ、`メールを送信できませんでした` とステータスコードが出ていれば Resend 側の拒否（宛先制約か無効なキー）。**通知の失敗はログインを妨げない**設計なので、ログインが成功していても送信は失敗していることがある。
+
+### 13.4 デプロイが `identitytoolkit` の 403 で失敗する場合
+
+デプロイ用サービスアカウントに 2 章のカスタムロール（`firebaseAuthConfigWriter`）が付いていない。
+
+```
+i  functions: creating Node.js 22 (2nd Gen) function sendLoginNotification(asia-northeast1)...
+Request to https://identitytoolkit.googleapis.com/admin/v2/projects/<project-id>/config
+  had HTTP Error: 403, The caller does not have permission
+Functions deploy had errors with the following functions:
+	sendLoginNotification(asia-northeast1)
+```
+
+**他の関数は成功し、`sendLoginNotification` だけが失敗する**のが特徴。Blocking Function はコードのデプロイに加えて Identity Platform の設定へトリガーの URI を書き込むため、そこだけ追加の権限を要求する。デプロイステップが失敗した時点でジョブが止まるので、後続の App Hosting ロールアウトも実行されず、**フロントエンドも反映されない**。
+
+2 章のカスタムロールを作って付与し、デプロイを再実行する。既定ロールの `roles/firebaseauth.admin` でも解消するが、そちらは**利用者アカウントの作成・削除を含む 16 権限**を CI のサービスアカウントに与えることになるため採っていない。必要なのは `firebaseauth.configs.get` と `firebaseauth.configs.update` の 2 つだけ。
+
+`identitytoolkit.googleapis.com` 自体は 9 章の Identity Platform へのアップグレードで有効化済みのため、API の有効化は不要（未有効なら 403 ではなく `SERVICE_DISABLED` になる）。
 
 ## 14. 今後の検討事項（オープン課題）
 
