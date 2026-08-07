@@ -2,6 +2,10 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    // Storageは現時点で使っていない。B2のCSV取込はブラウザ上でパースして数値だけを
+    // Firestoreへ保存し、生ファイルは保管しない
+    // (docs/fire-asset-management-requirements.md 4.2)。
+    // 用途ができるまで全拒否のままにしておく。
     match /{allPaths=**} {
       allow read, write: if false;
     }

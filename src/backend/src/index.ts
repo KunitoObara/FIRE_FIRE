@@ -1,3 +1,22 @@
 import { initializeApp } from "firebase-admin/app";
+import { setGlobalOptions } from "firebase-functions";
+
+/**
+ * Cloud Functionsのリージョン。
+ * Storageのロケーション(docs/ci-cd-setup.md)と揃え、dev/prodで共通にする。
+ */
+const FUNCTIONS_REGION = "asia-northeast1";
 
 initializeApp();
+setGlobalOptions({ region: FUNCTIONS_REGION });
+
+export {
+  generateMfaRecoveryCodes,
+  getMfaRecoveryCodeStatus,
+  resetMfaEnrollment,
+  useMfaRecoveryCode,
+} from "./mfa-recovery/functions";
+
+export { unlinkPasswordProvider } from "./linked-providers/functions";
+
+export { sendLoginNotification } from "./login-notification/functions";

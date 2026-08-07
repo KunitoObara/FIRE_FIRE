@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(gh pr merge:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(rm -rf:*)",
+      "Read(./docs/.env)"
+    ],
+    "allow": [
+      "mcp__trello__get_lists",
+      "mcp__trello__get_board_labels",
+      "mcp__trello__get_board_members",
+      "mcp__trello__get_cards_by_list_id",
+      "mcp__trello__get_card",
+      "mcp__trello__get_card_comments",
+      "mcp__trello__get_card_history",
+      "mcp__trello__get_checklist_items",
+      "mcp__trello__get_acceptance_criteria",
+      "mcp__trello__move_card",
+      "mcp__trello__add_comment",
+      "mcp__trello__add_card_to_list",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh api repos/KunitoObara/private_room/pulls/*/comments*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "禁止コマンドをチェック中",
+            "command": "[ -n \"${GITHUB_ACTIONS:-}\" ] && [ -n \"${CLAUDE_GUARD_DISABLE:-}\" ] && exit 0\nr() { printf '%s' \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"permissionDecision\\\":\\\"$1\\\",\\\"permissionDecisionReason\\\":\\\"$2\\\"}}\"; exit 0; }\nc=$(jq -r '.tool_input.command')\nm() { printf '%s' \"$c\" | grep -Eq \"$1\"; }\nt() { m \"(^|[^[:alnum:]_.-])$1([^[:alnum:]_.-]|\\$)\"; }\nF='(^|[[:space:]])--force(-with-lease)?([[:space:]=]|$)|(^|[[:space:]])-[[:alnum:]]*f[[:alnum:]]*([[:space:]]|$)'\nR='(^|[[:space:]])--recursive([[:space:]]|$)|(^|[[:space:]])-[[:alnum:]]*[rR][[:alnum:]]*([[:space:]]|$)'\n# 次の sed 式は Grep|Glob|Read 側フックのものと同一に保つこと。JSON に埋め込む別々のシェル文字列なので共有できない。片方だけ変えると回帰テストのもう片方が落ちる。\ne() { sed -E -e 's#docs/\\.env\\.example([^[:alnum:]_./-])#\\1#g' -e 's#docs/\\.env\\.example$##'; }\nprintf '%s' \"$c\" | e | grep -Eq 'docs/\\.env' && r deny 'docs/.env は秘密情報です。読み取り・出力・コミットのいずれも禁止です(CLAUDE.md)。パスに言及するだけのコマンドも安全側で拒否しています。コミット対象のテンプレート docs/.env.example だけは除外します。'\nt gh && { t merge && r deny 'マージはPOの操作です(docs/development-workflow.md 8章)。gh pr merge も gh api の .../merge も対象です。コメント本文に merge の語が含まれただけでもここに来ます。その場合は --body-file でファイル渡しにしてください。'; t api && m '(^|[[:space:]])(-X|--method|-f|-F|--raw-field|--input)([[:space:]=]|$)' && r deny 'gh api での書き込みは禁止です。読み取り以外はPOの操作です(docs/development-workflow.md 8章)。-f / -F はメソッド未指定でもPOSTになります。'; }\nt rm && m \"$F\" && m \"$R\" && r deny '再帰的な強制削除は禁止です(docs/development-workflow.md 8章)。-rf / -fr / -Rf / --recursive --force のいずれも対象です。'\nt git || exit 0\nt push && { m \"$F|[[:space:]]\\+[^[:space:]]+\" && r deny 'force push は禁止です(docs/development-workflow.md 8章)。--force / --force-with-lease / f を含む短オプション / + 付きリフスペックのいずれも対象です。'; }\nt reset && m '(^|[[:space:]])--hard([[:space:]]|$)' && r ask '未コミットの変更が失われます。実行してよいか確認してください(docs/development-workflow.md 8章)。'\nt clean && m \"$F\" && r ask '追跡外のファイルが削除されます。実行してよいか確認してください(docs/development-workflow.md 8章)。'\nexit 0\n"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep|Glob|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "秘密ファイルをチェック中",
+            "command": "[ -n \"${GITHUB_ACTIONS:-}\" ] && [ -n \"${CLAUDE_GUARD_DISABLE:-}\" ] && exit 0\n# 次の sed 式は Bash 側フックの e() と同一に保つこと。JSON に埋め込む別々のシェル文字列なので共有できない。片方だけ変えると回帰テストのもう片方が落ちる。\njq -r '.tool_input | tostring' | sed -E -e 's#docs/\\.env\\.example([^[:alnum:]_./-])#\\1#g' -e 's#docs/\\.env\\.example$##' | grep -Eq 'docs/\\.env' && printf '%s' \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"permissionDecision\\\":\\\"deny\\\",\\\"permissionDecisionReason\\\":\\\"docs/.env は秘密情報です。Grep は一致行を返すため内容が読めてしまいます。読み取り・出力・コミットのいずれも禁止です(CLAUDE.md)。コミット対象のテンプレート docs/.env.example だけは除外します。\\\"}}\"\nexit 0\n"
+          }
+        ]
+      }
+    ]
+  }
+}

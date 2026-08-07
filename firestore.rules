@@ -2,6 +2,242 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 2FAリカバリーコードのハッシュ(docs/auth-login-requirements.md 3.3)。
+    // Cloud FunctionsがAdmin SDKで読み書きし(セキュリティルールを経由しない)、
+    // クライアントからは本人であっても一切触らせない。
+    // Firestoreに残るのはscryptハッシュだけで平文は保存しないが、ハッシュはオフラインでの
+    // 総当たりの起点になりうるため、参照させる理由が無い以上は明示的に拒否しておく。
+    // 残り本数のような表示用の情報も、この領域を読ませる代わりにcallableの応答で返す。
+    match /mfaRecoveryCodes/{userId} {
+      allow read, write: if false;
+    }
+
+    // ユーザー自身の資産データ(docs/fire-asset-management-requirements.md 5章)。
+    //
+    // B2 CSV取込はクライアントSDKから直接書き込む。認証状態はブラウザ側のFirebase SDKが
+    // 持っていてサーバー側から`uid`を特定できないため、アクセス制御はここが唯一の砦になる
+    // (画面側の`AppAccessGuard`は表示制御であって保護ではない)。
+    //
+    // メール未確認のアカウントを弾くのは、アドレスの所有者ではない相手が作った
+    // アカウントに資産データを溜めさせないため(A2でメール確認を必須にしているのと同じ理由)。
+    //
+    // 2FA(TOTP)はアプリの必須要件だが、ここでは`sign_in_second_factor`を要求しない。
+    // Authエミュレータが TOTP を実装しておらずローカルでこの請求を持つトークンを作れないため、
+    // 要求するとデータを扱う画面がすべてエミュレータで動かせなくなる
+    // (docs/ci-cd-setup.md 11章と同じ制約)。2FAの強制は認証フロー側で行う。
+    // アプリが日付を持つ書式(`yyyy-MM-dd`。src/constants/csv-import.ts の STORED_DATE_FORMAT)。
+    // 資産残高のドキュメントIDにも使うため、形の崩れた日付を作らせない
+    function isIsoDate(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    // 物件の金額(時価・ローン残高・賃貸収入・賃貸支出)。上限は
+    // src/frontend/src/constants/real-estate.ts の REAL_ESTATE_AMOUNT_MAX と揃える。
+    // マイナスの金額は入力側でも受け付けない(ローン完済済みの物件は0)
+    function isPropertyAmount(value) {
+      return value is number && value >= 0 && value <= 999999999999;
+    }
+
+    // 物件1件の中身(B7で保存する形)。作成・更新のどちらでも同じ形を要求する
+    function isValidProperty(property) {
+      return property.keys().hasAll(
+          ['name', 'location', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'createdAt']
+        )
+        && property.keys().hasOnly(
+          ['name', 'location', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'createdAt']
+        )
+        // 文字数の上限は src/frontend/src/constants/real-estate.ts と揃える
+        && property.name is string
+        && property.name.size() > 0
+        && property.name.size() <= 60
+        // 所在地は任意入力なので空文字を許す
+        && property.location is string
+        && property.location.size() <= 100
+        && isPropertyAmount(property.marketValue)
+        && isPropertyAmount(property.loanBalance)
+        // 最終更新日は入力項目ではなく保存時に付く日付(B7)。B6がこの値を表示するため形を崩させない
+        && isIsoDate(property.updatedAt)
+        // 収益物件でない物件は`rental`をnullで持つ。区分のフラグを別に持たず、
+        // この有無だけで収益物件かどうかが決まる(docs/screen-requirements-real-estate.md B6)
+        && (
+          property.rental == null || (
+            property.rental.keys().hasAll(['monthlyIncome', 'monthlyExpense'])
+            && property.rental.keys().hasOnly(['monthlyIncome', 'monthlyExpense'])
+            && isPropertyAmount(property.rental.monthlyIncome)
+            && isPropertyAmount(property.rental.monthlyExpense)
+          )
+        );
+    }
+
+    // FIRE目標の金額(目標資産額・想定年間支出額)。上限は
+    // src/frontend/src/constants/fire-goal.ts の FIRE_GOAL_AMOUNT_MAX と揃える。
+    // 使っていない方式の欄はnullで保存されるため、nullも許す。
+    // 0を許さないのは、目標資産額が0だと達成率(現在資産 ÷ 目標資産)が定義できないため
+    function isFireGoalAmount(value) {
+      return value == null || (value is number && value > 0 && value <= 999999999999);
+    }
+
+    // 逆算係数(%)。4%ルールなら4。0%は「年間支出額 ÷ 0」になり目標額を導けないため許さない。
+    // 上限は src/frontend/src/constants/fire-goal.ts の FIRE_GOAL_WITHDRAWAL_RATE_MAX と揃える
+    function isWithdrawalRate(value) {
+      return value == null || (value is number && value > 0 && value <= 100);
+    }
+
+    function isOwner(userId) {
+      return request.auth != null
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true;
+    }
+
+    match /users/{userId} {
+      // 親ドキュメント自体は使わない。配下だけを許可し、ここは既定の拒否のままにする。
+
+      // 資産残高推移CSVから取り込んだ日次の資産残高。
+      // ドキュメントIDは集計日(`yyyy-MM-dd`)で、同じ日付の再取込は上書きになる。
+      //
+      // `create`と`update`を`write`でまとめない。`write`は削除も含むが、削除では
+      // `request.resource`が存在せず下の検証式が評価できないため、意図が読めないまま
+      // 削除だけが落ちる。許可する操作は1つずつ書く。
+      match /assetSnapshots/{date} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          // 想定外のフィールドを混ぜて書けないようにする。B1がこのデータを直接集計する
+          // ようになったとき、読み出し側で形を疑わずに済むようにしておく
+          && request.resource.data.keys().hasOnly(['date', 'total', 'byType', 'importedAt'])
+          && isIsoDate(request.resource.data.date)
+          // ドキュメントIDと中身の日付がずれた資産残高を作らせない
+          && request.resource.data.date == date
+          && request.resource.data.total is number
+          && request.resource.data.importedAt is timestamp
+          // `byType`は資産種別が動的に増減するマップなので、キーは列挙できない。
+          // ルールに繰り返しが無く値をすべて検査することもできないため、
+          // 個々の金額が数値であることはパース側(src/lib/csv/asset-balance-csv.ts)で担保する
+          && request.resource.data.byType is map;
+        // 資産残高を消す画面はまだ無い。必要になった時点でここに許可を書く
+        allow delete: if false;
+      }
+
+      // 取込履歴(B2の「直近の取込履歴」)。取り消し・改ざんの余地を残さないよう、
+      // 追加と参照だけを許し、更新・削除は禁じる。
+      match /csvImports/{importId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(
+            ['typeId', 'fileName', 'rowCount', 'periodFrom', 'periodTo', 'importedAt']
+          )
+          // 取込種別は画面のタブ(src/constants/csv-import.ts)と対応する2値に限る。
+          // 種別を増やすときはここも足す
+          && request.resource.data.typeId in ['asset-balance', 'transaction']
+          && request.resource.data.fileName is string
+          && request.resource.data.rowCount is number
+          && request.resource.data.rowCount >= 0
+          && isIsoDate(request.resource.data.periodFrom)
+          && isIsoDate(request.resource.data.periodTo)
+          && request.resource.data.importedAt is timestamp;
+        allow update, delete: if false;
+      }
+
+      // 分類軸(B4 資産分類マスタ設定画面)。総資産のように集計対象を1件も選ばない軸を
+      // 表せるよう、`assetTypeNames`は空配列を許可する(すべての資産種別が対象という意味になる)。
+      match /categoryAxes/{axisId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'createdAt'])
+          && request.resource.data.name is string
+          // 文字数の上限はsrc/constants/asset-categories.tsのCATEGORY_AXIS_NAME_MAX_LENGTHと揃える
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 40
+          // ルールに繰り返しが無く要素をすべて検査することはできないため(byTypeの扱いと同じ理由)、
+          // 件数だけ上限で歯止めをかける。要素が文字列であることはパース側
+          // (src/schemas/asset-categories.ts)で担保する
+          && request.resource.data.assetTypeNames is list
+          && request.resource.data.assetTypeNames.size() <= 50
+          && request.resource.data.createdAt is timestamp;
+        allow update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'createdAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 40
+          && request.resource.data.assetTypeNames is list
+          && request.resource.data.assetTypeNames.size() <= 50
+          // 登録順が分類別内訳の色スロットに対応するため、登録日時は編集で変えさせない(DESIGN.md 3章)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        // 集計対象が1件以上割り当てられた分類の削除は禁止する(画面の要件そのものを
+        // ルール側でも担保する。クライアント側の判定はscreen-requirements-dashboard.md B4参照)。
+        // 先に編集で割り当てを解除すれば`assetTypeNames`が空になり削除できるようになる。
+        allow delete: if isOwner(userId) && resource.data.assetTypeNames.size() == 0;
+      }
+
+      // FIRE目標(B8 FIRE目標設定画面)。ユーザーごとに1件で、ドキュメントIDは`fireGoal`固定。
+      // `settings`をコレクションにしているのは、Firestoreにドキュメント直下のサブドキュメントが
+      // 無いため(src/frontend/src/lib/fire-goal/fire-goal-repository.ts)。
+      // ここに書いていない`settings`配下のドキュメントは末尾の既定拒否で弾かれる。
+      match /settings/fireGoal {
+        allow read: if isOwner(userId);
+        // 初回設定も設定変更も`setDoc`でドキュメントを丸ごと置き換えるため、
+        // create/updateで同じ形を要求する
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'updatedAt']
+          )
+          && request.resource.data.keys().hasAll(
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'updatedAt']
+          )
+          // 有効な設定方式。src/frontend/src/types/fire-goal.d.ts の`FireGoalMode`と揃える
+          && request.resource.data.mode in ['direct', 'reverse']
+          // 使っていない方式の欄はnullで保存される。必須になるのは有効な方式の欄だけで、
+          // その判定は画面側(src/frontend/src/schemas/fire-goal.ts)が行う
+          && isFireGoalAmount(request.resource.data.targetAmount)
+          && isFireGoalAmount(request.resource.data.annualExpense)
+          && isWithdrawalRate(request.resource.data.withdrawalRate)
+          && request.resource.data.updatedAt is timestamp;
+        // FIRE目標を消す画面は無い。方式の切替も上書きで表せる
+        allow delete: if false;
+      }
+
+      // 想定利回り・リスク(B9 想定利回り・リスク設定画面)。ユーザーごとに1件で、
+      // ドキュメントIDは`assumptions`固定。資産種別ごとに1ドキュメントにしないのは、
+      // 資産種別名がCSVの列名そのもので`/`のようにドキュメントIDに使えない文字が
+      // 混じりうるため(src/frontend/src/lib/assumptions/assumption-repository.ts)。
+      match /settings/assumptions {
+        allow read: if isOwner(userId);
+        // 一覧の全行をまとめて`setDoc`で置き換えるため、create/updateで同じ形を要求する
+        allow create, update: if isOwner(userId)
+          && request.resource.data.keys().hasOnly(['entries', 'updatedAt'])
+          && request.resource.data.keys().hasAll(['entries', 'updatedAt'])
+          // `entries`は資産種別名をキーにしたマップで、資産種別が動的に増減するため
+          // キーを列挙できない。ルールに繰り返しが無く値をすべて検査することもできないため、
+          // 個々の想定利回り・リスクレベルの形はパース側(src/frontend/src/schemas/assumptions.ts)
+          // で担保し、ここでは件数だけ上限で歯止めをかける(`byType`と同じ扱い)。
+          // 上限は src/frontend/src/constants/assumptions.ts の ASSUMPTION_ENTRIES_MAX と揃える
+          && request.resource.data.entries is map
+          && request.resource.data.entries.size() <= 200
+          && request.resource.data.updatedAt is timestamp;
+        // 想定利回り・リスクを消す画面は無い。個々の資産種別の設定解除は上書きで表せる
+        allow delete: if false;
+      }
+
+      // 物件(B5 不動産一覧・B6 不動産詳細・B7 不動産登録/編集)。
+      // 資産残高と違いCSV由来ではなく、すべてB7の手入力なので、書ける形をここで縛る。
+      match /properties/{propertyId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidProperty(request.resource.data)
+          && request.resource.data.createdAt is timestamp;
+        // 一覧の並び順(登録順)が編集のたびに入れ替わらないよう、登録日時は編集で変えさせない
+        // (categoryAxesと同じ扱い)。`updateDoc`はドキュメント全体に対して評価されるため、
+        // クライアントが`createdAt`を送らなくても既存の値がここに現れる
+        allow update: if isOwner(userId)
+          && isValidProperty(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        // 物件を削除する画面はまだ無い(B5〜B7の要件に削除は含まれない)。
+        // 必要になった時点でここに許可を書く
+        allow delete: if false;
+      }
+    }
+
+    // 上記以外も既定で拒否する。コレクションを追加するときは、
+    // ここへ意図した許可を書くまで誰も読み書きできない状態から始める。
     match /{document=**} {
       allow read, write: if false;
     }

@@ -61,6 +61,15 @@
       <button class="btn btn-primary btn-block" type="button" onclick="document.getElementById('step-setup').classList.add('hidden'); document.getElementById('step-recovery').classList.remove('hidden');">
         確認する
       </button>
+
+      <!-- 認証フロー途中のログアウト導線(screen-requirements-auth.md 3章)。
+           A3はサインイン済みだが2FA未登録のため主要画面へ進めず、ガードも全B画面からここへ差し戻す。
+           この導線が無いと別のアカウントへ切り替える手段が存在しない。
+           ステップ2(リカバリーコード表示中)には置かない — 平文を保管する前に離脱させないため。 -->
+      <p class="text-xs text-slate-400 mt-4 text-center">
+        別のアカウントを使う場合は、
+        <a class="link" href="#" onclick="document.getElementById('logout-dialog').classList.remove('hidden'); return false;">別のアカウントでログイン</a>
+      </p>
     </div>
 
     <!-- ステップ2: 検証成功後のリカバリーコード表示(確認コード検証成功 → この状態へ) -->
@@ -88,6 +97,21 @@
       <a href="b1-dashboard.html" class="btn btn-primary btn-block">保存しました。開始する</a>
     </div>
 
+  </div>
+</div>
+
+<!-- ログアウトの確認ダイアログ(screen-requirements-account.md 2章)。
+     コンポーネントはB系の共通ヘッダーと同一で、注記の文言だけを出し分ける。
+     この時点ではTOTPが未登録のため、共通ヘッダー版の「再ログインには認証アプリの
+     確認コードが必要」は事実と異なる。代わりに未完了の手順(2FAの登録)を伝える。 -->
+<div id="logout-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4); z-index: 50;">
+  <div class="card p-6 max-w-sm w-full">
+    <h3 class="text-base font-bold mb-2">ログアウトしますか?</h3>
+    <p class="text-sm text-slate-500 mb-5">現在のアカウント(taro.yamada@example.com)からログアウトし、ログイン画面へ移動します。2段階認証の設定はまだ完了していません。</p>
+    <div class="flex gap-3">
+      <a href="a4-login.html?loggedOut=1" class="btn btn-primary flex-1">ログアウトする</a>
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('logout-dialog').classList.add('hidden')">キャンセル</button>
+    </div>
   </div>
 </div>
 

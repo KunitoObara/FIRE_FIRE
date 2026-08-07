@@ -16,12 +16,16 @@
 ## 3. データストア/ストレージ
 
 - **Cloud Firestore**: セキュリティルールは`firestore.rules`に定義し、[firestore-rules-review](../../../.claude/skills/firestore-rules-review/SKILL.md)スキルでユーザー単位のアクセス制御を都度確認する
-- **Firebase Storage**: マネーフォワードCSVアップロードファイルの保管
+- **Firebase Storage**: 現時点で用途なし。B2のCSV取込はブラウザ上でパースして数値だけをFirestoreへ保存し、**生ファイルは保管しない**方針にしたため(理由は[要件定義書](../../../docs/fire-asset-management-requirements.md) 4.2)。`storage.rules`は全拒否のままにしてある
 
 ## 4. 認証
 
 - **Identity Platform**: TOTP型2FA・パスワードポリシーの実体([docs/auth-login-requirements.md](../../../docs/auth-login-requirements.md)参照)
-- ログイン通知メールはBlocking Functions経由でCloud Functionsを起動し、外部メール送信サービスから送信する構成(docs/auth-login-requirements.md 3.6)。**送信サービスは未定**(7章オープン課題)
+- ログイン通知メールはBlocking Functions(`beforeUserSignedIn`)経由でCloud Functionsを起動し、外部メール送信サービスから送信する構成(docs/auth-login-requirements.md 3.6)
+- **Resend**: ログイン通知メールの送信サービス。HTTP APIだけで送れるためSMTPクライアント(nodemailer等)を依存に加えず`fetch`で完結する。無料枠(月3,000通/日100通)は個人利用の規模に対して十分で、共有送信ドメインを使えばDNS設定なしで始められる(代わりに宛先は自アカウントの登録メールアドレスに限られる)。APIキーは`RESEND_API_KEY`としてSecret Managerに置く
+  - 送信失敗でログインを止めない。Blocking Functionsは例外を投げるとサインインを拒否し、7秒を超えても失敗するため、送信は5秒で打ち切りエラーはログに残すだけにする
+- 2FAリカバリーコード(docs/auth-login-requirements.md 3.3)はIdentity Platformに機能が無いためcallableで自前実装する。コードのハッシュ化はNode標準の`node:crypto`のscryptを使い、外部のハッシュライブラリは入れない
+- 設定値のうち秘密でないもの(Identity PlatformのWeb APIキー)も、CIからの非対話デプロイで確実に解決できるよう`firebase-functions/params`の`defineSecret`(Secret Manager)に置く。`.env`系ファイルはリポジトリで除外しているため、そちらは使わない
 
 ## 5. バリデーション
 
@@ -48,6 +52,6 @@
 
 ## 10. 今後の検討事項(オープン課題)
 
-- ログイン通知メールの送信サービス選定(未定。docs/auth-login-requirements.md 8章の課題と対応)
+- ログイン通知メールの独自ドメイン化(docs/auth-login-requirements.md 8章の課題と対応)
 - Cloud FunctionsのNode.jsバージョン固定
 - フロントエンドとのバリデーションスキーマ共有の要否

@@ -13,12 +13,13 @@ import "@/lib/fontawesome";
 
 /**
  * 表示/非表示を切り替えられるパスワード入力欄。
- * 入力欄の右端のアイコンで平文表示をトグルする。A1・A7で共通に使う。
+ * 入力欄の右端のアイコンで平文表示をトグルする。A1・A4・A7で共通に使う。
  */
 export const PasswordField = ({
   id,
   label,
   registration,
+  autoComplete = "new-password",
   error,
   children,
 }: PasswordFieldProps): JSX.Element => {
@@ -32,7 +33,7 @@ export const PasswordField = ({
         <Input
           id={id}
           type={isVisible ? "text" : "password"}
-          autoComplete="new-password"
+          autoComplete={autoComplete}
           aria-invalid={error !== undefined}
           className="pr-9"
           {...registration}

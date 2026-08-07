@@ -7,14 +7,20 @@ import { SignupForm } from "@/components/auth/SignupForm";
 import type { UserEvent } from "@testing-library/user-event";
 
 const push = vi.fn();
+const replace = vi.fn();
 const signUpWithEmail = vi.fn<(email: string, password: string) => Promise<SignUpResult>>();
+const signInWithGoogle = vi.fn<(rememberMe: boolean) => Promise<GoogleSignInResult>>();
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace }),
 }));
 
 vi.mock("@/lib/auth/sign-up", () => ({
   signUpWithEmail: (email: string, password: string) => signUpWithEmail(email, password),
+}));
+
+vi.mock("@/lib/auth/google-sign-in", () => ({
+  signInWithGoogle: (rememberMe: boolean) => signInWithGoogle(rememberMe),
 }));
 
 const VALID_PASSWORD = "Passw0rd!";
@@ -56,6 +62,9 @@ const satisfiedRuleLabels = (): string[] =>
 describe("SignupForm", () => {
   beforeEach(() => {
     push.mockReset();
+    replace.mockReset();
+    signInWithGoogle.mockReset();
+    signInWithGoogle.mockResolvedValue({ ok: true, next: "mfa-setup" });
     signUpWithEmail.mockReset();
     signUpWithEmail.mockResolvedValue({ ok: true });
   });
@@ -330,6 +339,19 @@ describe("SignupForm", () => {
       expect(push).not.toHaveBeenCalled();
     });
 
+    it("Firebaseに接続できないときはネットワーク接続の確認を促すエラーを表示する", async () => {
+      const user = userEvent.setup();
+      signUpWithEmail.mockResolvedValue({ ok: false, reason: "network-error" });
+      render(<SignupForm />);
+
+      await fillValidForm(user);
+      await submitAndAwaitConfirmation(user);
+      await user.click(screen.getByRole("button", { name: "はい" }));
+
+      expect(await screen.findByText(/ネットワーク接続を確認してください/)).toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+    });
+
     it("Firebase未設定はフォーム全体のエラーとして対処法を表示する", async () => {
       const user = userEvent.setup();
       signUpWithEmail.mockResolvedValue({ ok: false, reason: "configuration-error" });
@@ -388,6 +410,39 @@ describe("SignupForm", () => {
 
       await waitFor(() => {
         expect(signUpWithEmail).toHaveBeenCalledWith("user@example.com", VALID_PASSWORD);
+      });
+    });
+  });
+  describe("Googleで続ける(docs/screen-requirements-auth.md 2章)", () => {
+    const googleButton = (): HTMLElement => screen.getByRole("button", { name: "Googleで続ける" });
+
+    // Googleで作成する場合も規約への同意は要る。ポップアップを開いてから断らない
+    it("規約に同意するまでは押せず、理由を出す", async () => {
+      const user = userEvent.setup();
+      render(<SignupForm />);
+
+      expect(googleButton()).toBeDisabled();
+      expect(
+        screen.getByText("利用規約とプライバシーポリシーへの同意が必要です"),
+      ).toBeInTheDocument();
+
+      await user.click(googleButton());
+
+      expect(signInWithGoogle).not.toHaveBeenCalled();
+    });
+
+    it("同意すると押せるようになる", async () => {
+      const user = userEvent.setup();
+      render(<SignupForm />);
+
+      await user.click(screen.getByRole("checkbox"));
+
+      expect(googleButton()).toBeEnabled();
+
+      await user.click(googleButton());
+
+      await waitFor(() => {
+        expect(signInWithGoogle).toHaveBeenCalled();
       });
     });
   });

@@ -1,13 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckIcon, CircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { PasswordField } from "@/components/auth/PasswordField";
+import { PasswordPolicyChecklist } from "@/components/auth/PasswordPolicyChecklist";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,11 +24,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { PASSWORD_MASK, SIGN_UP_FORM_LEVEL_MESSAGES } from "@/constants/auth";
-import { PASSWORD_RULES } from "@/constants/password";
+import {
+  GOOGLE_SIGN_IN_TERMS_REQUIRED_NOTICE,
+  PASSWORD_MASK,
+  PASSWORD_POLICY_VIOLATION_MESSAGE,
+  SIGN_UP_FORM_LEVEL_MESSAGES,
+} from "@/constants/auth";
 import { LOGIN_PATH, VERIFY_EMAIL_PATH } from "@/constants/routes";
 import { signUpWithEmail } from "@/lib/auth/sign-up";
-import { cn } from "@/lib/utils";
 import { signupSchema } from "@/schemas/signup";
 
 import type { JSX } from "react";
@@ -69,6 +73,8 @@ export const SignupForm = (): JSX.Element => {
 
   // `watch()`はReact Compilerがメモ化できないため、購読には`useWatch`を使う
   const password = useWatch({ control, name: "password" });
+  // Googleで作成する場合も規約への同意は要る。同意前はポップアップを開かせない
+  const agreedToTerms = useWatch({ control, name: "agreedToTerms" });
 
   const applyFailure = (reason: SignUpFailureReason): void => {
     switch (reason) {
@@ -79,7 +85,7 @@ export const SignupForm = (): JSX.Element => {
         setError("email", { message: "メールアドレスの形式が正しくありません" });
         break;
       case "password-policy-violation":
-        setError("password", { message: "パスワードがパスワードポリシーを満たしていません" });
+        setError("password", { message: PASSWORD_POLICY_VIOLATION_MESSAGE });
         break;
       default:
         setError("root", { message: SIGN_UP_FORM_LEVEL_MESSAGES[reason] });
@@ -145,32 +151,7 @@ export const SignupForm = (): JSX.Element => {
               registration={register("password")}
               error={errors.password}
             >
-              <ul aria-label="パスワードの条件" className="flex flex-col gap-1">
-                {PASSWORD_RULES.map((rule) => {
-                  const satisfied = rule.satisfiedBy(password);
-
-                  return (
-                    <li
-                      key={rule.id}
-                      data-satisfied={satisfied}
-                      className={cn(
-                        "flex items-center gap-1.5 text-sm",
-                        satisfied ? "text-primary" : "text-muted-foreground",
-                      )}
-                    >
-                      {satisfied ? (
-                        <CheckIcon aria-hidden className="size-3.5" />
-                      ) : (
-                        <CircleIcon aria-hidden className="size-3.5" />
-                      )}
-                      {rule.label}
-                      <span className="sr-only">
-                        {satisfied ? "条件を満たしています" : "条件を満たしていません"}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+              <PasswordPolicyChecklist password={password} />
             </PasswordField>
 
             <PasswordField
@@ -226,6 +207,10 @@ export const SignupForm = (): JSX.Element => {
             </Button>
           </FieldGroup>
         </form>
+
+        <GoogleSignInButton
+          blockedReason={agreedToTerms ? undefined : GOOGLE_SIGN_IN_TERMS_REQUIRED_NOTICE}
+        />
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           すでにアカウントをお持ちの方は{" "}

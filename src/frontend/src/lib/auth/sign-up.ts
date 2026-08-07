@@ -24,6 +24,8 @@ const toFailureReason = (error: unknown): SignUpFailureReason => {
       return "password-policy-violation";
     case "auth/too-many-requests":
       return "too-many-requests";
+    case "auth/network-request-failed":
+      return "network-error";
     default:
       return "unknown";
   }

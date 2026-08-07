@@ -1,9 +1,15 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 import { z } from "zod";
+
+import { FIREBASE_FUNCTIONS_REGION, PRODUCTION_FIREBASE_PROJECT_ID } from "@/constants/firebase";
 
 import type { FirebaseApp } from "firebase/app";
 import type { Auth } from "firebase/auth";
+import type { Firestore } from "firebase/firestore";
+import type { Functions } from "firebase/functions";
 
 /**
  * Firebaseの設定値が不足しているときに投げるエラー。
@@ -34,6 +40,8 @@ const firebaseEnvSchema = z.object({
 
 let cachedApp: FirebaseApp | undefined;
 let cachedAuth: Auth | undefined;
+let cachedFirestore: Firestore | undefined;
+let cachedFunctions: Functions | undefined;
 
 /**
  * Firebaseアプリを取得する。開発時のFast Refreshで多重初期化されないよう、
@@ -65,6 +73,30 @@ export const getFirebaseApp = (): FirebaseApp => {
     );
   }
 
+  // B0-1でエミュレータを廃止したため、接続先は`.env.local`の値だけで決まる。本番プロジェクトを
+  // 指したまま`npm run dev`すると、サインアップで本番に実アカウントが作られ、B2の取込が本番の
+  // Firestoreに書き込まれる。取り返しがつかないので、警告ではなく初期化ごと止める。
+  //
+  // 本番ビルド(NODE_ENV=production)では当然この照合をしない。Next.jsが`process.env.NODE_ENV`を
+  // ビルド時にリテラルへ置き換えるため、この分岐自体が本番の成果物からは消える。
+  // 裏を返すと、ローカルで`npm run build && npm run start`したときもガードは効かない。
+  // NODE_ENVだけではデプロイ済みの本番と区別できないため、ここは受容する
+  // (日常的に使う`npm run dev`は必ずガードの側を通る)。
+  if (
+    process.env.NODE_ENV !== "production" &&
+    parsed.data.projectId === PRODUCTION_FIREBASE_PROJECT_ID
+  ) {
+    // 画面には汎用の設定エラー(`FIREBASE_CONFIGURATION_MESSAGE`)しか出ないため、
+    // 実際の原因はコンソールにも出しておく
+    console.error(
+      `Firebaseの接続先が本番プロジェクト(${PRODUCTION_FIREBASE_PROJECT_ID})になっています。` +
+        `.env.local に fire-fire-dev(STG)の値を設定してください(src/frontend/README.md「セットアップ」)。`,
+    );
+    throw new FirebaseConfigurationError(
+      `.env.local が本番プロジェクト(${PRODUCTION_FIREBASE_PROJECT_ID})を指しています。ローカル開発では fire-fire-dev(STG)の値を設定してください。`,
+    );
+  }
+
   cachedApp = initializeApp(parsed.data);
   return cachedApp;
 };
@@ -72,12 +104,10 @@ export const getFirebaseApp = (): FirebaseApp => {
 /**
  * Firebase Authenticationのインスタンスを取得する。
  *
- * `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` が設定されていればAuthエミュレータへ繋ぐ。
- * ローカル開発でサインアップを試すたびに本番のIdentity Platformへ実アカウントが作られ、
- * 入力したアドレスへ実際に確認メールが飛ぶのを防ぐため、`.env.example`では既定で有効にしている。
+ * ローカル開発を含め常に`.env.local`で指定したFirebaseプロジェクト(既定は`fire-fire-dev`)に
+ * 直接繋ぐ(B0-1: Firebase Emulatorはローカルでは使わない方針)。
  *
- * 言語設定とエミュレータ接続はインスタンス生成時に一度だけ行えばよいので、
- * 生成済みのAuthをキャッシュして再利用する(`connectAuthEmulator`は繰り返し呼べない)。
+ * 言語設定はインスタンス生成時に一度だけ行えばよいので、生成済みのAuthをキャッシュして再利用する。
  */
 export const getFirebaseAuth = (): Auth => {
   if (cachedAuth) {
@@ -88,11 +118,44 @@ export const getFirebaseAuth = (): Auth => {
   // 確認メール等のFirebase送信メールを日本語で送る(DESIGN.md 4章)
   auth.languageCode = "ja";
 
-  const emulatorUrl = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL;
-  if (emulatorUrl) {
-    connectAuthEmulator(auth, emulatorUrl);
-  }
-
   cachedAuth = auth;
   return auth;
+};
+
+/**
+ * Cloud Firestoreのインスタンスを取得する。
+ *
+ * B2 CSV取込の書き込みはクライアントSDKから直接行い、他人のデータに触れないことは
+ * `firestore.rules`のユーザー単位の判定で担保する
+ * (docs/fire-asset-management-requirements.md 5章のセキュリティ方針)。
+ * 認証はブラウザ側のFirebase SDKが持つため、サーバー側からは`uid`を特定できない。
+ *
+ * ローカル開発を含め常に`.env.local`で指定したFirebaseプロジェクトのFirestoreに直接繋ぐ
+ * (B0-1: Firebase Emulatorはローカルでは使わない方針)。
+ */
+export const getFirebaseFirestore = (): Firestore => {
+  if (cachedFirestore) {
+    return cachedFirestore;
+  }
+
+  cachedFirestore = getFirestore(getFirebaseApp());
+  return cachedFirestore;
+};
+
+/**
+ * Cloud Functions(callable)のインスタンスを取得する。
+ *
+ * リージョンはバックエンドの`setGlobalOptions`と揃える必要がある。既定(us-central1)のままだと
+ * 存在しない関数を呼びに行き、原因の分かりにくい`functions/internal`になる。
+ *
+ * ローカル開発を含め常に`.env.local`で指定したFirebaseプロジェクトにデプロイ済みのFunctionsを
+ * 直接呼ぶ(B0-1: Firebase Emulatorはローカルでは使わない方針)。
+ */
+export const getFirebaseFunctions = (): Functions => {
+  if (cachedFunctions) {
+    return cachedFunctions;
+  }
+
+  cachedFunctions = getFunctions(getFirebaseApp(), FIREBASE_FUNCTIONS_REGION);
+  return cachedFunctions;
 };
