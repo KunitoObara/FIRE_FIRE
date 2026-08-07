@@ -7,6 +7,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 
+import { reloadEmailVerificationState } from "@/lib/auth/email-verification";
 import { markGoogleLinkFailed } from "@/lib/auth/google-link-notice";
 import {
   clearPendingGoogleLink,
@@ -198,5 +199,35 @@ export const linkPendingGoogleAccount = async (): Promise<void> => {
     // 成立しているため扱いは同じ(docs/screen-requirements-dashboard.md B1)
     console.error("Googleアカウントを連携できませんでした", error);
     markGoogleLinkFailed();
+  }
+};
+
+/**
+ * A8で連携を実行したあとの遷移先を決め直す(2FA未登録の分岐)。
+ *
+ * A8のパスワード検証が返す`next`は**連携前**の`emailVerified`で決まっている。連携する
+ * GoogleアカウントのメールアドレスはGoogle側で確認済みのため、連携によってこれがtrueへ
+ * 変わりうる。読み直さずにそのまま使うと、確認済みになったユーザーを不要なA2へ送ってしまう。
+ *
+ * Identity Platformが実際にtrueへ変えるかは、その挙動を前提にせず**毎回読み直して**判断する。
+ * どちらの挙動でも遷移先が正しくなり、Identity Platform側が将来変わっても壊れないため
+ * (docs/screen-requirements-auth.md A8)。
+ *
+ * 取り直せなかった場合(通信失敗・設定不足・セッション消失)は連携前の判断をそのまま使う。
+ * 遷移先を誤っても`AppAccessGuard`が正しい手順へ差し戻すため、ここで止める理由が無い。
+ */
+export const resolveNextStepAfterLink = async (
+  beforeLink: SignInNextStep,
+): Promise<SignInNextStep> => {
+  const state = await reloadEmailVerificationState();
+
+  switch (state.status) {
+    case "verified":
+      // A8のこの分岐に来ている時点で2FAは未登録と分かっている
+      return "mfa-setup";
+    case "unverified":
+      return "email-unverified";
+    default:
+      return beforeLink;
   }
 };
