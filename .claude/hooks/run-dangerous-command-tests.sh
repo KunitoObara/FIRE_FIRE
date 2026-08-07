@@ -93,19 +93,39 @@ check_file_tool DENY  Glob '{"pattern":"docs/.env.*"}'
 check_file_tool DENY  Read '{"file_path":"docs/.env.example/../.env"}'
 check_file_tool DENY  Glob '{"pattern":"docs/.env.example/**"}'
 
-# CI(GitHub Actions)では歯止めごと無効になること。
-# claude-review ジョブは settingSources に project を含むため、このフックを
-# 読み込んでしまう。歯止めの対象(秘密ファイル・ローカルのpush)はCIの
-# チェックアウトに存在しないのに、レビュー本文に禁止語が含まれるだけで
-# コメント投稿が拒否され、ジョブが落ちる。
+# 歯止めを無効化するのは、claude-review ジョブが明示的に渡す CLAUDE_GUARD_DISABLE と
+# GITHUB_ACTIONS の両方が揃ったときだけ。片方だけで無効化すると、
+#   - GITHUB_ACTIONS だけ … 書き込み権限を持つ将来のワークフローでも歯止めが消える
+#   - CLAUDE_GUARD_DISABLE だけ … 手元のシェルに残っていると手元でも歯止めが消える
+# のどちらかの穴が開く。両方を要求すれば claude-review ジョブに限定できる。
 ci_case=$(grep -m1 '^DENY|' "$cases" | cut -d'|' -f2-)
 ci_payload=$(CMD="$ci_case" python3 -c 'import json,os;print(json.dumps({"tool_name":"Bash","tool_input":{"command":os.environ["CMD"]}}))')
-if [ -n "$(printf '%s' "$ci_payload" | GITHUB_ACTIONS=true bash "$hook")" ]; then
-  fail=$((fail + 1))
-  printf 'FAIL  GITHUB_ACTIONS=true でも拒否された: %s\n' "$ci_case"
-else
-  pass=$((pass + 1))
-fi
+
+# $1=期待値(ALLOW=歯止め無効 / DENY=歯止め有効) $2以降=env の割り当て。
+# 呼び出し元の環境に両変数が残っていても結果が変わらないよう、先に落としてから渡す
+# (このスクリプト自体がCIで実行される場合に GITHUB_ACTIONS を拾ってしまうため)。
+check_guard_env() {
+  want=$1
+  shift
+  run() { env -u GITHUB_ACTIONS -u CLAUDE_GUARD_DISABLE "$@"; }
+  got=DENY
+  [ -z "$(printf '%s' "$ci_payload" | run "$@" bash "$hook")" ] && got=ALLOW
+  fgot=DENY
+  [ -z "$(printf '{"tool_name":"Read","tool_input":{"file_path":"docs/.env"}}' | run "$@" bash "$file_hook")" ] && fgot=ALLOW
+  for g in "$got" "$fgot"; do
+    if [ "$g" = "$want" ]; then
+      pass=$((pass + 1))
+    else
+      fail=$((fail + 1))
+      printf 'FAIL  判定=%-5s 期待=%-5s  env %s\n' "$g" "$want" "$*"
+    fi
+  done
+}
+check_guard_env ALLOW GITHUB_ACTIONS=true CLAUDE_GUARD_DISABLE=1
+check_guard_env DENY  GITHUB_ACTIONS=true
+check_guard_env DENY  CLAUDE_GUARD_DISABLE=1
+check_guard_env DENY  GITHUB_ACTIONS=true CLAUDE_GUARD_DISABLE=
+check_guard_env DENY
 
 echo "----"
 if [ "$fail" -eq 0 ]; then

@@ -16,6 +16,15 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
+    env:
+      # 禁止コマンド遮断フック(.claude/settings.json の PreToolUse)を、この
+      # ジョブに限って無効化する。リポジトリにコミットした settings.json は
+      # チェックアウトする他の Claude Code 実行にも読み込まれるため、レビュー
+      # 本文が禁止語に触れただけで gh pr comment が拒否されジョブが落ちる(PR #44)。
+      # 無効化して安全なのは、このジョブの権限が contents: read で push できず、
+      # docs/.env もチェックアウトに含まれないから。歯止めを必要とする権限を
+      # 持つワークフローには、この変数を渡してはならない。
+      CLAUDE_GUARD_DISABLE: "1"
     steps:
       - uses: actions/checkout@v4
         with:
