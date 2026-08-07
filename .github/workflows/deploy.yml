@@ -63,13 +63,15 @@ jobs:
           cache: npm
           cache-dependency-path: src/backend/package-lock.json
 
-      # 15.22.2 以降は requireAuth のタイムアウトに Workload Identity の資格情報交換が
-      # 間に合わず、ADCが有効でも "Failed to authenticate, have you run firebase login?"
-      # で失敗する既知の回帰があるため、直前の 15.22.1 に固定する。
+      # 15.22.3 未満は、google-auth-library のトランスポートが keep-alive したソケットを
+      # 再利用する際に Node.js 22.23.0 / 24.17.0 のリグレッションを踏み、ADCが有効でも
+      # "Failed to authenticate, have you run firebase login?" で確率的に失敗する。
+      # 15.22.3 で keep-alive を無効化する回避が入っている(firebase-tools#10717)ため、
+      # それ以降のバージョンを使う必要がある。ランナーのNodeは 22.23.1 で該当する。
       # https://github.com/firebase/firebase-tools/issues/10716
-      # 上流で修正されたらこの固定を外す。
+      # 下げるときは 15.22.3 を下回らせないこと。詳細は docs/ci-cd-setup.md 8章。
       - name: Firebase CLIを導入する
-        run: npm i -g firebase-tools@15.22.1
+        run: npm i -g firebase-tools@15.26.0
 
       # firebase.json の predeploy で `npm run build` が走るため、
       # 先に src/backend の依存をインストールしておく必要がある。
