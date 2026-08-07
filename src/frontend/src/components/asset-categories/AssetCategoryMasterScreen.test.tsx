@@ -265,6 +265,7 @@ describe("AssetCategoryMasterScreen", () => {
     const user = userEvent.setup();
     deleteCategoryAxis.mockResolvedValue({ ok: true });
     renderScreen();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
 
     const row = (await screen.findByText("総資産")).closest("li");
 
@@ -279,5 +280,7 @@ describe("AssetCategoryMasterScreen", () => {
       expect(deleteCategoryAxis).toHaveBeenCalledWith("total-assets");
     });
     expect(toastSuccess).toHaveBeenCalledWith("分類を削除しました");
+    // 削除した軸がB1の軸セレクタに残らないよう、新規追加・編集と同じくB1も無効化する
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
   });
 });
