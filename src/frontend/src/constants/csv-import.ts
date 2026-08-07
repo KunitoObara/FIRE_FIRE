@@ -1,5 +1,7 @@
 /** B2 CSV取込画面で使う定数(docs/screen-requirements-dashboard.md B2) */
 
+import { FIRESTORE_QUERY_LIMIT_MAX } from "@/constants/firebase";
+
 /**
  * 取込種別タブ。
  *
@@ -122,11 +124,16 @@ export const IMPORT_HISTORY_LIMIT = 5;
  * 数百件にしかならない。日次で蓄積し続けたアカウントでも読み込みが青天井にならないための
  * 歯止めとして置く。新しい日付から順に読むため、上限に達しても切り落とされるのは古い側だけ。
  *
- * 値は現状`MAX_ASSET_BALANCE_ROWS`と同じだが、そちらを参照せず独立した定数にしてある。
+ * 値は`FIRESTORE_QUERY_LIMIT_MAX`(Firestoreが`limit()`に許す最大値)そのものにしてある。
+ * この上限は歯止めであって、小さくして得られるものが特に無いため、遡れる期間が最大になる
+ * 側に寄せる。日次で溜め続けても約27年分にあたる。**これより大きい値は置けない。**
+ * 超えるとクエリが`invalid-argument`で拒否され、1件も読めなくなる(B1-3)。
+ *
+ * 値は現状`MAX_ASSET_BALANCE_ROWS`の半分だが、そちらを参照せず独立した定数にしてある。
  * 前者は「1回のCSV取込で許容する行数」(パース時のガード)、こちらは「蓄積済みの資産残高を
  * 読み返す件数」(表示時の読み取りコストのガード)で、変えたくなる理由が別々のため。
  */
-export const ASSET_SNAPSHOT_SCAN_LIMIT = 20_000;
+export const ASSET_SNAPSHOT_SCAN_LIMIT = FIRESTORE_QUERY_LIMIT_MAX;
 
 /** 取込履歴のキャッシュキー(TanStack Query) */
 export const IMPORT_HISTORY_QUERY_KEY = ["csv-imports"] as const;
