@@ -70,6 +70,8 @@ done
 #
 # 既に作成済みなら作り直さない。下の注記のとおりこのブロックは失敗時に再実行する運用で、
 # `roles create` は同名ロールがあると ALREADY_EXISTS で止まってしまうため。
+# 逆に、後から `--permissions` を変えたい場合はこの分岐では反映されない（`describe` が
+# 通ってスキップされる）。そのときは `gcloud iam roles update` で明示的に更新する。
 gcloud iam roles describe firebaseAuthConfigWriter --project="$PROJECT_ID" >/dev/null 2>&1 || \
 gcloud iam roles create firebaseAuthConfigWriter \
   --project="$PROJECT_ID" \
@@ -596,7 +598,11 @@ Functions deploy had errors with the following functions:
 
 2 章のカスタムロールを作って付与し、デプロイを再実行する。既定ロールの `roles/firebaseauth.admin` でも解消するが、そちらは**利用者アカウントの作成・削除を含む 16 権限**を CI のサービスアカウントに与えることになるため採っていない。必要なのは `firebaseauth.configs.get` と `firebaseauth.configs.update` の 2 つだけ。
 
-`identitytoolkit.googleapis.com` 自体は 9 章の Identity Platform へのアップグレードで有効化済みのため、API の有効化は不要（未有効なら 403 ではなく `SERVICE_DISABLED` になる）。
+`identitytoolkit.googleapis.com` 自体は 9 章の Identity Platform へのアップグレードで有効化済みのため、API の有効化は不要（未有効なら 403 ではなく `SERVICE_DISABLED` になる）。念のため確かめるなら次のコマンドで、出力があれば有効。
+
+```bash
+gcloud services list --enabled --project=fire-fire-dev | grep identitytoolkit
+```
 
 ## 14. 今後の検討事項（オープン課題）
 
