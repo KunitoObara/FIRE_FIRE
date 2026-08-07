@@ -67,6 +67,10 @@ done
 # Identity Platform の設定（テナント設定に相当）の書き換えが要る。既定のロールには
 # 含まれないため、必要な2権限だけのカスタムロールを作って付与する。
 # 付与しないと、関数の作成まで進んだあと 403 でデプロイが失敗する（13.4）。
+#
+# 既に作成済みなら作り直さない。下の注記のとおりこのブロックは失敗時に再実行する運用で、
+# `roles create` は同名ロールがあると ALREADY_EXISTS で止まってしまうため。
+gcloud iam roles describe firebaseAuthConfigWriter --project="$PROJECT_ID" >/dev/null 2>&1 || \
 gcloud iam roles create firebaseAuthConfigWriter \
   --project="$PROJECT_ID" \
   --title="Firebase Auth Config Writer" \
