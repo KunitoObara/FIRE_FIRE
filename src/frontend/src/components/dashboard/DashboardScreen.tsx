@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { CashflowSummaryCard } from "@/components/dashboard/CashflowSummaryCard";
 import { CategoryBreakdownCard } from "@/components/dashboard/CategoryBreakdownCard";
@@ -10,11 +10,15 @@ import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState"
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
 import { FireProgressCard } from "@/components/dashboard/FireProgressCard";
 import { NetWorthTrendCard } from "@/components/dashboard/NetWorthTrendCard";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DASHBOARD_DATA_QUERY_KEY,
   DASHBOARD_FAILURE_MESSAGES,
+  DASHBOARD_RETRY_LABEL,
+  DASHBOARD_RETRYING_LABEL,
+  DASHBOARD_UNEXPECTED_ERROR_MESSAGE,
   NO_ASSET_AXIS_EMPTY_STATE,
   NO_CSV_IMPORT_LABEL,
 } from "@/constants/dashboard";
@@ -24,6 +28,22 @@ import { resolveAxisId, resolvePeriodId } from "@/lib/dashboard/filters";
 import { filterSeriesByPeriod } from "@/lib/dashboard/period";
 
 import type { JSX } from "react";
+
+/**
+ * 表示できないときの文言。取得の失敗(理由つき)と、集計まで含めた例外の両方をここに集める。
+ *
+ * 例外は原因を特定できないので、理由つきの失敗を優先して具体的な文言を出す。
+ */
+const resolveErrorMessage = (
+  failureReason: FirestoreAccessFailureReason | null,
+  unexpectedError: unknown,
+): string | null => {
+  if (failureReason) {
+    return DASHBOARD_FAILURE_MESSAGES[failureReason];
+  }
+
+  return unexpectedError ? DASHBOARD_UNEXPECTED_ERROR_MESSAGE : null;
+};
 
 /** 直近CSV取込日時の表示。未取込のときは日時の代わりにその旨を出す */
 const formatLastImportedAt = (isoDateTime: string | null): string =>
@@ -54,6 +74,22 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
   const failureReason = result !== undefined && !result.ok ? result.reason : null;
   const axes = data?.axes ?? [];
 
+  /**
+   * 取得が例外で落ちた場合は結果そのものが無い(`ok: false`にもならない)。
+   * Firestoreを引く処理は理由付きの失敗を返すが、その後の集計は各リポジトリの
+   * try/catchの外で走るため、日付が壊れたドキュメントが1件混じるだけでここへ来る。
+   */
+  const unexpectedError = dashboardQuery.error;
+
+  const errorMessage = resolveErrorMessage(failureReason, unexpectedError);
+
+  // 画面の文言は原因まで特定できないので、開発者向けの手掛かりだけコンソールに残す
+  useEffect(() => {
+    if (unexpectedError) {
+      console.error("ダッシュボードの表示データを組み立てられませんでした", unexpectedError);
+    }
+  }, [unexpectedError]);
+
   const selectedAxisId = resolveAxisId(axisParam, axes);
   const selectedPeriodId = resolvePeriodId(periodParam);
   const selectedAxis = axes.find((axis) => axis.id === selectedAxisId);
@@ -80,10 +116,22 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
         </div>
       ) : null}
 
-      {failureReason ? (
-        <p role="alert" className="text-sm text-destructive">
-          {DASHBOARD_FAILURE_MESSAGES[failureReason]}
-        </p>
+      {errorMessage ? (
+        <div role="alert" className="flex flex-col items-start gap-3">
+          <p className="text-sm text-destructive">{errorMessage}</p>
+          {/* リロードしか手が無い状態にしない。一時的な失敗ならこの場で回復できる */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={dashboardQuery.isFetching}
+            onClick={() => {
+              void dashboardQuery.refetch();
+            }}
+          >
+            {dashboardQuery.isFetching ? DASHBOARD_RETRYING_LABEL : DASHBOARD_RETRY_LABEL}
+          </Button>
+        </div>
       ) : null}
 
       {data ? (

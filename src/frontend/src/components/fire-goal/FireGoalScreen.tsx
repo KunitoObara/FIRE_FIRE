@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { FireGoalForm } from "@/components/fire-goal/FireGoalForm";
 import { FireGoalSummary } from "@/components/fire-goal/FireGoalSummary";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 import {
   CURRENT_ASSET_TOTAL_QUERY_KEY,
   FIRE_GOAL_DESCRIPTION,
@@ -58,6 +59,8 @@ export const FireGoalScreen = (): JSX.Element => {
       toast.success(FIRE_GOAL_SAVED_MESSAGE);
       // B8に戻ってきたときに前回の値から再開できるよう、保存した目標を取り直させる
       void queryClient.invalidateQueries({ queryKey: FIRE_GOAL_QUERY_KEY });
+      // 遷移先のB1はこの目標でFIRE達成度を出す。古い目標のゲージを一瞬見せない
+      void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
       router.push(DASHBOARD_PATH);
     }
 

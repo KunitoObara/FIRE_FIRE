@@ -30,12 +30,18 @@ vi.mock("sonner", () => ({
   toast: { success: (...args: unknown[]) => toastSuccess(...args) },
 }));
 
-const renderScreen = (): RenderResult =>
-  render(
-    <QueryClientProvider client={new QueryClient()}>
+/** 保存後にどのキーを無効化したかを確かめるため、画面と同じインスタンスを掴んでおく */
+let queryClient: QueryClient;
+
+const renderScreen = (): RenderResult => {
+  queryClient = new QueryClient();
+
+  return render(
+    <QueryClientProvider client={queryClient}>
       <FireGoalScreen />
     </QueryClientProvider>,
   );
+};
 
 describe("FireGoalScreen", () => {
   beforeEach(() => {
@@ -90,6 +96,7 @@ describe("FireGoalScreen", () => {
   it("保存に成功するとB1へ遷移して完了を通知する", async () => {
     const user = userEvent.setup();
     renderScreen();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
 
     await user.type(await screen.findByLabelText("目標資産額(円)"), "80000000");
     await user.click(screen.getByRole("button", { name: "保存" }));
@@ -104,6 +111,8 @@ describe("FireGoalScreen", () => {
     });
     expect(toastSuccess).toHaveBeenCalledWith("FIRE目標を保存しました");
     expect(push).toHaveBeenCalledWith("/dashboard");
+    // 遷移先のB1が古い目標でゲージを描かないよう、表示データも無効化する
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["dashboard-data"] });
   });
 
   it("保存に失敗したら遷移しない", async () => {
