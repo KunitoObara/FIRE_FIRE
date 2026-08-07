@@ -35,10 +35,14 @@ const EMPTY_FORM_VALUES: AssetCategoryAxisFormValues = { name: "", assetTypeName
  * 案内の文言と保存の可否がずれる(B4-1・B4-2)。3つを型で分けて持たせる。
  */
 const resolveAssetTypeOptionsState = (
-  isPending: boolean,
   result: AssetTypeOptionsResult | undefined,
 ): AssetTypeOptionsState => {
-  if (isPending || result === undefined) {
+  /*
+    結果がまだ無いあいだが読み込み中。`isPending`は見ない — `fetchAssetTypeOptions`は
+    失敗も`ok: false`として解決するので結果が`undefined`のままなのは取得中だけで、
+    両方を見ると同じ状態を2つの条件で書くことになる(レビュー指摘)
+  */
+  if (result === undefined) {
     return { status: "loading" };
   }
 
@@ -81,10 +85,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
   const axes = axesResult?.ok === true ? axesResult.axes : [];
   const axesFailureReason = axesResult !== undefined && !axesResult.ok ? axesResult.reason : null;
 
-  const assetTypeOptions = resolveAssetTypeOptionsState(
-    assetTypeOptionsQuery.isPending,
-    assetTypeOptionsQuery.data,
-  );
+  const assetTypeOptions = resolveAssetTypeOptionsState(assetTypeOptionsQuery.data);
 
   const closeForm = (): void => {
     setFormMode("closed");
