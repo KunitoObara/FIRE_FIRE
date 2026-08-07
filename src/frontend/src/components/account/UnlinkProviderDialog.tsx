@@ -25,9 +25,9 @@ import type { JSX, MouseEvent } from "react";
 /**
  * 連携解除の確認ダイアログ(docs/screen-requirements-account.md「連携アカウントの管理」)。
  *
- * 解除は元に戻せる操作(連携し直せる)なのでパスワードの再入力までは求めず、確認だけを挟む。
- * ただしパスワードの解除だけは戻す導線が無いため、文言側でその旨を伝える
- * (`UNLINK_PROVIDER_DIALOG_TEXTS`)。
+ * 扱うのは連携し直せる解除だけなので、パスワードの再入力までは求めず確認だけを挟む。
+ * パスワードの解除は戻す導線が無く本人確認まで求めるため、`PasswordConfirmDialog`側で扱う
+ * (`LinkedAccountsCard`が解除対象で出し分ける)。
  *
  * 失敗した場合はダイアログを閉じずにその場でエラーを出す(`DeleteCategoryAxisDialog`と同じ方針)。
  */

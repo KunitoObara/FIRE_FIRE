@@ -1,8 +1,13 @@
 import { getAuth } from "firebase-admin/auth";
 import { HttpsError, onCall } from "firebase-functions/https";
-import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 
+import {
+  IDENTITY_PLATFORM_WEB_API_KEY,
+  callableFailure,
+  passwordConfirmationSchema,
+  verifyPasswordOrThrow,
+} from "../auth/password-confirmation";
 import { verifyPassword } from "../auth/verify-password";
 import {
   createRecoveryCodeHash,
@@ -17,6 +22,10 @@ import {
   replaceRecoveryCodes,
 } from "./store";
 
+import type {
+  CallableFailureCode,
+  PasswordConfirmationFailureReason,
+} from "../auth/password-confirmation";
 import type { RecoveryCodeStatus } from "./store";
 import type { MultiFactorInfo, UserRecord } from "firebase-admin/auth";
 
@@ -40,28 +49,11 @@ import type { MultiFactorInfo, UserRecord } from "firebase-admin/auth";
  *   この呼び出し単価では現実的な時間・費用に収まらない
  */
 
-/**
- * Identity PlatformのWeb APIキー。パスワードの再検証(`verify-password.ts`)に使う。
- *
- * 公開値ではあるが、CIからの非対話デプロイでも確実に解決できる置き場が要るためSecret Managerに置く
- * (`.env`系ファイルはリポジトリで除外している)。設定手順は docs/ci-cd-setup.md を参照。
- * Authエミュレータに向いている間はダミーキーで動くため、ローカル開発では未設定でよい。
- */
-const IDENTITY_PLATFORM_WEB_API_KEY = defineSecret("IDENTITY_PLATFORM_WEB_API_KEY");
-
 const useMfaRecoveryCodeInputSchema = z.object({
   email: z.string().min(1),
   password: z.string().min(1),
   recoveryCode: z.string().min(1),
 });
-
-/**
- * B10からの呼び出しに載る本人確認用のパスワード。
- *
- * A3(初回発行)はパスワードを送らないため任意にしてある。要否は入力の形ではなく
- * サーバー側の状態(`hasLiveRecoveryCodes`・2FAの登録有無)で決める。
- */
-const passwordConfirmationSchema = z.object({ password: z.string().min(1).optional() });
 
 /**
  * 画面が出し分けに使う失敗理由。
@@ -73,21 +65,17 @@ type RecoveryFailureReason =
   | "unauthenticated"
   | "email-unverified"
   | "mfa-not-enrolled"
-  /** 本人確認が要る操作なのにパスワードが送られてこなかった */
-  | "password-required"
-  | "invalid-credential"
   | "invalid-recovery-code"
   | "no-recovery-codes"
-  | "too-many-requests"
   /** コードは消費したが2FAを解除できなかった。他の失敗と違い、使ったコードが戻らない */
   | "unenroll-failed"
-  | "unavailable";
+  | PasswordConfirmationFailureReason;
 
 const failure = (
-  code: "unauthenticated" | "failed-precondition" | "permission-denied" | "unavailable",
+  code: CallableFailureCode,
   reason: RecoveryFailureReason,
   message: string,
-): HttpsError => new HttpsError(code, message, { reason });
+): HttpsError => callableFailure(code, reason, message);
 
 /** 2FA(TOTP)が登録済みか。本アプリが登録する2要素目はTOTPだけ(3.3) */
 const hasEnrolledFactor = (user: UserRecord): boolean =>
@@ -119,41 +107,6 @@ const hasLiveRecoveryCodes = (status: RecoveryCodeStatus, factor: MultiFactorInf
     factor.enrollmentTime === undefined ? Number.NaN : Date.parse(factor.enrollmentTime);
 
   return Number.isNaN(enrolledAt) || status.generatedAt >= enrolledAt;
-};
-
-/**
- * パスワードを再検証し、通らなければ`HttpsError`を投げる(B10の本人確認)。
- *
- * 2FA登録済みのアカウントではサインインが完了せず`mfa-required`が返るが、
- * ここで確かめたいのは「パスワードが正しいこと」だけなので`signed-in`と同じ扱いにする。
- *
- * `user.email`が無いアカウントはパスワードで確認しようがないため、資格情報の誤りと同じ扱いにする。
- * 連携アカウント管理(B10)ではパスワードの解除を許しており、Googleのみのアカウントは
- * この本人確認を通せない = 2FAの再設定もリカバリーコードの発行もできない状態になる。これは
- * 承知のうえで、B10の解除確認ダイアログが実行前にその旨を伝える
- * (docs/screen-requirements-account.md「メールアドレス / パスワードの解除」)。
- */
-const verifyPasswordOrThrow = async (user: UserRecord, password: string | undefined) => {
-  if (password === undefined) {
-    throw failure("failed-precondition", "password-required", "パスワードの入力が必要です");
-  }
-
-  const verification =
-    user.email === undefined
-      ? ({ status: "invalid-credential" } as const)
-      : await verifyPassword(IDENTITY_PLATFORM_WEB_API_KEY.value(), user.email, password);
-
-  switch (verification.status) {
-    case "mfa-required":
-    case "signed-in":
-      return;
-    case "invalid-credential":
-      throw failure("permission-denied", "invalid-credential", "パスワードが正しくありません");
-    case "too-many-requests":
-      throw failure("permission-denied", "too-many-requests", "試行回数が多すぎます");
-    default:
-      throw failure("unavailable", "unavailable", "認証基盤に接続できませんでした");
-  }
 };
 
 /**

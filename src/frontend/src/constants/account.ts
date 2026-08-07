@@ -147,6 +147,16 @@ export const UNLINK_PROVIDER_CONFIRM_LABEL = "解除する";
 export const UNLINK_PROVIDER_SUBMITTING_LABEL = "解除中...";
 export const UNLINK_PROVIDER_CANCEL_LABEL = "キャンセル";
 
+/**
+ * パスワード解除の本人確認ダイアログの文言
+ * (docs/screen-requirements-account.md「メールアドレス / パスワードの解除」)。
+ *
+ * 失うものの説明は確認ダイアログと同じ文面を使い、本人確認を求める一文だけを足す。
+ * 同じ操作の説明を2つ持つと、片方だけが直されて食い違うため。
+ */
+export const UNLINK_PASSWORD_DIALOG_DESCRIPTION = `${UNLINK_PROVIDER_DIALOG_TEXTS.password.description}本人確認のため、パスワードを再入力してください。`;
+export const UNLINK_PASSWORD_CONFIRM_LABEL = "確認して解除する";
+
 /** Googleを連携できなかったときのメッセージ */
 export const LINK_GOOGLE_MESSAGES: Record<LinkGoogleDisplayFailureReason, string> = {
   "popup-blocked":
@@ -179,6 +189,27 @@ export const UNLINK_PROVIDER_MESSAGES: Record<UnlinkProviderFailureReason, strin
   "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   unknown: "連携を解除できませんでした。時間をおいて再度お試しください。",
+};
+
+/**
+ * パスワードでのログインを解除できなかったときのメッセージ。
+ *
+ * 解除はCloud Functionsで行うため、Googleの解除とは失敗の出方が違う
+ * (`UNLINK_PROVIDER_MESSAGES`)。本人確認の失敗が加わり、ポップアップ・再認証は起きない。
+ */
+export const UNLINK_PASSWORD_MESSAGES: Record<UnlinkPasswordFailureReason, string> = {
+  "signed-out": ACCOUNT_SIGNED_OUT_MESSAGE,
+  "not-linked": "パスワードでのログインは設定されていません。画面を開き直してください。",
+  // 画面はボタンを無効化して防ぐため、通常はここに来ない
+  "last-provider": "唯一のログイン方法のため解除できません。",
+  // ダイアログが未入力を弾くため、通常はここに来ない
+  "password-required": "パスワードを入力してください。",
+  "invalid-credential": "パスワードが正しくありません。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "unlink-failed": "パスワードでのログインを解除できませんでした。時間をおいて再度お試しください。",
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  unavailable: "パスワードでのログインを解除できませんでした。時間をおいて再度お試しください。",
+  unknown: "パスワードでのログインを解除できませんでした。時間をおいて再度お試しください。",
 };
 
 /** 「2段階認証(2FA)」セクション */

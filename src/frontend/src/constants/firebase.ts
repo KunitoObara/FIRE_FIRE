@@ -29,3 +29,9 @@ export const USE_MFA_RECOVERY_CODE_FUNCTION = "useMfaRecoveryCode";
 
 /** 本人確認のうえ2FA(TOTP)の登録を解除するcallable関数の名前(B10の「2FAを再設定する」) */
 export const RESET_MFA_ENROLLMENT_FUNCTION = "resetMfaEnrollment";
+
+/**
+ * 本人確認のうえメールアドレス / パスワードでのログインを解除するcallable関数の名前(B10)。
+ * バックエンドのexport名(src/backend/src/linked-providers/functions.ts)と一致させる。
+ */
+export const UNLINK_PASSWORD_PROVIDER_FUNCTION = "unlinkPasswordProvider";

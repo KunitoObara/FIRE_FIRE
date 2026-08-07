@@ -17,4 +17,6 @@ export {
   useMfaRecoveryCode,
 } from "./mfa-recovery/functions";
 
+export { unlinkPasswordProvider } from "./linked-providers/functions";
+
 export { sendLoginNotification } from "./login-notification/functions";

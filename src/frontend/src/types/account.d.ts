@@ -122,6 +122,39 @@ declare global {
 
   type UnlinkProviderResult = { ok: true } | { ok: false; reason: UnlinkProviderFailureReason };
 
+  /**
+   * クライアントSDKだけで解除してよいログイン方法。
+   *
+   * パスワードの解除は本人確認を挟むためcallable経由に限る(`unlinkPasswordProvider`)。
+   * 型で絞っておかないと、`unlinkProvider`に"password"を渡すだけで本人確認を迂回できてしまう。
+   */
+  type ClientUnlinkableProviderId = Exclude<LinkedProviderId, "password">;
+
+  /**
+   * B10でパスワードでのログインを解除できなかった理由
+   * (`src/lib/auth/linked-providers.ts`、src/backend/src/linked-providers/functions.ts)。
+   *
+   * 解除をCloud Functionsで行うため、Googleの解除(`UnlinkProviderFailureReason`)とは
+   * 失敗の出方が違う。ポップアップも再認証も挟まらない代わりに、本人確認の失敗が加わる。
+   */
+  type UnlinkPasswordFailureReason =
+    /** セッションが無い(直接アクセス・サインアウト済み) */
+    | "signed-out"
+    /** パスワードでのログインが設定されていない。別タブで解除した後などに起きる */
+    | "not-linked"
+    /** 最後に残った1つは解除できない。解除するとサインインする手段が無くなるため */
+    | "last-provider"
+    /** 本人確認のパスワードが渡らなかった */
+    | "password-required"
+    /** 本人確認のパスワードが誤り */
+    | "invalid-credential"
+    | "too-many-requests"
+    /** 本人確認は通ったが、Identity Platform側で解除できなかった */
+    | "unlink-failed"
+    | CallableSharedFailureReason;
+
+  type UnlinkPasswordResult = { ok: true } | { ok: false; reason: UnlinkPasswordFailureReason };
+
   /** B10の連携・解除の結果として画面に出すメッセージ */
   type LinkedAccountsFeedback = {
     kind: "success" | "error";
@@ -145,14 +178,15 @@ declare global {
   /**
    * B10の連携解除の確認ダイアログのProps。
    *
-   * 解除は本人確認(パスワード再入力)ではなく確認ダイアログのみを挟む
+   * 連携し直せる解除だけを扱うため、確認ダイアログのみを挟む
    * (docs/screen-requirements-account.md「連携アカウントの管理」)。
+   * パスワードの解除は戻す導線が無く、本人確認まで求めるため`PasswordConfirmDialog`側で扱う。
    */
   type UnlinkProviderDialogProps = {
     /** 解除対象。`null`の間は閉じた状態を表す */
-    provider: LinkedProviderId | null;
+    provider: ClientUnlinkableProviderId | null;
     onOpenChange: (open: boolean) => void;
     /** 実行結果。失敗した場合はダイアログを閉じずその場にエラーを出す */
-    onConfirm: (provider: LinkedProviderId) => Promise<UnlinkProviderResult>;
+    onConfirm: (provider: ClientUnlinkableProviderId) => Promise<UnlinkProviderResult>;
   };
 }
