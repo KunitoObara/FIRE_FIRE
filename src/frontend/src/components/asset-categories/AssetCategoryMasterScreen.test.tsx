@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AssetCategoryMasterScreen } from "@/components/asset-categories/AssetCategoryMasterScreen";
+import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 
 import type { RenderResult } from "@testing-library/react";
 
@@ -40,13 +41,19 @@ const NET_FINANCIAL_AXIS: AssetCategoryAxisDocument = {
   createdAt: "2026-01-02T00:00:00.000Z",
 };
 
+/** 保存後にどのキーを無効化したかを確かめるため、画面と同じインスタンスを掴んでおく */
+let queryClient: QueryClient;
+
 /** `useQuery`を使うため、テストでも`QueryClientProvider`で包む必要がある */
-const renderScreen = (): RenderResult =>
-  render(
-    <QueryClientProvider client={new QueryClient()}>
+const renderScreen = (): RenderResult => {
+  queryClient = new QueryClient();
+
+  return render(
+    <QueryClientProvider client={queryClient}>
       <AssetCategoryMasterScreen />
     </QueryClientProvider>,
   );
+};
 
 describe("AssetCategoryMasterScreen", () => {
   beforeEach(() => {
@@ -87,6 +94,7 @@ describe("AssetCategoryMasterScreen", () => {
     const user = userEvent.setup();
     createCategoryAxis.mockResolvedValue({ ok: true });
     renderScreen();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
 
     await screen.findByText("総資産");
     await user.click(screen.getByRole("button", { name: "新規分類を追加" }));
@@ -107,6 +115,8 @@ describe("AssetCategoryMasterScreen", () => {
     await waitFor(() => {
       expect(fetchAssetTypeOptions).toHaveBeenCalledTimes(2);
     });
+    // 分類軸はB1の軸セレクタと集計を決めるので、B1の表示データも無効化する
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
   });
 
   it("分類名が空のまま保存しようとするとエラーを出し、保存処理を呼ばない", async () => {
@@ -140,6 +150,7 @@ describe("AssetCategoryMasterScreen", () => {
     const user = userEvent.setup();
     updateCategoryAxis.mockResolvedValue({ ok: true });
     renderScreen();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
 
     const row = (await screen.findByText("純金融資産")).closest("li");
 
@@ -162,6 +173,8 @@ describe("AssetCategoryMasterScreen", () => {
         assetTypeNames: ["預金・現金", "投資信託"],
       });
     });
+    // 新規追加と同じくB1の表示データも無効化する(片方の分岐だけ外れても気づけるように)
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
   });
 
   /**

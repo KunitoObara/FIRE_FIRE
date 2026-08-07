@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AssetBalanceImportPanel } from "@/components/csv-import/AssetBalanceImportPanel";
 import { ImportHistoryCard } from "@/components/csv-import/ImportHistoryCard";
@@ -12,6 +12,7 @@ import {
   IMPORT_HISTORY_QUERY_KEY,
   UNIMPLEMENTED_IMPORT_TYPE_NOTICE,
 } from "@/constants/csv-import";
+import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 import { fetchImportHistory } from "@/lib/csv-import/asset-balance-repository";
 
 import type { JSX } from "react";
@@ -27,6 +28,8 @@ import type { JSX } from "react";
  * 捨てない(DESIGN.md 6章「タブ切替で入力値を保持する」)。
  */
 export const CsvImportScreen = (): JSX.Element => {
+  const queryClient = useQueryClient();
+
   const history = useQuery({
     queryKey: IMPORT_HISTORY_QUERY_KEY,
     queryFn: fetchImportHistory,
@@ -67,6 +70,9 @@ export const CsvImportScreen = (): JSX.Element => {
                 <AssetBalanceImportPanel
                   onImported={() => {
                     void history.refetch();
+                    // 取り込んだ残高はB1の表示内容そのもの。B1に戻ったとき古い集計を
+                    // 見せないよう、ここで無効化しておく
+                    void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
                   }}
                 />
               ) : (
