@@ -59,6 +59,9 @@ export const CATEGORY_AXIS_LOAD_FAILURE_MESSAGES: Record<AssetCategoryFailureRea
   unknown: "データを取得できませんでした。時間をおいて再度お試しください。",
 };
 
+/** 集計対象の選択肢を読み込んでいるあいだの表示(A7の「リンクを確認しています...」と同じ扱い) */
+export const ASSET_TYPE_OPTIONS_LOADING_LABEL = "集計対象の選択肢を読み込んでいます...";
+
 /**
  * 集計対象の選択肢を取得できないあいだ、保存を止めていることの説明。
  *

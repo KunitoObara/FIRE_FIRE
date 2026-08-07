@@ -41,18 +41,25 @@ declare global {
   type AssetTypeOptionsResult =
     { ok: true; assetTypeNames: string[] } | { ok: false; reason: AssetCategoryFailureReason };
 
+  /**
+   * 集計対象の選択肢の状態。読み込み中・取得失敗・取得済みを1つの値で表す。
+   *
+   * 件数(空配列)だけでは「まだ読み込んでいない」「取得に失敗した」「CSVを一度も
+   * 取り込んでいない」の3つが区別できず、案内の文言と保存の可否がずれる。
+   * 空配列に倒した結果が未取込の案内に化けたのがB4-1、読み込み中に保存できてしまう
+   * のが残っていたのがB4-2。
+   */
+  type AssetTypeOptionsState =
+    | { status: "loading" }
+    | { status: "error"; message: string }
+    | { status: "ready"; assetTypeNames: string[] };
+
   /** 分類軸の追加・編集フォームのProps */
   type AssetCategoryAxisFormProps = {
     /** 新規追加は空値、編集は対象の分類軸の値を渡す */
     initialValues: AssetCategoryAxisFormValues;
-    /** 集計対象チェックボックスの選択肢(既知の資産種別名) */
-    assetTypeOptions: string[];
-    /**
-     * 集計対象の選択肢を取得できなかったときの文言。`null`は取得できている状態。
-     * 空の選択肢が「まだCSVを取り込んでいない」ことを意味するのか、取得に失敗したのかを
-     * 画面で区別するために、件数とは別に受け取る
-     */
-    assetTypeOptionsError: string | null;
+    /** 集計対象チェックボックスの選択肢(既知の資産種別名)と、その取得状態 */
+    assetTypeOptions: AssetTypeOptionsState;
     submitLabel: string;
     onSubmit: (values: AssetCategoryAxisFormValues) => Promise<SaveCategoryAxisResult>;
     onCancel: () => void;
