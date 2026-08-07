@@ -141,6 +141,27 @@ describe("AssetCategoryMasterScreen", () => {
     expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
   });
 
+  /**
+   * 編集も同じ抑止が要る。チェックボックスが出る前に保存すると、既存の割り当てが
+   * 空のまま上書きされて消える
+   */
+  it("集計対象を読み込んでいるあいだは、編集フォームからも保存させない", async () => {
+    const user = userEvent.setup();
+    fetchAssetTypeOptions.mockReturnValue(new Promise(() => {}));
+    renderScreen();
+
+    const row = (await screen.findByText("純金融資産")).closest("li");
+
+    if (row === null) {
+      throw new Error("行が見つからない");
+    }
+
+    await user.click(within(row).getByRole("button", { name: "編集" }));
+
+    expect(screen.getByLabelText("分類名")).toHaveValue("純金融資産");
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  });
+
   it("新規分類を追加して保存すると、一覧を取り直して完了を通知する", async () => {
     const user = userEvent.setup();
     createCategoryAxis.mockResolvedValue({ ok: true });
