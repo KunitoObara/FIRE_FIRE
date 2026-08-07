@@ -89,6 +89,9 @@ check_file_tool ALLOW Glob '{"pattern":"docs/*.md"}'
 check_file_tool DENY  Read '{"file_path":"/repo/docs/.env.example.bak"}'
 check_file_tool DENY  Read '{"file_path":"/repo/docs/.env.exampleX"}'
 check_file_tool DENY  Glob '{"pattern":"docs/.env.*"}'
+# / は境界として扱わない。扱うと .example ごと除去されて本体パスが判定から消える。
+check_file_tool DENY  Read '{"file_path":"docs/.env.example/../.env"}'
+check_file_tool DENY  Glob '{"pattern":"docs/.env.example/**"}'
 
 # CI(GitHub Actions)では歯止めごと無効になること。
 # claude-review ジョブは settingSources に project を含むため、このフックを

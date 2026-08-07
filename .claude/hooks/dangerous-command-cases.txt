@@ -86,6 +86,13 @@ DENY|cat docs/.env.example.bak
 DENY|cat docs/.env.exampleX
 DENY|cp docs/.env.example docs/.env
 
+# --- 拒否されるべき: .example をディレクトリに見立てて本体へ降りる形 ---
+# 境界文字から / を外していないと、docs/.env.example/ ごと除去されて判定対象から
+# 本体パスが消え、素通りする。.example がディレクトリなら本体を指すことになる。
+DENY|cat docs/.env.example/../.env
+DENY|cd docs/.env.example/.. && cat .env
+DENY|ls docs/.env.example/
+
 # --- 通すべき: docs 配下の他のファイル ---
 ALLOW|cat docs/development-workflow.md
 ALLOW|ls docs/
