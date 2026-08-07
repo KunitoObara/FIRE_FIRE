@@ -45,6 +45,29 @@ export const DELETE_CATEGORY_AXIS_BLOCKED_MESSAGE =
 export const buildDeleteCategoryAxisConfirmMessage = (name: string): string =>
   `分類「${name}」を削除します。この操作は取り消せません。`;
 
+/**
+ * 分類軸一覧・集計対象の選択肢を**取得**できなかったときの文言。
+ *
+ * 保存・削除の失敗(`CATEGORY_AXIS_FAILURE_MESSAGES`)とは別に持つ。表示できないことと
+ * 操作できないことでは次にすべきことが違い、「操作に失敗しました」では読めないため。
+ * 取得の失敗を空状態(未取込・未登録)として見せないのがこの文言の目的(B1・B5と同じ扱い)。
+ */
+export const CATEGORY_AXIS_LOAD_FAILURE_MESSAGES: Record<AssetCategoryFailureReason, string> = {
+  "signed-out": "ログイン状態が切れています。ログインし直してから表示してください。",
+  "configuration-error": "Firebaseの設定が読み込めないため表示できません。",
+  "permission-denied": "このデータの参照が許可されていません。ログインし直してください。",
+  unknown: "データを取得できませんでした。時間をおいて再度お試しください。",
+};
+
+/**
+ * 集計対象の選択肢を取得できないあいだ、保存を止めていることの説明。
+ *
+ * 選択肢が出せないまま保存すると、集計対象を1件も選べず「すべての資産種別が対象」の
+ * 分類軸ができてしまう(B1-3で実際に起きた)。意図しない軸を作らせない。
+ */
+export const ASSET_TYPE_OPTIONS_UNAVAILABLE_NOTICE =
+  "集計対象を選べないまま保存すると、すべての資産種別が対象の分類軸になるため、選択肢を読み込めるまで保存できません。";
+
 /** 分類軸の取得・保存・削除が失敗したときの文言 */
 export const CATEGORY_AXIS_FAILURE_MESSAGES: Record<AssetCategoryFailureReason, string> = {
   "signed-out": "ログイン状態が切れています。ログインし直してから操作してください。",

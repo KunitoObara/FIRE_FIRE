@@ -47,6 +47,12 @@ declare global {
     initialValues: AssetCategoryAxisFormValues;
     /** 集計対象チェックボックスの選択肢(既知の資産種別名) */
     assetTypeOptions: string[];
+    /**
+     * 集計対象の選択肢を取得できなかったときの文言。`null`は取得できている状態。
+     * 空の選択肢が「まだCSVを取り込んでいない」ことを意味するのか、取得に失敗したのかを
+     * 画面で区別するために、件数とは別に受け取る
+     */
+    assetTypeOptionsError: string | null;
     submitLabel: string;
     onSubmit: (values: AssetCategoryAxisFormValues) => Promise<SaveCategoryAxisResult>;
     onCancel: () => void;

@@ -8,6 +8,7 @@ import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  ASSET_TYPE_OPTIONS_UNAVAILABLE_NOTICE,
   CATEGORY_AXIS_FAILURE_MESSAGES,
   CATEGORY_AXIS_NAME_REQUIRED_MESSAGE,
   CATEGORY_AXIS_NAME_TOO_LONG_MESSAGE,
@@ -29,6 +30,7 @@ const NAME_INPUT_ID = "category-axis-name";
 export const AssetCategoryAxisForm = ({
   initialValues,
   assetTypeOptions,
+  assetTypeOptionsError,
   submitLabel,
   onSubmit,
   onCancel,
@@ -94,9 +96,20 @@ export const AssetCategoryAxisForm = ({
 
       <div className="flex flex-col gap-2">
         <Label>集計対象(資産種別を複数選択可。1つも選ばない場合はすべての資産種別が対象)</Label>
-        {assetTypeOptions.length === 0 ? (
+        {/*
+          取得に失敗しているときは「まだ選択肢が無い」の案内を出さない。
+          取り込み済みでも空に見えるので、未取込の状態と取り違える(B4-1)
+        */}
+        {assetTypeOptionsError ? (
+          <div role="alert" className="flex flex-col gap-1 text-sm text-destructive">
+            <p>{assetTypeOptionsError}</p>
+            <p>{ASSET_TYPE_OPTIONS_UNAVAILABLE_NOTICE}</p>
+          </div>
+        ) : null}
+        {assetTypeOptionsError === null && assetTypeOptions.length === 0 ? (
           <p className="text-sm text-muted-foreground">{NO_ASSET_TYPE_OPTIONS_NOTICE}</p>
-        ) : (
+        ) : null}
+        {assetTypeOptionsError === null && assetTypeOptions.length > 0 ? (
           <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
             {assetTypeOptions.map((assetTypeName) => {
               const checkboxId = `category-axis-asset-type-${assetTypeName}`;
@@ -115,7 +128,7 @@ export const AssetCategoryAxisForm = ({
               );
             })}
           </div>
-        )}
+        ) : null}
       </div>
 
       {submitError ? (
@@ -128,7 +141,7 @@ export const AssetCategoryAxisForm = ({
         <Button
           type="button"
           size="sm"
-          disabled={submitting}
+          disabled={submitting || assetTypeOptionsError !== null}
           onClick={() => {
             void handleSubmit();
           }}
