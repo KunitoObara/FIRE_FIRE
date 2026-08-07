@@ -395,15 +395,29 @@ firebase functions:artifacts:setpolicy --project fire-fire-dev --location asia-n
 
 ## 8. 既知の問題
 
-### firebase-tools のバージョンを 15.22.1 に固定している
+### firebase-tools は 15.22.3 以降を使う必要がある
 
-15.22.2 以降、`requireAuth` 内のタイムアウトに Workload Identity の資格情報交換が間に合わず、ADC が正しく設定されていても以下のエラーでデプロイが失敗する回帰がある（[firebase-tools#10716](https://github.com/firebase/firebase-tools/issues/10716)）。
+デプロイが以下のエラーで失敗することがある（[firebase-tools#10716](https://github.com/firebase/firebase-tools/issues/10716)）。ADC は正しく設定されているのに出るため、認証設定側を疑って時間を溶かしやすい。
 
 ```
 Error: Failed to authenticate, have you run firebase login?
 ```
 
-実際の ADC のエラーが握りつぶされて汎用メッセージになるため、認証設定側を疑って時間を溶かしやすい。`deploy.yml` では 15.22.1 に固定して回避している。上流で修正されたら固定を外す。
+原因は認証設定でもタイムアウトでもない。google-auth-library のトランスポートが **keep-alive したソケットを再利用**する際に、Node.js 22.23.0 / 24.17.0 のリグレッションで `Premature close` になる。firebase-tools は `autoAuth()` の例外を握りつぶして上のメッセージに差し替えるため（[requireAuth.ts](https://github.com/firebase/firebase-tools/blob/master/src/requireAuth.ts)）、実際の失敗理由が表に出ない。
+
+ソケット再利用が起きるかどうかはタイミング次第なので、**同じコミット・同じ環境でも成功したり失敗したりする**。再実行で直るのはこのため。
+
+[firebase-tools#10717](https://github.com/firebase/firebase-tools/pull/10717) が `GoogleAuth` に keep-alive しないエージェントを渡す回避を入れ、**15.22.3** で出荷された。`deploy.yml` はこれを含む 15.26.0 に固定している。**バージョンを下げるときは 15.22.3 を下回らせないこと。**
+
+> **かつて「15.22.2 以降の回帰なので 15.22.1 に固定して回避している」と書いていたのは誤り。**
+> 15.22.1 と 15.22.3 の `google-auth-library` 依存はどちらも `^9.11.0` で同一なので、15.22.1 も同じリグレッションを踏む。固定先が回避の入る手前を指していたぶん、むしろ踏み続ける状態だった。実際、15.22.1 に固定したまま失敗した（[PR #54 マージ後のデプロイ](https://github.com/KunitoObara/private_room/actions/runs/31123642113)。再実行3回目で成功）。
+>
+> 切り分けの参考として、否定できた仮説も残しておく。
+>
+> - **`requireAuth` のタイムアウト説** — `autoAuth()` のタイムアウトは 15.22.1 から最新まで一貫して15秒。上記の失敗はステップ開始から4.6秒で起きており発火していない
+> - **`google-github-actions/auth` に `token_format: access_token` を指定してアクセストークンを直接渡す案** — firebase-tools は `GOOGLE_OAUTH_ACCESS_TOKEN` を参照しない（gcloud とは異なる）。[firebase-tools#10726](https://github.com/firebase/firebase-tools/issues/10726) に機能要望として挙がっている段階で、現状は取れない手段
+
+再発した場合は、まずデプロイを再実行して切り分ける。それで通るならこの問題で、firebase-tools 側の回避が効かなくなった可能性を疑う（Node.js のバージョンが上がったときなど）。再実行しても通らないなら別の原因なので、認証設定側（2章のサービスアカウント権限、Workload Identity の設定）を見る。
 
 ### Storage ルールはデプロイターゲットでバケットを明示している
 
