@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
+import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 
 import type { RenderResult } from "@testing-library/react";
 
@@ -244,13 +245,41 @@ describe("DashboardScreen", () => {
     fetchDashboardData.mockRejectedValue(new Error("Invalid time value"));
 
     await act(async () => {
-      await queryClient.invalidateQueries({ queryKey: ["dashboard-data"] }).catch(() => {});
+      await queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY }).catch(() => {});
     });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "データを表示できませんでした。再試行しても直らない場合は、取り込んだCSVのデータに問題がある可能性があります。",
     );
     expect(screen.queryByText("資産推移(総資産)")).not.toBeInTheDocument();
+
+    consoleError.mockRestore();
+  });
+
+  /**
+   * rejectでは`data`が更新されないので、`ok: false`の理由が残ったままになる。
+   * 理由を先に見ると1つ前の文言を出し続けてしまうため、直近の試行を優先する
+   */
+  it("取得失敗のあと再試行が例外で落ちたら、例外の文言に切り替える", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const user = userEvent.setup();
+    fetchDashboardData.mockResolvedValueOnce({ ok: false, reason: "unknown" });
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "データを取得できませんでした。時間をおいて再度お試しください。",
+    );
+
+    fetchDashboardData.mockRejectedValue(new Error("Invalid time value"));
+    await user.click(screen.getByRole("button", { name: "再試行する" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "データを表示できませんでした。再試行しても直らない場合は、取り込んだCSVのデータに問題がある可能性があります。",
+      );
+    });
+    // 例外は一時的なこともあるので、導線は残したまま
+    expect(screen.getByRole("button", { name: "再試行する" })).toBeInTheDocument();
 
     consoleError.mockRestore();
   });

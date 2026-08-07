@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CsvImportScreen } from "@/components/csv-import/CsvImportScreen";
+import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 
 import type { RenderResult } from "@testing-library/react";
 
@@ -49,7 +50,7 @@ describe("CsvImportScreen", () => {
 
     await user.click(await screen.findByRole("button", { name: "取込完了を通知する" }));
 
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["dashboard-data"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
     expect(fetchImportHistory).toHaveBeenCalledTimes(2);
   });
 });

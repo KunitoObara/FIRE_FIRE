@@ -32,27 +32,39 @@ import type { JSX } from "react";
 /**
  * 表示できないときの文言。取得の失敗(理由つき)と、集計まで含めた例外の両方をここに集める。
  *
- * 例外は原因を特定できないので、理由つきの失敗を優先して具体的な文言を出す。
+ * **例外を先に見る。** rejectしたときTanStack Queryは`data`を更新しないので、`ok: false`で
+ * 失敗したあとに再試行が例外で落ちると、`failureReason`には1つ前の理由が残ったままになる。
+ * 理由を先に見ると、その古い文言を出し続けてしまう。
  */
 const resolveErrorMessage = (
   failureReason: FirestoreAccessFailureReason | null,
   unexpectedError: unknown,
 ): string | null => {
-  if (failureReason) {
-    return DASHBOARD_FAILURE_MESSAGES[failureReason];
+  if (unexpectedError) {
+    return DASHBOARD_UNEXPECTED_ERROR_MESSAGE;
   }
 
-  return unexpectedError ? DASHBOARD_UNEXPECTED_ERROR_MESSAGE : null;
+  return failureReason ? DASHBOARD_FAILURE_MESSAGES[failureReason] : null;
 };
 
 /**
- * その場でやり直す意味があるか。
+ * その場でやり直す意味があるか。判断は`resolveErrorMessage`と同じ順序で行う。
  *
  * ログイン切れ・設定不備は再取得しても同じ結果にしかならず、文言で案内している
  * 「ログインし直す」より先にボタンを押させてしまう。押せる導線は残さない。
+ * `permission-denied`は文言で再ログインを促してはいるが、IDトークンが更新されれば
+ * その場で通ることがあるので残す(`unknown`と同じ扱い)。
  */
-const isRetryable = (failureReason: FirestoreAccessFailureReason | null): boolean =>
-  failureReason !== "signed-out" && failureReason !== "configuration-error";
+const isRetryable = (
+  failureReason: FirestoreAccessFailureReason | null,
+  unexpectedError: unknown,
+): boolean => {
+  if (unexpectedError) {
+    return true;
+  }
+
+  return failureReason !== "signed-out" && failureReason !== "configuration-error";
+};
 
 /** 直近CSV取込日時の表示。未取込のときは日時の代わりにその旨を出す */
 const formatLastImportedAt = (isoDateTime: string | null): string =>
@@ -133,10 +145,13 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
       ) : null}
 
       {errorMessage ? (
-        <div role="alert" className="flex flex-col items-start gap-3">
-          <p className="text-sm text-destructive">{errorMessage}</p>
+        <div className="flex flex-col items-start gap-3">
+          {/* 読み上げの対象は文言だけにする。ボタンを含めない扱いは既存画面と同じ */}
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage}
+          </p>
           {/* リロードしか手が無い状態にしない。一時的な失敗ならこの場で回復できる */}
-          {isRetryable(failureReason) ? (
+          {isRetryable(failureReason, unexpectedError) ? (
             <Button
               type="button"
               variant="outline"

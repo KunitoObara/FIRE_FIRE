@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AssetCategoryMasterScreen } from "@/components/asset-categories/AssetCategoryMasterScreen";
+import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 
 import type { RenderResult } from "@testing-library/react";
 
@@ -115,7 +116,7 @@ describe("AssetCategoryMasterScreen", () => {
       expect(fetchAssetTypeOptions).toHaveBeenCalledTimes(2);
     });
     // 分類軸はB1の軸セレクタと集計を決めるので、B1の表示データも無効化する
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["dashboard-data"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
   });
 
   it("分類名が空のまま保存しようとするとエラーを出し、保存処理を呼ばない", async () => {
@@ -173,7 +174,7 @@ describe("AssetCategoryMasterScreen", () => {
       });
     });
     // 新規追加と同じくB1の表示データも無効化する(片方の分岐だけ外れても気づけるように)
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["dashboard-data"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
   });
 
   /**
