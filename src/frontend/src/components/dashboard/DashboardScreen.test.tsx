@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -63,16 +63,22 @@ const data: DashboardData = {
   cashflow: null,
 };
 
+/** 画面の外から再取得を起こすため、画面と同じインスタンスを掴んでおく */
+let queryClient: QueryClient;
+
 /**
  * リトライはここでは切らない。画面側が`retry: false`を指定しており、既定のまま包んでも
  * 失敗のテストが指数バックオフで待たされないことを、この形のまま確かめられる
  */
-const renderScreen = (props: Partial<DashboardScreenProps> = {}): RenderResult =>
-  render(
-    <QueryClientProvider client={new QueryClient()}>
+const renderScreen = (props: Partial<DashboardScreenProps> = {}): RenderResult => {
+  queryClient = new QueryClient();
+
+  return render(
+    <QueryClientProvider client={queryClient}>
       <DashboardScreen axisParam={undefined} periodParam={undefined} {...props} />
     </QueryClientProvider>,
   );
+};
 
 describe("DashboardScreen", () => {
   beforeEach(() => {
@@ -223,6 +229,36 @@ describe("DashboardScreen", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     consoleError.mockRestore();
+  });
+
+  /**
+   * 表示済みのデータがある状態で背後の再取得が例外で落ちても、`useQuery`は成功のまま
+   * 直前のデータを返し、`error`を出さない(@tanstack/react-query 5.101で確認)。
+   * エラーの文言と古い金額が同時に並ぶ状態にはならないことを、この形で固定しておく
+   */
+  it("表示済みのデータがある状態で再取得が例外で落ちても、エラーと中身が同時に出ない", async () => {
+    renderScreen();
+
+    await screen.findByText("資産推移(総資産)");
+    fetchDashboardData.mockRejectedValue(new Error("Invalid time value"));
+
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-data"] }).catch(() => {});
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("資産推移(総資産)")).toBeInTheDocument();
+  });
+
+  /** 再取得しても同じ結果にしかならない失敗では、押せる導線を出さない */
+  it("ログイン切れ・設定不備のときは再試行の導線を出さない", async () => {
+    fetchDashboardData.mockResolvedValue({ ok: false, reason: "signed-out" });
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "ログイン状態が切れています。ログインし直してから表示してください。",
+    );
+    expect(screen.queryByRole("button", { name: "再試行する" })).not.toBeInTheDocument();
   });
 
   /** 取得失敗(`ok: false`)も、リロード以外の回復手段が無い状態にはしない */
