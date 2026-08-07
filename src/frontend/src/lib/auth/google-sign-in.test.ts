@@ -357,7 +357,7 @@ describe("resolveNextStepAfterLink", () => {
     await expect(resolveNextStepAfterLink("mfa-setup")).resolves.toBe("mfa-setup");
   });
 
-  // 遷移先を誤ってもAppAccessGuardが正しい手順へ差し戻すため、ここでは止めない
+  // 誤ってA2へ送ってもA2自身のポーリングが確認済みを検知してA3へ進めるため、ここでは止めない
   it.each<EmailVerificationState>([
     { status: "network-error" },
     { status: "configuration-error" },

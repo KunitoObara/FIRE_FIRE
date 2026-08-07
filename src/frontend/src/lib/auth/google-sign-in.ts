@@ -214,7 +214,14 @@ export const linkPendingGoogleAccount = async (): Promise<void> => {
  * (docs/screen-requirements-auth.md A8)。
  *
  * 取り直せなかった場合(通信失敗・設定不足・セッション消失)は連携前の判断をそのまま使う。
- * 遷移先を誤っても`AppAccessGuard`が正しい手順へ差し戻すため、ここで止める理由が無い。
+ * 誤りうるのは「本当は確認済みなのにA2へ送る」側だけで、これはA2自身が確認状況を
+ * ポーリングしているため確認済みになった時点で自動的にA3へ進む(`VerifyEmailNotice`)。
+ * 逆向き(本当は未確認なのにA3へ送る)は起きない — `mfa-setup`が返るのは連携前が確認済み
+ * だった場合に限られ、連携で未確認へ戻ることは無いため。行き止まりにならない以上、
+ * ここで取得失敗を理由にユーザーを止める理由が無い。
+ *
+ * A1〜A8は`AppAccessGuard`(`(dashboard)`レイアウト、B1〜B10のみ)の外側にあるので、
+ * 差し戻しをガードに期待してはいけない。上記のA2のポーリングを消すとここが行き止まりになる。
  */
 export const resolveNextStepAfterLink = async (
   beforeLink: SignInNextStep,
