@@ -90,6 +90,37 @@ describe("AssetCategoryMasterScreen", () => {
     expect(await screen.findByText(/分類軸がまだ登録されていません/u)).toBeInTheDocument();
   });
 
+  /** 取得の失敗を「0件」として見せない。登録済みでも未登録に見えてしまうため */
+  it("分類軸の取得に失敗したら、登録を促す案内ではなく失敗を出す", async () => {
+    fetchCategoryAxes.mockResolvedValue({ ok: false, reason: "permission-denied" });
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "このデータの参照が許可されていません。ログインし直してください。",
+    );
+    expect(screen.queryByText(/分類軸がまだ登録されていません/u)).not.toBeInTheDocument();
+  });
+
+  /**
+   * 選択肢の取得に失敗した状態と、CSVを一度も取り込んでいない状態を画面で区別する。
+   * 区別が付かないと「取り込んだはずなのに未取込と言われる」ように見える(B4-1)
+   */
+  it("集計対象の取得に失敗したら、CSV未取込の案内ではなく失敗を出して保存させない", async () => {
+    const user = userEvent.setup();
+    fetchAssetTypeOptions.mockResolvedValue({ ok: false, reason: "unknown" });
+    renderScreen();
+
+    await screen.findByText("総資産");
+    await user.click(screen.getByRole("button", { name: "新規分類を追加" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "データを取得できませんでした。時間をおいて再度お試しください。",
+    );
+    expect(screen.queryByText(/CSVを取り込むと選択できるようになります/u)).not.toBeInTheDocument();
+    // 集計対象を選べないまま「すべての資産種別が対象」の軸を作らせない
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  });
+
   it("新規分類を追加して保存すると、一覧を取り直して完了を通知する", async () => {
     const user = userEvent.setup();
     createCategoryAxis.mockResolvedValue({ ok: true });
