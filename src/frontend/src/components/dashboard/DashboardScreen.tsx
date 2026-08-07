@@ -30,40 +30,39 @@ import { filterSeriesByPeriod } from "@/lib/dashboard/period";
 import type { JSX } from "react";
 
 /**
- * 表示できないときの文言。取得の失敗(理由つき)と、集計まで含めた例外の両方をここに集める。
+ * 表示できないときの扱いを決める。取得の失敗(理由つき)と、集計まで含めた例外の両方をここに集める。
+ * 表示できているあいだは`null`。
+ *
+ * 文言と再試行の可否を**同じ場所で**決める。別々に判断すると、失敗理由を足したときに
+ * 片方だけ直して、文言は「ログインし直してください」なのに再試行ボタンが出る、といった
+ * 食い違いが起きる。
  *
  * **例外を先に見る。** rejectしたときTanStack Queryは`data`を更新しないので、`ok: false`で
  * 失敗したあとに再試行が例外で落ちると、`failureReason`には1つ前の理由が残ったままになる。
  * 理由を先に見ると、その古い文言を出し続けてしまう。
  */
-const resolveErrorMessage = (
+const resolveFailureView = (
   failureReason: FirestoreAccessFailureReason | null,
   unexpectedError: unknown,
-): string | null => {
+): DashboardFailureView | null => {
   if (unexpectedError) {
-    return DASHBOARD_UNEXPECTED_ERROR_MESSAGE;
+    return { message: DASHBOARD_UNEXPECTED_ERROR_MESSAGE, retryable: true };
   }
 
-  return failureReason ? DASHBOARD_FAILURE_MESSAGES[failureReason] : null;
-};
-
-/**
- * その場でやり直す意味があるか。判断は`resolveErrorMessage`と同じ順序で行う。
- *
- * ログイン切れ・設定不備は再取得しても同じ結果にしかならず、文言で案内している
- * 「ログインし直す」より先にボタンを押させてしまう。押せる導線は残さない。
- * `permission-denied`は文言で再ログインを促してはいるが、IDトークンが更新されれば
- * その場で通ることがあるので残す(`unknown`と同じ扱い)。
- */
-const isRetryable = (
-  failureReason: FirestoreAccessFailureReason | null,
-  unexpectedError: unknown,
-): boolean => {
-  if (unexpectedError) {
-    return true;
+  if (failureReason === null) {
+    return null;
   }
 
-  return failureReason !== "signed-out" && failureReason !== "configuration-error";
+  return {
+    message: DASHBOARD_FAILURE_MESSAGES[failureReason],
+    /*
+      ログイン切れ・設定不備は再取得しても同じ結果にしかならず、文言で案内している
+      「ログインし直す」より先にボタンを押させてしまう。押せる導線は残さない。
+      `permission-denied`は文言で再ログインを促してはいるが、IDトークンが更新されれば
+      その場で通ることがあるので残す(`unknown`と同じ扱い)。
+    */
+    retryable: failureReason !== "signed-out" && failureReason !== "configuration-error",
+  };
 };
 
 /** 直近CSV取込日時の表示。未取込のときは日時の代わりにその旨を出す */
@@ -109,7 +108,7 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
    */
   const unexpectedError = dashboardQuery.error;
 
-  const errorMessage = resolveErrorMessage(failureReason, unexpectedError);
+  const failureView = resolveFailureView(failureReason, unexpectedError);
 
   // 画面の文言は原因まで特定できないので、開発者向けの手掛かりだけコンソールに残す
   useEffect(() => {
@@ -144,14 +143,14 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
         </div>
       ) : null}
 
-      {errorMessage ? (
+      {failureView ? (
         <div className="flex flex-col items-start gap-3">
           {/* 読み上げの対象は文言だけにする。ボタンを含めない扱いは既存画面と同じ */}
           <p role="alert" className="text-sm text-destructive">
-            {errorMessage}
+            {failureView.message}
           </p>
           {/* リロードしか手が無い状態にしない。一時的な失敗ならこの場で回復できる */}
-          {isRetryable(failureReason, unexpectedError) ? (
+          {failureView.retryable ? (
             <Button
               type="button"
               variant="outline"
@@ -172,7 +171,7 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
         残る(TanStack Query)ので、条件を`data`だけにするとエラーの真下に古い金額が並ぶ。
         `ok: false`では結果ごと置き換わって消えるので、そちらと扱いを揃える
       */}
-      {data && errorMessage === null ? (
+      {data && failureView === null ? (
         <>
           <p className="text-xs text-muted-foreground">
             直近CSV取込:{" "}
