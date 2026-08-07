@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ASSET_TYPE_OPTIONS_QUERY_KEY,
   CATEGORY_AXES_QUERY_KEY,
+  CATEGORY_AXIS_LOAD_FAILURE_MESSAGES,
 } from "@/constants/asset-categories";
 import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 import {
@@ -51,9 +52,21 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
   const [editingAxis, setEditingAxis] = useState<AssetCategoryAxisDocument | null>(null);
   const [deletingAxis, setDeletingAxis] = useState<AssetCategoryAxisDocument | null>(null);
 
-  const axes = axesQuery.data?.ok === true ? axesQuery.data.axes : [];
+  /*
+    取得の失敗を空配列に倒さない。倒すと「分類軸が0件」「CSV未取込」の案内に化けて、
+    取り込み済みでも未取込に見える(B4-1)。失敗は失敗として出す(B1・B5と同じ扱い)
+  */
+  const axesResult = axesQuery.data;
+  const axes = axesResult?.ok === true ? axesResult.axes : [];
+  const axesFailureReason = axesResult !== undefined && !axesResult.ok ? axesResult.reason : null;
+
+  const assetTypeOptionsResult = assetTypeOptionsQuery.data;
   const assetTypeOptions =
-    assetTypeOptionsQuery.data?.ok === true ? assetTypeOptionsQuery.data.assetTypeNames : [];
+    assetTypeOptionsResult?.ok === true ? assetTypeOptionsResult.assetTypeNames : [];
+  const assetTypeOptionsError =
+    assetTypeOptionsResult !== undefined && !assetTypeOptionsResult.ok
+      ? CATEGORY_AXIS_LOAD_FAILURE_MESSAGES[assetTypeOptionsResult.reason]
+      : null;
 
   const closeForm = (): void => {
     setFormMode("closed");
@@ -125,6 +138,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
             <AssetCategoryAxisForm
               initialValues={EMPTY_FORM_VALUES}
               assetTypeOptions={assetTypeOptions}
+              assetTypeOptionsError={assetTypeOptionsError}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
@@ -141,6 +155,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
               key={editingAxis.id}
               initialValues={{ name: editingAxis.name, assetTypeNames: editingAxis.assetTypeNames }}
               assetTypeOptions={assetTypeOptions}
+              assetTypeOptionsError={assetTypeOptionsError}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
@@ -154,9 +169,17 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
         </div>
-      ) : (
+      ) : null}
+
+      {axesFailureReason ? (
+        <p role="alert" className="text-sm text-destructive">
+          {CATEGORY_AXIS_LOAD_FAILURE_MESSAGES[axesFailureReason]}
+        </p>
+      ) : null}
+
+      {!axesQuery.isPending && axesFailureReason === null ? (
         <AssetCategoryAxisList axes={axes} onEdit={handleEdit} onDelete={setDeletingAxis} />
-      )}
+      ) : null}
 
       <DeleteCategoryAxisDialog
         axis={deletingAxis}
