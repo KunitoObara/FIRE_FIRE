@@ -152,7 +152,12 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
         </div>
       ) : null}
 
-      {data ? (
+      {/*
+        失敗を出しているあいだは中身を出さない。例外で落ちた再取得では直前の成功データが
+        残る(TanStack Query)ので、条件を`data`だけにするとエラーの真下に古い金額が並ぶ。
+        `ok: false`では結果ごと置き換わって消えるので、そちらと扱いを揃える
+      */}
+      {data && errorMessage === null ? (
         <>
           <p className="text-xs text-muted-foreground">
             直近CSV取込:{" "}

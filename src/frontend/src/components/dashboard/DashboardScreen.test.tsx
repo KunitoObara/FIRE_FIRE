@@ -232,11 +232,12 @@ describe("DashboardScreen", () => {
   });
 
   /**
-   * 表示済みのデータがある状態で背後の再取得が例外で落ちても、`useQuery`は成功のまま
-   * 直前のデータを返し、`error`を出さない(@tanstack/react-query 5.101で確認)。
-   * エラーの文言と古い金額が同時に並ぶ状態にはならないことを、この形で固定しておく
+   * 例外で落ちた再取得では直前の成功データが残る(TanStack Query)。B2の取込やB4の保存で
+   * 無効化した直後に起こりうる経路なので、エラーの真下に古い金額が並ばないことを見る。
+   * エラーが画面へ伝わるまでに間があるため、待ってから確かめる
    */
-  it("表示済みのデータがある状態で再取得が例外で落ちても、エラーと中身が同時に出ない", async () => {
+  it("再取得が例外で落ちたら、直前の内容を残さずエラーに切り替える", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     renderScreen();
 
     await screen.findByText("資産推移(総資産)");
@@ -246,8 +247,12 @@ describe("DashboardScreen", () => {
       await queryClient.invalidateQueries({ queryKey: ["dashboard-data"] }).catch(() => {});
     });
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByText("資産推移(総資産)")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "データを表示できませんでした。再試行しても直らない場合は、取り込んだCSVのデータに問題がある可能性があります。",
+    );
+    expect(screen.queryByText("資産推移(総資産)")).not.toBeInTheDocument();
+
+    consoleError.mockRestore();
   });
 
   /** 再取得しても同じ結果にしかならない失敗では、押せる導線を出さない */
