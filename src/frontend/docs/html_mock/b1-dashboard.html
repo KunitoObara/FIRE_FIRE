@@ -221,25 +221,31 @@
               </defs>
               <!-- 手前の分類を描き終えてから次を描く。合計600msで1周のスイープになる。
                    負債のスライスも同じ1周に含める(DESIGN.md 9章) -->
-              <circle class="chart-anim-arc" style="--arc-len: 118; --arc-dur: 250ms; --arc-delay: 0ms;"
+              <circle class="chart-anim-arc" style="--arc-len: 121; --arc-dur: 257ms; --arc-delay: 0ms;"
                 cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-1))" stroke-width="20" transform="rotate(-90 60 60)"/>
-              <circle class="chart-anim-arc" style="--arc-len: 47; --arc-dur: 100ms; --arc-delay: 250ms;"
-                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-2))" stroke-width="20" stroke-dashoffset="-118" transform="rotate(-90 60 60)"/>
-              <circle class="chart-anim-arc" style="--arc-len: 31; --arc-dur: 66ms; --arc-delay: 350ms;"
-                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-6))" stroke-width="20" stroke-dashoffset="-165" transform="rotate(-90 60 60)"/>
-              <circle class="chart-anim-arc" style="--arc-len: 86; --arc-dur: 184ms; --arc-delay: 416ms;"
-                cx="60" cy="60" r="45" fill="none" stroke="url(#debt-hatch)" stroke-width="20" stroke-dashoffset="-196" transform="rotate(-90 60 60)"/>
+              <circle class="chart-anim-arc" style="--arc-len: 49; --arc-dur: 103ms; --arc-delay: 257ms;"
+                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-2))" stroke-width="20" stroke-dashoffset="-121" transform="rotate(-90 60 60)"/>
+              <circle class="chart-anim-arc" style="--arc-len: 34; --arc-dur: 72ms; --arc-delay: 360ms;"
+                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-6))" stroke-width="20" stroke-dashoffset="-170" transform="rotate(-90 60 60)"/>
+              <circle class="chart-anim-arc" style="--arc-len: 79; --arc-dur: 168ms; --arc-delay: 432ms;"
+                cx="60" cy="60" r="45" fill="none" stroke="url(#debt-hatch)" stroke-width="20" stroke-dashoffset="-204" transform="rotate(-90 60 60)"/>
             </svg>
             <div class="flex flex-col gap-3">
               <ul class="text-sm flex flex-col gap-2 tabular-nums">
-                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-1));"></span>投資信託 <span class="ml-auto text-slate-400">42%</span></li>
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-1));"></span>投資信託 <span class="ml-auto text-slate-400">43%</span></li>
                 <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-2));"></span>現金・預金 <span class="ml-auto text-slate-400">17%</span></li>
-                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-6));"></span>株式 <span class="ml-auto text-slate-400">11%</span></li>
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-6));"></span>株式 <span class="ml-auto text-slate-400">12%</span></li>
                 <!-- 凡例の色見本もハッチングにする。グラフと同じ見た目でないと対応が取れない -->
-                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: repeating-linear-gradient(45deg, hsl(var(--destructive)) 0 2px, hsl(var(--card)) 2px 3px);"></span>負債 <span class="ml-auto text-slate-400">30%</span></li>
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: repeating-linear-gradient(45deg, hsl(var(--destructive)) 0 2px, hsl(var(--card)) 2px 3px);"></span>負債 <span class="ml-auto text-slate-400">28%</span></li>
               </ul>
+              <!--
+                差し引くのは分類軸で選んだ負債だけ(b4-category-master.html の「純金融資産」は
+                住宅ローン+自動車ローンの2件を選択し、奨学金は選んでいない)。
+                そのため負債サマリの合計(全3件 21,930,000円)とは一致しない。
+                資産 50,370,000円 - 負債 19,630,000円 = 30,740,000円、分母は 70,000,000円。
+              -->
               <div class="text-xs text-slate-400 border-t pt-2" style="border-color: hsl(var(--border));">
-                <p class="tabular-nums">差引後 <span class="text-sm font-semibold text-slate-700">28,070,000円</span>(負債 -21,930,000円 を控除)</p>
+                <p class="tabular-nums">差引後 <span class="text-sm font-semibold text-slate-700">30,740,000円</span>(この分類軸が対象にしている負債2件 -19,630,000円 を控除)</p>
                 <p class="mt-1">構成比は資産と負債の絶対値の合計に対する割合です。</p>
               </div>
             </div>
