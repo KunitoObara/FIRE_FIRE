@@ -34,6 +34,28 @@ jobs:
           fi
           echo "PRタイトルにWIPは含まれていません: ${PR_TITLE}"
 
+  hooks:
+    name: hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 禁止コマンド遮断フック(.claude/settings.json の PreToolUse)の回帰テスト。
+      # 安全装置そのものなので、「判定内容を変えたら流す」という運用ルールだけに
+      # 任せず、実行し忘れをCIで拾う。
+      #
+      # 依存のインストールは不要。スクリプトが使うのは bash / jq / python3 / grep /
+      # sed で、いずれも ubuntu-latest に最初から入っている。
+      #
+      # 環境変数の細工も不要。フック本体が素通りするのは GITHUB_ACTIONS と
+      # CLAUDE_GUARD_DISABLE の**両方**が揃ったときだけで、後者を渡しているのは
+      # claude-review.yml の review ジョブだけ。このジョブでは前者しか立たないので
+      # 歯止めは有効なまま動く。片方だけで無効化する形に変える場合
+      # (claude-review.yml 側の判定を見直す場合)は、ここが素通りしないかを
+      # 確かめること — 素通りすると全ケースが期待DENYに対して判定ALLOWとなって落ちる。
+      - name: 禁止コマンド遮断フックの回帰テスト
+        run: bash .claude/hooks/run-dangerous-command-tests.sh
+
   frontend:
     name: frontend
     runs-on: ubuntu-latest
