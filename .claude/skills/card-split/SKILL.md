@@ -70,7 +70,7 @@ git diff develop --numstat -- ':(exclude)*.test.ts' ':(exclude)*.test.tsx' \
   | awk '{ added += $1; deleted += $2 } END { print added + deleted }'
 ```
 
-触る画面IDの数は差分のパスから数える(`src/app/(dashboard)/<画面>/`、`src/components/<画面>/`)。
+触る画面IDの数は、差分のパスを**画面IDに読み替えてから**数える。`src/app/(dashboard)/` と `src/components/` 配下は `dashboard` / `debts` / `real-estate` のような**機能名のディレクトリで、画面IDそのものではない**(B1 → `dashboard`、B11 → `debts`、B5〜B7 → `real-estate`)。対応は [docs/screen-list-and-transitions.md](../../../docs/screen-list-and-transitions.md) の画面一覧で引く。`real-estate` のように1つのディレクトリが複数の画面ID(B5・B6・B7)に対応することもあるので、ディレクトリ数をそのまま画面IDの数として数えない。
 
 正本 5章「分ける目安」と突き合わせ、**そもそも分ける必要があるか**を判断する。目安を下回っているなら分けずに終わってよい。その場合はそう報告する。
 
