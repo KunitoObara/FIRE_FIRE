@@ -54,8 +54,8 @@ export const CategoryBreakdownChart = ({ slices }: CategoryBreakdownChartProps):
           stroke="var(--card)"
           strokeWidth={2}
           // `paddingAngle`と併用するとRechartsが角度を広げきれず、開始フレーム
-          // (ほぼ0度の扇形)のまま止まって円が出ない。スイープは`chart-sweep`のCSSマスクで
-          // 行うので、Recharts側のアニメーションは止めたままにする(DESIGN.md 9章)
+          // (ほぼ0度の扇形)のまま止まって円が出ない。スイープは`CategoryBreakdownChart.module.css`
+          // のCSSマスクで行うので、Recharts側のアニメーションは止めたままにする(DESIGN.md 9章)
           isAnimationActive={false}
         >
           {slices.map((slice) => (
