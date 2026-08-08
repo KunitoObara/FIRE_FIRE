@@ -23,6 +23,7 @@ import {
   NO_ASSET_AXIS_EMPTY_STATE,
   NO_CSV_IMPORT_LABEL,
 } from "@/constants/dashboard";
+import { resolveAxisNetAmount } from "@/lib/dashboard/aggregation";
 import { buildBreakdownSlices } from "@/lib/dashboard/category-color";
 import { fetchDashboardData } from "@/lib/dashboard/dashboard-data";
 import { resolveAxisId, resolvePeriodId } from "@/lib/dashboard/filters";
@@ -129,12 +130,12 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
   /*
     差引後の純額は負債を含む分類軸でだけ併記する(同要件B1)。含まない軸では構成比の分母が
     資産合計そのものなので、断り書きを添える意味が無い。0円の負債はスライスも出ないため
-    `debtTotal`が0のときは`null`にして、断り書きだけが残る状態にしない
+    `debtTotal`が0のときは`null`になり、断り書きだけが残る状態にはならない。
+
+    絞り込み後の`series`ではなく`axisData`を渡す。純額は「いま何をどれだけ持っているか」を
+    表す内訳の相手なので、表示期間ではなく直近の資産残高で出す(`resolveAxisNetAmount`)
   */
-  const netAmount =
-    debtTotal > 0
-      ? (axisData?.breakdown ?? []).reduce((sum, entry) => sum + entry.amount, 0) - debtTotal
-      : null;
+  const netAmount = resolveAxisNetAmount(axisData);
 
   return (
     <>

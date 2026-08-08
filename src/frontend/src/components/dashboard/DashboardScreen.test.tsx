@@ -431,7 +431,12 @@ describe("DashboardScreen(負債)", () => {
         byAxis: {
           ...data.byAxis,
           total: {
-            netWorthSeries: data.byAxis.total?.netWorthSeries ?? [],
+            /*
+              推移の各点は`sumAxisAmount`を通った値なので、既に負債が引かれている。
+              純額はこの最新点をそのまま採る(スライスの足し直しはしない。
+              `resolveAxisNetAmount`)ので、資産11,400,000 - 負債2,000,000 = 9,400,000
+            */
+            netWorthSeries: [{ date: "2026-08-05", amount: 9_400_000 }],
             breakdown: data.byAxis.total?.breakdown ?? [],
             debtTotal: 2_000_000,
           },

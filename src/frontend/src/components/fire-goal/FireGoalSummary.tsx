@@ -1,12 +1,12 @@
 import { Card, CardContent } from "@/components/ui/card";
 import {
   FIRE_GOAL_ACTIVE_MODE_LABEL,
-  NEGATIVE_CURRENT_ASSET_NOTICE,
   FIRE_GOAL_CURRENT_ASSET_LABEL,
   FIRE_GOAL_MODES,
   FIRE_GOAL_REFERENCE_SUFFIX,
   FIRE_GOAL_UNKNOWN_ASSET_LABEL,
   FIRE_GOAL_UNSET_MODE_LABEL,
+  NEGATIVE_CURRENT_ASSET_NOTICE,
 } from "@/constants/fire-goal";
 import { formatJpy } from "@/lib/format/currency";
 

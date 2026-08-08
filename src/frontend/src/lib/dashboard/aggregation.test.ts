@@ -5,6 +5,7 @@ import {
   buildAxisNetWorthSeries,
   collectAssetCategories,
   resolveAxisDebts,
+  resolveAxisNetAmount,
   resolveDebtBalanceAt,
   sumAxisAmount,
   sumDebtBalanceAt,
@@ -221,5 +222,54 @@ describe("buildAxisNetWorthSeries(負債を含む分類軸)", () => {
       { date: "2026-07-31", amount: 11_000_000 - 4_000_000 },
       { date: "2026-08-05", amount: 11_400_000 - 3_000_000 },
     ]);
+  });
+});
+
+describe("resolveAxisNetAmount", () => {
+  /**
+   * マネーフォワードのCSVには借入・信用取引のようにマイナス残高で現れる資産種別がある。
+   * 円グラフのスライスは「0円以下の資産種別を除く」ので、それを足し直して純額を出すと
+   * 推移グラフの最新点・FIRE達成度ゲージの現在資産額とずれる(PR #83 のレビュー指摘)。
+   */
+  const snapshotWithNegative: AssetSnapshot = {
+    date: "2026-08-05",
+    total: 9_400_000,
+    byType: { "預金・現金": 10_000_000, 信用取引: -600_000 },
+  };
+
+  const axisDataWithNegative: AssetAxisData = {
+    netWorthSeries: buildAxisNetWorthSeries([snapshotWithNegative], [], [mortgage]),
+    breakdown: buildAxisBreakdown(snapshotWithNegative, []),
+    debtTotal: sumDebtBalanceAt([mortgage], snapshotWithNegative.date),
+  };
+
+  it("マイナス残高の資産種別があっても、推移グラフの最新点と一致する", () => {
+    // 10,000,000 - 600,000 - 3,000,000(2026-08-01時点の残債) = 6,400,000
+    expect(resolveAxisNetAmount(axisDataWithNegative)).toBe(6_400_000);
+    expect(resolveAxisNetAmount(axisDataWithNegative)).toBe(
+      axisDataWithNegative.netWorthSeries.at(-1)?.amount,
+    );
+  });
+
+  /** スライスを足し直す実装だと、除外されたマイナス分だけ純額が過大になっていた */
+  it("スライスの足し直しでは一致しないことを示す(退行の目印)", () => {
+    const fromSlices =
+      axisDataWithNegative.breakdown.reduce((sum, entry) => sum + entry.amount, 0) -
+      axisDataWithNegative.debtTotal;
+
+    expect(fromSlices).toBe(7_000_000);
+    expect(fromSlices).not.toBe(resolveAxisNetAmount(axisDataWithNegative));
+  });
+
+  /** 負債を含まない分類軸では併記そのものを出さない */
+  it("負債を差し引かない分類軸はnullを返す", () => {
+    expect(resolveAxisNetAmount({ ...axisDataWithNegative, debtTotal: 0 })).toBeNull();
+  });
+
+  it("資産残高が未取込ならnullを返す", () => {
+    expect(resolveAxisNetAmount(undefined)).toBeNull();
+    expect(
+      resolveAxisNetAmount({ netWorthSeries: [], breakdown: [], debtTotal: 3_000_000 }),
+    ).toBeNull();
   });
 });
