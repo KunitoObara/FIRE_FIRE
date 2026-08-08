@@ -118,6 +118,36 @@ describe("buildNetWorthSeriesKey", () => {
   });
 });
 
+/**
+ * 分類軸名はB4でユーザーが付け、資産種別名はCSVの列名がそのまま入る。
+ * どちらも自由入力に近いので、区切り文字を値に含む名前で署名が衝突しないことを確かめる。
+ */
+describe("署名に使う名前が区切り文字を含む場合", () => {
+  it("分類軸名に区切り文字が入っていても、別のデータが同じ署名にならない", () => {
+    const left = buildNetWorthSeriesKey('投資性資産","x', [{ date: "2026-08-05", amount: 1 }]);
+    const right = buildNetWorthSeriesKey("投資性資産", [
+      { date: '","x', amount: 0 },
+      { date: "2026-08-05", amount: 1 },
+    ]);
+
+    expect(left).not.toBe(right);
+  });
+
+  it("資産種別名に区切り文字が入っていても、別のデータが同じ署名にならない", () => {
+    const slice = (categoryId: string, amount: number): AssetBreakdownSlice => ({
+      categoryId,
+      name: categoryId,
+      amount,
+      ratio: 1,
+      color: "var(--chart-1)",
+    });
+
+    expect(buildBreakdownKey("総資産", [slice('株式","1', 2)])).not.toBe(
+      buildBreakdownKey("総資産", [slice("株式", 1), slice("", 2)]),
+    );
+  });
+});
+
 describe("buildBreakdownKey", () => {
   it("中身が同じなら、別インスタンスでも同じ署名になる", () => {
     expect(buildBreakdownKey("総資産", slices)).toBe(

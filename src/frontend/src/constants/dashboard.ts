@@ -111,9 +111,13 @@ export const CHART_ANIMATION_EASING = "ease-out";
  * **全点を署名に含める。** 件数と両端だけでは、CSVを取り込み直して途中の月の残高だけが
  * 訂正された場合(件数も両端も変わらない)に線の形が変わったことを検出できず、再生が漏れる。
  * 点は月に1つで「全期間」でも数十個にしかならないため、全点を並べても負担にならない。
+ *
+ * **区切り文字での連結ではなく`JSON.stringify`で組む。** 分類軸名(B4でユーザーが付ける)や
+ * 資産種別名(CSVの列名)は自由入力に近く、区切りに使った文字がそのまま値に現れうる。
+ * 連結だと、中身の違う2つのデータが同じ署名に潰れて再生が漏れる。
  */
 export const buildNetWorthSeriesKey = (axisName: string, series: NetWorthPoint[]): string =>
-  [axisName, ...series.map((point) => `${point.date}:${point.amount}`)].join("|");
+  JSON.stringify([axisName, series.map((point) => [point.date, point.amount])]);
 
 /**
  * FIRE達成度ゲージの再生の引き金。**固定値**で、初回描画時にしか再生しない(DESIGN.md 9章)。
@@ -127,7 +131,7 @@ export const FIRE_GAUGE_ANIMATION_KEY = "fire-progress-gauge";
 
 /** 分類別内訳の再生の引き金にする署名(`buildNetWorthSeriesKey`と同じ考え方) */
 export const buildBreakdownKey = (axisName: string, slices: AssetBreakdownSlice[]): string =>
-  [axisName, ...slices.map((slice) => `${slice.categoryId}:${slice.amount}`)].join("|");
+  JSON.stringify([axisName, slices.map((slice) => [slice.categoryId, slice.amount])]);
 
 /** ダッシュボードの表示データのキャッシュキー(TanStack Query) */
 export const DASHBOARD_DATA_QUERY_KEY = ["dashboard-data"] as const;
