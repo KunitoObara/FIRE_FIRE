@@ -51,6 +51,10 @@ export const DebtInputScreen = (): JSX.Element => {
       void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
       // 削除した負債はB4の集計対象の選択肢からも消える
       void queryClient.invalidateQueries({ queryKey: CATEGORY_AXES_QUERY_KEY });
+      /*
+        フォームの行と実IDの同期は再取得ではなく`saveDebts`の戻り値で行う
+        (`DebtInputForm`)。ここでの再取得は、B1・B4が参照する側を新しくするためのもの
+      */
     }
 
     return result;

@@ -99,8 +99,12 @@ export const fetchDebts = async (): Promise<DebtsResult> => {
  *
  * キーが日付なので、同じ日に複数回保存すればその日の記録が上書きされる
  * (CSV取込が同じ日付を上書きするのと同じ冪等な扱い)。
+ *
+ * `saveDebts`はFirestoreに触るためテストから直接は動かせないので、履歴の組み立てだけを
+ * exportして単体で確かめられるようにしてある。ここを誤ると資産推移グラフが過去に遡って
+ * 別の値を描く。
  */
-const buildNextBalanceHistory = (
+export const buildNextBalanceHistory = (
   current: DebtBalanceHistory,
   previousBalance: number | undefined,
   balance: number,
@@ -173,6 +177,14 @@ export const saveDebts = async (
 
     const today = format(new Date(), STORED_DATE_FORMAT);
     const batch = writeBatch(context.firestore);
+    /*
+      保存後の負債を組み立てて返す。画面が追加した行はここで初めてIDが決まるため、
+      これを返さないとフォームの行が`id: null`のまま残り、次の保存で同じ負債が
+      「削除して作り直し」に化けて残債の履歴が消える。
+      並びは`fetchDebts`(登録順)と一致する — 既存の行は元の順のまま、追加した行は
+      `createdAt`が今なので末尾に来る。`inputs`の並びがそのままそれを表している
+    */
+    const saved: Debt[] = [];
 
     for (const input of inputs) {
       // 保存済みのIDが手元に無い場合(別のタブで削除された等)は新規として採番し直す。
@@ -203,11 +215,15 @@ export const saveDebts = async (
 
       if (existing === undefined) {
         // `addDoc`は使えない(バッチに載せられない)ので、IDだけ先に採番して`set`する
-        batch.set(doc(collectionRef), { ...fields, createdAt: serverTimestamp() });
+        const reference = doc(collectionRef);
+
+        batch.set(reference, { ...fields, createdAt: serverTimestamp() });
+        saved.push({ id: reference.id, ...fields });
       } else {
         // 登録順が編集のたびに入れ替わらないよう`createdAt`は更新しない
         // (`categoryAxes`・`properties`と同じ扱いで、`firestore.rules`側でも拒否する)
         batch.update(doc(collectionRef, existing.id), fields);
+        saved.push({ id: existing.id, ...fields });
       }
     }
 
@@ -220,7 +236,7 @@ export const saveDebts = async (
 
     await batch.commit();
 
-    return { ok: true };
+    return { ok: true, debts: saved };
   } catch (error) {
     console.error("負債を保存できませんでした", error);
     return { ok: false, reason: toFirestoreFailureReason(error) };

@@ -92,8 +92,15 @@ declare global {
   type DebtsResult =
     { ok: true; debts: Debt[] } | { ok: false; reason: FirestoreAccessFailureReason };
 
-  /** 負債の一括保存の結果 */
-  type SaveDebtsResult = { ok: true } | { ok: false; reason: DebtFailureReason };
+  /**
+   * 負債の一括保存の結果。
+   *
+   * 成功時は**保存後の負債をそのまま返す**。画面が追加した行は保存で初めてIDが決まるので、
+   * これを返さないとフォームの行が`id: null`のまま残り、次の保存で「削除して作り直し」に
+   * 化ける(残債の履歴が消える)。取り直しを待つ形にしないのは、再取得が届くまでの間に
+   * もう一度保存できてしまうため。
+   */
+  type SaveDebtsResult = { ok: true; debts: Debt[] } | { ok: false; reason: DebtFailureReason };
 
   /** B11 負債入力フォームの入力値(`debtFormSchema`から導出) */
   type DebtFormValues = z.infer<typeof debtFormSchema>;

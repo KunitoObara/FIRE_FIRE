@@ -70,7 +70,8 @@ describe("DebtInputScreen", () => {
 
     fetchDebts.mockResolvedValue({ ok: true, debts: [mortgage, scholarship] });
     fetchCategoryAxes.mockResolvedValue({ ok: true, axes: [netAxis] });
-    saveDebts.mockResolvedValue({ ok: true });
+    // 保存は保存後の負債を返す。画面が追加した行はここで初めてIDが決まる
+    saveDebts.mockResolvedValue({ ok: true, debts: [mortgage, scholarship] });
   });
 
   it("登録済みの負債を1件=1フォームで並べ、合計と最終更新日を出す", async () => {
@@ -286,5 +287,86 @@ describe("DebtInputScreen", () => {
 
     expect(await screen.findByRole("button", { name: /負債を追加/u })).toBeDisabled();
     expect(screen.getByText(`登録できる負債は${DEBT_MAX_COUNT}件までです。`)).toBeInTheDocument();
+  });
+});
+
+/**
+ * 保存後も画面に留まる(B11の遷移条件)ため、同じフォームから続けて保存できる。
+ * 保存でIDが決まった行をフォーム側に反映しないと、次の保存でその負債が
+ * 「消して作り直し」に化け、残債の履歴が失われる(PR #83 のレビュー指摘)。
+ */
+describe("DebtInputScreen(保存してから続けて保存する)", () => {
+  const created: Debt = {
+    id: "debt-created",
+    name: "カードローン",
+    balance: 450_000,
+    interestRate: null,
+    repaymentMonths: null,
+    updatedAt: "2026-08-08",
+    balanceHistory: { "2026-08-08": 450_000 },
+  };
+
+  beforeEach(() => {
+    fetchDebts.mockReset();
+    saveDebts.mockReset();
+    fetchCategoryAxes.mockReset();
+    toastSuccess.mockReset();
+
+    fetchDebts.mockResolvedValue({ ok: true, debts: [] });
+    fetchCategoryAxes.mockResolvedValue({ ok: true, axes: [] });
+    saveDebts.mockResolvedValue({ ok: true, debts: [created] });
+  });
+
+  it("追加した負債は2回目の保存で採番済みのIDとして渡る", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: /負債を追加/u }));
+    await user.type(screen.getByLabelText("項目名"), "カードローン");
+    await user.type(screen.getByLabelText("残債(円)"), "450000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    // 1回目は未採番なのでid: null
+    await waitFor(() => {
+      expect(saveDebts).toHaveBeenNthCalledWith(1, [expect.objectContaining({ id: null })], []);
+    });
+
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    // 2回目は保存が返したIDが載る。載らないと新規作成として書き直され履歴が消える
+    await waitFor(() => {
+      expect(saveDebts).toHaveBeenNthCalledWith(
+        2,
+        [expect.objectContaining({ id: "debt-created" })],
+        expect.any(Array),
+      );
+    });
+  });
+
+  it("2回目の保存で、触っていない負債が削除確認ダイアログに出ない", async () => {
+    const user = userEvent.setup();
+    /*
+      保存成功後の`invalidateQueries`による再取得を模す。2回目以降は採番済みの負債が
+      返るので、フォーム側のIDが同期されていないと`buildDebtDeletionPreviews`が
+      それを削除対象と誤判定してダイアログを出す
+    */
+    fetchDebts.mockResolvedValueOnce({ ok: true, debts: [] });
+    fetchDebts.mockResolvedValue({ ok: true, debts: [created] });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: /負債を追加/u }));
+    await user.type(screen.getByLabelText("項目名"), "カードローン");
+    await user.type(screen.getByLabelText("残債(円)"), "450000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => {
+      expect(saveDebts).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(saveDebts).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.queryByText(/削除して保存しますか/u)).not.toBeInTheDocument();
   });
 });

@@ -60,6 +60,7 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
     formState: { errors },
     handleSubmit,
     register,
+    reset,
   } = useForm<DebtFormValues>({
     resolver: zodResolver(debtFormSchema),
     // 初回入力中に赤字を出さず、一度フォーカスを外した項目から検証する(B7・A1と揃える)
@@ -104,7 +105,23 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
       // 保存に失敗しても画面の入力値は保持する(B11「保存はまとめて行い、一部だけ
       // 書き込まれた状態を残さない」)。書き直しをやり直させない
       setSaveError(DEBT_FAILURE_MESSAGES[result.reason]);
+      return;
     }
+
+    /*
+      保存結果でフォームを組み直す。**これが無いと次の保存で残債の履歴が消える。**
+
+      `defaultValues`はマウント時にしか効かず、保存後に`debts`propが取り直されても
+      react-hook-formの内部状態は追随しない。画面上で追加した行は保存でIDが決まるのに、
+      フォーム側は`id: null`のまま残るため、次の保存でその負債が「消して作り直し」に
+      化ける — 触っていない負債が削除確認ダイアログに出て、確定すると元のドキュメントが
+      履歴ごと削除され、同じ内容が別IDで作り直される。
+
+      再取得(`invalidateQueries`)の到着を待つ形にはしない。届くまでの間にもう一度
+      保存できてしまい、同じ経路を踏むため、保存が返した結果でその場で揃える。
+      保存直後は未保存の編集が存在しないので、ここで組み直しても入力は失われない。
+    */
+    reset({ debts: result.debts.map(toDebtRowFormValues) });
   };
 
   const handleValidSubmit = async (values: DebtFormValues): Promise<void> => {
