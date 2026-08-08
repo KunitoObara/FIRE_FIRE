@@ -1,6 +1,13 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { buildBreakdownKey, buildNetWorthSeriesKey } from "@/constants/dashboard";
+import {
+  buildBreakdownKey,
+  buildNetWorthSeriesKey,
+  CHART_ANIMATION_DURATION_MS,
+  CHART_ANIMATION_EASING,
+} from "@/constants/dashboard";
 
 /**
  * 登場アニメーションの再生の引き金(DESIGN.md 9章)。
@@ -30,6 +37,29 @@ const slices: AssetBreakdownSlice[] = [
     color: "var(--chart-2)",
   },
 ];
+
+/**
+ * 円グラフのスイープはCSS(`CategoryBreakdownChart.module.css`)側にも同じ再生時間・
+ * イージングを書いており、CSSからTypeScriptの定数を読めないぶん値が二重になっている。
+ *
+ * 片方だけ変えると、同じ画面の中で円グラフだけ別の速さで動く。lintも型検査も気付けないので、
+ * CSSを文字列として読んで値が一致していることをここで確かめる。
+ */
+describe("グラフの再生時間・イージング", () => {
+  // vitestの実行時のカレントディレクトリは`src/frontend`(vitest.config.ts の root)
+  const moduleCss = readFileSync(
+    resolve(process.cwd(), "src/components/dashboard/CategoryBreakdownChart.module.css"),
+    "utf8",
+  );
+
+  it("CSSの再生時間が定数と一致している", () => {
+    expect(moduleCss).toContain(`${CHART_ANIMATION_DURATION_MS}ms`);
+  });
+
+  it("CSSのイージングが定数と一致している", () => {
+    expect(moduleCss).toContain(CHART_ANIMATION_EASING);
+  });
+});
 
 describe("buildNetWorthSeriesKey", () => {
   /** 表示データは取得のたびに組み立て直されるため、配列の参照では判定できない */

@@ -115,6 +115,16 @@ export const CHART_ANIMATION_EASING = "ease-out";
 export const buildNetWorthSeriesKey = (axisName: string, series: NetWorthPoint[]): string =>
   [axisName, ...series.map((point) => `${point.date}:${point.amount}`)].join("|");
 
+/**
+ * FIRE達成度ゲージの再生の引き金。**固定値**で、初回描画時にしか再生しない(DESIGN.md 9章)。
+ *
+ * 資産推移・分類別内訳と違い、ゲージは「そのグラフのデータが変わったとき」でも再生しない。
+ * 9章の再生条件の表が「初回描画時のみ。分類軸切替・表示期間切替では再生しない」と、他の2つの
+ * 一般条件とは書き分けているため。達成率を引き金にすると、画面を開いたまま裏で取り直しが
+ * 走って値が変わったとき(別タブでCSVを取り込み直した場合など)にもリングが0%から再生される。
+ */
+export const FIRE_GAUGE_ANIMATION_KEY = "fire-progress-gauge";
+
 /** 分類別内訳の再生の引き金にする署名(`buildNetWorthSeriesKey`と同じ考え方) */
 export const buildBreakdownKey = (axisName: string, slices: AssetBreakdownSlice[]): string =>
   [axisName, ...slices.map((slice) => `${slice.categoryId}:${slice.amount}`)].join("|");

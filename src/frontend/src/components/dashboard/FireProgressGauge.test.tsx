@@ -76,4 +76,21 @@ describe("FireProgressGauge", () => {
 
     expect(gaugeLabel()).toHaveTextContent("125%");
   });
+
+  /**
+   * 再生するのは初回描画時のみ(DESIGN.md 9章)。画面を開いたまま裏で取り直しが走って
+   * 達成率が変わっても、リングを0%から引き直さない。
+   */
+  it("マウントしたまま達成率が変わっても再生し直さない", () => {
+    stubReducedMotion(false);
+    const { rerender } = render(<FireProgressGauge achievementRate={0.62} />);
+
+    advance(700);
+    expect(gaugeLabel()).toHaveTextContent("62%");
+
+    rerender(<FireProgressGauge achievementRate={0.7} />);
+
+    // 0%へ戻らず、新しい達成率がそのまま出る
+    expect(gaugeLabel()).toHaveTextContent("70%");
+  });
 });
