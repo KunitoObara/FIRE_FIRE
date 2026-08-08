@@ -107,15 +107,13 @@ export const CHART_ANIMATION_EASING = "ease-out";
  *
  * 配列の同一性(参照)では判定できない。表示データは取得のたびに組み立て直されるため、
  * 中身が同じでも参照は毎回変わり、再取得だけで再生してしまう。
+ *
+ * **全点を署名に含める。** 件数と両端だけでは、CSVを取り込み直して途中の月の残高だけが
+ * 訂正された場合(件数も両端も変わらない)に線の形が変わったことを検出できず、再生が漏れる。
+ * 点は月に1つで「全期間」でも数十個にしかならないため、全点を並べても負担にならない。
  */
 export const buildNetWorthSeriesKey = (axisName: string, series: NetWorthPoint[]): string =>
-  [
-    axisName,
-    series.length,
-    series.at(0)?.date ?? "",
-    series.at(-1)?.date ?? "",
-    series.at(-1)?.amount ?? "",
-  ].join("|");
+  [axisName, ...series.map((point) => `${point.date}:${point.amount}`)].join("|");
 
 /** 分類別内訳の再生の引き金にする署名(`buildNetWorthSeriesKey`と同じ考え方) */
 export const buildBreakdownKey = (axisName: string, slices: AssetBreakdownSlice[]): string =>

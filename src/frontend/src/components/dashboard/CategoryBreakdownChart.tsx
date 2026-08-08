@@ -3,10 +3,9 @@
 import { Cell, Pie, PieChart } from "recharts";
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { CHART_ANIMATION_DURATION_MS, CHART_ANIMATION_EASING } from "@/constants/dashboard";
 import { formatJpy } from "@/lib/format/currency";
 
-import type { CSSProperties, JSX } from "react";
+import type { JSX } from "react";
 
 import type { ChartConfig } from "@/components/ui/chart";
 
@@ -30,20 +29,7 @@ export const CategoryBreakdownChart = ({ slices }: CategoryBreakdownChartProps):
   ) satisfies ChartConfig;
 
   return (
-    <ChartContainer
-      config={chartConfig}
-      className="chart-sweep aspect-square h-36"
-      /*
-        再生時間とイージングはCSSではなく定数(`src/constants/dashboard.ts`)を出所にする。
-        3つのグラフで同じ値を使う以上、CSSとTypeScriptに同じ数字を二重に持たせない
-      */
-      style={
-        {
-          "--chart-anim-duration": `${CHART_ANIMATION_DURATION_MS}ms`,
-          "--chart-anim-easing": CHART_ANIMATION_EASING,
-        } as CSSProperties
-      }
-    >
+    <ChartContainer config={chartConfig} className="chart-sweep aspect-square h-36">
       <PieChart>
         <ChartTooltip
           content={
