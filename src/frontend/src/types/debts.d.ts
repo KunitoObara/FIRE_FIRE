@@ -123,7 +123,12 @@ declare global {
      * 該当する分類軸は件数ではなくすべて列挙する(B11)。
      */
     axes: AssetCategoryAxisDocument[];
-    onSave: (inputs: DebtInput[]) => Promise<SaveDebtsResult>;
+    /**
+     * `baselineIds`は画面が読み込んだ時点の負債のID。削除対象をこれを基準に求めるため、
+     * 保存の側へ明示的に渡す。サーバーの最新状態を基準にすると、別のタブで追加された
+     * 負債まで消えてしまう(`saveDebts`)。
+     */
+    onSave: (inputs: DebtInput[], baselineIds: string[]) => Promise<SaveDebtsResult>;
   };
 
   /** 保存時の削除確認ダイアログのProps */

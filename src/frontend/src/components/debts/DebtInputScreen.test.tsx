@@ -114,15 +114,18 @@ describe("DebtInputScreen", () => {
     await user.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
-      expect(saveDebts).toHaveBeenCalledWith([
-        {
-          id: null,
-          name: "カードローン",
-          balance: 450_000,
-          interestRate: null,
-          repaymentMonths: null,
-        },
-      ]);
+      expect(saveDebts).toHaveBeenCalledWith(
+        [
+          {
+            id: null,
+            name: "カードローン",
+            balance: 450_000,
+            interestRate: null,
+            repaymentMonths: null,
+          },
+        ],
+        [],
+      );
     });
   });
 
@@ -139,7 +142,10 @@ describe("DebtInputScreen", () => {
     await user.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
-      expect(saveDebts).toHaveBeenCalledWith([expect.objectContaining({ repaymentMonths: 60 })]);
+      expect(saveDebts).toHaveBeenCalledWith(
+        [expect.objectContaining({ repaymentMonths: 60 })],
+        [],
+      );
     });
   });
 
@@ -199,9 +205,12 @@ describe("DebtInputScreen", () => {
     await user.click(await screen.findByRole("button", { name: "削除して保存する" }));
 
     await waitFor(() => {
-      expect(saveDebts).toHaveBeenCalledWith([
-        expect.objectContaining({ id: "debt-scholarship", balance: 2_300_000 }),
-      ]);
+      expect(saveDebts).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: "debt-scholarship", balance: 2_300_000 })],
+        // 画面が読み込んだ時点のIDを基準として渡す。削除対象をサーバーの最新状態から
+        // 求めると、別のタブで追加された負債まで消える(`saveDebts`)
+        ["debt-mortgage", "debt-scholarship"],
+      );
     });
     expect(toastSuccess).toHaveBeenCalled();
   });

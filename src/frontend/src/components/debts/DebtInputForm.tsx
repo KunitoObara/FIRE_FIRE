@@ -87,7 +87,16 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
     setSaveError(null);
     setSaving(true);
 
-    const result = await onSave(toDebtInputs(values));
+    /*
+      画面が読み込んだ時点のIDを基準として渡す。保存側がサーバーの最新状態を基準に
+      削除対象を求めると、別のタブで追加された負債まで消える(`saveDebts`)。
+      確認ダイアログの削除対象(`buildDebtDeletionPreviews`)も同じ`debts`から
+      組み立てているので、ダイアログに出した負債と実際に消える負債が一致する
+    */
+    const result = await onSave(
+      toDebtInputs(values),
+      debts.map((debt) => debt.id),
+    );
 
     setSaving(false);
 

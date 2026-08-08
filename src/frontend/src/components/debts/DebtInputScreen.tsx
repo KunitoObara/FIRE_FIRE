@@ -37,8 +37,11 @@ export const DebtInputScreen = (): JSX.Element => {
   const debtsQuery = useQuery({ queryKey: DEBTS_QUERY_KEY, queryFn: fetchDebts });
   const axesQuery = useQuery({ queryKey: CATEGORY_AXES_QUERY_KEY, queryFn: fetchCategoryAxes });
 
-  const handleSave = async (inputs: DebtInput[]): Promise<SaveDebtsResult> => {
-    const result = await saveDebts(inputs);
+  const handleSave = async (
+    inputs: DebtInput[],
+    baselineIds: string[],
+  ): Promise<SaveDebtsResult> => {
+    const result = await saveDebts(inputs, baselineIds);
 
     if (result.ok) {
       // 保存後も画面に留まる(B2の取込完了と同じ扱い)。続けて別の負債を編集できるようにするため

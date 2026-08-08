@@ -108,20 +108,51 @@ const buildNextBalanceHistory = (
 ): DebtBalanceHistory => (previousBalance === balance ? current : { ...current, [today]: balance });
 
 /**
+ * 今回の保存で削除する負債のIDを求める。
+ *
+ * **基準は`baselineIds`(画面が読み込んだ時点のID)で、サーバーの最新状態ではない。**
+ * 最新状態を基準にすると、画面が存在を知らない負債(別のタブで追加されたもの)まで
+ * 削除対象に入る(`saveDebts`の説明を参照)。
+ *
+ * Firestoreに触らない判断だけを切り出してある。ここが誤ると資産推移グラフから
+ * 負債の控除が過去に遡って消えるため、リポジトリの外から直接確かめられるようにしておく。
+ */
+export const resolveDeletedDebtIds = (baselineIds: string[], inputs: DebtInput[]): string[] => {
+  const keptIds = new Set(inputs.flatMap((input) => (input.id === null ? [] : [input.id])));
+
+  return baselineIds.filter((id) => !keptIds.has(id));
+};
+
+/**
  * 画面全体の負債を一括保存する(B11の「保存」)。
  *
  * 行ごとに保存せず`writeBatch`で1回にまとめる。負債は複数まとめて見直すことが多く、
  * 行単位の保存だと途中まで保存された状態が残るため(B11「追加・削除と保存」)。
  * 途中で失敗した場合は何も書き込まれず、画面の入力値はそのまま残る。
  *
- * 削除は「保存済みの負債のうち、渡された行に含まれないもの」として求める。画面上の
- * 「削除」は行を減らすだけで、確定するのはこの保存の時点になる。
- *
  * 保存直前に現在の負債を読み直すのは、残債が前回と変わったかの判定と、追記先の履歴が
  * 必要なため。画面が読み込んだ時点の値を持ち回すと、別のタブで更新された履歴を
  * 巻き戻して書くことになる。
+ *
+ * **削除対象は`baselineIds`(画面が読み込んだ時点のID)を基準に求める。** 読み直した
+ * サーバー側の一覧を基準にすると、**画面が存在を知らない負債まで削除してしまう**。
+ * 同じアカウントを2つのタブで開き、片方で負債を追加したあと、もう片方(古いフォーム状態の
+ * まま)で保存すると、追加したはずの負債が消える。単一ユーザー前提のアプリだが、
+ * だからこそPCとスマートフォンの両方から開く運用は普通に起こる。
+ *
+ * 基準を分けた結果、次の3つが意図どおりに揃う。
+ *
+ * - `baselineIds`にあって`inputs`に無い → 画面上で削除された。消す
+ * - `baselineIds`に無い(=別のタブで追加された) → 触らない
+ * - `inputs`にあって`stored`に無い(=別のタブで削除された) → 新規として採番し直す
+ *
+ * 保存前の確認ダイアログが出す削除対象も同じ`baselineIds`側から組み立てているので
+ * (`buildDebtDeletionPreviews`)、ダイアログに出した負債とここで消える負債が一致する。
  */
-export const saveDebts = async (inputs: DebtInput[]): Promise<SaveDebtsResult> => {
+export const saveDebts = async (
+  inputs: DebtInput[],
+  baselineIds: string[],
+): Promise<SaveDebtsResult> => {
   const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
@@ -142,7 +173,6 @@ export const saveDebts = async (inputs: DebtInput[]): Promise<SaveDebtsResult> =
 
     const today = format(new Date(), STORED_DATE_FORMAT);
     const batch = writeBatch(context.firestore);
-    const keptIds = new Set<string>();
 
     for (const input of inputs) {
       // 保存済みのIDが手元に無い場合(別のタブで削除された等)は新規として採番し直す。
@@ -175,19 +205,17 @@ export const saveDebts = async (inputs: DebtInput[]): Promise<SaveDebtsResult> =
         // `addDoc`は使えない(バッチに載せられない)ので、IDだけ先に採番して`set`する
         batch.set(doc(collectionRef), { ...fields, createdAt: serverTimestamp() });
       } else {
-        keptIds.add(existing.id);
         // 登録順が編集のたびに入れ替わらないよう`createdAt`は更新しない
         // (`categoryAxes`・`properties`と同じ扱いで、`firestore.rules`側でも拒否する)
         batch.update(doc(collectionRef, existing.id), fields);
       }
     }
 
-    for (const id of stored.keys()) {
-      if (!keptIds.has(id)) {
-        // 負債を削除すると残債の履歴も一緒に消える。資産推移グラフからその負債の控除が
-        // 過去に遡って消えることは、保存前の確認ダイアログで明示している(B11)
-        batch.delete(doc(collectionRef, id));
-      }
+    // 負債を削除すると残債の履歴も一緒に消える。資産推移グラフからその負債の控除が
+    // 過去に遡って消えることは、保存前の確認ダイアログで明示している(B11)。
+    // 既に消えているIDへの`delete`は無害なので、`stored`との突き合わせはしない
+    for (const id of resolveDeletedDebtIds(baselineIds, inputs)) {
+      batch.delete(doc(collectionRef, id));
     }
 
     await batch.commit();
