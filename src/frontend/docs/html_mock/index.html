@@ -49,10 +49,10 @@
       <h1 class="text-2xl font-bold mb-2">HTMLモック一覧</h1>
       <p class="text-sm text-slate-500">
         docs/screen-list-and-transitions.md の画面一覧・遷移図に基づくHTMLモックです。各カードから各画面を確認できます。
-        認証系(A1〜A8)は中央寄せ1カラムレイアウト、ログイン後(B1〜B10)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
+        認証系(A1〜A8)は中央寄せ1カラムレイアウト、ログイン後(B1〜B11)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
       </p>
       <p class="text-sm text-slate-500 mt-2">
-        ログアウトは画面IDを持たない共通操作です(screen-list-and-transitions.md 2.6)。B1〜B10 のどの画面でも、ヘッダー右上のアバターからユーザーメニューを開いて実行できます。
+        ログアウトは画面IDを持たない共通操作です(screen-list-and-transitions.md 2.6)。B1〜B11 のどの画面でも、ヘッダー右上のアバターからユーザーメニューを開いて実行できます。
       </p>
     </header>
 
@@ -114,7 +114,7 @@
     <!-- ダッシュボード・データ管理系画面 -->
     <section class="mb-10">
       <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
-        ダッシュボード・データ管理系画面(B1〜B4)
+        ダッシュボード・データ管理系画面(B1〜B4、B11)
       </h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <a class="screen-card" href="b1-dashboard.html">
@@ -135,9 +135,17 @@
         <a class="screen-card" href="b4-category-master.html">
           <span class="screen-id w-fit">B4</span>
           <span class="text-sm font-medium">資産分類マスタ設定画面</span>
-          <span class="text-xs text-slate-400">分類の追加・編集・削除禁止確認</span>
+          <span class="text-xs text-slate-400">分類の追加・編集・削除禁止確認。集計対象に負債も選べる</span>
+        </a>
+        <a class="screen-card" href="b11-debt-input.html">
+          <span class="screen-id w-fit">B11</span>
+          <span class="text-sm font-medium">負債入力画面</span>
+          <span class="text-xs text-slate-400">フォームの追加・削除、まとめて保存(手動入力のみ)</span>
         </a>
       </div>
+      <p class="text-xs text-slate-400 mt-3">
+        B11 は後から追加された画面のため画面IDが連番の末尾になっていますが、位置付けは B2〜B4 と同じ「ダッシュボードに供給するデータを管理する画面」です(screen-list-and-transitions.md 2.2)。
+      </p>
     </section>
 
     <!-- 不動産管理系画面 -->

@@ -60,7 +60,7 @@ Claudeが自発的にTrelloの変化を検知することはできない(Webhook
 
 ### カードと画面IDの対応
 
-カード名は `[B8] FIRE目標設定画面` の形式で、`docs/screen-list-and-transitions.md` の画面ID(A1〜A8、B1〜B10)に対応する。`[A5-2]` のような枝番はレビュー指摘から起票された後続カード。
+カード名は `[B8] FIRE目標設定画面` の形式で、`docs/screen-list-and-transitions.md` の画面ID(A1〜A8、B1〜B11。B11は後から追加されたためB10の次に並ぶ)に対応する。`[A5-2]` のような枝番はレビュー指摘から起票された後続カード。
 
 ## 3. 着手時に読むもの
 

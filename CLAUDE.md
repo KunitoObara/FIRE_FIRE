@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - [docs/fire-asset-management-requirements.md](docs/fire-asset-management-requirements.md) — top-level requirements: architecture, features, phased MVP scope. Read this first; other docs detail specific sections of it.
 - [docs/auth-login-requirements.md](docs/auth-login-requirements.md) — detailed spec for §4.1 (auth)
-- [docs/screen-list-and-transitions.md](docs/screen-list-and-transitions.md) — full screen inventory (IDs A1–A8, B1–B10) and Mermaid transition diagrams
+- [docs/screen-list-and-transitions.md](docs/screen-list-and-transitions.md) — full screen inventory (IDs A1–A8, B1–B11) and Mermaid transition diagrams
 - [docs/screen-requirements-auth.md](docs/screen-requirements-auth.md), [screen-requirements-dashboard.md](docs/screen-requirements-dashboard.md), [screen-requirements-real-estate.md](docs/screen-requirements-real-estate.md), [screen-requirements-fire-goal.md](docs/screen-requirements-fire-goal.md), [screen-requirements-account.md](docs/screen-requirements-account.md) — per-screen field/behavior detail, keyed to the screen IDs above
 - [DESIGN.md](DESIGN.md) — frontend design system: Tailwind/shadcn-based stack, color/typography rules, layout patterns, and the screen-ID-to-library mapping. Read this before adding any UI library or component pattern.
 - [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md), [src/backend/docs/TECH_STACK.md](src/backend/docs/TECH_STACK.md) — full technical stack per side (language, data fetching, testing, lint/format, deployment). Read these before adding a dependency or scaffolding either project; they complement rather than repeat DESIGN.md.
@@ -89,7 +89,7 @@ Single-user (developer-only) in the initial release; multi-tenant/role-based acc
 
 ### Screen navigation model
 
-Post-login, the app is a dashboard-app-style shell: common header/sidebar gives free navigation between primary screens (B1 Dashboard, B2 CSV Import, B3 Transactions, B4 Category Master, B5 Real Estate List, B8 FIRE Goal, B9 Assumption Settings, B10 Account Settings). Auth screens (A1–A8) instead follow a linear flow (signup → email verify → forced MFA setup → dashboard; login → MFA verify → dashboard; Google sign-in → [A8 account link] → MFA setup/verify → dashboard) — see the Mermaid diagrams in [screen-list-and-transitions.md](docs/screen-list-and-transitions.md) for exact edges before adding new transitions.
+Post-login, the app is a dashboard-app-style shell: common header/sidebar gives free navigation between primary screens (B1 Dashboard, B2 CSV Import, B3 Transactions, B4 Category Master, B5 Real Estate List, B11 Debt Input, B8 FIRE Goal, B9 Assumption Settings, B10 Account Settings). Auth screens (A1–A8) instead follow a linear flow (signup → email verify → forced MFA setup → dashboard; login → MFA verify → dashboard; Google sign-in → [A8 account link] → MFA setup/verify → dashboard) — see the Mermaid diagrams in [screen-list-and-transitions.md](docs/screen-list-and-transitions.md) for exact edges before adding new transitions.
 
 ### Auth-specific constraints worth knowing before touching auth flows
 
@@ -107,6 +107,6 @@ Work should generally respect this phase order (see §7 of the main requirements
 
 1. Auth (Identity Platform) + manual CSV upload (balance history) + basic dashboard
 2. Transaction CSV import + income/expense summary
-3. Real estate management
+3. Real estate management + debt management (manual entry only — Money Forward does not export liabilities to CSV; debts feed the category axes and the dashboard)
 4. FIRE goal setting/progress/ETA + yield/risk assumptions and simulation
 5. (Future) Automated Money Forward sync, SaaS multi-tenancy — out of scope for now
