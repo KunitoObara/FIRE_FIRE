@@ -2,7 +2,7 @@ import { format, parseISO } from "date-fns";
 
 import { NO_PROJECTED_DATE_LABEL } from "@/constants/dashboard";
 import { DEFAULT_ACHIEVEMENT_AXIS_NAME } from "@/constants/fire-goal";
-import { sumAxisAmount } from "@/lib/dashboard/aggregation";
+import { resolveAxisDebts, sumAxisAmount } from "@/lib/dashboard/aggregation";
 import { resolveFireGoalTargetAmount } from "@/lib/fire-goal/calculation";
 
 /**
@@ -21,16 +21,31 @@ export const resolveAchievementAxis = (
   axes: AchievementAxisOption[],
 ): AchievementAxisResolution => {
   if (achievementAxisId === null) {
-    return { name: DEFAULT_ACHIEVEMENT_AXIS_NAME, assetTypeNames: null, missing: false };
+    return {
+      name: DEFAULT_ACHIEVEMENT_AXIS_NAME,
+      assetTypeNames: null,
+      debtIds: [],
+      missing: false,
+    };
   }
 
   const axis = axes.find((option) => option.id === achievementAxisId);
 
   if (axis === undefined) {
-    return { name: DEFAULT_ACHIEVEMENT_AXIS_NAME, assetTypeNames: null, missing: true };
+    return {
+      name: DEFAULT_ACHIEVEMENT_AXIS_NAME,
+      assetTypeNames: null,
+      debtIds: [],
+      missing: true,
+    };
   }
 
-  return { name: axis.name, assetTypeNames: axis.assetTypeNames, missing: false };
+  return {
+    name: axis.name,
+    assetTypeNames: axis.assetTypeNames,
+    debtIds: axis.debtIds,
+    missing: false,
+  };
 };
 
 /**
@@ -55,6 +70,7 @@ export const resolveAchievementAxis = (
 export const resolveAchievementAmount = (
   resolution: AchievementAxisResolution,
   latest: AssetSnapshot | undefined,
+  debts: Debt[],
 ): number | null => {
   if (latest === undefined) {
     return null;
@@ -62,7 +78,7 @@ export const resolveAchievementAmount = (
 
   return resolution.assetTypeNames === null
     ? latest.total
-    : sumAxisAmount(latest, resolution.assetTypeNames);
+    : sumAxisAmount(latest, resolution.assetTypeNames, resolveAxisDebts(debts, resolution.debtIds));
 };
 
 /**
@@ -85,6 +101,7 @@ export const buildFireProgress = (
   goal: FireGoal | null,
   latest: AssetSnapshot | undefined,
   axes: AchievementAxisOption[],
+  debts: Debt[],
 ): FireProgress | null => {
   if (!goal) {
     return null;
@@ -101,7 +118,7 @@ export const buildFireProgress = (
 
   return {
     targetAmount,
-    currentAmount: resolveAchievementAmount(resolution, latest) ?? 0,
+    currentAmount: resolveAchievementAmount(resolution, latest, debts) ?? 0,
     achievementAxisName: resolution.name,
     achievementAxisMissing: resolution.missing,
     // 到達予測日は想定利回り(B9)を前提とする別の計算なので、ここでは算出しない
@@ -135,6 +152,24 @@ export const calculateAchievementRate = (
  */
 export const toGaugeRatio = (achievementRate: number): number =>
   Math.min(Math.max(achievementRate, 0), 1);
+
+/**
+ * 中央に出す達成率(%)へ変換する。
+ *
+ * **下振れ側だけ0で止め、目標超過は丸めない。上下で扱いを分けているのは意図**
+ * (DESIGN.md 9章)。
+ *
+ * - 負の達成率をそのまま出すと、0で止まっているリングと数値が食い違い、同じ瞬間に
+ *   2つの違う達成率が画面に出る。「目標からどれだけ遠いか」は併記する現在資産額が示すので、
+ *   0%に丸めても失うものが無い(docs/screen-requirements-dashboard.md B1)
+ * - 超過側を丸めると`120%`が`100%`になり、超過分が画面から消える。こちらは丸めることで
+ *   情報が失われるため、リングだけ1周で止めて数値は実際の比率を出す
+ *
+ * 0%は「まだ何も貯まっていない」状態でも出る値なので、負債が資産を上回っていることは
+ * カード側が注記で示す(`FireProgressCard`)。
+ */
+export const toDisplayAchievementRate = (achievementRate: number): number =>
+  Math.max(achievementRate, 0);
 
 /**
  * 到達予測日を「2033年4月頃」の形に整形する。

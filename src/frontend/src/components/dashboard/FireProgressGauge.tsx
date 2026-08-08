@@ -5,7 +5,7 @@ import { PolarAngleAxis, RadialBar, RadialBarChart } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
 import { FIRE_GAUGE_ANIMATION_KEY } from "@/constants/dashboard";
 import { useAnimatedProgress } from "@/hooks/use-animated-progress";
-import { toGaugeRatio } from "@/lib/dashboard/fire-progress";
+import { toDisplayAchievementRate, toGaugeRatio } from "@/lib/dashboard/fire-progress";
 import { formatPercent } from "@/lib/format/currency";
 
 import type { JSX } from "react";
@@ -19,9 +19,13 @@ const chartConfig = {
 /**
  * FIRE達成度ゲージ(B1)。
  *
- * 塗りは0〜100%で止めるが、中央に出す数値は実際の達成率をそのまま出す。
+ * 塗りは0〜100%で止める。中央に出す数値は**超過側だけ**実際の達成率をそのまま出す。
  * 目標を超えている場合に「100%」としか出ないと、超過分が見えなくなるため
  * (`src/lib/dashboard/fire-progress.ts`)。
+ *
+ * **負の達成率(負債が資産を上回る場合)は0%に丸める。** リングは0で止まるので、
+ * 数値だけ`-18%`を出すと同じ瞬間に2つの違う達成率が画面に出る(DESIGN.md 9章)。
+ * 丸めるのは達成率だけで、現在資産額の金額はカード側がマイナスのまま出す。
  *
  * **リングと中央の%は同じ進捗値から描く**(DESIGN.md 9章)。リングをRechartsの
  * アニメーション、数値を自前のカウントアップ、と別々の仕組みに分けると、同じ600msでも
@@ -67,7 +71,7 @@ export const FireProgressGauge = ({ achievementRate }: FireProgressGaugeProps): 
         aria-hidden
         className="pointer-events-none absolute inset-0 flex items-center justify-center text-xl font-bold tabular-nums"
       >
-        {formatPercent(animatedRate)}
+        {formatPercent(toDisplayAchievementRate(animatedRate))}
       </p>
     </div>
   );

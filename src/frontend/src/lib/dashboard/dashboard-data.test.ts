@@ -6,6 +6,7 @@ const fetchCategoryAxes = vi.fn();
 const fetchAssetSnapshots = vi.fn();
 const fetchLastImportedAt = vi.fn();
 const fetchFireGoal = vi.fn();
+const fetchDebts = vi.fn();
 
 vi.mock("@/lib/asset-categories/category-axis-repository", () => ({
   fetchCategoryAxes: () => fetchCategoryAxes(),
@@ -20,12 +21,23 @@ vi.mock("@/lib/fire-goal/fire-goal-repository", () => ({
   fetchFireGoal: () => fetchFireGoal(),
 }));
 
+vi.mock("@/lib/debts/debt-repository", () => ({
+  fetchDebts: () => fetchDebts(),
+}));
+
 const axes: AssetCategoryAxisDocument[] = [
-  { id: "total", name: "総資産", assetTypeNames: [], createdAt: "2026-01-01T00:00:00.000Z" },
+  {
+    id: "total",
+    name: "総資産",
+    assetTypeNames: [],
+    debtIds: [],
+    createdAt: "2026-01-01T00:00:00.000Z",
+  },
   {
     id: "investment",
     name: "投資性資産",
     assetTypeNames: ["株式(現物)", "投資信託"],
+    debtIds: [],
     createdAt: "2026-01-02T00:00:00.000Z",
   },
 ];
@@ -49,6 +61,9 @@ describe("fetchDashboardData", () => {
     fetchAssetSnapshots.mockReset();
     fetchLastImportedAt.mockReset();
     fetchFireGoal.mockReset();
+    // 負債(B11)。既定は取得成功・0件にして、負債を扱わない既存のケースの期待値を変えない
+    fetchDebts.mockReset();
+    fetchDebts.mockResolvedValue({ ok: true, debts: [] });
 
     fetchCategoryAxes.mockResolvedValue({ ok: true, axes });
     fetchAssetSnapshots.mockResolvedValue({ ok: true, snapshots });
@@ -172,6 +187,7 @@ describe("fetchDashboardData", () => {
         axes: [],
         categories: [],
         byAxis: {},
+        debts: [],
         fireProgress: null,
         cashflow: null,
       },

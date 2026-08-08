@@ -4,7 +4,7 @@ import type { JSX } from "react";
 
 /**
  * 開発環境構築の動作確認用のプレースホルダー画面。
- * 画面実装タスク(docs/screen-list-and-transitions.md の A1〜A7 / B1〜B10)で置き換える。
+ * 画面実装タスク(docs/screen-list-and-transitions.md の A1〜A8 / B1〜B11)で置き換える。
  */
 const Home = (): JSX.Element => (
   <main className="flex flex-col gap-6">

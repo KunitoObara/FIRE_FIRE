@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { DEBT_CATEGORY_COLOR, DEBT_CATEGORY_ID, DEBT_CATEGORY_NAME } from "@/constants/dashboard";
 import { buildBreakdownSlices } from "@/lib/dashboard/category-color";
 
 /** 分類マスタ(B4)を模したもの。並び順が色の割り当て順になる */
@@ -120,5 +121,56 @@ describe("buildBreakdownSlices", () => {
 
     expect(slices.map((slice) => slice.name)).toEqual(["投資信託", "その他"]);
     expect(slices.at(-1)?.amount).toBe(300);
+  });
+});
+
+/**
+ * 負債のスライス(DESIGN.md 3章、docs/screen-requirements-dashboard.md B1)。
+ * 資産分類カラーのスロットを使わず、専用の固定色を持つ1スライスとして最後に足す。
+ */
+describe("buildBreakdownSlices(負債)", () => {
+  const debtCategories: AssetCategory[] = [
+    { id: "株式(現物)", name: "株式(現物)" },
+    { id: "預金・現金", name: "預金・現金" },
+  ];
+
+  const debtEntries: AssetBreakdownEntry[] = [
+    { categoryId: "株式(現物)", amount: 6_000_000 },
+    { categoryId: "預金・現金", amount: 4_000_000 },
+  ];
+
+  it("負債を最後のスライスとして足し、資産分類のスロットは消費しない", () => {
+    const slices = buildBreakdownSlices(debtEntries, debtCategories, 2_000_000);
+
+    expect(slices.map((slice) => slice.categoryId)).toEqual([
+      "株式(現物)",
+      "預金・現金",
+      DEBT_CATEGORY_ID,
+    ]);
+    expect(slices[0]?.color).toBe("var(--chart-1)");
+    expect(slices[1]?.color).toBe("var(--chart-2)");
+    expect(slices[2]?.color).toBe(DEBT_CATEGORY_COLOR);
+  });
+
+  /** 円グラフは正の面積でしか比を表せないため、分母は純額ではなく資産+負債になる */
+  it("構成比の分母は「資産合計 + 負債合計」になる", () => {
+    const slices = buildBreakdownSlices(debtEntries, debtCategories, 2_000_000);
+
+    expect(slices.map((slice) => slice.ratio)).toEqual([0.5, 1 / 3, 1 / 6]);
+  });
+
+  /** 0円のスライスは凡例を埋めるだけになる(0円以下の資産種別を除いているのと同じ理由) */
+  it("負債の残債合計が0円ならスライスを出さない", () => {
+    expect(
+      buildBreakdownSlices(debtEntries, debtCategories, 0).map((slice) => slice.categoryId),
+    ).not.toContain(DEBT_CATEGORY_ID);
+  });
+
+  /** 表示名との一致で判定すると、「負債」という名前の資産種別と衝突する */
+  it("負債のスライスは擬似的な分類IDで表す", () => {
+    const slices = buildBreakdownSlices(debtEntries, debtCategories, 2_000_000);
+
+    expect(slices.at(-1)?.categoryId).toBe(DEBT_CATEGORY_ID);
+    expect(slices.at(-1)?.name).toBe(DEBT_CATEGORY_NAME);
   });
 });

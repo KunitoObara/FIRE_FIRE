@@ -145,6 +145,7 @@ export const createCategoryAxis = async (
     await addDoc(categoryAxesRef(context.firestore, context.uid), {
       name: values.name,
       assetTypeNames: values.assetTypeNames,
+      debtIds: values.debtIds,
       createdAt: serverTimestamp(),
     });
 
@@ -175,6 +176,7 @@ export const updateCategoryAxis = async (
     await updateDoc(doc(categoryAxesRef(context.firestore, context.uid), id), {
       name: values.name,
       assetTypeNames: values.assetTypeNames,
+      debtIds: values.debtIds,
     });
 
     return { ok: true };
@@ -189,8 +191,11 @@ export const updateCategoryAxis = async (
  *
  * 集計対象が1件以上割り当てられた分類は`firestore.rules`側でも削除を拒否しており
  * (先に編集で割り当てを解除する必要がある)、呼び出し側は`permission-denied`として受け取る。
- * 実際の禁止判定は画面側で`assetTypeNames`の件数から先に行い、確認ダイアログの時点で
- * ブロックする(この関数まで進むのは削除可能な分類のときだけ)。
+ * 実際の禁止判定は画面側で`assetTypeNames`と`debtIds`の件数から先に行い、確認ダイアログの
+ * 時点でブロックする(この関数まで進むのは削除可能な分類のときだけ)。
+ *
+ * 負債だけが割り当てられた分類軸も削除できない。集計対象が割り当てられた軸を消させない
+ * という制約を資産・負債で分ける理由が無いため(docs/screen-requirements-dashboard.md B4)。
  */
 export const deleteCategoryAxis = async (id: string): Promise<DeleteCategoryAxisResult> => {
   const context = resolveFirestoreUserContext();

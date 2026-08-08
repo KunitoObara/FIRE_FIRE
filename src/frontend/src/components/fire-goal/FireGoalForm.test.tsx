@@ -20,7 +20,7 @@ const onAchievementAxisChange = vi.fn();
 
 /** B4に登録済みの分類軸(対象分類の選択肢) */
 const achievementAxisOptions: AchievementAxisOption[] = [
-  { id: "axis-investment", name: "投資性資産", assetTypeNames: ["株式(現物)"] },
+  { id: "axis-investment", name: "投資性資産", assetTypeNames: ["株式(現物)"], debtIds: [] },
 ];
 
 const renderForm = (overrides: Partial<FireGoalFormProps> = {}): RenderResult =>

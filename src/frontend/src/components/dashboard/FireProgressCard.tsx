@@ -10,6 +10,7 @@ import {
   ACHIEVEMENT_AXIS_MISSING_NOTICE,
   DASHBOARD_EMPTY_STATES,
   FIRE_GOAL_LINK,
+  NEGATIVE_CURRENT_AMOUNT_NOTICE,
 } from "@/constants/dashboard";
 import {
   calculateAchievementRate,
@@ -67,6 +68,17 @@ export const FireProgressCard = ({ fireProgress }: FireProgressCardProps): JSX.E
             {fireProgress.achievementAxisMissing ? (
               <p role="status" className="text-xs text-destructive">
                 {ACHIEVEMENT_AXIS_MISSING_NOTICE}
+              </p>
+            ) : null}
+
+            {/*
+              負債が資産を上回ると現在資産額がマイナスになり、達成率は0%に丸めて表示する
+              (docs/screen-requirements-dashboard.md B1)。0%は「まだ何も貯まっていない」
+              状態でも出る値なので、丸めたことをここで明示しないと両者を区別できない
+            */}
+            {fireProgress.currentAmount < 0 ? (
+              <p role="status" className="text-xs text-destructive">
+                {NEGATIVE_CURRENT_AMOUNT_NOTICE}
               </p>
             ) : null}
 

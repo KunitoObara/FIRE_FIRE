@@ -99,6 +99,12 @@ declare global {
     name: string;
     /** 集計対象の資産種別名。空配列は「すべての資産種別が対象」(B4の約束) */
     assetTypeNames: string[];
+    /**
+     * 集計から差し引く負債のID。空配列は「負債を差し引かない」(B4)。
+     * `assetTypeNames`と読み替えが非対称なのは、負債の登録だけで既存の分類軸が
+     * 黙って純資産の軸へ変わるのを避けるため。
+     */
+    debtIds: string[];
   };
 
   /**
@@ -112,6 +118,14 @@ declare global {
     name: string;
     /** 集計対象の資産種別名。`null`は既定(CSVの「合計（円）」列をそのまま採る) */
     assetTypeNames: string[] | null;
+    /**
+     * 集計から差し引く負債のID。
+     *
+     * 既定(総資産)は空配列になる。マネーフォワードの合計に負債は含まれず
+     * (CSVに出力されないため)、負債を達成度に効かせるには負債を含む分類軸を作って
+     * 選ぶ必要がある(docs/screen-requirements-fire-goal.md B8)。
+     */
+    debtIds: string[];
     /** 設定されていた分類軸が見つからず既定へフォールバックした場合に`true` */
     missing: boolean;
   };

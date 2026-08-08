@@ -7,8 +7,11 @@ import {
   buildAxisBreakdown,
   buildAxisNetWorthSeries,
   collectAssetCategories,
+  resolveAxisDebts,
+  sumDebtBalanceAt,
 } from "@/lib/dashboard/aggregation";
 import { buildFireProgress } from "@/lib/dashboard/fire-progress";
+import { fetchDebts } from "@/lib/debts/debt-repository";
 import { fetchFireGoal } from "@/lib/fire-goal/fire-goal-repository";
 
 /**
@@ -19,20 +22,23 @@ import { fetchFireGoal } from "@/lib/fire-goal/fire-goal-repository";
  * users/{uid}/assetSnapshots    B2 CSV取込          資産推移グラフ・分類別内訳・現在資産額
  * users/{uid}/csvImports        B2 CSV取込          直近CSV取込日時
  * users/{uid}/settings/fireGoal B8 FIRE目標設定     FIRE達成度ゲージ
+ * users/{uid}/debts             B11 負債入力        負債サマリ・負債を含む分類軸の集計
  * ```
  *
  * 収支サマリ(`cashflow`)はB3 入出金明細の取込が前提なので`null`のまま返す(Phase 2)。
  *
- * 4つの取得は互いに独立しているので並列に投げる。順に待つと、いちばん遅いものだけでなく
+ * 5つの取得は互いに独立しているので並列に投げる。順に待つと、いちばん遅いものだけでなく
  * 合計の待ち時間がログイン直後の最初の画面に乗る。
  */
 export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
-  const [axesResult, snapshotsResult, lastImportedAtResult, fireGoalResult] = await Promise.all([
-    fetchCategoryAxes(),
-    fetchAssetSnapshots(),
-    fetchLastImportedAt(),
-    fetchFireGoal(),
-  ]);
+  const [axesResult, snapshotsResult, lastImportedAtResult, fireGoalResult, debtsResult] =
+    await Promise.all([
+      fetchCategoryAxes(),
+      fetchAssetSnapshots(),
+      fetchLastImportedAt(),
+      fetchFireGoal(),
+      fetchDebts(),
+    ]);
 
   // どれか1つでも失敗したら画面全体を失敗として返す。失敗の原因(未ログイン・権限・設定)は
   // 4つに共通するものばかりで、部分的に欠けた数字を実データとして見せる方が危うい
@@ -52,7 +58,12 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
     return fireGoalResult;
   }
 
+  if (!debtsResult.ok) {
+    return debtsResult;
+  }
+
   const { snapshots } = snapshotsResult;
+  const { debts } = debtsResult;
   // 日付の昇順で返るので、末尾が直近の資産残高になる
   const latest = snapshots.at(-1);
 
@@ -63,17 +74,31 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
       axes: axesResult.axes.map((axis) => ({ id: axis.id, name: axis.name })),
       categories: collectAssetCategories(latest),
       byAxis: Object.fromEntries(
-        axesResult.axes.map((axis) => [
-          axis.id,
-          {
-            netWorthSeries: buildAxisNetWorthSeries(snapshots, axis.assetTypeNames),
-            breakdown: latest ? buildAxisBreakdown(latest, axis.assetTypeNames) : [],
-          },
-        ]),
+        axesResult.axes.map((axis) => {
+          // 分類軸が参照している負債がB11で削除されていた場合は、ここで落ちる
+          const axisDebts = resolveAxisDebts(debts, axis.debtIds);
+
+          return [
+            axis.id,
+            {
+              netWorthSeries: buildAxisNetWorthSeries(snapshots, axis.assetTypeNames, axisDebts),
+              breakdown: latest ? buildAxisBreakdown(latest, axis.assetTypeNames) : [],
+              /*
+                円グラフは「いま何をどれだけ持っているか」なので、直近の資産残高の時点の
+                残債を引く。推移グラフの最新点と同じ時点・同じ求め方にしないと、同じ画面の
+                2つのグラフで差し引いた額が違うことになる
+              */
+              debtTotal: latest ? sumDebtBalanceAt(axisDebts, latest.date) : 0,
+            },
+          ];
+        }),
       ),
+      // 負債サマリは分類軸で絞らず登録済みの負債をそのまま並べる(同要件B1「負債サマリ」)
+      debts,
       // ゲージの現在資産額はB1のセレクタではなくB8の対象分類で集計する。分類軸の一覧を
-      // 渡すのは、設定された軸がB4で削除されていたときに既定へフォールバックさせるため
-      fireProgress: buildFireProgress(fireGoalResult.goal, latest, axesResult.axes),
+      // 渡すのは、設定された軸がB4で削除されていたときに既定へフォールバックさせるため。
+      // 負債は対象分類が負債を含む軸のときだけ差し引かれる
+      fireProgress: buildFireProgress(fireGoalResult.goal, latest, axesResult.axes, debts),
       cashflow: null,
     },
   };

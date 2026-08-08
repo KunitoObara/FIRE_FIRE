@@ -9,7 +9,7 @@ import type { loginSchema } from "@/schemas/login";
 import type { resetPasswordSchema } from "@/schemas/reset-password";
 import type { signupSchema } from "@/schemas/signup";
 
-// 認証(A1〜A7)関連の型。import を持つため既にモジュールであり、
+// 認証(A1〜A8)関連の型。import を持つため既にモジュールであり、
 // `declare global` でグローバルへ公開する。
 declare global {
   /**
@@ -605,7 +605,7 @@ declare global {
   };
 
   /**
-   * ログイン後画面(B1〜B10)を表示してよいかの判定結果。
+   * ログイン後画面(B1〜B11)を表示してよいかの判定結果。
    * `ready`以外はいずれも認証フローの未完了で、対応する認証系画面へ戻す。
    */
   type ResolvedAppAccessState = "signed-out" | "email-unverified" | "mfa-required" | "ready";

@@ -41,7 +41,7 @@ const AppAccessBypassBanner = (): JSX.Element => (
 );
 
 /**
- * ログイン後画面(B1〜B10)の表示可否を判定するガード。
+ * ログイン後画面(B1〜B11)の表示可否を判定するガード。
  *
  * 認証フローを飛ばして直接URLを叩かれた場合に、未完了の手順の画面へ戻す
  * (docs/screen-list-and-transitions.md の認証フロー)。判定そのものは
