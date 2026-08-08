@@ -364,7 +364,7 @@ body {
   color: hsl(var(--success));
 }
 
-/* ---- アプリシェル(ログイン後 B1〜B10) ---- */
+/* ---- アプリシェル(ログイン後 B1〜B11) ---- */
 
 .app-shell {
   min-height: 100vh;

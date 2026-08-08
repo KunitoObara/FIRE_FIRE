@@ -73,7 +73,7 @@
 
 <div class="app-shell">
 
-  <!-- サイドバー(共通ヘッダー/サイドバーからB1〜B10へ自由遷移) -->
+  <!-- サイドバー(共通ヘッダー/サイドバーからB1〜B11へ自由遷移) -->
   <aside class="app-sidebar">
     <div class="h-[3.75rem] flex items-center px-5 border-b" style="border-color: hsl(var(--border));">
       <span class="font-bold text-sm">FIRE-FIRE</span>
@@ -98,6 +98,10 @@
       <a class="sidebar-link" href="b5-real-estate-list.html">
         <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V10l9-6 9 6v11" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 21v-7h6v7" stroke-linecap="round" stroke-linejoin="round"/></svg>
         不動産一覧
+      </a>
+      <a class="sidebar-link" href="b11-debt-input.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18" stroke-linecap="round"/><path d="M8 15h4" stroke-linecap="round"/></svg>
+        負債入力
       </a>
       <div class="my-2 border-t" style="border-color: hsl(var(--border));"></div>
       <a class="sidebar-link" href="b8-fire-goal.html">
@@ -150,9 +154,10 @@
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2">
           <label class="text-sm text-slate-500">分類軸</label>
+          <!-- 負債を集計対象に含む分類軸(ここでは「純金融資産」)を選んだ状態を示す -->
           <select class="input" style="width: auto; height: 2.25rem;">
             <option>総資産</option>
-            <option>純金融資産</option>
+            <option selected>純金融資産</option>
             <option>投資性資産</option>
           </select>
         </div>
@@ -167,9 +172,11 @@
         </div>
       </div>
 
-      <!-- 総資産推移グラフ -->
+      <!-- 資産推移グラフ。見出しには選択中の分類軸名を添える
+           (docs/screen-requirements-dashboard.md B1「分類軸の切り替えが及ぶ範囲」)。
+           負債を含む分類軸では、各時点で「その時点以前で最も新しい残債」を差し引いた線になる -->
       <section class="card p-5">
-        <h2 class="text-sm font-semibold mb-4">総資産推移</h2>
+        <h2 class="text-sm font-semibold mb-4">資産推移(純金融資産)</h2>
         <svg viewBox="0 0 640 200" class="w-full h-48">
           <line x1="0" y1="40" x2="640" y2="40" stroke="hsl(var(--border))" stroke-width="1"/>
           <line x1="0" y1="90" x2="640" y2="90" stroke="hsl(var(--border))" stroke-width="1"/>
@@ -194,27 +201,54 @@
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        <!-- 分類別内訳(円グラフ) -->
+        <!-- 分類別内訳(円グラフ)。
+             負債を含む分類軸では負債を1スライスとして描く。色は資産分類カラーのスロット
+             (--chart-1〜8)を使わず負債専用の固定色にする(DESIGN.md 3章)。
+             構成比の分母は「資産合計 + 負債合計」になるため、差引後の純額を数字で併記する
+             (docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」) -->
         <section class="card p-5">
-          <h2 class="text-sm font-semibold mb-4">分類別内訳(総資産)</h2>
+          <h2 class="text-sm font-semibold mb-4">分類別内訳(純金融資産)</h2>
           <div class="flex items-center gap-6">
             <svg viewBox="0 0 120 120" class="w-32 h-32 shrink-0">
-              <!-- 手前の分類を描き終えてから次を描く。合計600msで1周のスイープになる -->
-              <circle class="chart-anim-arc" style="--arc-len: 127; --arc-dur: 270ms; --arc-delay: 0ms;"
+              <defs>
+                <!-- 負債のハッチング(DESIGN.md 3章)。資産の1色目(--chart-1)と負債(--destructive)は
+                     どちらも暖色で、円グラフでは12時の位置で必ず隣り合う。色相だけに頼らず
+                     模様でも区別できるようにする -->
+                <pattern id="debt-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+                  <rect width="6" height="6" fill="hsl(var(--destructive))"/>
+                  <line x1="0" y1="0" x2="0" y2="6" stroke="hsl(var(--card))" stroke-width="2" stroke-opacity="0.55"/>
+                </pattern>
+              </defs>
+              <!-- 手前の分類を描き終えてから次を描く。合計600msで1周のスイープになる。
+                   負債のスライスも同じ1周に含める(DESIGN.md 9章) -->
+              <circle class="chart-anim-arc" style="--arc-len: 121; --arc-dur: 257ms; --arc-delay: 0ms;"
                 cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-1))" stroke-width="20" transform="rotate(-90 60 60)"/>
-              <circle class="chart-anim-arc" style="--arc-len: 71; --arc-dur: 151ms; --arc-delay: 270ms;"
-                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-2))" stroke-width="20" stroke-dashoffset="-127" transform="rotate(-90 60 60)"/>
-              <circle class="chart-anim-arc" style="--arc-len: 42; --arc-dur: 89ms; --arc-delay: 421ms;"
-                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-6))" stroke-width="20" stroke-dashoffset="-198" transform="rotate(-90 60 60)"/>
-              <circle class="chart-anim-arc" style="--arc-len: 42; --arc-dur: 89ms; --arc-delay: 510ms;"
-                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-4))" stroke-width="20" stroke-dashoffset="-240" transform="rotate(-90 60 60)"/>
+              <circle class="chart-anim-arc" style="--arc-len: 49; --arc-dur: 103ms; --arc-delay: 257ms;"
+                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-2))" stroke-width="20" stroke-dashoffset="-121" transform="rotate(-90 60 60)"/>
+              <circle class="chart-anim-arc" style="--arc-len: 34; --arc-dur: 72ms; --arc-delay: 360ms;"
+                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-6))" stroke-width="20" stroke-dashoffset="-170" transform="rotate(-90 60 60)"/>
+              <circle class="chart-anim-arc" style="--arc-len: 79; --arc-dur: 168ms; --arc-delay: 432ms;"
+                cx="60" cy="60" r="45" fill="none" stroke="url(#debt-hatch)" stroke-width="20" stroke-dashoffset="-204" transform="rotate(-90 60 60)"/>
             </svg>
-            <ul class="text-sm flex flex-col gap-2 tabular-nums">
-              <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-1));"></span>投資信託 <span class="ml-auto text-slate-400">45%</span></li>
-              <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-2));"></span>現金・預金 <span class="ml-auto text-slate-400">25%</span></li>
-              <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-6));"></span>株式 <span class="ml-auto text-slate-400">15%</span></li>
-              <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-4));"></span>不動産(利ざや) <span class="ml-auto text-slate-400">15%</span></li>
-            </ul>
+            <div class="flex flex-col gap-3">
+              <ul class="text-sm flex flex-col gap-2 tabular-nums">
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-1));"></span>投資信託 <span class="ml-auto text-slate-400">43%</span></li>
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-2));"></span>現金・預金 <span class="ml-auto text-slate-400">17%</span></li>
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-6));"></span>株式 <span class="ml-auto text-slate-400">12%</span></li>
+                <!-- 凡例の色見本もハッチングにする。グラフと同じ見た目でないと対応が取れない -->
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: repeating-linear-gradient(45deg, hsl(var(--destructive)) 0 2px, hsl(var(--card)) 2px 3px);"></span>負債 <span class="ml-auto text-slate-400">28%</span></li>
+              </ul>
+              <!--
+                差し引くのは分類軸で選んだ負債だけ(b4-category-master.html の「純金融資産」は
+                住宅ローン+自動車ローンの2件を選択し、奨学金は選んでいない)。
+                そのため負債サマリの合計(全3件 21,930,000円)とは一致しない。
+                資産 50,370,000円 - 負債 19,630,000円 = 30,740,000円、分母は 70,000,000円。
+              -->
+              <div class="text-xs text-slate-400 border-t pt-2" style="border-color: hsl(var(--border));">
+                <p class="tabular-nums">差引後 <span class="text-sm font-semibold text-slate-700">30,740,000円</span>(この分類軸が対象にしている負債2件 -19,630,000円 を控除)</p>
+                <p class="mt-1">構成比は資産と負債の絶対値の合計に対する割合です。</p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -271,6 +305,40 @@
           <li class="flex items-center justify-between"><span>食費</span><span class="tabular-nums text-slate-500">¥ 62,400</span></li>
           <li class="flex items-center justify-between"><span>住居費</span><span class="tabular-nums text-slate-500">¥ 98,000</span></li>
           <li class="flex items-center justify-between"><span>交通費</span><span class="tabular-nums text-slate-500">¥ 21,000</span></li>
+        </ul>
+      </section>
+
+      <!-- 負債サマリ(docs/screen-requirements-dashboard.md B1「負債サマリ」)。
+           登録済みの負債(B11)をそのまま並べるカードで、分類軸切替セレクタの影響を受けない。
+           絞ると「登録したのに出てこない負債」が生まれるため -->
+      <section class="card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold">負債サマリ</h2>
+          <a class="link text-xs" href="b11-debt-input.html">負債を入力する</a>
+        </div>
+        <div class="flex items-baseline gap-3 mb-4">
+          <p class="text-xs text-slate-400">負債合計</p>
+          <p class="text-xl font-semibold tabular-nums" style="color: hsl(var(--destructive));">¥ 21,930,000</p>
+          <p class="text-xs text-slate-400 ml-auto">最終更新 2026/07/12</p>
+        </div>
+        <!-- 残債の多い順。B11の並び(登録順)ではなく「いま何をどれだけ返済中か」を示す順にする -->
+        <ul class="text-sm flex flex-col gap-2">
+          <li class="flex items-center gap-3">
+            <span class="flex-1 min-w-0">住宅ローン(〇〇銀行)</span>
+            <span class="text-xs text-slate-400 tabular-nums text-right whitespace-nowrap">年利 0.475% / 残り23年4ヶ月</span>
+            <span class="tabular-nums text-slate-500 w-28 text-right">¥ 18,400,000</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="flex-1 min-w-0">奨学金(第一種)</span>
+            <!-- 金利・残りの返済期間は任意入力。未登録は0%・0ヶ月と書かず空欄にする -->
+            <span class="text-xs text-slate-400 tabular-nums text-right whitespace-nowrap"></span>
+            <span class="tabular-nums text-slate-500 w-28 text-right">¥ 2,300,000</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="flex-1 min-w-0">自動車ローン</span>
+            <span class="text-xs text-slate-400 tabular-nums text-right whitespace-nowrap">年利 2.9% / 残り2年8ヶ月</span>
+            <span class="tabular-nums text-slate-500 w-28 text-right">¥ 1,230,000</span>
+          </li>
         </ul>
       </section>
 
