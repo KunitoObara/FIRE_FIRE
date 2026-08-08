@@ -57,12 +57,22 @@ git checkout -b feature/fire-fire-<カードID>-1
 
 ### B-1. 現状を測る
 
+正本 5章「分ける目安」の指標をそのまま測る。**`--stat` の出力は使わない** — 末尾のサマリ行が混じって件数が1多く出るうえ、増減の合計にテストが含まれてしまい、「テストを除くソースの増減」という指標とずれる。
+
 ```bash
-git diff develop --stat | tail -1
-git diff develop --stat | wc -l
+# 変更ファイル数
+git diff develop --name-only | wc -l
+
+# テストを除く増減の合計
+git diff develop --numstat -- ':(exclude)*.test.ts' ':(exclude)*.test.tsx' \
+  | awk '{ added += $1; deleted += $2 } END { print added + deleted }'
 ```
 
+触る画面IDの数は差分のパスから数える(`src/app/(dashboard)/<画面>/`、`src/components/<画面>/`)。
+
 正本 5章「分ける目安」と突き合わせ、**そもそも分ける必要があるか**を判断する。目安を下回っているなら分けずに終わってよい。その場合はそう報告する。
+
+参考値(この指標で測った実績): PR #82 は4ファイル・26行で目安内。PR #83 は68ファイル・2,646行で超過していた。
 
 ### B-2. 差分をファイル単位で層に割り当てる
 
