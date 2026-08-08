@@ -141,7 +141,7 @@ Trello: <カードのURL>
 ### 何を「レビュー」とみなすか
 
 1. **claude-review ボットのコメント** — [.github/workflows/claude-review.yml](../.github/workflows/claude-review.yml) が PR の `opened` / `synchronize` で投稿する
-2. **CI(ci.yml)の失敗** — `wip-check` / `frontend` / `backend`
+2. **CI(ci.yml)の失敗** — `wip-check` / `hooks` / `frontend` / `backend`
 3. **PO(人間)のPRコメント**
 
 ### 往復の上限
@@ -290,12 +290,18 @@ force push だけ `deny` のパターン列挙ではなくフックにしてあ�
 bash .claude/hooks/run-dangerous-command-tests.sh
 ```
 
+**同じスクリプトを [ci.yml](../.github/workflows/ci.yml) の `hooks` ジョブが実行する。** 安全装置のテストを「変えたら流す」という運用ルールだけに預けると、流し忘れたまま遮断が壊れてマージされうるため。手元で流すのをやめてよいという意味ではない — CIで気づくのはPRを出したあとになる。
+
+ジョブは依存のインストールをしない(`bash` / `jq` / `python3` / `grep` / `sed` だけで動く)。環境変数の細工も不要。スクリプトは判定ロジックを見るケースで `GITHUB_ACTIONS` と `CLAUDE_GUARD_DISABLE` を落としてからフックを呼ぶので、**結果は実行環境に依らない**(手元・`hooks` ジョブ・両変数が立った環境のいずれでも同じ115ケースが一致する)。無効化の条件そのものは `check_guard_env` が env を明示的に組み立てて検証しているので、**条件を変えるときはそのケースの期待値を更新する**。
+
+判定ロジックのケースを環境から切り離してあるのは、テストが緑であることを「判定が正しい」と読めるようにするため。呼び出し元の環境しだいでフックが素通りする状態だと、期待DENYのケースが全滅して落ちる(黙って通りはしない)にせよ、原因の分かりにくい落ち方になる。
+
 ケースは [.claude/hooks/dangerous-command-cases.txt](../.claude/hooks/dangerous-command-cases.txt) にあり、拒否側だけでなく**誤って拒否してはいけない側**(`git push -u origin feature/fire-fire-x0` のようにブランチ名へ `-f` を含むもの、`git push -n`、`npm run build -- --force`、`cat docs/development-workflow.md` など)も含めてある。テストスクリプトは `.claude/settings.json` からフック本体を取り出して実行するので、判定ロジックの二重管理は起きない。
 
 無効化の条件も同じスクリプトが見ている。`GITHUB_ACTIONS` と `CLAUDE_GUARD_DISABLE` が揃ったときだけ素通りし、**片方だけ・空文字・どちらも無しでは歯止めが効いたまま**であることを、Bash 側と Grep / Glob / Read 側の両方のフックについて確かめる。
 
 ## 9. 前提と制約
 
-- ブランチ保護は有効にできない(このプランの非公開リポジトリのため)。CIが赤でもマージボタンは押せてしまうので、CI3ジョブは**慣例として必須**とみなす
+- ブランチ保護は有効にできない(このプランの非公開リポジトリのため)。CIが赤でもマージボタンは押せてしまうので、CI4ジョブは**慣例として必須**とみなす
 - claude-review は `main` 上のワークフローファイルと一致するときだけ実際に動く。編集しても `main` に載るまで効かないので、レビューコメントを待つ側は「ボットが動いていない」ケースを空振りせずに判定すること(`gh run list --workflow claude-review.yml --branch <ブランチ>` で実行有無を確認する)
 - claude-review は必須チェックではない。コメントを投稿するだけでマージをブロックしない
