@@ -46,10 +46,12 @@ Bは常にAより高くつく。**大きくなってから呼ばれた場合で�
 
 ```bash
 git checkout develop && git pull
-git checkout -b feature/fire-fire-<カードID>-1
+git checkout -b feature/fire-fire-<カードID>-part1
 ```
 
-ブランチ名は正本 5章の規約に連番を足す(`feature/fire-fire-b11-1`)。2本目以降は1本目がマージされてから切る(逐次が既定)。
+**スライスのブランチ名は `-part<N>` を付ける。連番だけを足さない。** 枝番カード(`[B11-2]`)のブランチ名が `feature/fire-fire-b11-2` なので、連番だけだと**実在する別カードのブランチと同名になる**。実際 `[B11-2]`・`[B11-3]` は存在するカードで、B11を3分割していたらスライス2・3のブランチ名がそのまま衝突していた。`/card-start` のマージ同期はカード名からブランチ名を導出するため、衝突すると別のカードを完了へ動かしうる。
+
+2本目以降は1本目がマージされてから切る(逐次が既定)。
 
 ---
 
@@ -93,7 +95,7 @@ git diff develop --name-only
 
 ```bash
 git checkout develop && git pull
-git checkout -b feature/fire-fire-<カードID>-1
+git checkout -b feature/fire-fire-<カードID>-part1
 git checkout <元のブランチ> -- <このスライスのパス...>
 ```
 
@@ -134,7 +136,7 @@ PR本文の「変更内容」の冒頭に、**分割の全体像**を書く。�
 
 - カードは1本目のPRを出した時点で `/card-ship` が**確認中**へ移す
 - 2本目以降のPRのURLも、同じカードにコメントで追記する(`mcp__trello__add_comment`)
-- カードが**完了**へ動くのは全部のPRがマージされたあと。`/card-start` のマージ同期は「カード名から引いたブランチ」を見るので、**分割したカードでは自動判定が効かない**。カードのコメントに残したPRのURLを全部見て、すべて `MERGED` になっていることを確認してから移す
+- カードが**完了**へ動くのは全部のPRがマージされたあと。判定の手順は `/card-start` §1 に書いてある(カードのコメントに残ったPRのURLを全部集め、**すべて `MERGED` のときだけ**移す)。1本目がマージされた時点で動かさない
 
 ## やらないこと
 
