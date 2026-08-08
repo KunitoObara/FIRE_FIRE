@@ -220,7 +220,7 @@ export const linkPendingGoogleAccount = async (): Promise<void> => {
  * だった場合に限られ、連携で未確認へ戻ることは無いため。行き止まりにならない以上、
  * ここで取得失敗を理由にユーザーを止める理由が無い。
  *
- * A1〜A8は`AppAccessGuard`(`(dashboard)`レイアウト、B1〜B10のみ)の外側にあるので、
+ * A1〜A8は`AppAccessGuard`(`(dashboard)`レイアウト、B1〜B11のみ)の外側にあるので、
  * 差し戻しをガードに期待してはいけない。上記のA2のポーリングを消すとここが行き止まりになる。
  */
 export const resolveNextStepAfterLink = async (

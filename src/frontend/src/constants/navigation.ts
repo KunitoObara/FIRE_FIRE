@@ -1,7 +1,8 @@
-/** ログイン後(B1〜B10)の共通サイドバーの構成 */
+/** ログイン後(B1〜B11)の共通サイドバーの構成 */
 
 import {
   Building2,
+  CreditCard,
   FileUp,
   LayoutDashboard,
   ReceiptText,
@@ -17,6 +18,7 @@ import {
   ASSUMPTION_SETTINGS_PATH,
   CSV_IMPORT_PATH,
   DASHBOARD_PATH,
+  DEBTS_PATH,
   FIRE_GOAL_PATH,
   REAL_ESTATE_PATH,
   TRANSACTIONS_PATH,
@@ -43,6 +45,11 @@ export const PRIMARY_NAV_GROUPS: PrimaryNavGroup[] = [
       { screenId: "B3", label: "収支明細一覧", path: TRANSACTIONS_PATH, icon: ReceiptText },
       { screenId: "B4", label: "資産分類マスタ", path: ASSET_CATEGORIES_PATH, icon: Tags },
       { screenId: "B5", label: "不動産一覧", path: REAL_ESTATE_PATH, icon: Building2 },
+      // B11は画面IDこそB10の次だが、サイドバーではB5の次に並べる
+      // (docs/screen-list-and-transitions.md 2.2)。節の分類はデータの経路で決めている
+      // 一方、サイドバーの並びは操作の性質で決めており、手動で登録・更新する画面(B5・B11)を
+      // 隣り合わせるほうが探しやすいため。CSV取込を起点とするB2〜B4の並びも崩れない
+      { screenId: "B11", label: "負債入力", path: DEBTS_PATH, icon: CreditCard },
     ],
   },
   {

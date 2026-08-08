@@ -48,7 +48,7 @@ jobs:
             1. 要件との整合
                - ルートの CLAUDE.md と docs/ 配下の要件(特に docs/fire-asset-management-requirements.md、
                  docs/screen-list-and-transitions.md、docs/screen-requirements-*.md)と矛盾していないか
-               - 画面(A1〜A7 / B1〜B10)の実装は、対応する画面要件の項目・遷移条件を満たしているか
+               - 画面(A1〜A8 / B1〜B11)の実装は、対応する画面要件の項目・遷移条件を満たしているか
             2. コーディング規約
                - src/frontend/docs/CODING_STANDARDS.md に沿っているか(命名、import順、
                  Server / Client Componentsの使い分け、スタイリング方針)

@@ -4,6 +4,11 @@ import { Cell, Pie, PieChart } from "recharts";
 
 import styles from "@/components/dashboard/CategoryBreakdownChart.module.css";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import {
+  DEBT_CATEGORY_COLOR,
+  DEBT_CATEGORY_ID,
+  DEBT_SLICE_HATCH_PATTERN_ID,
+} from "@/constants/dashboard";
 import { formatJpy } from "@/lib/format/currency";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +39,24 @@ export const CategoryBreakdownChart = ({ slices }: CategoryBreakdownChartProps):
   return (
     <ChartContainer config={chartConfig} className={cn(styles.chartSweep, "aspect-square h-36")}>
       <PieChart>
+        {/*
+          負債のスライスに重ねるハッチング(斜線)。**隣り合うスライスの色相にかかわらず
+          常に重ねる**(DESIGN.md 3章)。負債は最後のスライスなので12時の位置で1色目と必ず
+          隣り合うが、そこに何色が来るかは分類軸ごとの登録順で決まり、`--chart-*`の値も
+          後から調整されうる。凡例の色見本にも同じ斜線を出す(`CategoryBreakdownCard`)
+        */}
+        <defs>
+          <pattern
+            id={DEBT_SLICE_HATCH_PATTERN_ID}
+            width="4"
+            height="4"
+            patternTransform="rotate(45)"
+            patternUnits="userSpaceOnUse"
+          >
+            <rect width="4" height="4" fill={DEBT_CATEGORY_COLOR} />
+            <line x1="0" y1="0" x2="0" y2="4" stroke="var(--card)" strokeWidth="1.5" />
+          </pattern>
+        </defs>
         <ChartTooltip
           content={
             <ChartTooltipContent
@@ -59,7 +82,14 @@ export const CategoryBreakdownChart = ({ slices }: CategoryBreakdownChartProps):
           isAnimationActive={false}
         >
           {slices.map((slice) => (
-            <Cell key={slice.categoryId} fill={slice.color} />
+            <Cell
+              key={slice.categoryId}
+              fill={
+                slice.categoryId === DEBT_CATEGORY_ID
+                  ? `url(#${DEBT_SLICE_HATCH_PATTERN_ID})`
+                  : slice.color
+              }
+            />
           ))}
         </Pie>
       </PieChart>

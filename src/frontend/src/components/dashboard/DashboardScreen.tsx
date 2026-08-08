@@ -8,6 +8,7 @@ import { CashflowSummaryCard } from "@/components/dashboard/CashflowSummaryCard"
 import { CategoryBreakdownCard } from "@/components/dashboard/CategoryBreakdownCard";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
+import { DebtSummaryCard } from "@/components/dashboard/DebtSummaryCard";
 import { FireProgressCard } from "@/components/dashboard/FireProgressCard";
 import { NetWorthTrendCard } from "@/components/dashboard/NetWorthTrendCard";
 import { Button } from "@/components/ui/button";
@@ -123,7 +124,17 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
   const axisData = selectedAxisId ? data?.byAxis[selectedAxisId] : undefined;
 
   const series = filterSeriesByPeriod(axisData?.netWorthSeries ?? [], selectedPeriodId, now);
-  const slices = buildBreakdownSlices(axisData?.breakdown ?? [], data?.categories ?? []);
+  const debtTotal = axisData?.debtTotal ?? 0;
+  const slices = buildBreakdownSlices(axisData?.breakdown ?? [], data?.categories ?? [], debtTotal);
+  /*
+    差引後の純額は負債を含む分類軸でだけ併記する(同要件B1)。含まない軸では構成比の分母が
+    資産合計そのものなので、断り書きを添える意味が無い。0円の負債はスライスも出ないため
+    `debtTotal`が0のときは`null`にして、断り書きだけが残る状態にしない
+  */
+  const netAmount =
+    debtTotal > 0
+      ? (axisData?.breakdown ?? []).reduce((sum, entry) => sum + entry.amount, 0) - debtTotal
+      : null;
 
   return (
     <>
@@ -198,12 +209,23 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
           */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {selectedAxis ? (
-              <CategoryBreakdownCard axisName={selectedAxis.name} slices={slices} />
+              <CategoryBreakdownCard
+                axisName={selectedAxis.name}
+                slices={slices}
+                netAmount={netAmount}
+              />
             ) : null}
             <FireProgressCard fireProgress={data.fireProgress} />
           </div>
 
-          <CashflowSummaryCard cashflow={data.cashflow} />
+          {/*
+            負債サマリは分類軸切替セレクタの影響を受けない。分類軸で絞ると、負債を集計対象に
+            選んでいない軸を表示中に「登録したはずの負債が消える」ことになる(同要件B1)
+          */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <DebtSummaryCard debts={data.debts} />
+            <CashflowSummaryCard cashflow={data.cashflow} />
+          </div>
         </>
       ) : null}
     </>

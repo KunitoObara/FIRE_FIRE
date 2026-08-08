@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  buildCategoryAxisDebtCountLabel,
   CATEGORY_AXIS_ALL_TYPES_LABEL,
   CATEGORY_AXIS_MEMBER_DISPLAY_LIMIT,
   NO_CATEGORY_AXES_LABEL,
@@ -18,8 +19,8 @@ import type { JSX } from "react";
 const resolveDotColor = (index: number): string =>
   index < CATEGORY_COLOR_SLOT_COUNT ? `var(--chart-${index + 1})` : "var(--muted-foreground)";
 
-/** 集計対象の一覧表示。件数が多い場合は先頭だけ出して残りを「ほかN件」にまとめる */
-const buildMemberSummary = (assetTypeNames: string[]): string => {
+/** 資産種別の一覧表示。件数が多い場合は先頭だけ出して残りを「ほかN件」にまとめる */
+const buildAssetTypeSummary = (assetTypeNames: string[]): string => {
   if (assetTypeNames.length === 0) {
     return CATEGORY_AXIS_ALL_TYPES_LABEL;
   }
@@ -28,6 +29,25 @@ const buildMemberSummary = (assetTypeNames: string[]): string => {
   const remaining = assetTypeNames.length - shown.length;
 
   return remaining > 0 ? `${shown.join("、")} ほか${remaining}件` : shown.join("、");
+};
+
+/**
+ * 紐付け状況の1行(B4の表示項目)。
+ *
+ * **負債を含む軸にだけ**資産種別に続けて負債の件数を出す(例:「すべての資産種別が対象 / 負債 2件」)。
+ * 負債を含む軸かどうかが一覧で分からないと、B1で値が資産合計と違う理由が追えない。
+ * 含まない軸に「負債なし」と書き添えないのは、大半の軸に同じ但し書きが並ぶだけになるため
+ * (docs/screen-requirements-dashboard.md B4)。
+ *
+ * 負債の名前は出さず件数だけにする。名前まで並べると資産種別と混ざって、どちらが
+ * 足される側でどちらが引かれる側なのかが読み取れなくなる。
+ */
+const buildMemberSummary = (axis: AssetCategoryAxisDocument): string => {
+  const assetTypes = buildAssetTypeSummary(axis.assetTypeNames);
+
+  return axis.debtIds.length === 0
+    ? assetTypes
+    : `${assetTypes} / ${buildCategoryAxisDebtCountLabel(axis.debtIds.length)}`;
 };
 
 /**
@@ -61,9 +81,7 @@ export const AssetCategoryAxisList = ({
             />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">{axis.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {buildMemberSummary(axis.assetTypeNames)}
-              </p>
+              <p className="text-xs text-muted-foreground">{buildMemberSummary(axis)}</p>
             </div>
             <Button type="button" variant="ghost" size="sm" onClick={() => onEdit(axis)}>
               編集

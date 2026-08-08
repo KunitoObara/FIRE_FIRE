@@ -3,6 +3,7 @@
 import {
   ASSET_CATEGORIES_PATH,
   CSV_IMPORT_PATH,
+  DEBTS_PATH,
   FIRE_GOAL_PATH,
   TRANSACTIONS_PATH,
 } from "@/constants/routes";
@@ -38,6 +39,60 @@ export const OTHER_CATEGORY_NAME = "その他";
 /** 色のスロットに収まらなかった分類をまとめる際の擬似的な分類ID */
 export const OTHER_CATEGORY_ID = "__other__";
 
+/**
+ * 分類別内訳の負債スライスを表す擬似的な分類ID(`OTHER_CATEGORY_ID`と同じ考え方)。
+ *
+ * **表示名「負債」との一致で判定しない。** 資産種別の名前はCSVの列名そのもの
+ * (要件定義書 4.3)なので「負債」という名前の資産種別が現れうるし、名前による分岐は
+ * 分類軸をハードコードしない方針にも反する(docs/screen-requirements-dashboard.md B1)。
+ */
+export const DEBT_CATEGORY_ID = "__debt__";
+
+/** 分類別内訳の負債スライスの表示名。項目ごとに分けず1つにまとめる(項目別はB1の負債サマリとB11で見る) */
+export const DEBT_CATEGORY_NAME = "負債";
+
+/**
+ * 負債スライスの色。**資産分類カラーのスロット(`--chart-1`〜`--chart-8`)を使わない**
+ * (DESIGN.md 3章)。
+ *
+ * 負債がスロットを1つ占めると、実際に保有している資産の分類が「その他」へ押し出される。
+ * 負債は分類軸ごとに1スライスに固定なので、スロットを配る対象にする必要がない。
+ * 赤(`--destructive`)を当てるのは、負の値を赤で表す会計上の慣用に沿うため。
+ */
+export const DEBT_CATEGORY_COLOR = "var(--destructive)";
+
+/**
+ * 負債のスライスに重ねるハッチング(斜線)。**隣り合うスライスの色相にかかわらず常に重ねる**
+ * (DESIGN.md 3章)。
+ *
+ * 負債は最後のスライスなので円グラフでは12時の位置で1色目と必ず隣り合うが、そこに何色が
+ * 来るかは分類軸ごとの登録順で決まり、`--chart-*`の値も後から調整されうる。「今のパレットでは
+ * 色相が離れているから不要」という判断にすると、パレットを触ったときに見分けにくい
+ * 組み合わせが黙って生まれる。色以外の手がかりを併用する方針はリスクレベル(B9)と同じ。
+ *
+ * 円グラフ側はSVGの`<pattern>`で描くため、参照するIDをここで固定する。
+ */
+export const DEBT_SLICE_HATCH_PATTERN_ID = "category-breakdown-debt-hatch";
+
+/**
+ * 凡例の色見本に重ねるハッチング。円グラフのスライスと同じ見た目にする
+ * (見本とスライスの見た目が違うと対応が取れない。DESIGN.md 3章)。
+ *
+ * SVGの`<pattern>`はグラフのSVGの中にしか無いので、凡例はCSSのグラデーションで同じ
+ * 斜線を作る。角度と間隔を`DEBT_SLICE_HATCH_*`と揃えてある。
+ */
+export const DEBT_LEGEND_SWATCH_BACKGROUND =
+  "repeating-linear-gradient(45deg, var(--destructive) 0 2px, color-mix(in oklab, var(--destructive) 55%, white) 2px 4px)";
+
+/**
+ * 差引後の純額に添える見出し(分類別内訳のカード)。
+ *
+ * 円グラフは正の面積でしか比を表せず、負債のスライスを置いた時点で**構成比の分母は
+ * 「対象の資産合計 + 対象の負債合計」**になる。%が純資産に対する割合ではないことが
+ * 分かるよう、差引後の純額を数字で併記する(docs/screen-requirements-dashboard.md B1)。
+ */
+export const BREAKDOWN_NET_AMOUNT_LABEL = "資産 - 負債";
+
 /** 直近CSV取込日時が無いときの表示 */
 export const NO_CSV_IMPORT_LABEL = "CSV未取込";
 
@@ -59,6 +114,24 @@ export const DASHBOARD_EMPTY_STATES = {
     message: "入出金明細のデータがまだありません。CSVを取り込むと当月の収支が表示されます。",
     action: { label: "CSVを取り込む", href: CSV_IMPORT_PATH },
   },
+} as const;
+
+/**
+ * 負債サマリに並べる項目の件数。超過分は「ほかN件」にまとめてB11へ渡す
+ * (docs/screen-requirements-dashboard.md B1「負債サマリ」)。
+ * ダッシュボードのカードは俯瞰のための場所で、全件を並べる場所ではB11がある。
+ */
+export const DEBT_SUMMARY_ROW_LIMIT = 5;
+
+/**
+ * 負債が1件も登録されていないときの案内。負債が無いこと自体はエラーではない。
+ *
+ * 導線のラベルはカード見出しの「負債を入力する」とあえて変える。同じ文言のリンクが
+ * 縦に2つ並ぶと別の操作があるように見えるため(B5の空状態と同じ扱い)。
+ */
+export const DEBT_SUMMARY_EMPTY_STATE = {
+  message: "負債がまだ登録されていません。登録するとここに残債が並びます。",
+  action: { label: "負債を登録する", href: DEBTS_PATH },
 } as const;
 
 /** 分類軸が1つも登録されていないときの案内 */
@@ -85,6 +158,16 @@ export const CSV_IMPORT_LINK = { label: "CSVを取り込む", href: CSV_IMPORT_P
  */
 export const ACHIEVEMENT_AXIS_MISSING_NOTICE =
   "設定していた対象分類が見つからないため、総資産で計算しています。";
+
+/**
+ * 現在資産額がマイナス(負債が資産を上回る)のときにゲージのカードへ添える注記。
+ *
+ * 達成率は0%に丸めるが、0%は「まだ何も貯まっていない」状態でも出る値なので、
+ * 注記が無いと両者を区別できない(docs/screen-requirements-dashboard.md B1)。
+ * 現在資産額そのものはマイナスのまま出すので、金額と読み合わせられる。
+ */
+export const NEGATIVE_CURRENT_AMOUNT_NOTICE =
+  "対象分類の負債が資産を上回っているため、達成率は0%として表示しています。";
 
 /** 到達予測日が算出できていないときの表示 */
 export const NO_PROJECTED_DATE_LABEL = "算出できません";

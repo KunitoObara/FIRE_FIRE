@@ -7,7 +7,7 @@ import type { JSX, ReactNode } from "react";
  * ルート遷移をまたいでマウントされ続けるため、配下の NavigationProbe の状態が
  * クライアント遷移で保持されるかどうかを確認できる。
  *
- * 画面実装タスク(A1〜A7 / B1〜B10)の着手時に `(setup-check)` ごと削除してよい。
+ * 画面実装タスク(A1〜A8 / B1〜B11)の着手時に `(setup-check)` ごと削除してよい。
  */
 const SetupCheckLayout = ({ children }: { children: ReactNode }): JSX.Element => (
   <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-16">

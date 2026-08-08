@@ -10,6 +10,7 @@ import { FireGoalSummary } from "@/components/fire-goal/FireGoalSummary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORY_AXES_QUERY_KEY } from "@/constants/asset-categories";
 import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
+import { DEBTS_QUERY_KEY } from "@/constants/debts";
 import {
   ACHIEVEMENT_AXIS_MISSING_MESSAGE,
   FIRE_GOAL_DESCRIPTION,
@@ -22,6 +23,7 @@ import { DASHBOARD_PATH } from "@/constants/routes";
 import { fetchCategoryAxes } from "@/lib/asset-categories/category-axis-repository";
 import { fetchLatestAssetSnapshot } from "@/lib/csv-import/asset-balance-repository";
 import { resolveAchievementAmount, resolveAchievementAxis } from "@/lib/dashboard/fire-progress";
+import { fetchDebts } from "@/lib/debts/debt-repository";
 import { fetchFireGoal, saveFireGoal } from "@/lib/fire-goal/fire-goal-repository";
 import { toFireGoalFormValues } from "@/lib/fire-goal/form-values";
 
@@ -55,6 +57,13 @@ export const FireGoalScreen = (): JSX.Element => {
     queryFn: fetchLatestAssetSnapshot,
   });
 
+  /*
+    負債(B11)も参考表示に要る。対象分類に負債を含む分類軸を選ぶと現在資産額は負債控除後の
+    額になり(docs/screen-requirements-fire-goal.md B8)、B1のゲージと同じ値を出すには
+    同じ入力が要るため。現在資産額と同じく参考表示なので、取得できなくても目標は設定できる
+  */
+  const debtsQuery = useQuery({ queryKey: DEBTS_QUERY_KEY, queryFn: fetchDebts });
+
   /**
    * 選択中の対象分類。`undefined`は「まだ触っていない」で、保存済みの設定に追従する。
    *
@@ -84,7 +93,12 @@ export const FireGoalScreen = (): JSX.Element => {
   // 現在資産額は参考表示なので、取得できなくても目標の設定は続けられるようにする。
   // 失敗を重ねて表示しても増える情報が無く、「—」で分からないことは伝わる
   const latestSnapshot = snapshotQuery.data?.ok === true ? snapshotQuery.data.snapshot : null;
-  const currentAssetTotal = resolveAchievementAmount(achievementAxis, latestSnapshot ?? undefined);
+  const debts = debtsQuery.data?.ok === true ? debtsQuery.data.debts : [];
+  const currentAssetTotal = resolveAchievementAmount(
+    achievementAxis,
+    latestSnapshot ?? undefined,
+    debts,
+  );
 
   const handleSubmit = async (goal: FireGoal): Promise<SaveFireGoalResult> => {
     const saved = await saveFireGoal(goal);

@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import {
   FIRE_GOAL_ACTIVE_MODE_LABEL,
+  NEGATIVE_CURRENT_ASSET_NOTICE,
   FIRE_GOAL_CURRENT_ASSET_LABEL,
   FIRE_GOAL_MODES,
   FIRE_GOAL_REFERENCE_SUFFIX,
@@ -53,6 +54,18 @@ export const FireGoalSummary = ({
             <dd className="self-center text-xs text-muted-foreground">({achievementAxisName})</dd>
           </div>
         </dl>
+
+        {/*
+          対象分類の負債が資産を上回ると現在資産額がマイナスになる。金額はマイナスのまま
+          出したうえで、B1のゲージが達成率を0%に丸めることをここでも伝える。丸め方の正は
+          docs/screen-requirements-dashboard.md B1で、この画面で別に決めない
+          (同じ設定に対して画面ごとに違う達成率が出るのを避けるため)
+        */}
+        {currentAssetTotal !== null && currentAssetTotal < 0 ? (
+          <p role="status" className="mt-2 text-xs text-destructive">
+            {NEGATIVE_CURRENT_ASSET_NOTICE}
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );

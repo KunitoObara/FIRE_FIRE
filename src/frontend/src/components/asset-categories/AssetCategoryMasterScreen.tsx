@@ -16,6 +16,7 @@ import {
   CATEGORY_AXIS_LOAD_FAILURE_MESSAGES,
 } from "@/constants/asset-categories";
 import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
+import { DEBT_LOAD_FAILURE_MESSAGES, DEBTS_QUERY_KEY } from "@/constants/debts";
 import {
   createCategoryAxis,
   deleteCategoryAxis,
@@ -23,10 +24,59 @@ import {
   fetchCategoryAxes,
   updateCategoryAxis,
 } from "@/lib/asset-categories/category-axis-repository";
+import { fetchDebts } from "@/lib/debts/debt-repository";
 
 import type { JSX } from "react";
 
-const EMPTY_FORM_VALUES: AssetCategoryAxisFormValues = { name: "", assetTypeNames: [] };
+const EMPTY_FORM_VALUES: AssetCategoryAxisFormValues = {
+  name: "",
+  assetTypeNames: [],
+  debtIds: [],
+};
+
+/**
+ * 負債の選択肢の状態を1つの値にまとめる(`resolveAssetTypeOptionsState`と同じ理由)。
+ *
+ * 空配列に倒すと「読み込み中」「取得失敗」「B11で1件も登録していない」が同じ見た目になる。
+ * 負債では実害がさらに大きく、選択肢が出ないまま保存できると、選択済みの負債が黙って
+ * 外れた分類軸で上書きされる。
+ */
+const resolveDebtOptionsState = (result: DebtsResult | undefined): DebtOptionsState => {
+  if (result === undefined) {
+    return { status: "loading" };
+  }
+
+  if (!result.ok) {
+    return { status: "error", message: DEBT_LOAD_FAILURE_MESSAGES[result.reason] };
+  }
+
+  return { status: "ready", debts: result.debts };
+};
+
+/**
+ * 編集フォームに渡す初期値を組み立てる。
+ *
+ * **B11で削除された負債への参照は落とす。** 存在しない負債を選択中として出すことはできず、
+ * 集計対象にもしないため(docs/screen-requirements-dashboard.md B4)。保存し直せば
+ * ドキュメント側の参照も消える。負債の選択肢がまだ読めていない間は絞り込めないので、
+ * その状態では保存自体をフォーム側が止める。
+ */
+const toEditingFormValues = (
+  axis: AssetCategoryAxisDocument,
+  debtOptions: DebtOptionsState,
+): AssetCategoryAxisFormValues => {
+  if (debtOptions.status !== "ready") {
+    return { name: axis.name, assetTypeNames: axis.assetTypeNames, debtIds: axis.debtIds };
+  }
+
+  const existingIds = new Set(debtOptions.debts.map((debt) => debt.id));
+
+  return {
+    name: axis.name,
+    assetTypeNames: axis.assetTypeNames,
+    debtIds: axis.debtIds.filter((debtId) => existingIds.has(debtId)),
+  };
+};
 
 /**
  * 集計対象の選択肢の状態を1つの値にまとめる。
@@ -72,6 +122,8 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
     queryKey: ASSET_TYPE_OPTIONS_QUERY_KEY,
     queryFn: fetchAssetTypeOptions,
   });
+  // 集計対象に含める負債の選択肢(B4「集計対象に負債を含める」)。B11の登録済みの負債そのもの
+  const debtsQuery = useQuery({ queryKey: DEBTS_QUERY_KEY, queryFn: fetchDebts });
 
   const [formMode, setFormMode] = useState<"closed" | "create" | "edit">("closed");
   const [editingAxis, setEditingAxis] = useState<AssetCategoryAxisDocument | null>(null);
@@ -86,6 +138,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
   const axesFailureReason = axesResult !== undefined && !axesResult.ok ? axesResult.reason : null;
 
   const assetTypeOptions = resolveAssetTypeOptionsState(assetTypeOptionsQuery.data);
+  const debtOptions = resolveDebtOptionsState(debtsQuery.data);
 
   const closeForm = (): void => {
     setFormMode("closed");
@@ -157,6 +210,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
             <AssetCategoryAxisForm
               initialValues={EMPTY_FORM_VALUES}
               assetTypeOptions={assetTypeOptions}
+              debtOptions={debtOptions}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
@@ -171,8 +225,9 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
             <h2 className="mb-4 text-sm font-semibold">分類を編集</h2>
             <AssetCategoryAxisForm
               key={editingAxis.id}
-              initialValues={{ name: editingAxis.name, assetTypeNames: editingAxis.assetTypeNames }}
+              initialValues={toEditingFormValues(editingAxis, debtOptions)}
               assetTypeOptions={assetTypeOptions}
+              debtOptions={debtOptions}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
