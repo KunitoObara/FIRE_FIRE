@@ -192,8 +192,9 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
           )}
 
           {/*
-            FIRE達成度は目標資産額と直近の資産総額の比較で、分類軸を参照していない(同要件B1)。
-            分類軸が未登録でも隠さず、内訳の空状態と並べて出す
+            FIRE達成度の現在資産額はB8で設定した対象分類で集計しており、この画面の分類軸切替
+            セレクタには追従しない(同要件B1)。分類軸が未登録でも隠さず、内訳の空状態と
+            並べて出す(対象分類が未設定なら総資産で計算できる)
           */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {selectedAxis ? (

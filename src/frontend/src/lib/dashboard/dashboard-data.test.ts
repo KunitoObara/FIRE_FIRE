@@ -58,7 +58,13 @@ describe("fetchDashboardData", () => {
     });
     fetchFireGoal.mockResolvedValue({
       ok: true,
-      goal: { mode: "direct", targetAmount: 80_000_000, annualExpense: null, withdrawalRate: null },
+      goal: {
+        mode: "direct",
+        targetAmount: 80_000_000,
+        annualExpense: null,
+        withdrawalRate: null,
+        achievementAxisId: null,
+      },
     });
   });
 
@@ -106,12 +112,44 @@ describe("fetchDashboardData", () => {
         lastImportedAt: "2026-08-05T12:00:00.000Z",
         fireProgress: {
           targetAmount: 80_000_000,
-          // 現在資産額は分類軸によらずCSVの合計(直近の資産残高の`total`)
+          // 対象分類が未設定なので、現在資産額はCSVの合計(直近の資産残高の`total`)
           currentAmount: 11_400_000,
+          achievementAxisName: "総資産(マネーフォワードの合計)",
+          achievementAxisMissing: false,
           projectedAchievementDate: null,
         },
       },
     });
+  });
+
+  /**
+   * B8で対象分類に選んだ分類軸で集計する(要件B1)。同じ分類軸をB1のセレクタで選んだときの
+   * 資産推移グラフの最新点(`byAxis.investment`の末尾)と一致することまで確かめる。
+   */
+  it("対象分類に分類軸が設定されていれば、その分類軸の集計を現在資産額にする", async () => {
+    fetchFireGoal.mockResolvedValue({
+      ok: true,
+      goal: {
+        mode: "direct",
+        targetAmount: 80_000_000,
+        annualExpense: null,
+        withdrawalRate: null,
+        achievementAxisId: "investment",
+      },
+    });
+
+    const result = await fetchDashboardData();
+
+    if (!result.ok) {
+      throw new Error("取得に失敗した");
+    }
+
+    expect(result.data.fireProgress).toMatchObject({
+      currentAmount: 7_000_000,
+      achievementAxisName: "投資性資産",
+      achievementAxisMissing: false,
+    });
+    expect(result.data.byAxis.investment?.netWorthSeries.at(-1)?.amount).toBe(7_000_000);
   });
 
   /** 入出金明細の取込(B3)はPhase 2。ここで埋めるデータが無い */

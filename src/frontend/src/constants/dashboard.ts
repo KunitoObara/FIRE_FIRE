@@ -76,6 +76,16 @@ export const FIRE_GOAL_LINK = { label: "目標を設定する", href: FIRE_GOAL_
 /** 「CSVを取り込む」ボタンの導線 */
 export const CSV_IMPORT_LINK = { label: "CSVを取り込む", href: CSV_IMPORT_PATH } as const;
 
+/**
+ * 達成度の対象分類(B8)に設定していた分類軸がB4で削除されていたときの注意書き。
+ *
+ * 既定(総資産)で計算したうえでこれを出す。ゲージを消したり達成率0%にしたりはしない
+ * (docs/screen-requirements-dashboard.md B1)。設定し直す先はB8なので、カードに元から
+ * ある`FIRE_GOAL_LINK`がそのまま導線になる。
+ */
+export const ACHIEVEMENT_AXIS_MISSING_NOTICE =
+  "設定していた対象分類が見つからないため、総資産で計算しています。";
+
 /** 到達予測日が算出できていないときの表示 */
 export const NO_PROJECTED_DATE_LABEL = "算出できません";
 

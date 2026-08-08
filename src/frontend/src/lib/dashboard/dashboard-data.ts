@@ -71,7 +71,9 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
           },
         ]),
       ),
-      fireProgress: buildFireProgress(fireGoalResult.goal, latest?.total ?? null),
+      // ゲージの現在資産額はB1のセレクタではなくB8の対象分類で集計する。分類軸の一覧を
+      // 渡すのは、設定された軸がB4で削除されていたときに既定へフォールバックさせるため
+      fireProgress: buildFireProgress(fireGoalResult.goal, latest, axesResult.axes),
       cashflow: null,
     },
   };

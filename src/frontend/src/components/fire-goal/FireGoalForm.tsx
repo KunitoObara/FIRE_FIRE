@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
@@ -8,10 +9,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  ACHIEVEMENT_AXIS_EMPTY_HINT,
+  ACHIEVEMENT_AXIS_HINT,
+  ACHIEVEMENT_AXIS_INVALID_MESSAGE,
+  ACHIEVEMENT_AXIS_LABEL,
+  ACHIEVEMENT_AXIS_MASTER_LINK_LABEL,
   buildFireGoalAchievementHint,
   buildFireGoalHiddenTabNoticeMessage,
+  DEFAULT_ACHIEVEMENT_AXIS_NAME,
+  DEFAULT_ACHIEVEMENT_AXIS_VALUE,
   FIRE_GOAL_AMOUNT_PATTERN,
   FIRE_GOAL_ANNUAL_EXPENSE_LABEL,
   FIRE_GOAL_CALCULATED_TARGET_LABEL,
@@ -28,6 +43,7 @@ import {
   FIRE_GOAL_WITHDRAWAL_RATE_LABEL,
   FIRE_GOAL_WITHDRAWAL_RATE_PATTERN,
 } from "@/constants/fire-goal";
+import { ASSET_CATEGORIES_PATH } from "@/constants/routes";
 import { calculateAchievementRate } from "@/lib/dashboard/fire-progress";
 import { calculateTargetFromAnnualExpense } from "@/lib/fire-goal/calculation";
 import { toFireGoal, toPreviewNumber } from "@/lib/fire-goal/form-values";
@@ -36,6 +52,9 @@ import { fireGoalFormSchema } from "@/schemas/fire-goal";
 
 import type { JSX } from "react";
 import type { FieldErrors } from "react-hook-form";
+
+/** 対象分類セレクタのid。見出し(`FieldLabel`)と結び付けるために固定名で持つ */
+const ACHIEVEMENT_AXIS_SELECT_ID = "achievementAxisId";
 
 /**
  * B8 FIRE目標設定画面のフォーム(docs/screen-requirements-fire-goal.md B8)。
@@ -46,11 +65,20 @@ import type { FieldErrors } from "react-hook-form";
  * 非表示タブのパネルは`forceMount`で組み立てたままにし、切り替えても入力値を捨てない
  * (要件の「タブ切替時、入力値は両タブとも保持される」・DESIGN.md 6章)。
  *
+ * **達成度の対象分類だけはタブの外に置く。** 目標額の決め方(直接入力/逆算)と、比較する
+ * 資産の範囲は別の話であり、方式ごとに別々の対象分類を持つと切り替えたときに達成率が理由なく
+ * 変わるため(要件B8)。選択状態はこのフォームではなく呼び出し側が持つ。画面上部の参考表示も
+ * 同じ選択に追従する必要があり、ここと二重に持つと表示ごとに違う分類を指しうる。
+ *
  * 保存の成否は呼び出し側(`onSubmit`)に委ね、ここでは失敗時の文言表示までを担う。
  */
 export const FireGoalForm = ({
   initialValues,
   currentAssetTotal,
+  achievementAxisName,
+  achievementAxisOptions,
+  achievementAxisId,
+  onAchievementAxisChange,
   onSubmit,
 }: FireGoalFormProps): JSX.Element => {
   const {
@@ -68,6 +96,9 @@ export const FireGoalForm = ({
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // 選択中の対象分類が選択肢から消えていた場合のエラー。セレクタからの選択なので通常は
+  // 起こらず、別のタブでB4から分類軸を削除したときにだけ出る
+  const [achievementAxisError, setAchievementAxisError] = useState<string | null>(null);
   // 表示していなかったタブのエラーで保存が止まり、こちらからタブを切り替えたときだけ出す説明。
   // タブが勝手に切り替わった理由が画面から読み取れないため添える
   const [hiddenTabNotice, setHiddenTabNotice] = useState<string | null>(null);
@@ -87,7 +118,12 @@ export const FireGoalForm = ({
       ? null
       : calculateTargetFromAnnualExpense(parsedAnnualExpense, parsedWithdrawalRate);
 
-  /** 目標資産額に対する達成率。現在資産額が分からなければ出さない */
+  /**
+   * 目標資産額に対する達成率。現在資産額が分からなければ出さない。
+   *
+   * 現在資産額は選択中の対象分類で集計済みの値を受け取る。どの範囲を数えた達成率かが
+   * 読めるよう、分類名を併記する(B1のゲージと同じ表記)。
+   */
   const achievementHint = (target: number | null): string | null => {
     if (target === null || currentAssetTotal === null) {
       return null;
@@ -95,7 +131,9 @@ export const FireGoalForm = ({
 
     const rate = calculateAchievementRate(currentAssetTotal, target);
 
-    return rate !== null ? buildFireGoalAchievementHint(formatPercent(rate)) : null;
+    return rate !== null
+      ? buildFireGoalAchievementHint(formatPercent(rate), achievementAxisName)
+      : null;
   };
 
   const directAchievementHint = achievementHint(
@@ -106,9 +144,25 @@ export const FireGoalForm = ({
   const handleValidSubmit = async (values: FireGoalFormValues): Promise<void> => {
     setSaveError(null);
     setHiddenTabNotice(null);
+
+    /*
+      存在しない分類軸IDのまま保存しない(要件B8)。黙って既定へ倒すと、設定したつもりの
+      分類とは別の基準で達成率を見続けることになるため、保存そのものを止めて選び直させる。
+      既定(`null`)は分類軸を指さない状態なので、この検査の対象外。
+    */
+    if (
+      achievementAxisId !== null &&
+      !achievementAxisOptions.some((option) => option.id === achievementAxisId)
+    ) {
+      setAchievementAxisError(ACHIEVEMENT_AXIS_INVALID_MESSAGE);
+
+      return;
+    }
+
+    setAchievementAxisError(null);
     setSaving(true);
 
-    const result = await onSubmit(toFireGoal(values));
+    const result = await onSubmit(toFireGoal(values, achievementAxisId));
 
     if (result.ok) {
       // 成功時は呼び出し側がB1へ遷移させる。ここで`saving`を戻すと、遷移が終わるまでの間だけ
@@ -167,6 +221,63 @@ export const FireGoalForm = ({
               {hiddenTabNotice}
             </p>
           ) : null}
+
+          {/*
+            達成度の対象分類。タブの外・タブ見出しより前に置き、両方式で共通の設定であることを
+            並び順でも示す(要件B8)。区切り線を挟むのはHTMLモック b8-fire-goal.html に合わせる。
+          */}
+          <Field className="mb-6 border-b pb-6">
+            <FieldLabel htmlFor={ACHIEVEMENT_AXIS_SELECT_ID}>{ACHIEVEMENT_AXIS_LABEL}</FieldLabel>
+            <Select
+              value={achievementAxisId ?? DEFAULT_ACHIEVEMENT_AXIS_VALUE}
+              onValueChange={(value) => {
+                // 既定は保存時に`null`。`<option value>`に`null`を載せられないため、
+                // 画面上だけ擬似IDで表している
+                onAchievementAxisChange(value === DEFAULT_ACHIEVEMENT_AXIS_VALUE ? null : value);
+                // 選び直した時点で「選択肢に無い」というエラーは用済み
+                setAchievementAxisError(null);
+              }}
+              disabled={saving}
+            >
+              <SelectTrigger id={ACHIEVEMENT_AXIS_SELECT_ID} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DEFAULT_ACHIEVEMENT_AXIS_VALUE}>
+                  {DEFAULT_ACHIEVEMENT_AXIS_NAME}
+                </SelectItem>
+                {achievementAxisOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {achievementAxisError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {achievementAxisError}
+              </p>
+            ) : null}
+            <FieldDescription>
+              {ACHIEVEMENT_AXIS_HINT}
+              {/*
+                分類軸が1件も無いこと自体はエラーではなく保存もできるので、警告ではなく
+                B4への導線として添えるだけにする(要件B8)
+              */}
+              {achievementAxisOptions.length === 0 ? (
+                <>
+                  {" "}
+                  {ACHIEVEMENT_AXIS_EMPTY_HINT}{" "}
+                  <Link
+                    href={ASSET_CATEGORIES_PATH}
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    {ACHIEVEMENT_AXIS_MASTER_LINK_LABEL}
+                  </Link>
+                </>
+              ) : null}
+            </FieldDescription>
+          </Field>
 
           <Tabs
             value={mode}

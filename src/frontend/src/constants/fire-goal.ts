@@ -45,6 +45,61 @@ export const FIRE_GOAL_MODES: FireGoalModeOption[] = [
   },
 ];
 
+/**
+ * 達成度の対象分類(docs/screen-requirements-fire-goal.md B8「達成度の対象分類」)。
+ *
+ * 既定は「総資産(マネーフォワードの合計)」で、これは分類軸を1つも選んでいない状態
+ * (`achievementAxisId`が`null`)を指す。B1のゲージにも同じ名前を併記するため、
+ * 文言はここ1か所に持つ(画面によって呼び名が変わると同じ数字だと判別できない)。
+ */
+export const ACHIEVEMENT_AXIS_LABEL = "達成度の対象分類";
+
+/** 既定の対象分類の表示名。B1のゲージの併記にも使う */
+export const DEFAULT_ACHIEVEMENT_AXIS_NAME = "総資産(マネーフォワードの合計)";
+
+/**
+ * 既定の対象分類を`<select>`の値として表すID。
+ *
+ * 保存する値は`null`だが、`<option value>`に`null`は載せられない。分類軸のIDは
+ * Firestoreの自動採番で`__`を含まないため、内訳の「その他」(`__other__`)と同じく
+ * 二重アンダースコアで囲んだ擬似IDにして実在のIDと衝突しないようにする。
+ */
+export const DEFAULT_ACHIEVEMENT_AXIS_VALUE = "__total__";
+
+/** 対象分類セレクタに添える説明(HTMLモック b8-fire-goal.html の文言に合わせる) */
+export const ACHIEVEMENT_AXIS_HINT =
+  "FIRE達成度の現在資産額をこの分類で集計します。ダッシュボードで切り替える分類軸とは別の設定です。";
+
+/**
+ * 分類軸が1件も登録されていないときに添える案内。
+ *
+ * 分類軸が無いこと自体はエラーではなく保存もできるため、警告ではなく導線として出す
+ * (要件「B4に分類軸が1件も無い場合は…B4への導線を添える」)。
+ */
+export const ACHIEVEMENT_AXIS_EMPTY_HINT =
+  "分類軸がまだ登録されていません。資産分類マスタで追加すると、この一覧から選べるようになります。";
+
+/** 分類軸を追加しに行く導線(B4) */
+export const ACHIEVEMENT_AXIS_MASTER_LINK_LABEL = "資産分類マスタを開く";
+
+/**
+ * 保存済みの対象分類がB4で削除されていたときの案内。
+ *
+ * 存在しない選択肢を選択中として出すことはできないので既定に戻すが、黙って戻すと
+ * 設定し直したことに気付けないため、戻したこと自体を画面に出す(要件B8)。
+ */
+export const ACHIEVEMENT_AXIS_MISSING_MESSAGE = `設定していた対象分類が見つからないため、「${DEFAULT_ACHIEVEMENT_AXIS_NAME}」に戻しました。必要であれば選び直して保存してください。`;
+
+/**
+ * 保存しようとした対象分類が選択肢に無いときのエラー。
+ *
+ * セレクタからの選択なので通常は起こらないが、画面を開いたまま別のタブでB4から分類軸を
+ * 削除した場合に起こりうる。要件が「存在しない分類軸IDが渡された場合は保存を拒否する」と
+ * しているため、黙って既定へ倒さずに止める(気付かないまま別の基準の達成率を見続けないため)
+ */
+export const ACHIEVEMENT_AXIS_INVALID_MESSAGE =
+  "選択した対象分類が見つかりません。分類を選び直してから保存してください。";
+
 /** 入力欄の見出し。単位を添えて、円単位なのか%なのかを入力欄だけで判断できるようにする */
 export const FIRE_GOAL_TARGET_AMOUNT_LABEL = "目標資産額(円)";
 export const FIRE_GOAL_ANNUAL_EXPENSE_LABEL = "想定年間支出額(円)";
@@ -142,9 +197,16 @@ export const FIRE_GOAL_UNSET_MODE_LABEL = "未設定";
  */
 export const FIRE_GOAL_UNKNOWN_ASSET_LABEL = "—";
 
-/** 達成率の参考表示。現在資産額が分からない場合は出さない */
-export const buildFireGoalAchievementHint = (formattedRate: string): string =>
-  `現在資産額に対する達成率: ${formattedRate}`;
+/**
+ * 達成率の参考表示。現在資産額が分からない場合は出さない。
+ *
+ * 対象分類名を併記する。B1のゲージと同じ表記にし、どの範囲を数えた達成率かが
+ * 画面をまたいでも同じように読めるようにするため(要件B8)。
+ */
+export const buildFireGoalAchievementHint = (
+  formattedRate: string,
+  achievementAxisName: string,
+): string => `現在資産額(${achievementAxisName})に対する達成率: ${formattedRate}`;
 
 /** 逆算タブに出す算出結果の見出し */
 export const FIRE_GOAL_CALCULATED_TARGET_LABEL = "逆算された目標資産額";
@@ -160,8 +222,13 @@ export const FIRE_GOAL_FAILURE_MESSAGES: Record<FirestoreAccessFailureReason, st
 /** FIRE目標のキャッシュキー(TanStack Query) */
 export const FIRE_GOAL_QUERY_KEY = ["fire-goal"] as const;
 
-/** 現在資産額のキャッシュキー(TanStack Query) */
-export const CURRENT_ASSET_TOTAL_QUERY_KEY = ["current-asset-total"] as const;
+/**
+ * 参考表示の元になる直近の資産残高のキャッシュキー(TanStack Query)。
+ *
+ * 総額だけでなく資産種別ごとの金額まで持つ。対象分類を切り替えたときに現在資産額を
+ * その場で集計し直すため、選択のたびにFirestoreを引き直さずに済ませる。
+ */
+export const LATEST_ASSET_SNAPSHOT_QUERY_KEY = ["latest-asset-snapshot"] as const;
 
 /**
  * 入力欄とそれが属する設定方式の対応。

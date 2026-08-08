@@ -17,11 +17,17 @@ import type { JSX } from "react";
  * 「現在有効な設定方式」は**保存済みの方式**であり、いま開いているタブではない。
  * タブを切り替えただけで表示が変わると、保存前の状態が保存済みの設定に見えてしまうため。
  *
- * 現在資産額はB2で取り込んだ資産残高の最新値をそのまま出す参考値で、入力項目ではない。
+ * 現在資産額はB2で取り込んだ資産残高を**達成度の対象分類で集計した**参考値で、入力項目では
+ * ない。B1のゲージと同じ値・同じ表記にするため対象分類名を併記する(要件B8)。
+ *
+ * 設定方式と違い、対象分類は**選択中(未保存)の値**に追従させる。目標額の達成率ヒントが
+ * 入力中の値で更新されるのと同じ扱いで、「この分類にすると達成率がこうなる」を保存前に
+ * 確かめられるようにするため。
  */
 export const FireGoalSummary = ({
   savedMode,
   currentAssetTotal,
+  achievementAxisName,
 }: FireGoalSummaryProps): JSX.Element => {
   const modeLabel =
     FIRE_GOAL_MODES.find((mode) => mode.id === savedMode)?.label ?? FIRE_GOAL_UNSET_MODE_LABEL;
@@ -44,6 +50,7 @@ export const FireGoalSummary = ({
                 ? FIRE_GOAL_UNKNOWN_ASSET_LABEL
                 : formatJpy(currentAssetTotal)}
             </dd>
+            <dd className="self-center text-xs text-muted-foreground">({achievementAxisName})</dd>
           </div>
         </dl>
       </CardContent>
