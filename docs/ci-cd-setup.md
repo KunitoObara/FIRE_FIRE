@@ -13,7 +13,7 @@ GitHub Actions による CI（Lint・型チェック・テスト・ビルド）�
 
 | ワークフロー | トリガー | 内容 |
 |---|---|---|
-| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | `develop` / `main` 宛ての PR | `wip-check` / `frontend` / `backend` の3ジョブを並列実行 |
+| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | `develop` / `main` 宛ての PR | `wip-check` / `hooks` / `frontend` / `backend` の4ジョブを並列実行 |
 | [.github/workflows/claude-review.yml](../.github/workflows/claude-review.yml) | PR の `opened` / `synchronize` | Claude による自動レビューコメント（マージはブロックしない） |
 | [.github/workflows/deploy.yml](../.github/workflows/deploy.yml) | `develop` / `main` への push（=マージ） | Functions / Firestore / Storage をデプロイし、App Hosting のロールアウトを作成 |
 
@@ -379,7 +379,7 @@ firebase functions:artifacts:setpolicy --project fire-fire-dev --location asia-n
 `develop` と `main` の両方に設定する（Settings → Branches）。
 
 - Pull Request 必須（直接 push を禁止）
-- 必須ステータスチェック: `wip-check` / `frontend` / `backend`
+- 必須ステータスチェック: `wip-check` / `hooks` / `frontend` / `backend`
   - これにより Lint・テストが NG の PR、タイトルに `WIP` を含む PR はマージボタンが押せなくなる
   - `claude-review` は**含めない**（レビューはコメントのみで、人間の判断を残す）
 - 「Require branches to be up to date before merging」を有効化
