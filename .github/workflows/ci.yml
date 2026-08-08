@@ -47,12 +47,12 @@ jobs:
       # 依存のインストールは不要。スクリプトが使うのは bash / jq / python3 / grep /
       # sed で、いずれも ubuntu-latest に最初から入っている。
       #
-      # 環境変数の細工も不要。フック本体が素通りするのは GITHUB_ACTIONS と
-      # CLAUDE_GUARD_DISABLE の**両方**が揃ったときだけで、後者を渡しているのは
-      # claude-review.yml の review ジョブだけ。このジョブでは前者しか立たないので
-      # 歯止めは有効なまま動く。片方だけで無効化する形に変える場合
-      # (claude-review.yml 側の判定を見直す場合)は、ここが素通りしないかを
-      # 確かめること — 素通りすると全ケースが期待DENYに対して判定ALLOWとなって落ちる。
+      # 環境変数の細工も不要。スクリプトは判定ロジックを見るケースで
+      # GITHUB_ACTIONS と CLAUDE_GUARD_DISABLE を落としてからフックを呼ぶので、
+      # 結果はこのジョブの環境に依らない。無効化の条件そのものは
+      # スクリプト内の check_guard_env が env を組み立てて検証しているため、
+      # 条件を変えるとき(claude-review.yml 側の判定を見直すとき)は、
+      # そのケースの期待値を更新すること。
       - name: 禁止コマンド遮断フックの回帰テスト
         run: bash .claude/hooks/run-dangerous-command-tests.sh
 
