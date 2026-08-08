@@ -16,6 +16,21 @@ export const FIREBASE_FUNCTIONS_REGION = "asia-northeast1";
 export const PRODUCTION_FIREBASE_PROJECT_ID = "fire-fire-prod";
 
 /**
+ * Firestoreのクエリが受け付ける`limit()`の最大値。
+ *
+ * これを超える値を指定すると、クエリはドキュメントを1件も返さず`invalid-argument`で
+ * 拒否される(`Limit value in the structured query is over the maximum value of 10000`)。
+ * 件数の上限は「読みすぎないための歯止め」として自由に決められる値に見えるが、
+ * 実際にはFirestore側の制約が天井になる。
+ *
+ * クエリを組み立てる側が直接この値を使うことは想定していない。走査件数の上限は用途ごとに
+ * 別々の定数として持ち(`ASSET_SNAPSHOT_SCAN_LIMIT`・`ASSET_TYPE_SCAN_LIMIT`)、
+ * それらがこの天井を超えていないことをテストで固定するために置いている。
+ * Firestoreをモックしたテストではサーバー側の制約を踏めないため、静的に縛る必要がある。
+ */
+export const FIRESTORE_QUERY_LIMIT_MAX = 10_000;
+
+/**
  * 2FAリカバリーコードを発行するcallable関数の名前(A3の登録完了時・B10の再発行)。
  * バックエンドのexport名(src/backend/src/mfa-recovery/functions.ts)と一致させる。
  */

@@ -13,7 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ASSET_TYPE_OPTIONS_QUERY_KEY,
   CATEGORY_AXES_QUERY_KEY,
+  CATEGORY_AXIS_LOAD_FAILURE_MESSAGES,
 } from "@/constants/asset-categories";
+import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 import {
   createCategoryAxis,
   deleteCategoryAxis,
@@ -25,6 +27,31 @@ import {
 import type { JSX } from "react";
 
 const EMPTY_FORM_VALUES: AssetCategoryAxisFormValues = { name: "", assetTypeNames: [] };
+
+/**
+ * 集計対象の選択肢の状態を1つの値にまとめる。
+ *
+ * 空配列に倒すと「読み込み中」「取得失敗」「CSV未取込」が同じ見た目になり、
+ * 案内の文言と保存の可否がずれる(B4-1・B4-2)。3つを型で分けて持たせる。
+ */
+const resolveAssetTypeOptionsState = (
+  result: AssetTypeOptionsResult | undefined,
+): AssetTypeOptionsState => {
+  /*
+    結果がまだ無いあいだが読み込み中。`isPending`は見ない — `fetchAssetTypeOptions`は
+    失敗も`ok: false`として解決するので結果が`undefined`のままなのは取得中だけで、
+    両方を見ると同じ状態を2つの条件で書くことになる(レビュー指摘)
+  */
+  if (result === undefined) {
+    return { status: "loading" };
+  }
+
+  if (!result.ok) {
+    return { status: "error", message: CATEGORY_AXIS_LOAD_FAILURE_MESSAGES[result.reason] };
+  }
+
+  return { status: "ready", assetTypeNames: result.assetTypeNames };
+};
 
 /**
  * B4 資産分類マスタ設定画面の本体(docs/screen-requirements-dashboard.md B4)。
@@ -50,9 +77,15 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
   const [editingAxis, setEditingAxis] = useState<AssetCategoryAxisDocument | null>(null);
   const [deletingAxis, setDeletingAxis] = useState<AssetCategoryAxisDocument | null>(null);
 
-  const axes = axesQuery.data?.ok === true ? axesQuery.data.axes : [];
-  const assetTypeOptions =
-    assetTypeOptionsQuery.data?.ok === true ? assetTypeOptionsQuery.data.assetTypeNames : [];
+  /*
+    取得の失敗を空配列に倒さない。倒すと「分類軸が0件」「CSV未取込」の案内に化けて、
+    取り込み済みでも未取込に見える(B4-1)。失敗は失敗として出す(B1・B5と同じ扱い)
+  */
+  const axesResult = axesQuery.data;
+  const axes = axesResult?.ok === true ? axesResult.axes : [];
+  const axesFailureReason = axesResult !== undefined && !axesResult.ok ? axesResult.reason : null;
+
+  const assetTypeOptions = resolveAssetTypeOptionsState(assetTypeOptionsQuery.data);
 
   const closeForm = (): void => {
     setFormMode("closed");
@@ -82,6 +115,8 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
       closeForm();
       void queryClient.invalidateQueries({ queryKey: CATEGORY_AXES_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ASSET_TYPE_OPTIONS_QUERY_KEY });
+      // 分類軸はB1の軸セレクタと集計そのものを決めるので、B1の表示データも取り直させる
+      void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
     }
 
     return result;
@@ -96,6 +131,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
       toast.success("分類を削除しました");
       void queryClient.invalidateQueries({ queryKey: CATEGORY_AXES_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ASSET_TYPE_OPTIONS_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
     }
 
     return result;
@@ -150,9 +186,17 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
         </div>
-      ) : (
+      ) : null}
+
+      {axesFailureReason ? (
+        <p role="alert" className="text-sm text-destructive">
+          {CATEGORY_AXIS_LOAD_FAILURE_MESSAGES[axesFailureReason]}
+        </p>
+      ) : null}
+
+      {!axesQuery.isPending && axesFailureReason === null ? (
         <AssetCategoryAxisList axes={axes} onEdit={handleEdit} onDelete={setDeletingAxis} />
-      )}
+      ) : null}
 
       <DeleteCategoryAxisDialog
         axis={deletingAxis}

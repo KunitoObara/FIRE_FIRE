@@ -94,3 +94,19 @@ export const DASHBOARD_FAILURE_MESSAGES: Record<FirestoreAccessFailureReason, st
   "permission-denied": "このデータの参照が許可されていません。ログインし直してください。",
   unknown: "データを取得できませんでした。時間をおいて再度お試しください。",
 };
+
+/**
+ * 表示データの組み立て自体が例外で落ちたときの文言。
+ *
+ * Firestoreの取得は理由付きの失敗として返るが、取得後の集計(日付の整形など)は
+ * その外側で走るため、壊れた値が1件混じるだけで例外になる。原因はデータ側にあり
+ * 再試行では直らないことが多いので、確認先まで添える。
+ */
+export const DASHBOARD_UNEXPECTED_ERROR_MESSAGE =
+  "データを表示できませんでした。再試行しても直らない場合は、取り込んだCSVのデータに問題がある可能性があります。";
+
+/** 取得をやり直すボタンの文言(A7の「再試行する」に合わせる) */
+export const DASHBOARD_RETRY_LABEL = "再試行する";
+
+/** 再試行の実行中に見せる文言 */
+export const DASHBOARD_RETRYING_LABEL = "再試行中…";

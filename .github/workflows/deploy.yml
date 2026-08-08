@@ -81,6 +81,46 @@ jobs:
           npm ci
           npm run build
 
+      # Cloud Functions のコンテナイメージは Artifact Registry に蓄積する。自動削除
+      # ポリシーが未設定のリージョンがあると、firebase deploy は関数のデプロイに成功
+      # した状態で「could not set up cleanup policy」を throw して終了する(非対話では
+      # 保持日数の確認を出せないため。firebase-tools の deploy/functions/prompts.ts)。
+      # デプロイステップが落ちるとジョブが止まり、後続の App Hosting ロールアウトごと
+      # 飛んでフロントエンドだけ古いまま残る。そのため deploy の「前」に設定しておく。
+      #
+      # `firebase deploy` 側に --force を付ける案は採らない。--force はソースから消えた
+      # 関数の削除確認までスキップするため、誤ってファイルを消したときに本番の関数が
+      # 黙って消える(docs/ci-cd-setup.md 5章)。
+      #
+      # setpolicy は設定済みのリージョンでは「No changes needed.」、gcf-artifacts が
+      # まだ無いリージョンでは「does not exist in Artifact Registry」と出て、いずれも
+      # exit 0 で終わる。冪等なので毎回無条件に流してよい。
+      #
+      # リージョンは src/backend に直書きせず、デプロイ済み関数から引く。将来リージョンを
+      # 増やしてもこのステップは変更不要になる。ただしリポジトリは最初の functions
+      # デプロイで作られるため、一度もデプロイしていないプロジェクト(と新しく足した
+      # リージョン)では取得結果に現れず、その回は従来どおり cleanup policy のエラーで
+      # 落ちる。関数自体は作成済みになるので、次の実行でこのステップが効いて緑に戻る
+      # ——手作業での setpolicy は要らない。
+      - name: Artifact Registry のクリーンアップポリシーを設定する
+        run: |
+          if ! functions_json=$(firebase functions:list --project "$FIREBASE_PROJECT" --json); then
+            echo "::warning::関数一覧を取得できなかったため、クリーンアップポリシーの設定をスキップします"
+            exit 0
+          fi
+          regions=$(printf '%s' "$functions_json" | jq -r '.result[]?.region' | sort -u)
+          if [ -z "$regions" ]; then
+            echo "::warning::デプロイ済みの関数がないため、クリーンアップポリシーの設定をスキップします(初回デプロイ時は正常)"
+            exit 0
+          fi
+          for region in $regions; do
+            echo "クリーンアップポリシーを確認: $region"
+            firebase functions:artifacts:setpolicy \
+              --project "$FIREBASE_PROJECT" \
+              --location "$region" \
+              --force
+          done
+
       - name: Functions / Firestore / Storage をデプロイする
         run: |
           firebase deploy \

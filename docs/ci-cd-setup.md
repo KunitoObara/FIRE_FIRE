@@ -13,7 +13,7 @@ GitHub Actions による CI（Lint・型チェック・テスト・ビルド）�
 
 | ワークフロー | トリガー | 内容 |
 |---|---|---|
-| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | `develop` / `main` 宛ての PR | `wip-check` / `frontend` / `backend` の3ジョブを並列実行 |
+| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | `develop` / `main` 宛ての PR | `wip-check` / `hooks` / `frontend` / `backend` の4ジョブを並列実行 |
 | [.github/workflows/claude-review.yml](../.github/workflows/claude-review.yml) | PR の `opened` / `synchronize` | Claude による自動レビューコメント（マージはブロックしない） |
 | [.github/workflows/deploy.yml](../.github/workflows/deploy.yml) | `develop` / `main` への push（=マージ） | Functions / Firestore / Storage をデプロイし、App Hosting のロールアウトを作成 |
 
@@ -348,23 +348,30 @@ for PROJECT_ID in fire-fire-dev fire-fire-prod; do
 done
 ```
 
-### Artifact Registry のクリーンアップポリシー
+### Artifact Registry のクリーンアップポリシー（手動設定は不要）
 
-Cloud Functions のコンテナイメージは Artifact Registry に蓄積する。firebase-tools は初回デプロイ時に自動削除ポリシーの設定を促すが、**CI は非対話のため確認プロンプトを出せず、関数のデプロイ自体は成功した状態でエラー終了する**（その結果、後続の App Hosting ロールアウトがスキップされる）。
+**この節に手動作業は無い。** [deploy.yml](../.github/workflows/deploy.yml) の「Artifact Registry のクリーンアップポリシーを設定する」ステップが毎回設定するので、通常は読み飛ばしてよい。以下は、なぜそのステップが要るのかと、新しいプロジェクト／リージョンを足したときに何が起きるかの説明。
+
+Cloud Functions のコンテナイメージは Artifact Registry に蓄積する。firebase-tools は自動削除ポリシーが未設定のリージョンを見つけると保持日数を尋ねるが、**CI は非対話のため確認プロンプトを出せず、関数のデプロイ自体は成功した状態でエラー終了する**。
 
 ```
 Error: Functions successfully deployed but could not set up cleanup policy in location asia-northeast1.
 ```
 
-一度だけ設定しておけば以後の deploy は通る。
+`firebase deploy` が exit != 0 で終わるため**ジョブがそこで止まり、後続の App Hosting ロールアウトごと飛ぶ**（フロントエンドだけ古いまま残る）。再実行しても同じ場所で止まるので、放っておくとデプロイが赤のまま固定される。実際に prod で発生した（2026-08-07、関数6つの初回デプロイ）。
+
+そのため deploy.yml では、**functions のデプロイより前**に次を実行する。
 
 ```bash
-firebase functions:artifacts:setpolicy --project fire-fire-dev --location asia-northeast1 --force
+firebase functions:artifacts:setpolicy --project "$FIREBASE_PROJECT" --location "$region" --force
 ```
 
 - 保持日数は既定の1日。イメージはビルド済みの成果物で、再デプロイはソースから行えるため長く持つ理由が無い（[src/backend/docs/TECH_STACK.md](../src/backend/docs/TECH_STACK.md) 9章のコスト管理）
-- **リポジトリ（`gcf-artifacts`）は最初の functions デプロイで作られる**ため、一度もデプロイしていないプロジェクトでは先回りして設定できない（`does not exist in Artifact Registry` になる）。prod は `main` への初回デプロイが同じ理由で一度失敗するので、そのあとに上記を `--project fire-fire-prod` で実行し、デプロイを再実行する
-- `firebase deploy` 側に `--force` を付ける方法もあるが、`--force` はソースから消えた関数の削除確認もスキップしてしまうため採らない
+- `$region` はワークフローに直書きせず、`firebase functions:list --json` が返すデプロイ済み関数のリージョンから引く。リージョンを増やしてもワークフローの変更は要らない
+- 冪等。設定済みのリージョンでは `No changes needed.`、`gcf-artifacts` がまだ無いリージョンでは `does not exist in Artifact Registry` と出て、**いずれも exit 0** で終わる。毎回無条件に流してよい
+- `firebase deploy` 側に `--force` を付ける方法もあるが、`--force` はソースから消えた関数の削除確認もスキップしてしまう（誤ってファイルを消したときに本番の関数が黙って消える）ため採らない
+
+**新しいプロジェクト、または新しいリージョンを足したときだけ、初回のデプロイが1度失敗する。** リポジトリ（`gcf-artifacts`）は最初の functions デプロイで作られるため、それまでは `functions:list` にも現れず先回りして設定できないため。ただし関数自体はその回に作成されるので、**ワークフローを再実行すれば上のステップが効いて緑に戻る**。手で `setpolicy` を打つ必要は無い。
 
 ## 6. ブランチ保護ルール
 
@@ -379,7 +386,7 @@ firebase functions:artifacts:setpolicy --project fire-fire-dev --location asia-n
 `develop` と `main` の両方に設定する（Settings → Branches）。
 
 - Pull Request 必須（直接 push を禁止）
-- 必須ステータスチェック: `wip-check` / `frontend` / `backend`
+- 必須ステータスチェック: `wip-check` / `hooks` / `frontend` / `backend`
   - これにより Lint・テストが NG の PR、タイトルに `WIP` を含む PR はマージボタンが押せなくなる
   - `claude-review` は**含めない**（レビューはコメントのみで、人間の判断を残す）
 - 「Require branches to be up to date before merging」を有効化

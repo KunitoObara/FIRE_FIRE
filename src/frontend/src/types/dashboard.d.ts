@@ -125,6 +125,17 @@ declare global {
     periodParam: string | string[] | undefined;
   };
 
+  /**
+   * B1が表示できないときの扱い。文言と、その場でやり直す意味があるかを1組で持つ。
+   *
+   * 2つを別々に決めると、失敗理由を足したときに片方だけ直して文言と導線が食い違う。
+   */
+  type DashboardFailureView = {
+    message: string;
+    /** `false`のときは再試行の導線を出さない(押しても同じ結果にしかならない失敗) */
+    retryable: boolean;
+  };
+
   /** 分類軸・表示期間の切替UIのProps */
   type DashboardFiltersProps = {
     axes: AssetCategoryAxis[];

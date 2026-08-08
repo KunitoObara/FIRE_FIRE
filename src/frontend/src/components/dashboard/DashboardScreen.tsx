@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { CashflowSummaryCard } from "@/components/dashboard/CashflowSummaryCard";
 import { CategoryBreakdownCard } from "@/components/dashboard/CategoryBreakdownCard";
@@ -10,11 +10,15 @@ import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState"
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
 import { FireProgressCard } from "@/components/dashboard/FireProgressCard";
 import { NetWorthTrendCard } from "@/components/dashboard/NetWorthTrendCard";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DASHBOARD_DATA_QUERY_KEY,
   DASHBOARD_FAILURE_MESSAGES,
+  DASHBOARD_RETRY_LABEL,
+  DASHBOARD_RETRYING_LABEL,
+  DASHBOARD_UNEXPECTED_ERROR_MESSAGE,
   NO_ASSET_AXIS_EMPTY_STATE,
   NO_CSV_IMPORT_LABEL,
 } from "@/constants/dashboard";
@@ -24,6 +28,42 @@ import { resolveAxisId, resolvePeriodId } from "@/lib/dashboard/filters";
 import { filterSeriesByPeriod } from "@/lib/dashboard/period";
 
 import type { JSX } from "react";
+
+/**
+ * 表示できないときの扱いを決める。取得の失敗(理由つき)と、集計まで含めた例外の両方をここに集める。
+ * 表示できているあいだは`null`。
+ *
+ * 文言と再試行の可否を**同じ場所で**決める。別々に判断すると、失敗理由を足したときに
+ * 片方だけ直して、文言は「ログインし直してください」なのに再試行ボタンが出る、といった
+ * 食い違いが起きる。
+ *
+ * **例外を先に見る。** rejectしたときTanStack Queryは`data`を更新しないので、`ok: false`で
+ * 失敗したあとに再試行が例外で落ちると、`failureReason`には1つ前の理由が残ったままになる。
+ * 理由を先に見ると、その古い文言を出し続けてしまう。
+ */
+const resolveFailureView = (
+  failureReason: FirestoreAccessFailureReason | null,
+  unexpectedError: unknown,
+): DashboardFailureView | null => {
+  if (unexpectedError) {
+    return { message: DASHBOARD_UNEXPECTED_ERROR_MESSAGE, retryable: true };
+  }
+
+  if (failureReason === null) {
+    return null;
+  }
+
+  return {
+    message: DASHBOARD_FAILURE_MESSAGES[failureReason],
+    /*
+      ログイン切れ・設定不備は再取得しても同じ結果にしかならず、文言で案内している
+      「ログインし直す」より先にボタンを押させてしまう。押せる導線は残さない。
+      `permission-denied`は文言で再ログインを促してはいるが、IDトークンが更新されれば
+      その場で通ることがあるので残す(`unknown`と同じ扱い)。
+    */
+    retryable: failureReason !== "signed-out" && failureReason !== "configuration-error",
+  };
+};
 
 /** 直近CSV取込日時の表示。未取込のときは日時の代わりにその旨を出す */
 const formatLastImportedAt = (isoDateTime: string | null): string =>
@@ -43,6 +83,13 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
   const dashboardQuery = useQuery({
     queryKey: DASHBOARD_DATA_QUERY_KEY,
     queryFn: fetchDashboardData,
+    /*
+      自動リトライはしない。`fetchDashboardData`はFirestoreの失敗を`ok: false`として
+      「解決」させるので、ここへ例外が届くのは集計が壊れたデータで落ちたときだけ。
+      同じ入力で何度やっても同じ例外になり、既定の3回(指数バックオフ)は原因の分からない
+      スケルトンを数秒延ばして読み取りを4倍にするだけになる。やり直しは再試行ボタンに委ねる
+    */
+    retry: false,
   });
 
   // 期間の絞り込みの基準時刻。レンダーのたびに進むと同じ表示が揺れるため1度だけ決める
@@ -53,6 +100,22 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
   // 失敗の判定だけは真偽値の比較で行う。取得前(`undefined`)と失敗を区別する必要があるため
   const failureReason = result !== undefined && !result.ok ? result.reason : null;
   const axes = data?.axes ?? [];
+
+  /**
+   * 取得が例外で落ちた場合は結果そのものが無い(`ok: false`にもならない)。
+   * Firestoreを引く処理は理由付きの失敗を返すが、その後の集計は各リポジトリの
+   * try/catchの外で走るため、日付が壊れたドキュメントが1件混じるだけでここへ来る。
+   */
+  const unexpectedError = dashboardQuery.error;
+
+  const failureView = resolveFailureView(failureReason, unexpectedError);
+
+  // 画面の文言は原因まで特定できないので、開発者向けの手掛かりだけコンソールに残す
+  useEffect(() => {
+    if (unexpectedError) {
+      console.error("ダッシュボードの表示データを組み立てられませんでした", unexpectedError);
+    }
+  }, [unexpectedError]);
 
   const selectedAxisId = resolveAxisId(axisParam, axes);
   const selectedPeriodId = resolvePeriodId(periodParam);
@@ -80,20 +143,44 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
         </div>
       ) : null}
 
-      {failureReason ? (
-        <p role="alert" className="text-sm text-destructive">
-          {DASHBOARD_FAILURE_MESSAGES[failureReason]}
-        </p>
+      {failureView ? (
+        <div className="flex flex-col items-start gap-3">
+          {/* 読み上げの対象は文言だけにする。ボタンを含めない扱いは既存画面と同じ */}
+          <p role="alert" className="text-sm text-destructive">
+            {failureView.message}
+          </p>
+          {/* リロードしか手が無い状態にしない。一時的な失敗ならこの場で回復できる */}
+          {failureView.retryable ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={dashboardQuery.isFetching}
+              onClick={() => {
+                void dashboardQuery.refetch();
+              }}
+            >
+              {dashboardQuery.isFetching ? DASHBOARD_RETRYING_LABEL : DASHBOARD_RETRY_LABEL}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
 
-      {data ? (
+      {/*
+        失敗を出しているあいだは中身を出さない。例外で落ちた再取得では直前の成功データが
+        残る(TanStack Query)ので、条件を`data`だけにするとエラーの真下に古い金額が並ぶ。
+        `ok: false`では結果ごと置き換わって消えるので、そちらと扱いを揃える
+      */}
+      {data && failureView === null ? (
         <>
           <p className="text-xs text-muted-foreground">
             直近CSV取込:{" "}
             <span className="tabular-nums">{formatLastImportedAt(data.lastImportedAt)}</span>
           </p>
 
-          {!selectedAxis ? (
+          {selectedAxis ? (
+            <NetWorthTrendCard axisName={selectedAxis.name} series={series} />
+          ) : (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">資産の表示</CardTitle>
@@ -102,15 +189,18 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
                 <DashboardEmptyState {...NO_ASSET_AXIS_EMPTY_STATE} />
               </CardContent>
             </Card>
-          ) : (
-            <>
-              <NetWorthTrendCard axisName={selectedAxis.name} series={series} />
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <CategoryBreakdownCard axisName={selectedAxis.name} slices={slices} />
-                <FireProgressCard fireProgress={data.fireProgress} />
-              </div>
-            </>
           )}
+
+          {/*
+            FIRE達成度は目標資産額と直近の資産総額の比較で、分類軸を参照していない(同要件B1)。
+            分類軸が未登録でも隠さず、内訳の空状態と並べて出す
+          */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {selectedAxis ? (
+              <CategoryBreakdownCard axisName={selectedAxis.name} slices={slices} />
+            ) : null}
+            <FireProgressCard fireProgress={data.fireProgress} />
+          </div>
 
           <CashflowSummaryCard cashflow={data.cashflow} />
         </>

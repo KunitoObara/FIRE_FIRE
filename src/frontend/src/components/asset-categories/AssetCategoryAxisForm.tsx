@@ -8,6 +8,8 @@ import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  ASSET_TYPE_OPTIONS_LOADING_LABEL,
+  ASSET_TYPE_OPTIONS_UNAVAILABLE_NOTICE,
   CATEGORY_AXIS_FAILURE_MESSAGES,
   CATEGORY_AXIS_NAME_REQUIRED_MESSAGE,
   CATEGORY_AXIS_NAME_TOO_LONG_MESSAGE,
@@ -94,11 +96,27 @@ export const AssetCategoryAxisForm = ({
 
       <div className="flex flex-col gap-2">
         <Label>集計対象(資産種別を複数選択可。1つも選ばない場合はすべての資産種別が対象)</Label>
-        {assetTypeOptions.length === 0 ? (
+        {/*
+          「まだ選択肢が無い」の案内を出すのは取得できたときだけ。読み込み中や取得失敗で
+          出すと、取り込み済みでも未取込に見える(B4-1・B4-2)
+        */}
+        {assetTypeOptions.status === "loading" ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            {ASSET_TYPE_OPTIONS_LOADING_LABEL}
+          </p>
+        ) : null}
+        {assetTypeOptions.status === "error" ? (
+          <div role="alert" className="flex flex-col gap-1 text-sm text-destructive">
+            <p>{assetTypeOptions.message}</p>
+            <p>{ASSET_TYPE_OPTIONS_UNAVAILABLE_NOTICE}</p>
+          </div>
+        ) : null}
+        {assetTypeOptions.status === "ready" && assetTypeOptions.assetTypeNames.length === 0 ? (
           <p className="text-sm text-muted-foreground">{NO_ASSET_TYPE_OPTIONS_NOTICE}</p>
-        ) : (
+        ) : null}
+        {assetTypeOptions.status === "ready" && assetTypeOptions.assetTypeNames.length > 0 ? (
           <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            {assetTypeOptions.map((assetTypeName) => {
+            {assetTypeOptions.assetTypeNames.map((assetTypeName) => {
               const checkboxId = `category-axis-asset-type-${assetTypeName}`;
               return (
                 <label key={assetTypeName} htmlFor={checkboxId} className="flex items-center gap-2">
@@ -115,7 +133,7 @@ export const AssetCategoryAxisForm = ({
               );
             })}
           </div>
-        )}
+        ) : null}
       </div>
 
       {submitError ? (
@@ -128,7 +146,7 @@ export const AssetCategoryAxisForm = ({
         <Button
           type="button"
           size="sm"
-          disabled={submitting}
+          disabled={submitting || assetTypeOptions.status !== "ready"}
           onClick={() => {
             void handleSubmit();
           }}
