@@ -2,6 +2,12 @@
 .env.*
 !.env.example
 
+# リポジトリ直下にはpackage.jsonが無く、node_modulesが正当に置かれることはない。
+# それでも、src/frontend や src/backend の外でうっかり npm/npx を叩くとキャッシュ
+# (node_modules/.vite など)がここに作られる。src/frontend/.gitignore の`/node_modules`は
+# そちらの配下しか見ないため、直下ぶんはここで無視する
+/node_modules/
+
 # Firebase エミュレータ・CLI のログ（実データが混入しうる）
 firebase-debug.log
 firebase-debug.*.log
