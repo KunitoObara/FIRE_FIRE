@@ -3,9 +3,10 @@
 import { Cell, Pie, PieChart } from "recharts";
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { CHART_ANIMATION_DURATION_MS, CHART_ANIMATION_EASING } from "@/constants/dashboard";
 import { formatJpy } from "@/lib/format/currency";
 
-import type { JSX } from "react";
+import type { CSSProperties, JSX } from "react";
 
 import type { ChartConfig } from "@/components/ui/chart";
 
@@ -17,6 +18,10 @@ import type { ChartConfig } from "@/components/ui/chart";
  * (`src/lib/dashboard/category-color.ts`)。
  *
  * 分類名と構成比はカード側の凡例に文字で並ぶため、円の上には数値を重ねない。
+ *
+ * 登場アニメーション(12時から時計回りのスイープ)は`chart-sweep`クラスのCSSマスクが担う
+ * (`src/app/globals.css`。理由もそこに書いてある)。再生の引き金は呼び出し側が渡す`key`で、
+ * データが変わったときだけこのコンポーネントが作り直されて最初から再生される。
  */
 export const CategoryBreakdownChart = ({ slices }: CategoryBreakdownChartProps): JSX.Element => {
   // 分類は増減するマスタデータなので、設定も描画時に組み立てる
@@ -25,7 +30,20 @@ export const CategoryBreakdownChart = ({ slices }: CategoryBreakdownChartProps):
   ) satisfies ChartConfig;
 
   return (
-    <ChartContainer config={chartConfig} className="aspect-square h-36">
+    <ChartContainer
+      config={chartConfig}
+      className="chart-sweep aspect-square h-36"
+      /*
+        再生時間とイージングはCSSではなく定数(`src/constants/dashboard.ts`)を出所にする。
+        3つのグラフで同じ値を使う以上、CSSとTypeScriptに同じ数字を二重に持たせない
+      */
+      style={
+        {
+          "--chart-anim-duration": `${CHART_ANIMATION_DURATION_MS}ms`,
+          "--chart-anim-easing": CHART_ANIMATION_EASING,
+        } as CSSProperties
+      }
+    >
       <PieChart>
         <ChartTooltip
           content={
@@ -46,10 +64,9 @@ export const CategoryBreakdownChart = ({ slices }: CategoryBreakdownChartProps):
           paddingAngle={1.5}
           stroke="var(--card)"
           strokeWidth={2}
-          // `paddingAngle`と登場アニメーションを併用すると、Rechartsが角度を広げきれず
-          // 開始フレーム(ほぼ0度の扇形)のまま止まって円が出ない。
-          // 加えて、ログイン直後の最初の画面で1秒以上グラフが空なのは資産状況の把握を妨げる
-          // (DESIGN.md 1章)。他のグラフと揃えて登場アニメーションは使わない
+          // `paddingAngle`と併用するとRechartsが角度を広げきれず、開始フレーム
+          // (ほぼ0度の扇形)のまま止まって円が出ない。スイープは`chart-sweep`のCSSマスクで
+          // 行うので、Recharts側のアニメーションは止めたままにする(DESIGN.md 9章)
           isAnimationActive={false}
         >
           {slices.map((slice) => (

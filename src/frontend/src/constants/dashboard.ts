@@ -89,6 +89,38 @@ export const ACHIEVEMENT_AXIS_MISSING_NOTICE =
 /** 到達予測日が算出できていないときの表示 */
 export const NO_PROJECTED_DATE_LABEL = "算出できません";
 
+/**
+ * グラフの登場アニメーションの再生時間(ms)と、その進み方(DESIGN.md 9章)。
+ *
+ * ログイン直後の最初の画面なので、資産状況の把握を待たせない長さに収める。
+ * 3つのグラフで同じ値を使う。グラフごとに違う長さだと、同じ画面の中で別々に動いて見える。
+ */
+export const CHART_ANIMATION_DURATION_MS = 600;
+export const CHART_ANIMATION_EASING = "ease-out";
+
+/**
+ * 資産推移グラフ・分類別内訳の再生の引き金にする、データの署名。
+ *
+ * 再生するのは**そのグラフ自身のデータが変わったとき**だけで、ホバー・リサイズ・
+ * 同じデータのままの再レンダリングでは再生しない(DESIGN.md 9章)。この署名を
+ * Reactの`key`に渡してコンポーネントを作り直すことで、その条件をそのまま表す。
+ *
+ * 配列の同一性(参照)では判定できない。表示データは取得のたびに組み立て直されるため、
+ * 中身が同じでも参照は毎回変わり、再取得だけで再生してしまう。
+ */
+export const buildNetWorthSeriesKey = (axisName: string, series: NetWorthPoint[]): string =>
+  [
+    axisName,
+    series.length,
+    series.at(0)?.date ?? "",
+    series.at(-1)?.date ?? "",
+    series.at(-1)?.amount ?? "",
+  ].join("|");
+
+/** 分類別内訳の再生の引き金にする署名(`buildNetWorthSeriesKey`と同じ考え方) */
+export const buildBreakdownKey = (axisName: string, slices: AssetBreakdownSlice[]): string =>
+  [axisName, ...slices.map((slice) => `${slice.categoryId}:${slice.amount}`)].join("|");
+
 /** ダッシュボードの表示データのキャッシュキー(TanStack Query) */
 export const DASHBOARD_DATA_QUERY_KEY = ["dashboard-data"] as const;
 

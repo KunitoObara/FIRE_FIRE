@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DASHBOARD_EMPTY_STATES } from "@/constants/dashboard";
+import { buildBreakdownKey, DASHBOARD_EMPTY_STATES } from "@/constants/dashboard";
 import { formatJpy, formatPercent } from "@/lib/format/currency";
 
 import type { JSX } from "react";
@@ -35,7 +35,12 @@ export const CategoryBreakdownCard = ({
         <DashboardEmptyState {...DASHBOARD_EMPTY_STATES.breakdown} />
       ) : (
         <div className="flex flex-wrap items-center gap-6">
-          <CategoryBreakdownChart slices={slices} />
+          {/*
+            `key`にデータの署名を渡し、データが差し替わったときだけ作り直してスイープを
+            最初から再生する(資産推移グラフと同じ扱い。DESIGN.md 9章)。
+            凡例の構成比・金額はアニメーションさせないので、この作り直しの対象に含めない
+          */}
+          <CategoryBreakdownChart key={buildBreakdownKey(axisName, slices)} slices={slices} />
           <ul className="flex min-w-48 flex-1 flex-col gap-2 text-sm">
             {slices.map((slice) => (
               <li key={slice.categoryId} className="flex items-center gap-2">
