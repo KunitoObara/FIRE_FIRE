@@ -89,6 +89,50 @@ export const ACHIEVEMENT_AXIS_MISSING_NOTICE =
 /** 到達予測日が算出できていないときの表示 */
 export const NO_PROJECTED_DATE_LABEL = "算出できません";
 
+/**
+ * グラフの登場アニメーションの再生時間(ms)と、その進み方(DESIGN.md 9章)。
+ *
+ * ログイン直後の最初の画面なので、資産状況の把握を待たせない長さに収める。
+ * 3つのグラフで同じ値を使う。グラフごとに違う長さだと、同じ画面の中で別々に動いて見える。
+ */
+export const CHART_ANIMATION_DURATION_MS = 600;
+export const CHART_ANIMATION_EASING = "ease-out";
+
+/**
+ * 資産推移グラフ・分類別内訳の再生の引き金にする、データの署名。
+ *
+ * 再生するのは**そのグラフ自身のデータが変わったとき**だけで、ホバー・リサイズ・
+ * 同じデータのままの再レンダリングでは再生しない(DESIGN.md 9章)。この署名を
+ * Reactの`key`に渡してコンポーネントを作り直すことで、その条件をそのまま表す。
+ *
+ * 配列の同一性(参照)では判定できない。表示データは取得のたびに組み立て直されるため、
+ * 中身が同じでも参照は毎回変わり、再取得だけで再生してしまう。
+ *
+ * **全点を署名に含める。** 件数と両端だけでは、CSVを取り込み直して途中の月の残高だけが
+ * 訂正された場合(件数も両端も変わらない)に線の形が変わったことを検出できず、再生が漏れる。
+ * 点は月に1つで「全期間」でも数十個にしかならないため、全点を並べても負担にならない。
+ *
+ * **区切り文字での連結ではなく`JSON.stringify`で組む。** 分類軸名(B4でユーザーが付ける)や
+ * 資産種別名(CSVの列名)は自由入力に近く、区切りに使った文字がそのまま値に現れうる。
+ * 連結だと、中身の違う2つのデータが同じ署名に潰れて再生が漏れる。
+ */
+export const buildNetWorthSeriesKey = (axisName: string, series: NetWorthPoint[]): string =>
+  JSON.stringify([axisName, series.map((point) => [point.date, point.amount])]);
+
+/**
+ * FIRE達成度ゲージの再生の引き金。**固定値**で、初回描画時にしか再生しない(DESIGN.md 9章)。
+ *
+ * 資産推移・分類別内訳と違い、ゲージは「そのグラフのデータが変わったとき」でも再生しない。
+ * 9章の再生条件の表が「初回描画時のみ。分類軸切替・表示期間切替では再生しない」と、他の2つの
+ * 一般条件とは書き分けているため。達成率を引き金にすると、画面を開いたまま裏で取り直しが
+ * 走って値が変わったとき(別タブでCSVを取り込み直した場合など)にもリングが0%から再生される。
+ */
+export const FIRE_GAUGE_ANIMATION_KEY = "fire-progress-gauge";
+
+/** 分類別内訳の再生の引き金にする署名(`buildNetWorthSeriesKey`と同じ考え方) */
+export const buildBreakdownKey = (axisName: string, slices: AssetBreakdownSlice[]): string =>
+  JSON.stringify([axisName, slices.map((slice) => [slice.categoryId, slice.amount])]);
+
 /** ダッシュボードの表示データのキャッシュキー(TanStack Query) */
 export const DASHBOARD_DATA_QUERY_KEY = ["dashboard-data"] as const;
 
