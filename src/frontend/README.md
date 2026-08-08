@@ -112,7 +112,7 @@ http://localhost:3000/reset-password?oobCode=<コピーした値>
   設定を何も変えていないのに確認メールが来なくなったらこれを疑う。上限に達したときは時間を置くか、
   Firebaseコンソールの Authentication → Templates から独自のSMTPサーバーを設定する
 
-#### ログイン後の画面(B1〜B10)をローカルで開く
+#### ログイン後の画面(B1〜B11)をローカルで開く
 
 サインアップ → メール確認 → TOTP登録という一連の流れは`fire-fire-dev`に直結していれば実際に通しで
 確認できるが、画面の見た目や遷移だけを毎回それを経由せず素早く確認したいときは、`.env.local` で
@@ -181,7 +181,7 @@ npx shadcn@latest add button
 ```
 src/frontend/
 ├── src/
-│   ├── app/                    # App Router。画面ID(A1〜A8 / B1〜B10)をルーティング規約に対応させる
+│   ├── app/                    # App Router。画面ID(A1〜A8 / B1〜B11)をルーティング規約に対応させる
 │   │   ├── layout.tsx          # ルートレイアウト(Noto Sans JP・lang="ja")
 │   │   ├── globals.css         # Tailwind v4 + shadcn/ui のCSS変数テーマ
 │   │   └── (setup-check)/      # ★ 環境構築の動作確認用。画面実装時に削除してよい

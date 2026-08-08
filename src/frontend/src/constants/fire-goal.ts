@@ -242,3 +242,12 @@ export const FIRE_GOAL_FIELDS = [
   { name: "annualExpense", mode: "reverse" },
   { name: "withdrawalRate", mode: "reverse" },
 ] as const satisfies readonly { name: keyof FireGoalFormValues; mode: FireGoalMode }[];
+
+/**
+ * 参考表示の現在資産額がマイナス(対象分類の負債が資産を上回る)のときの注記。
+ *
+ * 丸め方の正は docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」に置き、
+ * この画面で別に決めない。同じ設定に対して画面ごとに違う達成率が出るのを避けるため。
+ */
+export const NEGATIVE_CURRENT_ASSET_NOTICE =
+  "対象分類の負債が資産を上回っています。ダッシュボードのFIRE達成度は0%として表示されます。";

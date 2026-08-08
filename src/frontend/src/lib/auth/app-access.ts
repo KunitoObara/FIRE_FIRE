@@ -7,7 +7,7 @@ import { FirebaseConfigurationError, getFirebaseAuth } from "@/lib/firebase/clie
 import type { User } from "firebase/auth";
 
 /**
- * ログイン後画面(B1〜B10)を表示してよい状態かを判定する。
+ * ログイン後画面(B1〜B11)を表示してよい状態かを判定する。
  *
  * 判定順は認証フローの手順と同じで、前の手順が終わっていないうちは後の手順を見ない
  * (docs/screen-list-and-transitions.md の認証フロー)。

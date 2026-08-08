@@ -64,6 +64,13 @@ export const buildRealEstateDetailPath = (id: string): string =>
  */
 export const buildRealEstateEditPath = (id: string): string =>
   `${buildRealEstateDetailPath(id)}/edit`;
+/**
+ * B11 負債入力画面。
+ *
+ * 画面IDはB10の次に採番されたが、位置付けはB2〜B4と同じ「ダッシュボードに供給するデータを
+ * 管理する画面」で、サイドバーではB5の次に並べる(docs/screen-list-and-transitions.md 2.2)。
+ */
+export const DEBTS_PATH = "/debts";
 /** B8 FIRE目標設定画面 */
 export const FIRE_GOAL_PATH = "/fire-goal";
 /** B9 想定利回り・リスク設定画面 */

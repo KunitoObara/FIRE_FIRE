@@ -23,6 +23,51 @@ export const CATEGORY_AXIS_MEMBER_DISPLAY_LIMIT = 2;
 /** 集計対象を1件も選ばなかったときの表示(総資産のような軸を想定) */
 export const CATEGORY_AXIS_ALL_TYPES_LABEL = "すべての資産種別が対象";
 
+/**
+ * 集計対象の2グループの見出し(B4「集計対象に負債を含める」)。
+ *
+ * 資産種別と負債を同じ一覧に混ぜず、グループを分けて出す。同じ配列に混ぜると
+ * 識別子の性質が違う2つ(名前 / ID)が並ぶことになり、選択の意味も逆になる。
+ */
+export const CATEGORY_AXIS_ASSET_TYPE_GROUP_LABEL = "資産種別(複数選択可)";
+export const CATEGORY_AXIS_DEBT_GROUP_LABEL = "負債(複数選択可)";
+
+/**
+ * 未選択時の意味を各グループに添える文言。
+ *
+ * 資産種別は「未選択=すべて」、負債は「未選択=差し引かない」で**読み替えが非対称**。
+ * 分かりにくいので画面上に明示するのが要件そのもの(B4)。両方を「未選択=すべて」に
+ * しないのは、負債の選択を持たない既存の分類軸が、負債の登録と同時に黙って
+ * 純資産の軸へ変わってしまうため。
+ */
+export const CATEGORY_AXIS_ALL_TYPES_HINT = CATEGORY_AXIS_ALL_TYPES_LABEL;
+export const CATEGORY_AXIS_NO_DEBT_HINT = "負債は差し引かない";
+
+/** 選択できる負債がまだ無いときの案内(B11で1件も登録していない状態) */
+export const NO_DEBT_OPTIONS_NOTICE =
+  "集計対象にできる負債がまだありません。負債入力画面で登録すると選択できるようになります。";
+
+/** 負債の選択肢を読み込んでいるあいだの表示 */
+export const DEBT_OPTIONS_LOADING_LABEL = "負債の選択肢を読み込んでいます...";
+
+/**
+ * 負債の選択肢を取得できないあいだ、保存を止めていることの説明。
+ *
+ * 選択肢が出せないまま保存すると、選択済みの負債が黙って外れた分類軸で上書きされる
+ * (集計対象を選べないまま保存できてしまったのがB4-1・B4-2で、同じ落とし穴)。
+ */
+export const DEBT_OPTIONS_UNAVAILABLE_NOTICE =
+  "負債の選択が読み込めないまま保存すると、選択済みの負債が集計対象から外れるため、選択肢を読み込めるまで保存できません。";
+
+/**
+ * 一覧の紐付け状況に添える負債の件数(B4)。
+ *
+ * **負債を含む軸にだけ出す。** 含まない軸に「負債なし」と書き添えると、大半の軸に
+ * 同じ但し書きが並ぶだけになる。負債を含む軸かどうかが一覧で分からないと、
+ * B1で値が資産合計と違う理由が追えない。
+ */
+export const buildCategoryAxisDebtCountLabel = (count: number): string => `負債 ${count}件`;
+
 /** 集計対象の選択肢がまだ無いときの案内(CSVを一度も取り込んでいない状態) */
 export const NO_ASSET_TYPE_OPTIONS_NOTICE =
   "集計対象にできる資産種別がまだありません。CSVを取り込むと選択できるようになります。";
@@ -37,9 +82,14 @@ export const CATEGORY_AXIS_NAME_REQUIRED_MESSAGE = "分類名を入力してく�
 /** 分類名が長すぎるときのエラー */
 export const CATEGORY_AXIS_NAME_TOO_LONG_MESSAGE = `分類名は${CATEGORY_AXIS_NAME_MAX_LENGTH}文字以内で入力してください。`;
 
-/** 削除禁止時のダイアログの本文(モックの文言に合わせる) */
+/**
+ * 削除禁止時のダイアログの本文(モックの文言に合わせる)。
+ *
+ * 負債だけが紐づいている分類も同じく削除できない。集計対象が割り当てられた分類軸を
+ * 消させないという制約を資産・負債で分ける理由が無いため(B4の遷移条件)。
+ */
 export const DELETE_CATEGORY_AXIS_BLOCKED_MESSAGE =
-  "この分類には既存の資産データが紐づいているため、削除できません。先に紐づく資産種別の割り当てを解除してください。";
+  "この分類には集計対象(資産種別・負債)が紐づいているため、削除できません。先に編集で割り当てを解除してください。";
 
 /** 削除確認ダイアログの本文 */
 export const buildDeleteCategoryAxisConfirmMessage = (name: string): string =>

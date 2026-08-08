@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import type { JSX } from "react";
 
 /**
- * ログイン後の画面(B1〜B10)共通のシェル。
+ * ログイン後の画面(B1〜B11)共通のシェル。
  * DESIGN.md 5章のとおり、共通ヘッダー+サイドバーの「ダッシュボードアプリ型」レイアウトとする。
  *
  * `AppAccessGuard`が判定を通すまで配下の画面は描画されない。`children`はサーバー側で

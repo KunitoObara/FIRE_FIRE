@@ -180,7 +180,7 @@ export const SignupForm = (): JSX.Element => {
                 />
                 {/*
                   TODO: 利用規約・プライバシーポリシーのページを用意してリンク先を差し替える。
-                  docs/screen-list-and-transitions.md の画面一覧(A1〜A7 / B1〜B10)に
+                  docs/screen-list-and-transitions.md の画面一覧(A1〜A8 / B1〜B11)に
                   該当する画面IDがまだ無いため、静的ページとして持つか外部URLにするかを
                   決めたうえで src/constants/routes.ts に追加する。
                 */}

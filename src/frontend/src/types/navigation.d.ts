@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react";
 declare global {
   /** ログイン後の共通サイドバーに並べる1項目 */
   type PrimaryNavItem = {
-    /** docs/screen-list-and-transitions.md の画面ID(B1〜B10) */
+    /** docs/screen-list-and-transitions.md の画面ID(B1〜B11) */
     screenId: string;
     /** サイドバーとヘッダーの両方で使う画面名 */
     label: string;
