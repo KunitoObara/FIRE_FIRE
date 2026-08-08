@@ -1,6 +1,6 @@
 ---
 name: card-review
-description: PRのCIとclaude-reviewの結果を待って、レビュー指摘に対応する。修正pushは最大3往復まで数え、上限に達したあとの残指摘は重大なものだけ直し、それ以外はTrelloのバックログに新規カードとして起票する。ユーザーが「レビューを見て」「指摘に対応して」「CIを直して」と言ったとき、または /card-review で呼ばれたときに使う。
+description: Waits for CI and the claude-review bot on a pull request and works through their findings, counting each fix push as one round up to a limit of three — past the limit, only critical findings (CI failures, security, data loss, a screen that does not work) are fixed and the rest are filed as new cards at the end of the Trello backlog. Use this skill when the user says "レビューを見て", "指摘に対応して", or "CIを直して", or when invoked as /card-review.
 ---
 
 # レビュー対応

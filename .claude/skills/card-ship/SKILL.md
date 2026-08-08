@@ -1,6 +1,6 @@
 ---
 name: card-ship
-description: 実装が終わったカードをコミット・push・PR作成まで進め、Trelloカードを「確認中」へ移動する。PR前にCIと同じ検証コマンド一式と、変更内容に応じたプロジェクトスキルを実行する。ユーザーが「実装が終わった」「PRを作って」「確認中に移して」と言ったとき、または /card-ship で呼ばれたときに使う。
+description: Takes a finished card from commit through push to a pull request against develop, then moves its Trello card to the 確認中 (in review) list — running the same verification commands as CI, plus whichever project skills match what changed, before the PR is opened. Use this skill when the user says "実装が終わった", "PRを作って", or "確認中に移して", or when invoked as /card-ship.
 ---
 
 # 実装完了 → PR → 確認中へ
