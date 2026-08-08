@@ -43,13 +43,16 @@ The frontend does **not** use Firebase Emulator locally (B0-1): `.env.local` poi
 
 ## Development flow
 
-Work is driven by cards on the private Trello board **FIRE-FIRE**, reached through the `mcp__trello__*` tools (`WebFetch` cannot read it). Three skills carry a card from start to merge, with [docs/development-workflow.md](docs/development-workflow.md) as their canonical source of list/label IDs and rules:
+Work is driven by cards on the private Trello board **FIRE-FIRE**, reached through the `mcp__trello__*` tools (`WebFetch` cannot read it). Four skills carry a card from start to merge, with [docs/development-workflow.md](docs/development-workflow.md) as their canonical source of list/label IDs and rules:
 
 | | |
 |---|---|
-| `/card-start` | Sync merged cards to 完了 → pick a 進行中 card labelled 詳細設計・実装 or テスト実装 → read the specs → **ask every open question at once** → cut `feature/fire-fire-<id>` off `develop` |
+| `/card-start` | Sync merged cards to 完了 → pick a 進行中 card labelled 詳細設計・実装 or テスト実装 → read the specs → **ask every open question at once** → plan the PR split → cut `feature/fire-fire-<id>` off `develop` |
+| `/card-split` | Slice one card's work into several PRs that each pass CI alone — planned before implementation (cheap) or carved out of an already-large branch (expensive). A card is the unit of requirements, a PR is the unit of review; **one card may carry several PRs** |
 | `/card-ship` | Run the CI commands and the relevant project skills → commit → push → open the PR against `develop` → move the card to 確認中 |
 | `/card-review` | Wait for CI and claude-review → fix findings, **max 3 rounds** → past that, fix only CI failures / security / data-loss / broken-screen findings and file the rest as new backlog cards |
+
+PRs are kept small for review accuracy, not for the CI's sake: B11 (PR #83, 68 files) hid two data-loss bugs that local tests passed and that only surfaced across successive review rounds. The size thresholds and the slicing order live in [docs/development-workflow.md](docs/development-workflow.md) §5. Note this is a separate concern from claude-review occasionally finishing green without posting anything — that one reproduces on re-runs of the *same* commit, so it is not explained by PR size.
 
 Merging is the PO's call: **never run `gh pr merge`**. `.claude/settings.json` denies it, along with `firebase deploy`, `rm -rf`, and reading `docs/.env`; force-push is blocked by a `PreToolUse` hook instead, because prefix patterns cannot catch trailing `--force` or `+refspec` pushes. The card reaches 完了 on the next `/card-start`, which detects the merge.
 
