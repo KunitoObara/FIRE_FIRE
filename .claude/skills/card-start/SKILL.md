@@ -1,6 +1,6 @@
 ---
 name: card-start
-description: Trelloの「進行中」リストにあるカードに着手する。確認中カードのマージ状況の同期、着手対象カードの選定、要件定義書とHTMLモックの読み込み、不明点のまとめ質問、作業ブランチの作成までを行う。ユーザーが「カードに着手」「次のカードを始めて」「開発を始めて」と言ったとき、または /card-start で呼ばれたときに使う。
+description: Starts work on a card in the 進行中 (in-progress) list of the FIRE-FIRE Trello board — syncs already-merged 確認中 cards to 完了, picks an eligible card, reads the requirements docs and HTML mocks it references, asks every open question in one batch, and cuts the feature branch off develop. Use this skill when the user says 「カードに着手」「次のカードを始めて」「開発を始めて」, or when invoked as /card-start.
 ---
 
 # カード着手
