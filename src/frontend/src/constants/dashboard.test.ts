@@ -59,6 +59,34 @@ describe("グラフの再生時間・イージング", () => {
   it("CSSのイージングが定数と一致している", () => {
     expect(moduleCss).toContain(CHART_ANIMATION_EASING);
   });
+
+  /**
+   * `@property`で宣言した名前と、実際に animate / 参照している名前が一致していること。
+   *
+   * 片方だけ改名しても、CSSとしては妥当なまま**補間だけが静かに止まる**(型の無い
+   * カスタムプロパティとして扱われ、0deg→360degが一足飛びに切り替わる)。lintも型検査も
+   * テストの他のケースも気付けないので、対応関係そのものをここで固定する。
+   */
+  it("@propertyで宣言した名前を、keyframesとマスクの両方が参照している", () => {
+    const declared = /@property\s+(--[\w-]+)/u.exec(moduleCss)?.[1];
+
+    expect(declared).toBeDefined();
+    // `from { --x: 0deg }` の側
+    expect(moduleCss).toContain(`${declared}: 0deg`);
+    // マスクが読む側
+    expect(moduleCss).toContain(`var(${declared})`);
+  });
+
+  /**
+   * `@property`はCSS Moduleの中でもグローバルに登録されるため、名前にコンポーネント名を
+   * 含める(CODING_STANDARDS.md 6章)。他のコンポーネントが同名で再宣言すると
+   * `initial-value`が上書きされ、視差軽減の設定時に円グラフが欠けて見える形で壊れる。
+   */
+  it("@propertyの名前にコンポーネント名が含まれている", () => {
+    const declared = /@property\s+(--[\w-]+)/u.exec(moduleCss)?.[1];
+
+    expect(declared).toContain("category-breakdown");
+  });
 });
 
 describe("buildNetWorthSeriesKey", () => {
