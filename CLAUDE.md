@@ -107,6 +107,6 @@ Work should generally respect this phase order (see §7 of the main requirements
 
 1. Auth (Identity Platform) + manual CSV upload (balance history) + basic dashboard
 2. Transaction CSV import + income/expense summary
-3. Real estate management
+3. Real estate management + debt management (manual entry only — Money Forward does not export liabilities to CSV; debts feed the category axes and the dashboard)
 4. FIRE goal setting/progress/ETA + yield/risk assumptions and simulation
 5. (Future) Automated Money Forward sync, SaaS multi-tenancy — out of scope for now
