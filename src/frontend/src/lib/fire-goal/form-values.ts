@@ -31,12 +31,20 @@ const toOptionalNumber = (value: string): number | null => {
  *
  * 有効な方式の欄だけでなく、非表示タブの欄の値もそのまま保存する。方式を切り替えて
  * 保存し直したときに反対側の入力が消えないようにするため(`FireGoal`の型コメント参照)。
+ *
+ * 達成度の対象分類だけは別の引数で受ける。タブの外にある共通の設定で、選択肢からの選択なので
+ * 文字列と数値の変換もバリデーションも要らず、フォームの入力値(`FireGoalFormValues`)には
+ * 含めていないため。
  */
-export const toFireGoal = (values: FireGoalFormValues): FireGoal => ({
+export const toFireGoal = (
+  values: FireGoalFormValues,
+  achievementAxisId: string | null,
+): FireGoal => ({
   mode: values.mode,
   targetAmount: toOptionalNumber(values.targetAmount),
   annualExpense: toOptionalNumber(values.annualExpense),
   withdrawalRate: toOptionalNumber(values.withdrawalRate),
+  achievementAxisId,
 });
 
 /**

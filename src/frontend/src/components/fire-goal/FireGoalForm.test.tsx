@@ -16,11 +16,22 @@ const initialValues: FireGoalFormValues = {
   withdrawalRate: "4",
 };
 
+const onAchievementAxisChange = vi.fn();
+
+/** B4に登録済みの分類軸(対象分類の選択肢) */
+const achievementAxisOptions: AchievementAxisOption[] = [
+  { id: "axis-investment", name: "投資性資産", assetTypeNames: ["株式(現物)"] },
+];
+
 const renderForm = (overrides: Partial<FireGoalFormProps> = {}): RenderResult =>
   render(
     <FireGoalForm
       initialValues={initialValues}
       currentAssetTotal={49_600_000}
+      achievementAxisName="総資産(マネーフォワードの合計)"
+      achievementAxisOptions={achievementAxisOptions}
+      achievementAxisId={null}
+      onAchievementAxisChange={onAchievementAxisChange}
       onSubmit={onSubmit}
       {...overrides}
     />,
@@ -51,6 +62,7 @@ describe("FireGoalForm", () => {
   beforeEach(() => {
     onSubmit.mockReset();
     onSubmit.mockResolvedValue({ ok: true });
+    onAchievementAxisChange.mockReset();
   });
 
   /** 要件「タブ切替時、入力値は両タブとも保持される」そのもの */
@@ -83,6 +95,7 @@ describe("FireGoalForm", () => {
         targetAmount: 80_000_000,
         annualExpense: 3_600_000,
         withdrawalRate: 4,
+        achievementAxisId: null,
       });
     });
   });
@@ -101,6 +114,7 @@ describe("FireGoalForm", () => {
         targetAmount: null,
         annualExpense: 3_600_000,
         withdrawalRate: 4,
+        achievementAxisId: null,
       });
     });
   });
@@ -129,6 +143,7 @@ describe("FireGoalForm", () => {
         targetAmount: 80_000_000,
         annualExpense: null,
         withdrawalRate: 4,
+        achievementAxisId: null,
       });
     });
   });
@@ -214,6 +229,7 @@ describe("FireGoalForm", () => {
         targetAmount: 80_000_000,
         annualExpense: null,
         withdrawalRate: 4,
+        achievementAxisId: null,
       });
     });
   });
@@ -237,6 +253,7 @@ describe("FireGoalForm", () => {
         targetAmount: 80_000_000,
         annualExpense: 3_600_000,
         withdrawalRate: 4,
+        achievementAxisId: null,
       });
     });
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -270,7 +287,39 @@ describe("FireGoalForm", () => {
 
     await user.type(targetAmountInput(), "80000000");
 
-    expect(await screen.findByText("現在資産額に対する達成率: 62%")).toBeInTheDocument();
+    expect(
+      await screen.findByText("現在資産額(総資産(マネーフォワードの合計))に対する達成率: 62%"),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * 選択肢からの選択なので通常は起こらないが、画面を開いたまま別のタブでB4から分類軸を
+   * 削除すると起こりうる。黙って既定へ倒すと、設定したつもりの分類とは別の基準で
+   * 達成率を見続けることになる(要件B8「存在しない分類軸IDが渡された場合は保存を拒否する」)
+   */
+  it("選択中の対象分類が選択肢に無ければ保存せずエラーを出す", async () => {
+    const user = userEvent.setup();
+    renderForm({ achievementAxisId: "axis-deleted" });
+
+    await user.type(targetAmountInput(), "80000000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(
+      await screen.findByText(
+        "選択した対象分類が見つかりません。分類を選び直してから保存してください。",
+      ),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("対象分類を選び直すと、選択を呼び出し側へ伝える", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText("達成度の対象分類"));
+    await user.click(screen.getByRole("option", { name: "投資性資産" }));
+
+    expect(onAchievementAxisChange).toHaveBeenCalledWith("axis-investment");
   });
 
   /** CSV未取込のアカウントでは比較対象が無いので、達成率は出さずに目標だけ設定させる */

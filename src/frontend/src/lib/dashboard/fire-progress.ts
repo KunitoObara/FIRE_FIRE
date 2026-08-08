@@ -1,7 +1,69 @@
 import { format, parseISO } from "date-fns";
 
 import { NO_PROJECTED_DATE_LABEL } from "@/constants/dashboard";
+import { DEFAULT_ACHIEVEMENT_AXIS_NAME } from "@/constants/fire-goal";
+import { sumAxisAmount } from "@/lib/dashboard/aggregation";
 import { resolveFireGoalTargetAmount } from "@/lib/fire-goal/calculation";
+
+/**
+ * 達成度の対象分類(B8)を、集計に使える形へ解決する。
+ *
+ * 設定されている分類軸がB4で削除されていた場合は既定(総資産)へフォールバックし、
+ * フォールバックしたこと自体を`missing`で返す。ゲージを消したり0%にしたりはしない
+ * (docs/screen-requirements-dashboard.md B1)。計算できなくなったのではなく比較対象が
+ * 失われただけであり、黙って基準を変えると気付かないまま別の達成率を見続けることになる。
+ *
+ * B1のゲージとB8の参考表示の両方から呼ぶ。解決を1か所に置かないと、同じ設定に対して
+ * 画面ごとに違う分類名や金額が出うる。
+ */
+export const resolveAchievementAxis = (
+  achievementAxisId: string | null,
+  axes: AchievementAxisOption[],
+): AchievementAxisResolution => {
+  if (achievementAxisId === null) {
+    return { name: DEFAULT_ACHIEVEMENT_AXIS_NAME, assetTypeNames: null, missing: false };
+  }
+
+  const axis = axes.find((option) => option.id === achievementAxisId);
+
+  if (axis === undefined) {
+    return { name: DEFAULT_ACHIEVEMENT_AXIS_NAME, assetTypeNames: null, missing: true };
+  }
+
+  return { name: axis.name, assetTypeNames: axis.assetTypeNames, missing: false };
+};
+
+/**
+ * 対象分類の現在資産額を直近の資産残高から求める。資産残高が無ければ`null`。
+ *
+ * **既定(総資産)のときだけはCSVの「合計（円）」列(`total`)を採り、資産種別の
+ * 足し合わせでは求めない。** 分類軸の集計(`sumAxisAmount`)がその逆を採っているのは
+ * 意図した使い分けで、理由が別にある。
+ *
+ * - 分類軸は資産種別の部分集合を指すため、合計を出せる値が足し合わせしか無い
+ * - 総資産は本家(マネーフォワード)が出している額そのものを見せる。どこまでを合計に
+ *   含めるかを画面側で推測して再計算すると本家と食い違う(src/lib/csv/asset-balance-csv.ts)
+ *
+ * そのため、集計対象を空にした「総資産」相当の分類軸を対象分類に選ぶと、既定を選んだ
+ * 場合とわずかにずれることがある。ずれるのはマネーフォワードの合計に資産種別の列として
+ * 現れない額が含まれる場合だけで、そのときはCSVの合計側が正しい(要件B1・既知)。
+ *
+ * 逆に、分類軸を選んだときは資産推移グラフ・分類別内訳と同じ`sumAxisAmount`で集計する。
+ * B1のセレクタで同じ分類軸を選んだときに、推移グラフの最新点とゲージの現在資産額が
+ * 一致することを、集計方法を共有することで保証する。
+ */
+export const resolveAchievementAmount = (
+  resolution: AchievementAxisResolution,
+  latest: AssetSnapshot | undefined,
+): number | null => {
+  if (latest === undefined) {
+    return null;
+  }
+
+  return resolution.assetTypeNames === null
+    ? latest.total
+    : sumAxisAmount(latest, resolution.assetTypeNames);
+};
 
 /**
  * 保存済みのFIRE目標(B8)と直近の資産残高から、ゲージの表示値を組み立てる。
@@ -10,21 +72,10 @@ import { resolveFireGoalTargetAmount } from "@/lib/fire-goal/calculation";
  * 有効か」の判断をB8の参考表示とB1のゲージで別々に持つと、同じ目標額が画面によって
  * 違う値になりうるため。
  *
- * 現在資産額は分類軸の影響を受けない(docs/screen-requirements-dashboard.md B1)。
- * 目標資産額は資産全体に対する目標であり、B8の参考表示も同じ`total`を見ている。
- *
- * **資産全体の額だけはCSVの「合計（円）」列(`total`)を採り、資産種別の足し合わせでは
- * 求めない。** 分類軸の集計(`sumAxisAmount`)がその逆を採っているのは意図した使い分けで、
- * 理由が別にある。
- *
- * - 分類軸は資産種別の部分集合を指すため、合計を出せる値が足し合わせしか無い
- * - 資産全体は本家(マネーフォワード)が出している額そのものを見せる。どこまでを合計に
- *   含めるかを画面側で推測して再計算すると本家と食い違う(src/lib/csv/asset-balance-csv.ts)
- *
- * そのため、集計対象を空にした「総資産」相当の分類軸を登録すると、資産推移グラフの
- * 最新点とこのカードの現在資産額がわずかにずれることがある。ずれるのは
- * マネーフォワードの合計に資産種別の列として現れない額が含まれる場合だけで、
- * そのときはCSVの合計側が正しい。
+ * 現在資産額は**B1の分類軸切替セレクタには追従しないが、B8で設定した達成度の対象分類には
+ * 従う**(docs/screen-requirements-dashboard.md B1「FIRE達成度の現在資産額(対象分類)」)。
+ * どの分類軸で見るかは目標とセットの設定であり、B1のセレクタに追従させると同じ目標に
+ * 対する達成率が画面上の切替ひとつで別の値になるため。
  *
  * CSVが未取込で直近の資産残高が無い場合は0円として扱う。ここで`null`(=目標未設定)に
  * 倒すと、目標を設定済みのユーザーに「FIRE目標が未設定です」と出てしまうため。
@@ -32,7 +83,8 @@ import { resolveFireGoalTargetAmount } from "@/lib/fire-goal/calculation";
  */
 export const buildFireProgress = (
   goal: FireGoal | null,
-  latestAssetTotal: number | null,
+  latest: AssetSnapshot | undefined,
+  axes: AchievementAxisOption[],
 ): FireProgress | null => {
   if (!goal) {
     return null;
@@ -45,9 +97,13 @@ export const buildFireProgress = (
     return null;
   }
 
+  const resolution = resolveAchievementAxis(goal.achievementAxisId, axes);
+
   return {
     targetAmount,
-    currentAmount: latestAssetTotal ?? 0,
+    currentAmount: resolveAchievementAmount(resolution, latest) ?? 0,
+    achievementAxisName: resolution.name,
+    achievementAxisMissing: resolution.missing,
     // 到達予測日は想定利回り(B9)を前提とする別の計算なので、ここでは算出しない
     projectedAchievementDate: null,
   };
