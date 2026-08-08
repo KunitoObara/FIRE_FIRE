@@ -19,10 +19,18 @@
 /*
   カスタムプロパティを角度としてアニメーションさせるために型を宣言する。
   宣言が無いと文字列として扱われ、0deg→360degが補間されずに一足飛びで切り替わる。
-  `@property`はスコープを持たない(CSS Moduleでもグローバルに登録される)ため、
-  他と衝突しないよう用途の分かる名前にしてある。
+
+  **`@property`はCSS Moduleの中で書いてもスコープを持たず、グローバルに登録される。**
+  そのため名前にコンポーネント名を含める(CODING_STANDARDS.md 6章)。同じ名前で別の
+  コンポーネントが再宣言すると、後から読み込まれた方の`syntax` / `initial-value`で
+  上書きされ、ここの`initial-value: 360deg`が別の値に変わる。そうなると視差効果を減らす
+  設定のときに「全面が見えた状態」にならず、アニメーションが出ないのではなく**円グラフが
+  欠けて見える**形で壊れる。lint・型検査・テストのいずれでも検出できない衝突になる。
+
+  クラス名(`.chartSweep`)と`@keyframes`の名前はCSS Moduleがスコープを付けるので、
+  この配慮が要るのはカスタムプロパティだけ。
 */
-@property --chart-sweep {
+@property --category-breakdown-sweep {
   syntax: "<angle>";
   inherits: false;
   initial-value: 360deg;
@@ -30,7 +38,7 @@
 
 @keyframes chartSweep {
   from {
-    --chart-sweep: 0deg;
+    --category-breakdown-sweep: 0deg;
   }
 }
 
@@ -45,7 +53,7 @@
 */
 .chartSweep :global(.recharts-surface) {
   /* 再生後は1周(360deg)=全面が見える状態で止まるので、マスクは残っても見え方を変えない */
-  mask-image: conic-gradient(from 0deg, #000 var(--chart-sweep), transparent 0);
+  mask-image: conic-gradient(from 0deg, #000 var(--category-breakdown-sweep), transparent 0);
   /*
     再生時間とイージングは`src/constants/dashboard.ts`の`CHART_ANIMATION_DURATION_MS` /
     `CHART_ANIMATION_EASING`と同じ値にする。片方だけ変えると、同じ画面の中で円グラフだけ
@@ -57,7 +65,8 @@
 
 /*
   視差効果を減らす設定では最終状態を即座に描く(DESIGN.md 9章)。短くするのではなく行わない。
-  `--chart-sweep`の初期値が360degなので、アニメーションを外すだけで全面が見えた状態になる。
+  `--category-breakdown-sweep`の初期値が360degなので、アニメーションを外すだけで
+  全面が見えた状態になる。
   スクリプト側の判定は`usePrefersReducedMotion`が別に持つ。
 */
 @media (prefers-reduced-motion: reduce) {
