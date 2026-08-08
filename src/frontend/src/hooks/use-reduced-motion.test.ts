@@ -1,7 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
+import { readPrefersReducedMotion, usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 
 /**
  * `matchMedia`を差し替える。戻り値の`listeners`で、あとから設定が変わった場合を再現できる。
@@ -32,6 +32,38 @@ const stubMatchMedia = (matches: boolean): { change: (next: boolean) => void } =
     },
   };
 };
+
+/**
+ * 判定が**最初の描画の時点で**確定していることを、hookの初期値に使う関数を直に呼んで確かめる。
+ *
+ * hookの戻り値では確かめられない。React Testing Libraryの`render`はeffectによる更新まで
+ * 同期的に流し切るため、「最初の描画では止まっていて、effectで動く側に変わる」という
+ * 中間フレームがテストからは見えないため。この中間フレームがあると、視差軽減を設定していない
+ * ユーザーに完成形が一瞬見えてから再生し直される(資産推移に至っては再生されない)。
+ */
+describe("readPrefersReducedMotion", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("設定していなければ、その場でfalseを返す(effectを待たない)", () => {
+    stubMatchMedia(false);
+
+    expect(readPrefersReducedMotion()).toBe(false);
+  });
+
+  it("視差効果を減らす設定ならtrueを返す", () => {
+    stubMatchMedia(true);
+
+    expect(readPrefersReducedMotion()).toBe(true);
+  });
+
+  it("matchMediaが無い環境ではアニメーションしない側(true)に倒す", () => {
+    vi.stubGlobal("matchMedia", undefined);
+
+    expect(readPrefersReducedMotion()).toBe(true);
+  });
+});
 
 describe("usePrefersReducedMotion", () => {
   afterEach(() => {

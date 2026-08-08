@@ -177,7 +177,14 @@
 .chart-sweep {
   /* 再生後は1周(360deg)=全面が見える状態で止まるので、マスクは残っても見え方を変えない */
   mask-image: conic-gradient(from 0deg, #000 var(--chart-sweep), transparent 0);
-  animation: chart-sweep var(--chart-anim-duration) var(--chart-anim-easing) backwards;
+  /*
+    再生時間とイージングは`src/constants/dashboard.ts`の`CHART_ANIMATION_DURATION_MS` /
+    `CHART_ANIMATION_EASING`と同じ値にする。片方だけ変えると、同じ画面の中で円グラフだけ
+    別の速さで動く。CSSからTypeScriptの定数は読めないため、値の一致はこの相互参照で担保する
+    (JS側からstyle属性でCSS変数を渡す形は、CODING_STANDARDS.md 6章がインラインCSSを
+    禁じているため採らない)。
+  */
+  animation: chart-sweep 600ms ease-out backwards;
 }
 
 /*

@@ -51,6 +51,27 @@ describe("buildNetWorthSeriesKey", () => {
     );
   });
 
+  /**
+   * CSVを取り込み直して途中の月の残高だけが訂正された場合。
+   * 件数も両端も変わらないため、両端だけを見る署名では線の形の変化を取りこぼす。
+   */
+  it("途中の点の金額が変わると署名が変わる", () => {
+    const corrected = [
+      { date: "2026-06-30", amount: 10_000_000 },
+      { date: "2026-07-31", amount: 10_500_000 },
+      { date: "2026-08-05", amount: 11_400_000 },
+    ];
+    const original = [
+      { date: "2026-06-30", amount: 10_000_000 },
+      { date: "2026-07-31", amount: 11_000_000 },
+      { date: "2026-08-05", amount: 11_400_000 },
+    ];
+
+    expect(buildNetWorthSeriesKey("総資産", corrected)).not.toBe(
+      buildNetWorthSeriesKey("総資産", original),
+    );
+  });
+
   /** CSVを取り込み直して直近の残高だけが変わった場合(日付も件数も同じ) */
   it("直近の金額が変わると署名が変わる", () => {
     const reimported = series.map((point, index) =>
