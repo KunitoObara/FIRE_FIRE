@@ -165,7 +165,8 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="field">
             <label class="label">項目名</label>
-            <input class="input" data-field="name" placeholder="例: 住宅ローン(〇〇銀行)" />
+            <!-- 上限60文字はB7の物件名に揃える(docs/screen-requirements-dashboard.md B11) -->
+            <input class="input" data-field="name" maxlength="60" placeholder="例: 住宅ローン(〇〇銀行)" />
           </div>
           <div class="field">
             <label class="label">残債(円)</label>
@@ -214,7 +215,13 @@
     { name: 'カードローン', balance: '450,000', rate: '', years: '', months: '', updatedAt: null, balanceError: true },
   ];
 
-  let pendingDeleteNames = [];
+  /*
+    削除対象は項目名だけでなく残債額も覚える。項目名の重複を許す仕様のため、名前だけを
+    並べると同名の負債が2件あるときにどちらが消えるのか確認できない
+    (docs/screen-requirements-dashboard.md B11「追加・削除と保存」)。
+    実装での識別はIDで行い、ここで作るのは表示用の文字列だけ。
+  */
+  let pendingDeletes = [];
 
   const yen = (value) => `¥ ${Number(value || 0).toLocaleString('ja-JP')}`;
 
@@ -253,7 +260,8 @@
 
     // 保存済みの負債を消したときだけ、保存時の確認対象として覚えておく
     if (row.dataset.saved === '1') {
-      pendingDeleteNames.push(row.dataset.name);
+      const balance = row.querySelector('[data-field="balance"]').value;
+      pendingDeletes.push(`${row.dataset.name}(残債 ${yen(String(balance).replace(/[^0-9]/gu, ''))})`);
     }
 
     row.remove();
@@ -278,18 +286,18 @@
       return;
     }
 
-    if (pendingDeleteNames.length === 0) {
+    if (pendingDeletes.length === 0) {
       document.getElementById('save-done-dialog').classList.remove('hidden');
       return;
     }
 
-    document.getElementById('delete-confirm-count').textContent = `${pendingDeleteNames.length}件`;
-    document.getElementById('delete-confirm-names').textContent = pendingDeleteNames.join('、');
+    document.getElementById('delete-confirm-count').textContent = `${pendingDeletes.length}件`;
+    document.getElementById('delete-confirm-names').textContent = pendingDeletes.join('、');
     document.getElementById('delete-confirm-dialog').classList.remove('hidden');
   }
 
   function confirmSave() {
-    pendingDeleteNames = [];
+    pendingDeletes = [];
     document.getElementById('delete-confirm-dialog').classList.add('hidden');
     document.getElementById('save-done-dialog').classList.remove('hidden');
   }
