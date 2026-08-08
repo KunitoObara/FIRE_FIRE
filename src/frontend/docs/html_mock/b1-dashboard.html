@@ -211,9 +211,10 @@
           <div class="flex items-center gap-6">
             <svg viewBox="0 0 120 120" class="w-32 h-32 shrink-0">
               <defs>
-                <!-- 負債のハッチング(DESIGN.md 3章)。資産の1色目(--chart-1)と負債(--destructive)は
-                     どちらも暖色で、円グラフでは12時の位置で必ず隣り合う。色相だけに頼らず
-                     模様でも区別できるようにする -->
+                <!-- 負債のハッチング(DESIGN.md 3章)。負債は最後のスライスなので12時の位置で
+                     1色目と必ず隣り合うが、そこに何色が来るかは分類軸ごとの登録順で決まり、
+                     --chart-* の値も後から調整されうる。特定の色の組み合わせを根拠にせず、
+                     色相にかかわらず常に模様を重ねる -->
                 <pattern id="debt-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
                   <rect width="6" height="6" fill="hsl(var(--destructive))"/>
                   <line x1="0" y1="0" x2="0" y2="6" stroke="hsl(var(--card))" stroke-width="2" stroke-opacity="0.55"/>
@@ -222,19 +223,19 @@
               <!-- 手前の分類を描き終えてから次を描く。合計600msで1周のスイープになる。
                    負債のスライスも同じ1周に含める(DESIGN.md 9章) -->
               <circle class="chart-anim-arc" style="--arc-len: 121; --arc-dur: 257ms; --arc-delay: 0ms;"
-                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-1))" stroke-width="20" transform="rotate(-90 60 60)"/>
+                cx="60" cy="60" r="45" fill="none" stroke="var(--chart-1)" stroke-width="20" transform="rotate(-90 60 60)"/>
               <circle class="chart-anim-arc" style="--arc-len: 49; --arc-dur: 103ms; --arc-delay: 257ms;"
-                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-2))" stroke-width="20" stroke-dashoffset="-121" transform="rotate(-90 60 60)"/>
+                cx="60" cy="60" r="45" fill="none" stroke="var(--chart-2)" stroke-width="20" stroke-dashoffset="-121" transform="rotate(-90 60 60)"/>
               <circle class="chart-anim-arc" style="--arc-len: 34; --arc-dur: 72ms; --arc-delay: 360ms;"
-                cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--chart-6))" stroke-width="20" stroke-dashoffset="-170" transform="rotate(-90 60 60)"/>
+                cx="60" cy="60" r="45" fill="none" stroke="var(--chart-6)" stroke-width="20" stroke-dashoffset="-170" transform="rotate(-90 60 60)"/>
               <circle class="chart-anim-arc" style="--arc-len: 79; --arc-dur: 168ms; --arc-delay: 432ms;"
                 cx="60" cy="60" r="45" fill="none" stroke="url(#debt-hatch)" stroke-width="20" stroke-dashoffset="-204" transform="rotate(-90 60 60)"/>
             </svg>
             <div class="flex flex-col gap-3">
               <ul class="text-sm flex flex-col gap-2 tabular-nums">
-                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-1));"></span>投資信託 <span class="ml-auto text-slate-400">43%</span></li>
-                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-2));"></span>現金・預金 <span class="ml-auto text-slate-400">17%</span></li>
-                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: hsl(var(--chart-6));"></span>株式 <span class="ml-auto text-slate-400">12%</span></li>
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-1);"></span>投資信託 <span class="ml-auto text-slate-400">43%</span></li>
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-2);"></span>現金・預金 <span class="ml-auto text-slate-400">17%</span></li>
+                <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-6);"></span>株式 <span class="ml-auto text-slate-400">12%</span></li>
                 <!-- 凡例の色見本もハッチングにする。グラフと同じ見た目でないと対応が取れない -->
                 <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: repeating-linear-gradient(45deg, hsl(var(--destructive)) 0 2px, hsl(var(--card)) 2px 3px);"></span>負債 <span class="ml-auto text-slate-400">28%</span></li>
               </ul>
