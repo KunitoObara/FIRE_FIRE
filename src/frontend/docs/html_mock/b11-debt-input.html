@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>B11 負債入力 | FIRE-FIRE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+<style>
+  /* 「負債を追加」は行を増やすだけの副次操作なので、保存ボタンより目立たせない */
+  .add-row-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px dashed hsl(var(--border));
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    background-color: transparent;
+    cursor: pointer;
+  }
+  .add-row-button:hover {
+    border-color: hsl(var(--primary) / 0.5);
+    color: hsl(var(--primary));
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <aside class="app-sidebar">
+    <div class="h-[3.75rem] flex items-center px-5 border-b" style="border-color: hsl(var(--border));">
+      <span class="font-bold text-sm">FIRE-FIRE</span>
+    </div>
+    <nav class="flex-1 py-4 flex flex-col gap-1">
+      <a class="sidebar-link" href="b1-dashboard.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="12" width="4" height="8"/><rect x="10" y="8" width="4" height="12"/><rect x="17" y="4" width="4" height="16"/></svg>
+        ダッシュボード
+      </a>
+      <a class="sidebar-link" href="b2-csv-import.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        CSV取込
+      </a>
+      <a class="sidebar-link" href="b3-transactions.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10" stroke-linecap="round"/></svg>
+        収支明細一覧
+      </a>
+      <a class="sidebar-link" href="b4-category-master.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16" /></svg>
+        資産分類マスタ
+      </a>
+      <a class="sidebar-link" href="b5-real-estate-list.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V10l9-6 9 6v11" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 21v-7h6v7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        不動産一覧
+      </a>
+      <a class="sidebar-link sidebar-link-active" href="b11-debt-input.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18" stroke-linecap="round"/><path d="M8 15h4" stroke-linecap="round"/></svg>
+        負債入力
+      </a>
+      <div class="my-2 border-t" style="border-color: hsl(var(--border));"></div>
+      <a class="sidebar-link" href="b8-fire-goal.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        FIRE目標設定
+      </a>
+      <a class="sidebar-link" href="b9-assumption-settings.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l6-6 4 4 8-8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        想定利回り・リスク設定
+      </a>
+      <div class="my-2 border-t" style="border-color: hsl(var(--border));"></div>
+      <a class="sidebar-link" href="b10-account-settings.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke-linecap="round"/></svg>
+        アカウント設定
+      </a>
+    </nav>
+  </aside>
+
+  <div class="app-main">
+    <header class="app-header">
+      <h1 class="text-base font-semibold">負債入力</h1>
+      <div class="flex items-center gap-3">
+        <!-- ユーザーメニュー(docs/screen-requirements-account.md 2章)。
+             ログアウトの置き場所が他に無いため、アバターからB10へ直接リンクさせずメニューにする -->
+        <div class="user-menu">
+          <button class="user-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-label="ユーザーメニュー"
+                  onclick="const p = this.nextElementSibling; const opened = !p.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(opened));">
+            <span class="user-menu-avatar">太</span>
+          </button>
+          <div class="user-menu-panel hidden" role="menu">
+            <p class="user-menu-email">taro.yamada@example.com</p>
+            <a class="user-menu-item" role="menuitem" href="b10-account-settings.html">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke-linecap="round"/></svg>
+              アカウント設定
+            </a>
+            <button class="user-menu-item user-menu-item-signout" role="menuitem" type="button"
+                    onclick="document.getElementById('logout-dialog').classList.remove('hidden')">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 17l5-5-5-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12H9" stroke-linecap="round"/><path d="M12 20H6a2 2 0 01-2-2V6a2 2 0 012-2h6" stroke-linecap="round"/></svg>
+              ログアウト
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-6 flex flex-col gap-5 max-w-4xl">
+
+      <!-- 手動入力・自動計算なしであることを最初に示す(要件定義書 4.8)。
+           マネーフォワードが負債をCSVに出力しないため、この画面だけが負債の入り口になる -->
+      <div class="alert alert-info">
+        負債はマネーフォワードのCSVに含まれないため、すべて手動で入力・更新します。金利と残りの返済期間は参考情報として記録するだけで、
+        返済額や完済日の自動計算・残債の自動更新は行いません。
+      </div>
+
+      <!-- 負債合計。分類軸(B4)で集計対象に選んだ負債だけがダッシュボードの資産から差し引かれる -->
+      <section class="card p-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p id="debt-total-label" class="text-xs text-slate-400">負債合計(3件)</p>
+          <p id="debt-total" class="text-2xl font-bold tabular-nums" style="color: hsl(var(--destructive));">¥ 21,930,000</p>
+        </div>
+        <p class="text-xs text-slate-400 max-w-sm">
+          ここで登録した負債は、<a class="link" href="b4-category-master.html">資産分類マスタ</a>で分類軸の集計対象に選ぶと、
+          <a class="link" href="b1-dashboard.html">ダッシュボード</a>の資産から差し引かれます。
+        </p>
+      </section>
+
+      <!-- 負債の入力フォーム(1件=1フォーム)。追加・削除は保存するまで画面上の状態に留める -->
+      <div id="debt-list" class="flex flex-col gap-4"></div>
+
+      <button class="add-row-button" type="button" onclick="addDebtRow()">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+        負債を追加
+      </button>
+
+      <div class="flex items-center gap-3 pt-1">
+        <button class="btn btn-primary" type="button" onclick="save()">保存</button>
+        <p class="text-xs text-slate-400">
+          追加・削除は「保存」を押すまで確定しません。保存すると、残債が変わった負債はその日の残債が履歴として記録されます
+          (資産推移グラフが各時点の残債を差し引くために使います)。
+        </p>
+      </div>
+
+      <!-- 不動産のローン残高(B7)との関係。注記が無いと、B7に入れたローンが
+           ダッシュボードに出ないことを不具合と読まれる
+           (docs/screen-requirements-dashboard.md B11) -->
+      <p class="text-xs text-slate-400 border-t pt-4" style="border-color: hsl(var(--border));">
+        不動産の住宅ローンは <a class="link" href="b7-real-estate-edit.html">不動産登録・編集</a> にも「ローン残高」欄がありますが、
+        あちらは物件ごとの利ざや(時価 - ローン残高)を出すための項目で、ダッシュボードの集計には入りません。
+        ダッシュボードで資産から差し引きたい負債は、この画面に登録してください(両方に入れても二重には差し引かれません)。
+      </p>
+
+    </main>
+  </div>
+</div>
+
+<!-- 1件分の入力フォームのひな形。実装では react-hook-form の useFieldArray で扱う(DESIGN.md 6章) -->
+<template id="debt-row-template">
+  <section class="card p-5" data-debt-row>
+    <div class="flex items-start gap-4">
+      <div class="flex-1 flex flex-col gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="field">
+            <label class="label">項目名</label>
+            <input class="input" data-field="name" placeholder="例: 住宅ローン(〇〇銀行)" />
+          </div>
+          <div class="field">
+            <label class="label">残債(円)</label>
+            <input class="input tabular-nums" data-field="balance" inputmode="numeric" placeholder="0" oninput="updateTotal()" />
+            <p class="field-error hidden" data-balance-error>半角数字のみ入力してください</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="field">
+            <label class="label">金利(年利%)<span class="text-slate-400 font-normal">・任意</span></label>
+            <input class="input tabular-nums" data-field="rate" inputmode="decimal" placeholder="未登録" />
+          </div>
+          <!-- 総月数だけを入力させると「残り23年4ヶ月」を月数へ直す計算をユーザーにさせることになる。
+               年・ヶ月の2欄で受け取り、保存時に総月数へ正規化する -->
+          <div class="field">
+            <label class="label">残りの返済期間<span class="text-slate-400 font-normal">・任意</span></label>
+            <div class="flex items-center gap-2">
+              <input class="input tabular-nums" data-field="years" inputmode="numeric" placeholder="未登録" />
+              <span class="text-sm text-slate-500 shrink-0">年</span>
+              <input class="input tabular-nums" data-field="months" inputmode="numeric" placeholder="未登録" />
+              <span class="text-sm text-slate-500 shrink-0">ヶ月</span>
+            </div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-400" data-updated-at>まだ保存されていません</p>
+      </div>
+      <button class="btn btn-ghost btn-sm shrink-0" type="button" style="color: hsl(var(--destructive));" onclick="removeDebtRow(this)">削除</button>
+    </div>
+  </section>
+</template>
+
+<script>
+  /*
+    モック用の最小限の挙動。
+    - 「負債を追加」で行を増やし、「削除」で行を減らす(どちらも保存前は画面上の状態)
+    - 保存済みの負債を削除して保存しようとした場合だけ、確認ダイアログを挟む
+      (残債の履歴も消え、資産推移グラフから遡って控除が消えるため。DESIGN.md 6章)
+    実装では react-hook-form の useFieldArray で同じ構造を扱う。
+  */
+  const savedDebts = [
+    { name: '住宅ローン(〇〇銀行)', balance: '18400000', rate: '0.475', years: '23', months: '4', updatedAt: '2026/07/12' },
+    { name: '自動車ローン', balance: '1230000', rate: '2.9', years: '2', months: '8', updatedAt: '2026/06/30' },
+    // 金利・残りの返済期間は任意入力。未登録は0%・0ヶ月と区別して空欄のままにする
+    { name: '奨学金(第一種)', balance: '2300000', rate: '', years: '', months: '', updatedAt: '2026/05/02' },
+    // 「負債を追加」で増やした直後の行。残債の入力エラーの見え方もここで示す
+    { name: 'カードローン', balance: '450,000', rate: '', years: '', months: '', updatedAt: null, balanceError: true },
+  ];
+
+  let pendingDeleteNames = [];
+
+  const yen = (value) => `¥ ${Number(value || 0).toLocaleString('ja-JP')}`;
+
+  function buildRow(debt) {
+    const row = document.getElementById('debt-row-template').content.firstElementChild.cloneNode(true);
+
+    if (debt) {
+      // 未保存の行は削除しても確認ダイアログの対象にしない(まだ何も保存されていないため)
+      row.dataset.saved = debt.updatedAt === null ? '0' : '1';
+      row.dataset.name = debt.name;
+      ['name', 'balance', 'rate', 'years', 'months'].forEach((key) => {
+        row.querySelector(`[data-field="${key}"]`).value = debt[key];
+      });
+
+      if (debt.updatedAt !== null) {
+        row.querySelector('[data-updated-at]').textContent = `最終更新 ${debt.updatedAt}`;
+      }
+
+      if (debt.balanceError === true) {
+        row.querySelector('[data-field="balance"]').classList.add('input-error');
+        row.querySelector('[data-balance-error]').classList.remove('hidden');
+      }
+    }
+
+    return row;
+  }
+
+  function addDebtRow() {
+    const row = buildRow(null);
+    document.getElementById('debt-list').appendChild(row);
+    row.querySelector('[data-field="name"]').focus();
+  }
+
+  function removeDebtRow(button) {
+    const row = button.closest('[data-debt-row]');
+
+    // 保存済みの負債を消したときだけ、保存時の確認対象として覚えておく
+    if (row.dataset.saved === '1') {
+      pendingDeleteNames.push(row.dataset.name);
+    }
+
+    row.remove();
+    updateTotal();
+  }
+
+  function updateTotal() {
+    // 入力エラーの行は合計に入れない。読めない値を0円として黙って足すと合計が実態とずれる
+    const total = [...document.querySelectorAll('[data-field="balance"]')]
+      .filter((input) => !input.classList.contains('input-error'))
+      .reduce((sum, input) => sum + Number(String(input.value).replace(/[^0-9]/gu, '') || 0), 0);
+    const count = document.querySelectorAll('[data-debt-row]').length;
+
+    document.getElementById('debt-total').textContent = yen(total);
+    document.getElementById('debt-total-label').textContent = `負債合計(${count}件)`;
+  }
+
+  function save() {
+    // 入力エラーが残っている状態では保存しない(DESIGN.md 6章のインラインバリデーション)
+    if (document.querySelector('.input-error') !== null) {
+      document.getElementById('save-blocked-dialog').classList.remove('hidden');
+      return;
+    }
+
+    if (pendingDeleteNames.length === 0) {
+      document.getElementById('save-done-dialog').classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('delete-confirm-count').textContent = `${pendingDeleteNames.length}件`;
+    document.getElementById('delete-confirm-names').textContent = pendingDeleteNames.join('、');
+    document.getElementById('delete-confirm-dialog').classList.remove('hidden');
+  }
+
+  function confirmSave() {
+    pendingDeleteNames = [];
+    document.getElementById('delete-confirm-dialog').classList.add('hidden');
+    document.getElementById('save-done-dialog').classList.remove('hidden');
+  }
+
+  savedDebts.forEach((debt) => document.getElementById('debt-list').appendChild(buildRow(debt)));
+  updateTotal();
+</script>
+
+<!-- 保存時の削除確認(docs/screen-requirements-dashboard.md B11)。
+     残債の履歴も消え、資産推移グラフから遡って控除が消えるため、確認を挟む。
+     分類軸が集計対象にしている負債でも削除自体は禁止しない(完済した負債を整理できなくなるため) -->
+<div id="delete-confirm-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4); z-index: 50;">
+  <div class="card p-6 max-w-md w-full">
+    <h3 class="text-base font-bold mb-2">負債<span id="delete-confirm-count">1件</span>を削除して保存しますか?</h3>
+    <p class="text-sm text-slate-500 mb-3">削除する負債: <span id="delete-confirm-names" class="text-slate-700"></span></p>
+    <p class="text-sm text-slate-500 mb-3">残債の履歴も削除され、資産推移グラフからこの負債の控除が過去に遡って消えます。</p>
+    <p class="text-sm text-slate-500 mb-5">この負債を集計対象にしている分類軸「純金融資産」の集計も変わります。</p>
+    <div class="flex gap-3">
+      <button class="btn btn-destructive flex-1" type="button" onclick="confirmSave()">削除して保存する</button>
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('delete-confirm-dialog').classList.add('hidden')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- 入力エラーが残っている状態での保存。実装ではダイアログではなくインラインエラーへの
+     フォーカス移動で足りるが、モックでは止まったことが分かるように表示する -->
+<div id="save-blocked-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4); z-index: 50;">
+  <div class="card p-6 max-w-sm w-full">
+    <h3 class="text-base font-bold mb-2">入力内容を確認してください</h3>
+    <p class="text-sm text-slate-500 mb-5">入力エラーのある負債があるため保存できません。エラー表示のある欄を直してから保存してください。</p>
+    <button class="btn btn-primary btn-block" type="button" onclick="document.getElementById('save-blocked-dialog').classList.add('hidden')">閉じる</button>
+  </div>
+</div>
+
+<!-- 保存完了。画面に留まって続けて編集できる(B2の取込完了と同じ扱い) -->
+<div id="save-done-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4); z-index: 50;">
+  <div class="card p-6 max-w-sm w-full">
+    <h3 class="text-base font-bold mb-2">保存しました</h3>
+    <p class="text-sm text-slate-500 mb-5">残債が変わった負債は、本日の日付で履歴に記録されました。ダッシュボードの負債サマリと、負債を含む分類軸の集計に反映されます。</p>
+    <button class="btn btn-primary btn-block" type="button" onclick="document.getElementById('save-done-dialog').classList.add('hidden')">閉じる</button>
+  </div>
+</div>
+
+<!-- ログアウトの確認ダイアログ(docs/screen-requirements-account.md 2章)。
+     2FAが全ユーザー必須で再ログインに認証アプリの確認コードが要るため、誤操作を防ぐ確認を挟む。
+     共通ヘッダーのユーザーメニューと、A2・A3の「別のアカウントでログイン」で同じダイアログを使う。 -->
+<div id="logout-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4); z-index: 50;">
+  <div class="card p-6 max-w-sm w-full">
+    <h3 class="text-base font-bold mb-2">ログアウトしますか?</h3>
+    <p class="text-sm text-slate-500 mb-5">次回のログインでは、パスワードに加えて認証アプリの確認コードの入力が必要です。</p>
+    <div class="flex gap-3">
+      <a href="a4-login.html?loggedOut=1" class="btn btn-primary flex-1">ログアウトする</a>
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('logout-dialog').classList.add('hidden')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
