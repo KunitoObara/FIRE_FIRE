@@ -2,8 +2,10 @@
 
 import { Cell, Pie, PieChart } from "recharts";
 
+import styles from "@/components/dashboard/CategoryBreakdownChart.module.css";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { formatJpy } from "@/lib/format/currency";
+import { cn } from "@/lib/utils";
 
 import type { JSX } from "react";
 
@@ -18,9 +20,10 @@ import type { ChartConfig } from "@/components/ui/chart";
  *
  * 分類名と構成比はカード側の凡例に文字で並ぶため、円の上には数値を重ねない。
  *
- * 登場アニメーション(12時から時計回りのスイープ)は`chart-sweep`クラスのCSSマスクが担う
- * (`src/app/globals.css`。理由もそこに書いてある)。再生の引き金は呼び出し側が渡す`key`で、
- * データが変わったときだけこのコンポーネントが作り直されて最初から再生される。
+ * 登場アニメーション(12時から時計回りのスイープ)はCSSマスクが担う
+ * (`CategoryBreakdownChart.module.css`。理由もそこに書いてある)。再生の引き金は
+ * 呼び出し側が渡す`key`で、データが変わったときだけこのコンポーネントが作り直されて
+ * 最初から再生される。
  */
 export const CategoryBreakdownChart = ({ slices }: CategoryBreakdownChartProps): JSX.Element => {
   // 分類は増減するマスタデータなので、設定も描画時に組み立てる
@@ -29,7 +32,7 @@ export const CategoryBreakdownChart = ({ slices }: CategoryBreakdownChartProps):
   ) satisfies ChartConfig;
 
   return (
-    <ChartContainer config={chartConfig} className="chart-sweep aspect-square h-36">
+    <ChartContainer config={chartConfig} className={cn(styles.chartSweep, "aspect-square h-36")}>
       <PieChart>
         <ChartTooltip
           content={

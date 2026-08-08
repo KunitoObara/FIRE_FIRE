@@ -3,6 +3,7 @@
 import { PolarAngleAxis, RadialBar, RadialBarChart } from "recharts";
 
 import { ChartContainer } from "@/components/ui/chart";
+import { FIRE_GAUGE_ANIMATION_KEY } from "@/constants/dashboard";
 import { useAnimatedProgress } from "@/hooks/use-animated-progress";
 import { toGaugeRatio } from "@/lib/dashboard/fire-progress";
 import { formatPercent } from "@/lib/format/currency";
@@ -28,14 +29,15 @@ const chartConfig = {
  * そのためRecharts側のアニメーションは止めたまま(`isAnimationActive={false}`)にして、
  * 描画する値そのものを`useAnimatedProgress`で動かしている。
  *
- * 再生するのは初回描画時と達成率が変わったときだけ。分類軸・表示期間の切替では再生しない
- * ——ゲージはB1のセレクタに追従せず、切り替えても`achievementRate`が変わらないため。
+ * **再生するのは初回描画時だけ**(DESIGN.md 9章の再生条件)。分類軸・表示期間の切替で
+ * 再生しないのはもちろん、画面を開いたまま裏で取り直しが走って達成率が変わった場合にも
+ * 再生しない。そのため進捗の引き金には達成率ではなく固定値を渡している。
  *
  * 金額(目標資産額・現在資産額)はカウントアップさせない。桁の多い金額が途中の値で
  * 読めてしまうと、桁の読み違いをこちらから作ることになる(DESIGN.md 1章)。
  */
 export const FireProgressGauge = ({ achievementRate }: FireProgressGaugeProps): JSX.Element => {
-  const progress = useAnimatedProgress(achievementRate);
+  const progress = useAnimatedProgress(FIRE_GAUGE_ANIMATION_KEY);
   const animatedRate = achievementRate * progress;
 
   return (
