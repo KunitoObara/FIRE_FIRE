@@ -14,11 +14,14 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
 着手の前に、前回までのカードを片付ける。
 
 1. 確認中リストのカードを取得する(`mcp__trello__get_cards_by_list_id`)
-2. カードごとに対応するPRを特定する
-   - カード名 `[B7] ...` → ブランチ `feature/fire-fire-b7` → `gh pr list --head feature/fire-fire-b7 --state all --json number,state,mergedAt,url`
-   - 見つからなければカードのコメント(`mcp__trello__get_card_comments`)に残したPRのURLから探す
-3. `state` が `MERGED` のカードを**完了**リストへ移動する(`mcp__trello__move_card`)
-4. `OPEN` のまま残っているカードは移動せず、レビュー状況とあわせて一覧で報告する
+2. **カードのコメントを必ず読む**(`mcp__trello__get_card_comments`)。`/card-ship` はPRを出すたびにURLをコメントに残すので、**1枚のカードに複数のPRがぶら下がっていることがある**(PRを分割した場合。正本の文書 5章「PRの分割」)
+3. カードに紐づくPRを**すべて**特定する
+   - コメントに残ったPRのURLを全部集める。これが基準
+   - コメントが1件も無い場合だけ、カード名 `[B7] ...` → ブランチ `feature/fire-fire-b7` → `gh pr list --head feature/fire-fire-b7 --state all --json number,state,mergedAt,url` で引く
+4. **すべてのPRが `MERGED` のカードだけ**を**完了**リストへ移動する(`mcp__trello__move_card`)
+5. 1つでも `OPEN` が残っているカードは移動せず、レビュー状況とあわせて一覧で報告する
+
+**1本目がマージされただけで完了へ動かさない。** 分割したカードは残りのPRがまだレビュー中でありうる。カード名から引いたブランチだけを見ると、分割時のスライスは `-part<N>` が付いていて一致せず、コメント経由で見つけた1本目だけを根拠に動かしてしまう。
 
 移動した/しなかったカードを短く報告してから次に進む。1件も無ければ黙って次へ。
 
