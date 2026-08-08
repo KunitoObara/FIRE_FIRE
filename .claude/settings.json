@@ -8,15 +8,10 @@
       "Read(./docs/.env)"
     ],
     "allow": [
-      "mcp__trello__get_lists",
-      "mcp__trello__get_board_labels",
-      "mcp__trello__get_board_members",
       "mcp__trello__get_cards_by_list_id",
       "mcp__trello__get_card",
       "mcp__trello__get_card_comments",
-      "mcp__trello__get_card_history",
       "mcp__trello__get_checklist_items",
-      "mcp__trello__get_acceptance_criteria",
       "mcp__trello__move_card",
       "mcp__trello__add_comment",
       "mcp__trello__add_card_to_list",
