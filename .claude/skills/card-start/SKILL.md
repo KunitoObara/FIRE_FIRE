@@ -1,6 +1,6 @@
 ---
 name: card-start
-description: Starts work on a card in the 進行中 (in-progress) list of the FIRE-FIRE Trello board — syncs already-merged 確認中 cards to 完了, picks an eligible card, reads the requirements docs and HTML mocks it references, asks every open question in one batch, and cuts the feature branch off develop. Use this skill when the user says 「カードに着手」「次のカードを始めて」「開発を始めて」, or when invoked as /card-start.
+description: Starts work on a card in the 進行中 (in progress) list of the FIRE-FIRE Trello board — syncs already-merged 確認中 (in review) cards to 完了 (done), picks an eligible card, reads the requirements docs and HTML mocks it references, asks every open question in one batch, and cuts the feature branch off develop. Use this skill when the user says "カードに着手", "次のカードを始めて", or "開発を始めて", or when invoked as /card-start.
 ---
 
 # カード着手

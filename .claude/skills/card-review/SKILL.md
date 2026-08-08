@@ -1,6 +1,6 @@
 ---
 name: card-review
-description: Waits for CI and the claude-review bot on a pull request and works through their findings, counting each fix push as one round up to a limit of three — past the limit, only critical findings (CI failures, security, data loss, a screen that does not work) are fixed and the rest are filed as new cards at the end of the Trello backlog. Use this skill when the user says 「レビューを見て」「指摘に対応して」「CIを直して」, or when invoked as /card-review.
+description: Waits for CI and the claude-review bot on a pull request and works through their findings, counting each fix push as one round up to a limit of three — past the limit, only critical findings (CI failures, security, data loss, a screen that does not work) are fixed and the rest are filed as new cards at the end of the Trello backlog. Use this skill when the user says "レビューを見て", "指摘に対応して", or "CIを直して", or when invoked as /card-review.
 ---
 
 # レビュー対応
