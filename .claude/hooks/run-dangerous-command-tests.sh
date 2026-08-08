@@ -30,12 +30,20 @@ open('$hook', 'w').write(hooks[0]['command'])
   exit 1
 fi
 
+# 判定ロジックそのものを見るケースは、無効化の分岐を必ず落としてから実行する。
+# フック本体は GITHUB_ACTIONS と CLAUDE_GUARD_DISABLE が揃うと何もせず終了するため、
+# 呼び出し元にその2つが残っていると全ケースが判定ALLOWになる。期待DENYのケースが
+# 全滅して落ちるので黙って通ることはないが、原因の分かりにくい落ち方になるうえ、
+# 「テストが緑=判定が正しい」と言えるのは実行環境に依らないときだけ。
+# 無効化の条件そのものは check_guard_env が env を明示的に組み立てて検証する。
+h() { env -u GITHUB_ACTIONS -u CLAUDE_GUARD_DISABLE bash "$@"; }
+
 pass=0
 fail=0
 while IFS='|' read -r want cmd; do
   case "$want" in ''|'#'*) continue ;; esac
   payload=$(CMD="$cmd" python3 -c 'import json,os;print(json.dumps({"tool_name":"Bash","tool_input":{"command":os.environ["CMD"]}}))')
-  out=$(printf '%s' "$payload" | bash "$hook")
+  out=$(printf '%s' "$payload" | h "$hook")
   if [ -z "$out" ]; then
     got=ALLOW
   else
@@ -62,7 +70,7 @@ open('$file_hook', 'w').write(h[0]['command'])
 check_file_tool() {
   # $1=期待値 $2=tool_name $3=tool_input(JSON)
   got=ALLOW
-  [ -n "$(printf '{"tool_name":"%s","tool_input":%s}' "$2" "$3" | bash "$file_hook")" ] && got=DENY
+  [ -n "$(printf '{"tool_name":"%s","tool_input":%s}' "$2" "$3" | h "$file_hook")" ] && got=DENY
   if [ "$got" = "$1" ]; then
     pass=$((pass + 1))
   else
