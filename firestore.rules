@@ -83,6 +83,13 @@ service cloud.firestore {
       return value == null || (value is number && value > 0 && value <= 100);
     }
 
+    // 分類軸(`users/{userId}/categoryAxes`)のドキュメントIDを指す参照。
+    // 既定を表すnullを許し、空文字は許さない(どの軸も指さないなら既定のnullで表す)。
+    // 上限はFirestoreのドキュメントIDの上限(1500バイト)より十分に小さい値で足りる
+    function isCategoryAxisId(value) {
+      return value == null || (value is string && value.size() > 0 && value.size() <= 200);
+    }
+
     function isOwner(userId) {
       return request.auth != null
         && request.auth.uid == userId
@@ -178,10 +185,10 @@ service cloud.firestore {
         // create/updateで同じ形を要求する
         allow create, update: if isOwner(userId)
           && request.resource.data.keys().hasOnly(
-            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'updatedAt']
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'updatedAt']
           )
           && request.resource.data.keys().hasAll(
-            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'updatedAt']
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'updatedAt']
           )
           // 有効な設定方式。src/frontend/src/types/fire-goal.d.ts の`FireGoalMode`と揃える
           && request.resource.data.mode in ['direct', 'reverse']
@@ -190,6 +197,11 @@ service cloud.firestore {
           && isFireGoalAmount(request.resource.data.targetAmount)
           && isFireGoalAmount(request.resource.data.annualExpense)
           && isWithdrawalRate(request.resource.data.withdrawalRate)
+          // 達成度の対象分類(B4の分類軸ID)。既定の「総資産」はnullで保存される。
+          // 分類軸が実在するかはここでは確かめられない(ルールから他のドキュメントを
+          // 引くと読み取りが増え、B4での削除と競合もする)。存在しない軸を指したままでも
+          // 参照側が既定へフォールバックする作りなので、ここは形だけを見る
+          && isCategoryAxisId(request.resource.data.achievementAxisId)
           && request.resource.data.updatedAt is timestamp;
         // FIRE目標を消す画面は無い。方式の切替も上書きで表せる
         allow delete: if false;

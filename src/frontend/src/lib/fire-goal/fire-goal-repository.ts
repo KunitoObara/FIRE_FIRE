@@ -64,6 +64,9 @@ export const fetchFireGoal = async (): Promise<FireGoalResult> => {
         targetAmount: parsed.data.targetAmount,
         annualExpense: parsed.data.annualExpense,
         withdrawalRate: parsed.data.withdrawalRate,
+        // 対象分類を持たずに保存された既存の目標はキーごと無い。既定(総資産)として扱い、
+        // これまでと同じ現在資産額・達成率のままにする(要件B1)
+        achievementAxisId: parsed.data.achievementAxisId ?? null,
       },
     };
   } catch (error) {
@@ -91,6 +94,9 @@ export const saveFireGoal = async (goal: FireGoal): Promise<SaveFireGoalResult> 
       targetAmount: goal.targetAmount,
       annualExpense: goal.annualExpense,
       withdrawalRate: goal.withdrawalRate,
+      // 既定(総資産)も`null`として明示的に書く。キーを省くと、既定を選び直したのか
+      // 対象分類を導入する前に保存された目標なのかが読み出し側で区別できなくなる
+      achievementAxisId: goal.achievementAxisId,
       updatedAt: serverTimestamp(),
     });
 

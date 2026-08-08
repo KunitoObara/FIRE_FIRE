@@ -159,16 +159,22 @@ export const importAssetBalances = async (
 };
 
 /**
- * 直近の資産残高の総額を取得する(B8の参考表示「現在資産額」)。
+ * 直近の資産残高を1件取得する(B8の参考表示「現在資産額」)。
  *
- * B2が取り込んだ資産残高のうち、集計日がいちばん新しい1件の`total`をそのまま返す。
- * 読み出すのはB8だが、`assetSnapshots`を扱うのはこのファイルなのでここに置く。
+ * B2が取り込んだ資産残高のうち、集計日がいちばん新しい1件を返す。読み出すのはB8だが、
+ * `assetSnapshots`を扱うのはこのファイルなのでここに置く。
  *
- * CSVを一度も取り込んでいないアカウントでは1件も無いため、失敗ではなく`total: null`を返す。
- * 参考表示であって目標の設定を妨げるものではなく、呼び出し側で「未取込」として扱えるように
- * するため。`total`だけを見るので履歴のようなzodスキーマは通さず、型だけを確かめる。
+ * **総額だけでなく`byType`まで返す。** 参考表示の現在資産額は達成度の対象分類で集計する
+ * ようになり(docs/screen-requirements-fire-goal.md B8)、B8のセレクタを動かすたびに
+ * Firestoreを引き直さずその場で集計し直せるようにするため。集計そのものは
+ * `src/lib/dashboard/fire-progress.ts`がB1のゲージと共有する。
+ *
+ * CSVを一度も取り込んでいないアカウントでは1件も無いため、失敗ではなく`snapshot: null`を
+ * 返す。参考表示であって目標の設定を妨げるものではなく、呼び出し側で「未取込」として
+ * 扱えるようにするため。数値として読めない金額はその資産種別だけを飛ばす
+ * (`fetchAssetSnapshots`と同じ扱い)。
  */
-export const fetchLatestAssetTotal = async (): Promise<CurrentAssetTotalResult> => {
+export const fetchLatestAssetSnapshot = async (): Promise<LatestAssetSnapshotResult> => {
   const context = resolveFirestoreUserContext();
 
   if (!context.ok) {
@@ -182,19 +188,35 @@ export const fetchLatestAssetTotal = async (): Promise<CurrentAssetTotalResult> 
     const latest = snapshot.docs[0];
 
     if (!latest) {
-      return { ok: true, total: null };
+      return { ok: true, snapshot: null };
     }
 
-    const total: unknown = latest.get("total");
+    const parsed = assetSnapshotDocumentSchema.safeParse(latest.data());
 
-    if (typeof total !== "number") {
-      console.error("資産残高の総額を解釈できませんでした", latest.id);
-      return { ok: true, total: null };
+    if (!parsed.success) {
+      console.error("資産残高を解釈できませんでした", latest.id, parsed.error.issues);
+      return { ok: true, snapshot: null };
     }
 
-    return { ok: true, total };
+    const byType = Object.entries(parsed.data.byType).flatMap(([assetTypeName, amount]) => {
+      if (typeof amount !== "number") {
+        console.error("資産種別の残高を解釈できませんでした", latest.id, assetTypeName);
+        return [];
+      }
+
+      return [[assetTypeName, amount] as const];
+    });
+
+    return {
+      ok: true,
+      snapshot: {
+        date: parsed.data.date,
+        total: parsed.data.total,
+        byType: Object.fromEntries(byType),
+      },
+    };
   } catch (error) {
-    console.error("資産残高の総額を取得できませんでした", error);
+    console.error("資産残高を取得できませんでした", error);
     return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };

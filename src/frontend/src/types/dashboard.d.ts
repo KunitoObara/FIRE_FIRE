@@ -67,7 +67,18 @@ declare global {
   /** FIRE達成度ゲージの表示値。目標未設定なら`null`が渡る */
   type FireProgress = {
     targetAmount: number;
+    /**
+     * 現在資産額(円)。B8で設定した対象分類で集計する。
+     * B1の分類軸切替セレクタには追従しない(docs/screen-requirements-dashboard.md B1)
+     */
     currentAmount: number;
+    /** 現在資産額に併記する対象分類名。既定なら「総資産(マネーフォワードの合計)」 */
+    achievementAxisName: string;
+    /**
+     * 設定していた対象分類がB4で削除されていた場合に`true`。
+     * 既定で計算したうえで、カードにその旨とB8への導線を出すために使う(同要件B1)
+     */
+    achievementAxisMissing: boolean;
     /**
      * 到達予測日(`yyyy-MM-dd`)。想定利回り(B9)を前提に算出するため、
      * B1では計算せず算出済みの値を表示するだけにする。未算出は`null`

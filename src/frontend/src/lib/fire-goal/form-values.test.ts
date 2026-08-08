@@ -7,56 +7,70 @@ describe("toFireGoal", () => {
   /** 方式を切り替えて保存し直しても反対側の入力が消えないことが、この保存範囲の狙い */
   it("有効な方式の欄だけでなく、非表示タブの入力値も保存する", () => {
     expect(
-      toFireGoal({
-        mode: "direct",
-        targetAmount: "80000000",
-        annualExpense: "3600000",
-        withdrawalRate: "4",
-      }),
+      toFireGoal(
+        {
+          mode: "direct",
+          targetAmount: "80000000",
+          annualExpense: "3600000",
+          withdrawalRate: "4",
+        },
+        null,
+      ),
     ).toEqual({
       mode: "direct",
       targetAmount: 80_000_000,
       annualExpense: 3_600_000,
       withdrawalRate: 4,
+      achievementAxisId: null,
     });
   });
 
   it("未入力の欄はnullにする", () => {
     expect(
-      toFireGoal({
-        mode: "direct",
-        targetAmount: "80000000",
-        annualExpense: "",
-        withdrawalRate: "",
-      }),
+      toFireGoal(
+        {
+          mode: "direct",
+          targetAmount: "80000000",
+          annualExpense: "",
+          withdrawalRate: "",
+        },
+        null,
+      ),
     ).toEqual({
       mode: "direct",
       targetAmount: 80_000_000,
       annualExpense: null,
       withdrawalRate: null,
+      achievementAxisId: null,
     });
   });
 
   /** `Number("")`の0や`Number("abc")`のNaNが金額としてFirestoreに入らないことの確認 */
   it("数値として解釈できない値は0やNaNにせずnullにする", () => {
     expect(
-      toFireGoal({
-        mode: "reverse",
-        targetAmount: "８０００",
-        annualExpense: "3600000",
-        withdrawalRate: "4",
-      }).targetAmount,
+      toFireGoal(
+        {
+          mode: "reverse",
+          targetAmount: "８０００",
+          annualExpense: "3600000",
+          withdrawalRate: "4",
+        },
+        null,
+      ).targetAmount,
     ).toBeNull();
   });
 
   it("小数の逆算係数はそのまま保存する", () => {
     expect(
-      toFireGoal({
-        mode: "reverse",
-        targetAmount: "",
-        annualExpense: "3600000",
-        withdrawalRate: "3.5",
-      }).withdrawalRate,
+      toFireGoal(
+        {
+          mode: "reverse",
+          targetAmount: "",
+          annualExpense: "3600000",
+          withdrawalRate: "3.5",
+        },
+        null,
+      ).withdrawalRate,
     ).toBe(3.5);
   });
 });
@@ -78,6 +92,7 @@ describe("toFireGoalFormValues", () => {
         targetAmount: 80_000_000,
         annualExpense: 3_600_000,
         withdrawalRate: 3.5,
+        achievementAxisId: null,
       }),
     ).toEqual({
       mode: "reverse",
@@ -94,6 +109,7 @@ describe("toFireGoalFormValues", () => {
         targetAmount: 80_000_000,
         annualExpense: null,
         withdrawalRate: 4,
+        achievementAxisId: null,
       }).annualExpense,
     ).toBe("");
   });
@@ -106,6 +122,7 @@ describe("toFireGoalFormValues", () => {
         targetAmount: 80_000_000,
         annualExpense: null,
         withdrawalRate: null,
+        achievementAxisId: null,
       }).withdrawalRate,
     ).toBe("4");
   });

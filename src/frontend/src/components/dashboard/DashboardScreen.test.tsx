@@ -59,6 +59,8 @@ const data: DashboardData = {
   fireProgress: {
     targetAmount: 80_000_000,
     currentAmount: 11_400_000,
+    achievementAxisName: "投資性資産",
+    achievementAxisMissing: false,
     projectedAchievementDate: null,
   },
   cashflow: null,
@@ -159,7 +161,48 @@ describe("DashboardScreen", () => {
   });
 
   /**
-   * FIRE達成度は目標資産額との比較で、分類軸を参照しない(要件B1)。
+   * ゲージの現在資産額はB8で設定した対象分類で集計しており、この画面のセレクタには
+   * 追従しない(要件B1)。どちらの数字か判別できるよう分類名を併記する
+   */
+  it("FIRE達成度の現在資産額に対象分類名を併記する", async () => {
+    renderScreen();
+
+    expect(await screen.findByText("(投資性資産)")).toBeInTheDocument();
+  });
+
+  /** 切替ひとつで同じ目標への達成率が別の値になると「どこまで来たか」として読めなくなる */
+  it("分類軸を切り替えてもFIRE達成度の現在資産額は変わらない", async () => {
+    renderScreen({ axisParam: "investment" });
+
+    expect(await screen.findByText("¥ 11,400,000")).toBeInTheDocument();
+    expect(screen.getByText("(投資性資産)")).toBeInTheDocument();
+  });
+
+  /** 比較対象が失われただけなので、ゲージを消したり0%にしたりはしない(要件B1) */
+  it("対象分類の分類軸が削除されていたら、総資産で計算した旨をカードに出す", async () => {
+    fetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: {
+        ...data,
+        fireProgress: {
+          ...data.fireProgress,
+          achievementAxisName: "総資産(マネーフォワードの合計)",
+          achievementAxisMissing: true,
+        },
+      },
+    });
+    renderScreen();
+
+    expect(
+      await screen.findByText("設定していた対象分類が見つからないため、総資産で計算しています。"),
+    ).toBeInTheDocument();
+    // 注意書きを出すだけで、ゲージと数字はそのまま残す
+    expect(screen.getByText("¥ 11,400,000")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "目標を設定する" })).toBeInTheDocument();
+  });
+
+  /**
+   * FIRE達成度は目標資産額との比較で、B1の分類軸セレクタを参照しない(要件B1)。
    * ゲージごと消えるとB8への導線も一緒に失われるので、リンクの有無まで見る
    */
   it("分類軸が1件も無くてもFIRE達成度は出す", async () => {

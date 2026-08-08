@@ -32,6 +32,20 @@ declare global {
   type FireGoal = {
     /** 現在有効な設定方式。B8の表示項目「現在有効な設定方式」そのもの */
     mode: FireGoalMode;
+    /**
+     * 達成度の対象分類(B4の分類軸ID)。`null`は既定の「総資産(マネーフォワードの合計)」。
+     *
+     * 達成率の分子である現在資産額をどの範囲で数えるかの設定で、目標額と1組で
+     * 「何に対する目標か」を表すため同じドキュメントに持つ
+     * (docs/screen-requirements-fire-goal.md B8「達成度の対象分類」)。
+     *
+     * 設定方式(`mode`)ごとには持たない。目標額の決め方と比較する資産の範囲は別の話であり、
+     * 方式ごとに分けると方式を切り替えただけで達成率が理由なく変わるため。
+     *
+     * ここに入っている分類軸がB4で削除されることはありうる。参照している側
+     * (B1のゲージ・B8の参考表示)が既定へフォールバックする責務を持ち、B4の削除は禁止しない。
+     */
+    achievementAxisId: string | null;
     /** 目標資産額(円)。直接入力タブの値 */
     targetAmount: number | null;
     /** 想定年間支出額(円)。逆算タブの値 */
@@ -61,13 +75,46 @@ declare global {
   type SaveFireGoalResult = { ok: true } | { ok: false; reason: FirestoreAccessFailureReason };
 
   /**
-   * 現在資産額(参考表示)の取得結果。
+   * 現在資産額(参考表示)の元になる直近の資産残高の取得結果。
    *
    * CSVを一度も取り込んでいないアカウントでは資産残高が1件も無いため、
-   * 成功しつつ`total: null`が返る。
+   * 成功しつつ`snapshot: null`が返る。
+   *
+   * 総額ではなく資産残高そのものを返すのは、対象分類ごとの集計を呼び出し側で行うため
+   * (`resolveAchievementAmount`)。
    */
-  type CurrentAssetTotalResult =
-    { ok: true; total: number | null } | { ok: false; reason: FirestoreAccessFailureReason };
+  type LatestAssetSnapshotResult =
+    | { ok: true; snapshot: AssetSnapshot | null }
+    | { ok: false; reason: FirestoreAccessFailureReason };
+
+  /**
+   * 達成度の対象分類の選択肢1件分(B8のセレクタ)。
+   *
+   * 集計に使う`assetTypeNames`まで持たせるのは、参考表示の現在資産額をセレクタの変更に
+   * 合わせてその場で計算し直すため。保存を待たずに「この分類にすると達成率がこうなる」を
+   * 確かめられるようにする。
+   */
+  type AchievementAxisOption = {
+    id: string;
+    name: string;
+    /** 集計対象の資産種別名。空配列は「すべての資産種別が対象」(B4の約束) */
+    assetTypeNames: string[];
+  };
+
+  /**
+   * 達成度の対象分類を解決した結果。
+   *
+   * 名前と集計方法と「見つからなかったか」を1組で返す。別々に求めると、フォールバックした
+   * のに分類名だけ削除済みの軸を指す、といった食い違いが起きる。
+   */
+  type AchievementAxisResolution = {
+    /** 併記する対象分類名。既定なら「総資産(マネーフォワードの合計)」 */
+    name: string;
+    /** 集計対象の資産種別名。`null`は既定(CSVの「合計（円）」列をそのまま採る) */
+    assetTypeNames: string[] | null;
+    /** 設定されていた分類軸が見つからず既定へフォールバックした場合に`true` */
+    missing: boolean;
+  };
 
   /** B8の画面上部に出す参考表示(現在有効な設定方式・現在資産額)のProps */
   type FireGoalSummaryProps = {
@@ -75,6 +122,8 @@ declare global {
     savedMode: FireGoalMode | null;
     /** 現在資産額(円)。資産残高が未取込、または取得に失敗した場合は`null` */
     currentAssetTotal: number | null;
+    /** 現在資産額に併記する対象分類名。選択中(未保存)の分類で計算した値に対応する */
+    achievementAxisName: string;
   };
 
   /** B8 FIRE目標設定フォームのProps */
@@ -83,6 +132,13 @@ declare global {
     initialValues: FireGoalFormValues;
     /** 達成率の参考表示に使う。取得できていない場合は`null`で、達成率は出さない */
     currentAssetTotal: number | null;
+    /** 現在資産額に併記する対象分類名 */
+    achievementAxisName: string;
+    /** 選択肢にする分類軸(B4の登録順)。1件も無い場合は既定のみを選べる */
+    achievementAxisOptions: AchievementAxisOption[];
+    /** 選択中の対象分類。既定(総資産)は`null` */
+    achievementAxisId: string | null;
+    onAchievementAxisChange: (axisId: string | null) => void;
     onSubmit: (goal: FireGoal) => Promise<SaveFireGoalResult>;
   };
 }
