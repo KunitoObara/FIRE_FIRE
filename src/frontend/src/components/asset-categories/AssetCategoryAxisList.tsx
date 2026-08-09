@@ -2,11 +2,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   buildCategoryAxisDebtCountLabel,
+  buildCategoryAxisMissingDebtLabel,
   CATEGORY_AXIS_ALL_TYPES_LABEL,
   CATEGORY_AXIS_MEMBER_DISPLAY_LIMIT,
   NO_CATEGORY_AXES_LABEL,
 } from "@/constants/asset-categories";
 import { CATEGORY_COLOR_SLOT_COUNT } from "@/constants/dashboard";
+import { resolveCategoryAxisDebtReferences } from "@/lib/asset-categories/debt-references";
 
 import type { JSX } from "react";
 
@@ -42,12 +44,24 @@ const buildAssetTypeSummary = (assetTypeNames: string[]): string => {
  * 負債の名前は出さず件数だけにする。名前まで並べると資産種別と混ざって、どちらが
  * 足される側でどちらが引かれる側なのかが読み取れなくなる。
  */
-const buildMemberSummary = (axis: AssetCategoryAxisDocument): string => {
+const buildMemberSummary = (
+  axis: AssetCategoryAxisDocument,
+  references: CategoryAxisDebtReferences | null,
+): string => {
   const assetTypes = buildAssetTypeSummary(axis.assetTypeNames);
 
-  return axis.debtIds.length === 0
-    ? assetTypes
-    : `${assetTypes} / ${buildCategoryAxisDebtCountLabel(axis.debtIds.length)}`;
+  if (axis.debtIds.length === 0) {
+    return assetTypes;
+  }
+
+  /*
+    件数は**実際に差し引かれる負債**の数で出す(B4)。参照の数をそのまま出すと、一覧の
+    「負債 2件」とB1で差し引かれている額が食い違い、一覧に件数を出した目的そのものを外す。
+    負債の選択肢がまだ読めていない間は絞り込めないので、参照の数をそのまま出す
+  */
+  const debtCount = references === null ? axis.debtIds.length : references.activeIds.length;
+
+  return `${assetTypes} / ${buildCategoryAxisDebtCountLabel(debtCount)}`;
 };
 
 /**
@@ -58,6 +72,7 @@ const buildMemberSummary = (axis: AssetCategoryAxisDocument): string => {
  */
 export const AssetCategoryAxisList = ({
   axes,
+  debtOptions,
   onEdit,
   onDelete,
 }: AssetCategoryAxisListProps): JSX.Element => {
@@ -72,31 +87,48 @@ export const AssetCategoryAxisList = ({
   return (
     <Card className="py-0">
       <ul className="divide-y divide-border">
-        {axes.map((axis, index) => (
-          <li key={axis.id} className="flex items-center gap-3 px-5 py-4">
-            <span
-              aria-hidden
-              className="h-3 w-3 shrink-0 rounded-full"
-              style={{ backgroundColor: resolveDotColor(index) }}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{axis.name}</p>
-              <p className="text-xs text-muted-foreground">{buildMemberSummary(axis)}</p>
-            </div>
-            <Button type="button" variant="ghost" size="sm" onClick={() => onEdit(axis)}>
-              編集
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={() => onDelete(axis)}
-            >
-              削除
-            </Button>
-          </li>
-        ))}
+        {axes.map((axis, index) => {
+          const references = resolveCategoryAxisDebtReferences(axis.debtIds, debtOptions);
+
+          return (
+            <li key={axis.id} className="flex items-center gap-3 px-5 py-4">
+              <span
+                aria-hidden
+                className="h-3 w-3 shrink-0 rounded-full"
+                style={{ backgroundColor: resolveDotColor(index) }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">{axis.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {buildMemberSummary(axis, references)}
+                  {/*
+                    B11で削除された負債を参照している軸にだけ注記を添える(B4)。行の一部
+                    として最初から出ている文字なので`role="status"`は付けない — 軸の数だけ
+                    ライブリージョンが並び、再描画のたびに読み上げが走ることになるため。
+                    動的に現れる編集フォーム側の案内にだけ付ける
+                  */}
+                  {references !== null && references.missingCount > 0 ? (
+                    <span className="ml-1 text-destructive">
+                      {buildCategoryAxisMissingDebtLabel(references.missingCount)}
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={() => onEdit(axis)}>
+                編集
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => onDelete(axis)}
+              >
+                削除
+              </Button>
+            </li>
+          );
+        })}
       </ul>
     </Card>
   );

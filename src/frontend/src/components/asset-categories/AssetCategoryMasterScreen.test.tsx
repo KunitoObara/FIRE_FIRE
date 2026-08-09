@@ -432,6 +432,77 @@ describe("AssetCategoryMasterScreen(負債)", () => {
     });
   });
 
+  /**
+   * フォームは初期値をマウント時に一度だけstateへ写し取るので、編集を開いたあとに負債の
+   * 一覧が読み終わると、絞り込み前の値がstateに残る。そのまま保存すると「選択から
+   * 外しました」と出しながら参照だけが書き戻り、案内と保存内容が食い違う(B11-2)。
+   */
+  it("編集を開いたあとに負債の一覧が読み終わっても、削除済みの参照を保存し直さない", async () => {
+    const user = userEvent.setup();
+    let resolveDebts: (result: DebtsResult) => void = () => {};
+    fetchDebts.mockReturnValue(
+      new Promise<DebtsResult>((resolve) => {
+        resolveDebts = resolve;
+      }),
+    );
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage", "debt-deleted"] }],
+    });
+    renderScreen();
+
+    // 負債の選択肢がまだ読めていない状態で編集フォームを開く(この時点では絞り込めない)
+    await user.click(await screen.findByRole("button", { name: "編集" }));
+    expect(await screen.findByText(/負債の選択肢を読み込んでいます/u)).toBeInTheDocument();
+
+    resolveDebts({ ok: true, debts: [mortgage] });
+
+    // 読み終わってから保存する。住宅ローンのチェックには触らない
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
+    });
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(updateCategoryAxis).toHaveBeenCalledWith(
+        "total-assets",
+        expect.objectContaining({ debtIds: ["debt-mortgage"] }),
+      );
+    });
+  });
+
+  /**
+   * 黙って外すと、分類軸が何を差し引いているかが変わったことに気付けない(B11-2)。
+   * B8が対象分類の削除で既定へ戻すときに出しているのと同じ扱い。
+   */
+  it("編集フォームでは、外した参照の件数と保存で消えることを案内する", async () => {
+    const user = userEvent.setup();
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage", "debt-deleted"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "編集" }));
+
+    expect(
+      await screen.findByText(/負債のうち1件が見つからないため、選択から外しました/u),
+    ).toBeInTheDocument();
+    // エラーではなく集計の基準が変わった事実の通知なので、保存自体は妨げない
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
+  });
+
+  /** 新規追加は参照を持たないので、案内が出てはいけない */
+  it("新規追加のフォームには外した参照の案内を出さない", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "新規分類を追加" }));
+
+    expect(await screen.findByRole("checkbox", { name: /住宅ローン/u })).toBeInTheDocument();
+    expect(screen.queryByText(/選択から外しました/u)).not.toBeInTheDocument();
+  });
+
   /** 負債を含む軸かどうかが一覧で分からないと、B1の値が資産合計と違う理由が追えない */
   it("一覧には負債を含む軸だけ件数を添える", async () => {
     fetchCategoryAxes.mockResolvedValue({
@@ -442,6 +513,37 @@ describe("AssetCategoryMasterScreen(負債)", () => {
 
     expect(await screen.findByText(/負債 1件/u)).toBeInTheDocument();
     expect(screen.getByText("すべての資産種別が対象")).toBeInTheDocument();
+  });
+
+  /**
+   * 件数を参照の数で出すと、一覧の「負債 2件」とB1で差し引かれている額が食い違い、
+   * 一覧に件数を出した目的そのものを外す(B11-2)。
+   */
+  it("一覧の件数は実際に差し引かれる負債の数で出し、削除済みの件数を別に添える", async () => {
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...NET_FINANCIAL_AXIS, debtIds: ["debt-mortgage", "debt-deleted"] }],
+    });
+    renderScreen();
+
+    expect(await screen.findByText(/負債 1件/u)).toBeInTheDocument();
+    expect(screen.getByText("(1件は削除済み)")).toBeInTheDocument();
+  });
+
+  /**
+   * 登録済みの負債が分からない状態では削除済みかどうかを判定できない。
+   * 「取得に失敗しただけ」を「削除された」と読ませない(B11-2)。
+   */
+  it("負債の選択肢を取得できないあいだは、一覧に削除済みの件数を出さない", async () => {
+    fetchDebts.mockResolvedValue({ ok: false, reason: "unknown" });
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...NET_FINANCIAL_AXIS, debtIds: ["debt-mortgage", "debt-deleted"] }],
+    });
+    renderScreen();
+
+    expect(await screen.findByText(/負債 2件/u)).toBeInTheDocument();
+    expect(screen.queryByText(/は削除済み/u)).not.toBeInTheDocument();
   });
 
   /** 集計対象が割り当てられた軸を消させない制約を資産・負債で分ける理由が無い(B4) */
