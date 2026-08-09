@@ -5,7 +5,7 @@ description: Takes a finished card from commit through push to a pull request ag
 
 # 実装完了 → PR → 確認中へ
 
-[docs/development-workflow.md](../../../docs/development-workflow.md) が正本。**まずこの文書を読む**。PR本文のフォーマット、コミット規約、検証コマンド、リストIDはそこにある。
+[docs/development-workflow.md](../../../docs/development-workflow.md) が正本。**先に5〜6章を読む**(PR規約と分ける目安・PR前の検証とセルフレビュー)。PR本文のフォーマット、コミット規約、検証コマンド、セルフレビューの観点はそこにある。リストIDは2章。文書全体を読む必要はない。
 
 ## 手順
 
