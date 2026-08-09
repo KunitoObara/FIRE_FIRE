@@ -65,8 +65,32 @@ export const DEBT_OPTIONS_UNAVAILABLE_NOTICE =
  * **負債を含む軸にだけ出す。** 含まない軸に「負債なし」と書き添えると、大半の軸に
  * 同じ但し書きが並ぶだけになる。負債を含む軸かどうかが一覧で分からないと、
  * B1で値が資産合計と違う理由が追えない。
+ *
+ * 数えるのは**実際に差し引かれる負債**で、B11で削除済みの参照は含めない
+ * (削除済みの分は`buildCategoryAxisMissingDebtLabel`で別に添える)。
  */
 export const buildCategoryAxisDebtCountLabel = (count: number): string => `負債 ${count}件`;
+
+/**
+ * 一覧で、B11で削除済みの負債を参照している軸にだけ件数へ添える注記(B4)。
+ *
+ * 黙って外すと、その分類軸が何を差し引いているかが変わったことに気付けず、B1の値が
+ * 前と違う理由を追えなくなる。B8が対象分類の削除で既定へ戻すときに「その旨を表示する」
+ * としているのと同じ理由(docs/screen-requirements-fire-goal.md B8)。
+ */
+export const buildCategoryAxisMissingDebtLabel = (count: number): string =>
+  `(${count}件は削除済み)`;
+
+/**
+ * 編集フォームで、B11で削除済みの負債への参照を選択から外したことの案内(B4)。
+ *
+ * 文言はB8の`ACHIEVEMENT_AXIS_MISSING_MESSAGE`に揃える —
+ * 「見つからない」→「こう扱った」→「必要なら選び直して保存」の順。
+ * 保存すれば分類軸に残っている参照も消えることまで書くのは、外した状態が画面上だけの
+ * ものなのか保存済みなのかが、チェックボックスの見た目からは分からないため。
+ */
+export const buildCategoryAxisMissingDebtMessage = (count: number): string =>
+  `集計対象にしていた負債のうち${count}件が見つからないため、選択から外しました。この内容で保存すると、分類軸に残っている参照も消えます。`;
 
 /** 集計対象の選択肢がまだ無いときの案内(CSVを一度も取り込んでいない状態) */
 export const NO_ASSET_TYPE_OPTIONS_NOTICE =
