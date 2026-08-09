@@ -28,7 +28,8 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
      cid = sys.argv[1]
      if not re.fullmatch(r'[0-9a-f]{24}', cid):
          sys.exit('TrelloのカードID(24桁の16進)を渡すこと。[B7] のような表示上のIDではない')
-     print(datetime.datetime.fromtimestamp(int(cid[:8], 16), datetime.UTC))
+     # datetime.UTC は3.11以降のエイリアス。timezone.utc なら3.2から動く
+     print(datetime.datetime.fromtimestamp(int(cid[:8], 16), datetime.timezone.utc))
      " 6a7751a96c0eebb2a2d97faa
      ```
    - **渡すのは `mcp__trello__get_cards_by_list_id` / `get_card` が返す24桁の `id`。** カード名の `[B7]` や `[X0-8]` ではない。この文書の他の箇所(§2 の引数、§6 のブランチ名)で「カードID」と呼んでいるのは後者なので、ここだけ指すものが違う
