@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `docs/.env` is a real secrets file (excluded via `.gitignore`) — never read, print, or commit its contents.
 
+**This repository is public.** The developer's own financial figures must never enter it: fixtures, docstrings, and mock screens use obviously-fake round amounts, not rows pasted out of a real Money Forward export. The same goes for real addresses and personal email addresses — sample screens use `〇〇マンション101号室` / `taro.yamada@example.com`. Firebase's `NEXT_PUBLIC_*` values are already public in the deployed bundle and are supplied via GitHub Secrets / Secret Manager, so nothing about them belongs in a committed file either. Note that pull requests can now come from forks, where secrets are unavailable — a fork PR's `frontend` and `claude-review` jobs are expected to fail, and that is not a regression to chase.
+
 ## Documentation map
 
 - [docs/fire-asset-management-requirements.md](docs/fire-asset-management-requirements.md) — top-level requirements: architecture, features, phased MVP scope. Read this first; other docs detail specific sections of it.
