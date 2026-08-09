@@ -22,7 +22,7 @@
       "Bash(gh pr comment:*)",
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
-      "Bash(gh api repos/KunitoObara/private_room/pulls/*/comments*)",
+      "Bash(gh api repos/KunitoObara/FIRE_FIRE/pulls/*/comments*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)"

@@ -35,7 +35,7 @@ claude-review は `main` 上のワークフローファイルと一致すると�
 ### 3. 指摘を集める
 
 - 全体コメント: `gh pr view <番号> --comments`
-- インラインコメント: `gh api repos/KunitoObara/private_room/pulls/<番号>/comments`
+- インラインコメント: `gh api repos/KunitoObara/FIRE_FIRE/pulls/<番号>/comments`
 - CIの失敗内容: `gh run view <run-id> --log-failed`
 
 前回のラウンド以降に付いたものだけを対象にする(`created_at` で絞る)。対応済みの指摘を数え直さない。

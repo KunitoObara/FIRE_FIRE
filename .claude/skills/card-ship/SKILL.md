@@ -60,7 +60,7 @@ PRは `develop` 宛。タイトルはコミットタイトルと同じ。本文�
 2. `mcp__trello__add_comment` でPRのURLをカードにコメントする
 
 ```
-PR: https://github.com/KunitoObara/private_room/pull/<番号>
+PR: https://github.com/KunitoObara/FIRE_FIRE/pull/<番号>
 ```
 
 このコメントは、次回 `/card-start` がマージ状況を照合するときの手がかりにもなる。
