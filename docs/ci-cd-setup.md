@@ -240,9 +240,9 @@ API Error: Header 'Authorization' has invalid value
 401 Unauthorized - Claude Code is not installed on this repository.
 ```
 
-**自動レビューはデフォルトブランチ（`main`）に入るまで動かない**
+**自動レビューはデフォルトブランチ（`develop`）に入るまで動かない**
 
-App をインストールしても、`claude-review.yml` が `main` に存在して**内容が完全一致**するまで、action は Claude を起動せずスキップする。PR 側でワークフローを書き換えて `ANTHROPIC_API_KEY` を盗み出す攻撃を防ぐための仕様。
+App をインストールしても、`claude-review.yml` がデフォルトブランチに存在して**内容が完全一致**するまで、action は Claude を起動せずスキップする。PR 側でワークフローを書き換えて `ANTHROPIC_API_KEY` を盗み出す攻撃を防ぐための仕様。
 
 ```
 Skipping action due to workflow validation: The workflow file must exist and have
@@ -251,10 +251,10 @@ identical content to the version on the repository's default branch.
 
 スキップされてもジョブは**成功扱いで終わる**ため、「CI は緑なのにレビューコメントだけ付かない」という見え方になる。原因を調べるときはジョブのログを確認する。
 
-本リポジトリのブランチモデル（feature → `develop` → `main`）では、検証先は常にデフォルトブランチの `main` である点に注意する。
+本リポジトリのデフォルトブランチは **`develop`** である（`main` ではない。理由は [X9] — Dependabot のセキュリティ更新PRがデフォルトブランチに向くため、`main` のままだと本番へ直行する）。したがって検証先も `develop` になる。
 
-- `develop` へマージしただけでは動かない。`develop` → `main` のマージまで済ませて初めて、以降の PR でレビューが投稿される
-- 同じ理由で、`claude-review.yml` を後から編集した場合、その変更は `main` に入るまで反映されない（編集を含む PR 自体は再びスキップされる）
+- `claude-review.yml` を編集した場合、その変更は `develop` に入るまで反映されない（編集を含む PR 自体は再びスキップされる）
+- **デフォルトブランチが `main` だった頃は `develop` → `main` のマージまで済ませないと反映されなかった。** 1段ぶん早く効くようになっている
 
 `main` 向けには GitHub Environment `production` を作成し、承認を必須にするかを判断する（`deploy.yml` は `main` で `production`、`develop` で `development` の Environment を参照する）。
 
