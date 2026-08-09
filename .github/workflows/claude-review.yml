@@ -2,16 +2,46 @@ name: Claude PR Review
 
 # PR作成時・追加push時にClaudeがレビューコメントを投稿する。
 # コメントのみで、マージのブロック条件にはしない(必須ステータスチェックには含めない)。
+#
+# 自動で走るのはリポジトリ内のブランチから出たPRだけ。fork から出たPRは下の`if`で
+# スキップし、レビューしたい場合はオーナーが`workflow_dispatch`で明示的に実行する。
 on:
   pull_request:
     types:
       - opened
       - synchronize
+  # 外部PRをレビューするための手動実行。`pull_request`と違いベースリポジトリの文脈で
+  # 走るため、fork からのPRでもSecretsが使える。実行できるのは書き込み権限を持つ者だけ。
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "レビューするPRの番号"
+        required: true
+        type: number
 
 jobs:
   review:
     name: claude-review
     runs-on: ubuntu-latest
+    # fork からのPRにはSecretsが渡らず、`claude_code_oauth_token`が空のままジョブが
+    # 失敗する。レビューできないことに変わりはないので、失敗させずスキップする。
+    #
+    # 判定の主役は`head.repo.full_name`のほう。**Secretsが使えるかどうかを直接決めるのが
+    # fork かどうかだから**である。リポジトリ内へブランチをpushできるのは書き込み権限を
+    # 持つ者だけなので、この条件は信頼性の判定も兼ねる。`author_association`を重ねて
+    # いるのは「オーナーとコラボレーター以外は自動レビューしない」という意図を式の上で
+    # 読めるようにするためで、判定を厳しくするためではない。
+    #
+    # 両方を見ることで、オーナー自身が fork から出したPR(`author_association`は`OWNER`
+    # だがSecretsは渡らない)もスキップ側に倒れる。この場合も自動では失敗させず、
+    # 必要なら`workflow_dispatch`でレビューする。
+    #
+    # 継続行は`if:`の1行目と同じ深さに揃えること。`>-`は行頭がより深い行を折りたたまず
+    # 改行を残すため、インデントを付けると式に改行が混ざる。
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.pull_request.head.repo.full_name == github.repository
+      && contains(fromJSON('["OWNER", "COLLABORATOR", "MEMBER"]'), github.event.pull_request.author_association))
     permissions:
       contents: read
       pull-requests: write
@@ -25,10 +55,26 @@ jobs:
       # docs/.env もチェックアウトに含まれないから。歯止めを必要とする権限を
       # 持つワークフローには、この変数を渡してはならない。
       CLAUDE_GUARD_DISABLE: "1"
+      # レビュー対象のPR番号。トリガーによって取り出し先が違うのでここで一本化する。
+      PR_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || github.event.pull_request.number }}
     steps:
-      - uses: actions/checkout@v4
+      # `pull_request`の既定のチェックアウト(`refs/pull/<番号>/merge`)をそのまま使う。
+      - name: PRをチェックアウトする(自動レビュー)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      # 手動実行では対象PRが`github.ref`に現れないため、明示的に取りに行く。
+      # `merge`ではなく`head`を指すのは、コンフリクトしているPRでは`merge`refが
+      # 作られずチェックアウトごと失敗するため。レビューに要るのはPR側の内容なので
+      # ベースとの合流結果までは要らない。
+      - name: 対象PRをチェックアウトする(手動実行)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: refs/pull/${{ inputs.pr_number }}/head
 
       - uses: anthropics/claude-code-action@v1
         with:
@@ -38,7 +84,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR NUMBER: ${{ env.PR_NUMBER }}
 
             このPRをレビューしてください。PRブランチは既に作業ディレクトリにチェックアウト済みです。
             レビューコメントは日本語で書いてください。
@@ -48,7 +94,7 @@ jobs:
             1. 要件との整合
                - ルートの CLAUDE.md と docs/ 配下の要件(特に docs/fire-asset-management-requirements.md、
                  docs/screen-list-and-transitions.md、docs/screen-requirements-*.md)と矛盾していないか
-               - 画面(A1〜A7 / B1〜B10)の実装は、対応する画面要件の項目・遷移条件を満たしているか
+               - 画面(A1〜A8 / B1〜B11)の実装は、対応する画面要件の項目・遷移条件を満たしているか
             2. コーディング規約
                - src/frontend/docs/CODING_STANDARDS.md に沿っているか(命名、import順、
                  Server / Client Componentsの使い分け、スタイリング方針)

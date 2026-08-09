@@ -378,7 +378,8 @@ bash .claude/hooks/run-dangerous-command-tests.sh
 ## 9. 前提と制約
 
 - CI4ジョブ(`wip-check` / `hooks` / `frontend` / `backend`)は `develop`・`main` の必須ステータスチェックで、赤ければマージボタンが押せない。リポジトリを公開するまでは有効にできず「慣例として必須」に留めていたもので、設定内容は [ci-cd-setup.md](./ci-cd-setup.md) 6章にある
-- **fork からのPRでは `frontend` と `claude-review` が必ず失敗する。** Secretsが渡らないためで、退行ではない
+- **fork からのPRでは `frontend` が必ず失敗する。** Secretsが渡らないためで、退行ではない
+- **fork からのPRでは claude-review は走らずスキップされる。** 同じくSecretsが渡らないが、失敗させても得るものが無いのでジョブの`if`で除いてある。レビューしたい場合はオーナーが `workflow_dispatch` でPR番号を指定して実行する([ci-cd-setup.md](./ci-cd-setup.md) 3章)
 - claude-review は**デフォルトブランチ(`develop`)上**のワークフローファイルと一致するときだけ実際に動く。編集しても `develop` に載るまで効かないので、レビューコメントを待つ側は「ボットが動いていない」ケースを空振りせずに判定すること(`gh run list --workflow claude-review.yml --branch <ブランチ>` で実行有無を確認する)
 - claude-review は必須チェックではない。コメントを投稿するだけでマージをブロックしない
 
