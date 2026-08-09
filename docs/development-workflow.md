@@ -378,6 +378,19 @@ bash .claude/hooks/run-dangerous-command-tests.sh
 ## 9. 前提と制約
 
 - CI4ジョブ(`wip-check` / `hooks` / `frontend` / `backend`)は `develop`・`main` の必須ステータスチェックで、赤ければマージボタンが押せない。リポジトリを公開するまでは有効にできず「慣例として必須」に留めていたもので、設定内容は [ci-cd-setup.md](./ci-cd-setup.md) 6章にある
-- **fork からのPRでは `frontend` と `claude-review` が必ず失敗する。** Secretsが渡らないためで、退行ではない
-- claude-review は `main` 上のワークフローファイルと一致するときだけ実際に動く。編集しても `main` に載るまで効かないので、レビューコメントを待つ側は「ボットが動いていない」ケースを空振りせずに判定すること(`gh run list --workflow claude-review.yml --branch <ブランチ>` で実行有無を確認する)
+- **fork からのPRでは `frontend` が必ず失敗する。** Secretsが渡らないためで、退行ではない
+- **fork からのPRでは claude-review は走らずスキップされる。** 同じくSecretsが渡らないが、失敗させても得るものが無いのでジョブの`if`で除いてある。レビューしたい場合はオーナーが `workflow_dispatch` でPR番号を指定して実行する([ci-cd-setup.md](./ci-cd-setup.md) 3章)
+- claude-review は**デフォルトブランチ(`develop`)上**のワークフローファイルと一致するときだけ実際に動く。編集しても `develop` に載るまで効かないので、レビューコメントを待つ側は「ボットが動いていない」ケースを空振りせずに判定すること(`gh run list --workflow claude-review.yml --branch <ブランチ>` で実行有無を確認する)
 - claude-review は必須チェックではない。コメントを投稿するだけでマージをブロックしない
+
+### デフォルトブランチは `develop`
+
+`main` ではない。**Dependabot はセキュリティ更新のPRをデフォルトブランチに向けて出し、その向き先を変える設定が無いため**である。`dependabot.yml` の `target-branch` はバージョン更新のための設定で、[GitHubのドキュメント](https://docs.github.com/en/code-security/dependabot/dependabot-security-updates/configuring-dependabot-security-updates)は「セキュリティ更新にこの設定を使わせたいなら `target-branch` を指定してはならない」としている。指定するとその設定ブロックがセキュリティ更新に適用されなくなるだけで、PRは結局デフォルトブランチに向く。
+
+`main` をデフォルトのままにすると、Dependabot のPRをマージした瞬間に `develop` を通さず本番(`fire-fire-prod`)へデプロイされる。CIは走るので壊れたものは入らないが、STGでの確認を飛ばすことになる。
+
+この変更には副次的な効果がある。
+
+- `gh pr create` とWeb UIの既定のベースが `develop` になる。feature ブランチのPRが欲しいベースそのものなので、`--base` の付け忘れで `main` に向く事故が消える
+- 逆に **`develop` → `main` のリリースPRは `--base main` の明示が要る**。本番向けのPRを明示的に作る形になるのは望ましい
+- claude-review の検証先もデフォルトブランチなので、`claude-review.yml` の変更が1段早く効くようになった(上の項目を参照)
