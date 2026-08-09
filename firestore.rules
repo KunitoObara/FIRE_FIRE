@@ -21,10 +21,8 @@ service cloud.firestore {
     // メール未確認のアカウントを弾くのは、アドレスの所有者ではない相手が作った
     // アカウントに資産データを溜めさせないため(A2でメール確認を必須にしているのと同じ理由)。
     //
-    // 2FA(TOTP)はアプリの必須要件だが、ここでは`sign_in_second_factor`を要求しない。
-    // Authエミュレータが TOTP を実装しておらずローカルでこの請求を持つトークンを作れないため、
-    // 要求するとデータを扱う画面がすべてエミュレータで動かせなくなる
-    // (docs/ci-cd-setup.md 11章と同じ制約)。2FAの強制は認証フロー側で行う。
+    // 2FA(TOTP)の完了もここで要求する。詳しくは`hasCompletedTotp()`の注記を見ること。
+
     // アプリが日付を持つ書式(`yyyy-MM-dd`。src/constants/csv-import.ts の STORED_DATE_FORMAT)。
     // 資産残高のドキュメントIDにも使うため、形の崩れた日付を作らせない
     function isIsoDate(value) {
@@ -130,10 +128,24 @@ service cloud.firestore {
       return value == null || (value is string && value.size() > 0 && value.size() <= 200);
     }
 
-    function isOwner(userId) {
+    // 2FA(TOTP)まで済ませたセッションからのアクセスか(docs/auth-login-requirements.md 3.3)。
+    //
+    // 2FAは全ユーザー必須で、登録が済むまで主要機能を使わせない。画面側の`AppAccessGuard`は
+    // 表示制御でしかないため、パスワードが漏れた相手がTOTPを突破しないままクライアントSDKや
+    // REST APIで直接叩く経路は、ここで止めるほかない。それを許すと2FAを必須にした意味が無い。
+    //
+    // `sign_in_second_factor`は第2要素を検証したセッションのIDトークンにだけ載る。
+    // 本アプリが登録する2要素目はTOTPだけなので値も`totp`に限る(電話番号MFAは使わない)。
+    // 請求が無いトークンで評価エラーにせず`null`を返させたいので`get`で読む。
+    function hasCompletedTotp() {
+      return request.auth.token.firebase.get('sign_in_second_factor', null) == 'totp';
+    }
+
+    function canAccessOwnData(userId) {
       return request.auth != null
         && request.auth.uid == userId
-        && request.auth.token.email_verified == true;
+        && request.auth.token.email_verified == true
+        && hasCompletedTotp();
     }
 
     match /users/{userId} {
@@ -146,8 +158,8 @@ service cloud.firestore {
       // `request.resource`が存在せず下の検証式が評価できないため、意図が読めないまま
       // 削除だけが落ちる。許可する操作は1つずつ書く。
       match /assetSnapshots/{date} {
-        allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId)
+        allow read: if canAccessOwnData(userId);
+        allow create, update: if canAccessOwnData(userId)
           // 想定外のフィールドを混ぜて書けないようにする。B1がこのデータを直接集計する
           // ようになったとき、読み出し側で形を疑わずに済むようにしておく
           && request.resource.data.keys().hasOnly(['date', 'total', 'byType', 'importedAt'])
@@ -167,8 +179,8 @@ service cloud.firestore {
       // 取込履歴(B2の「直近の取込履歴」)。取り消し・改ざんの余地を残さないよう、
       // 追加と参照だけを許し、更新・削除は禁じる。
       match /csvImports/{importId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId)
+        allow read: if canAccessOwnData(userId);
+        allow create: if canAccessOwnData(userId)
           && request.resource.data.keys().hasOnly(
             ['typeId', 'fileName', 'rowCount', 'periodFrom', 'periodTo', 'importedAt']
           )
@@ -192,8 +204,8 @@ service cloud.firestore {
       // 負債はIDを持ち、同じ名前の負債を複数登録できるため。`assetTypeNames`と違い、
       // **空配列は「負債を差し引かない」を意味する**(「未選択=すべて」の読み替えを適用しない)。
       match /categoryAxes/{axisId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId)
+        allow read: if canAccessOwnData(userId);
+        allow create: if canAccessOwnData(userId)
           && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'createdAt'])
           && request.resource.data.name is string
           // 文字数の上限はsrc/constants/asset-categories.tsのCATEGORY_AXIS_NAME_MAX_LENGTHと揃える
@@ -208,7 +220,7 @@ service cloud.firestore {
           && request.resource.data.debtIds is list
           && request.resource.data.debtIds.size() <= 50
           && request.resource.data.createdAt is timestamp;
-        allow update: if isOwner(userId)
+        allow update: if canAccessOwnData(userId)
           && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'createdAt'])
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
@@ -227,7 +239,7 @@ service cloud.firestore {
         // 消させないという制約を資産・負債で分ける理由が無いため(B4の遷移条件)。
         // `debtIds`は後から足したフィールドなので、持たない既存のドキュメントでも
         // 評価が落ちないよう`get`の既定値で受ける(持たない=負債を差し引かない、と同じ意味)。
-        allow delete: if isOwner(userId)
+        allow delete: if canAccessOwnData(userId)
           && resource.data.assetTypeNames.size() == 0
           && resource.data.get('debtIds', []).size() == 0;
       }
@@ -240,16 +252,16 @@ service cloud.firestore {
       // 参照されているだけの負債も消せる。参照が残った分類軸は、その負債を集計対象から
       // 外して計算する(B1「負債を含む分類軸の集計」)。
       match /debts/{debtId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId)
+        allow read: if canAccessOwnData(userId);
+        allow create: if canAccessOwnData(userId)
           && isValidDebt(request.resource.data)
           && request.resource.data.createdAt is timestamp;
         // B11のフォームの並び順(登録順)が保存のたびに入れ替わらないよう、
         // 登録日時は編集で変えさせない(categoryAxes・propertiesと同じ扱い)
-        allow update: if isOwner(userId)
+        allow update: if canAccessOwnData(userId)
           && isValidDebt(request.resource.data)
           && request.resource.data.createdAt == resource.data.createdAt;
-        allow delete: if isOwner(userId);
+        allow delete: if canAccessOwnData(userId);
       }
 
       // FIRE目標(B8 FIRE目標設定画面)。ユーザーごとに1件で、ドキュメントIDは`fireGoal`固定。
@@ -257,10 +269,10 @@ service cloud.firestore {
       // 無いため(src/frontend/src/lib/fire-goal/fire-goal-repository.ts)。
       // ここに書いていない`settings`配下のドキュメントは末尾の既定拒否で弾かれる。
       match /settings/fireGoal {
-        allow read: if isOwner(userId);
+        allow read: if canAccessOwnData(userId);
         // 初回設定も設定変更も`setDoc`でドキュメントを丸ごと置き換えるため、
         // create/updateで同じ形を要求する
-        allow create, update: if isOwner(userId)
+        allow create, update: if canAccessOwnData(userId)
           && request.resource.data.keys().hasOnly(
             ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'updatedAt']
           )
@@ -289,9 +301,9 @@ service cloud.firestore {
       // 資産種別名がCSVの列名そのもので`/`のようにドキュメントIDに使えない文字が
       // 混じりうるため(src/frontend/src/lib/assumptions/assumption-repository.ts)。
       match /settings/assumptions {
-        allow read: if isOwner(userId);
+        allow read: if canAccessOwnData(userId);
         // 一覧の全行をまとめて`setDoc`で置き換えるため、create/updateで同じ形を要求する
-        allow create, update: if isOwner(userId)
+        allow create, update: if canAccessOwnData(userId)
           && request.resource.data.keys().hasOnly(['entries', 'updatedAt'])
           && request.resource.data.keys().hasAll(['entries', 'updatedAt'])
           // `entries`は資産種別名をキーにしたマップで、資産種別が動的に増減するため
@@ -309,14 +321,14 @@ service cloud.firestore {
       // 物件(B5 不動産一覧・B6 不動産詳細・B7 不動産登録/編集)。
       // 資産残高と違いCSV由来ではなく、すべてB7の手入力なので、書ける形をここで縛る。
       match /properties/{propertyId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId)
+        allow read: if canAccessOwnData(userId);
+        allow create: if canAccessOwnData(userId)
           && isValidProperty(request.resource.data)
           && request.resource.data.createdAt is timestamp;
         // 一覧の並び順(登録順)が編集のたびに入れ替わらないよう、登録日時は編集で変えさせない
         // (categoryAxesと同じ扱い)。`updateDoc`はドキュメント全体に対して評価されるため、
         // クライアントが`createdAt`を送らなくても既存の値がここに現れる
-        allow update: if isOwner(userId)
+        allow update: if canAccessOwnData(userId)
           && isValidProperty(request.resource.data)
           && request.resource.data.createdAt == resource.data.createdAt;
         // 物件を削除する画面はまだ無い(B5〜B7の要件に削除は含まれない)。
