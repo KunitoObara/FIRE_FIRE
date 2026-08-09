@@ -23,10 +23,21 @@ GitHub Actions による CI（Lint・型チェック・テスト・ビルド）�
 
 `fire-fire-dev` / `fire-fire-prod` の**両方**で実施する。長期有効なサービスアカウント鍵は GitHub に置かない。
 
+> **リポジトリのフルネームが2箇所に焼き込まれる。** 下のプロバイダの `--attribute-condition` と、サービスアカウントの IAM バインディングの `principalSet` である。GitHub の OIDC トークンの `repository` クレームは**現在の**名前を返すため、リポジトリを改名したり Organization へ移管したりすると、両方を直すまで `deploy.yml` の認証ステップが落ちる。dev / prod の2プロジェクト × 2箇所で計4箇所。
+>
+> 直す順番は「先に広げてから改名する」。デプロイが落ちる時間帯を作らずに済む。
+>
+> 1. 条件を `assertion.repository == '<旧>' || assertion.repository == '<新>'` に広げ、新名の `principalSet` を**追加**する（`gcloud iam workload-identity-pools providers update-oidc` と `add-iam-policy-binding`）
+> 2. GitHub 側で改名する
+> 3. `develop` へのマージでデプロイが緑になるのを確認する
+> 4. 条件を新名だけに戻し、旧名の `principalSet` を `remove-iam-policy-binding` で外す
+>
+> 3 の確認前に 4 をやらないこと。認証が通ることを確かめないまま退路を断つことになる。
+
 ```bash
 # ここを dev / prod で切り替えて2回実行する
 PROJECT_ID=fire-fire-dev
-GITHUB_REPO=KunitoObara/private_room
+GITHUB_REPO=KunitoObara/FIRE_FIRE
 
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 SA="github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
@@ -223,7 +234,7 @@ API Error: Header 'Authorization' has invalid value
 
 **Claude GitHub App のインストール**
 
-トークンの登録だけでは PR 自動レビューは動かない。https://github.com/apps/claude からアプリを **`KunitoObara/private_room` に対してインストール**する必要がある。未インストールだと `claude-review` ジョブが以下のエラーで失敗する（CI の必須チェックには含めていないため、マージ自体はブロックされない）。
+トークンの登録だけでは PR 自動レビューは動かない。https://github.com/apps/claude からアプリを **`KunitoObara/FIRE_FIRE` に対してインストール**する必要がある。未インストールだと `claude-review` ジョブが以下のエラーで失敗する（CI の必須チェックには含めていないため、マージ自体はブロックされない）。
 
 ```
 401 Unauthorized - Claude Code is not installed on this repository.
@@ -258,7 +269,7 @@ firebase apphosting:backends:create --project fire-fire-dev
 対話で以下を指定する。
 
 - リージョン: `asia-east1`（東京に近い対応リージョンを選ぶ）
-- GitHub リポジトリ: `KunitoObara/private_room`
+- GitHub リポジトリ: `KunitoObara/FIRE_FIRE`
 - ルートディレクトリ: `src/frontend`
 - ライブブランチ: **設定しない／自動ロールアウトは無効にする**（デプロイは `deploy.yml` から明示的に行うため）
 - バックエンド ID: 例 `fire-fire`（`fire-fire-prod` でも同じ ID で作成し、3章の `APPHOSTING_BACKEND_ID` に設定する）
@@ -432,7 +443,7 @@ Error: Failed to authenticate, have you run firebase login?
 [firebase-tools#10717](https://github.com/firebase/firebase-tools/pull/10717) が `GoogleAuth` に keep-alive しないエージェントを渡す回避を入れ、**15.22.3** で出荷された。`deploy.yml` はこれを含む 15.26.0 に固定している。**バージョンを下げるときは 15.22.3 を下回らせないこと。**
 
 > **かつて「15.22.2 以降の回帰なので 15.22.1 に固定して回避している」と書いていたのは誤り。**
-> 15.22.1 と 15.22.3 の `google-auth-library` 依存はどちらも `^9.11.0` で同一なので、15.22.1 も同じリグレッションを踏む。固定先が回避の入る手前を指していたぶん、むしろ踏み続ける状態だった。実際、15.22.1 に固定したまま失敗した（[PR #54 マージ後のデプロイ](https://github.com/KunitoObara/private_room/actions/runs/31123642113)。再実行3回目で成功）。
+> 15.22.1 と 15.22.3 の `google-auth-library` 依存はどちらも `^9.11.0` で同一なので、15.22.1 も同じリグレッションを踏む。固定先が回避の入る手前を指していたぶん、むしろ踏み続ける状態だった。実際、15.22.1 に固定したまま失敗した（[PR #54 マージ後のデプロイ](https://github.com/KunitoObara/FIRE_FIRE/actions/runs/31123642113)。再実行3回目で成功）。
 >
 > 切り分けの参考として、否定できた仮説も残しておく。
 >
