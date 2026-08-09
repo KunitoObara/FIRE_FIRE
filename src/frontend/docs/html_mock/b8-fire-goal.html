@@ -38,6 +38,10 @@
         <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V10l9-6 9 6v11" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 21v-7h6v7" stroke-linecap="round" stroke-linejoin="round"/></svg>
         不動産一覧
       </a>
+      <a class="sidebar-link" href="b11-debt-input.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18" stroke-linecap="round"/><path d="M8 15h4" stroke-linecap="round"/></svg>
+        負債入力
+      </a>
       <div class="my-2 border-t" style="border-color: hsl(var(--border));"></div>
       <a class="sidebar-link sidebar-link-active" href="b8-fire-goal.html">
         <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -85,10 +89,29 @@
     <main class="flex-1 overflow-y-auto p-6 max-w-2xl flex flex-col gap-5">
 
       <div class="alert alert-info">
-        <span>現在の設定方式: <strong>直接入力</strong>・現在資産額 <strong class="tabular-nums">49,600,000円</strong>(参考表示)</span>
+        <span>現在の設定方式: <strong>直接入力</strong>・現在資産額 <strong class="tabular-nums">49,600,000円</strong>(投資性資産・参考表示)</span>
       </div>
 
       <section class="card p-6">
+        <!--
+          達成度の対象分類(docs/screen-requirements-fire-goal.md「達成度の対象分類」)。
+          達成率の分子である現在資産額をどの範囲で数えるかの設定で、目標額の決め方(直接入力/逆算)
+          とは別の話なので、タブの外に置いて両方式で共通の設定にする。
+          選択肢は「総資産(マネーフォワードの合計)」+ B4で登録済みの分類軸。既定は前者。
+        -->
+        <div class="field mb-6 pb-6 border-b" style="border-color: hsl(var(--border));">
+          <label class="label">達成度の対象分類</label>
+          <select class="input">
+            <option>総資産(マネーフォワードの合計)</option>
+            <option>純金融資産</option>
+            <option selected>投資性資産</option>
+          </select>
+          <p class="field-hint">
+            FIRE達成度の現在資産額をこの分類で集計します。B1のダッシュボードで切り替える分類軸とは別の設定です。
+            分類は<a class="link" href="b4-category-master.html">資産分類マスタ</a>で追加できます。
+          </p>
+        </div>
+
         <!-- タブ切替(非表示タブの入力値も保持する) -->
         <div class="tab-row mb-6">
           <span id="tab-direct" class="tab tab-active" onclick="selectTab('direct')">直接入力</span>
@@ -100,7 +123,7 @@
           <div class="field">
             <label class="label">目標資産額(円)</label>
             <input class="input tabular-nums" value="80000000" />
-            <p class="field-hint">現在資産額に対する達成率: 62%</p>
+            <p class="field-hint">現在資産額(投資性資産)に対する達成率: 62%</p>
           </div>
         </div>
 

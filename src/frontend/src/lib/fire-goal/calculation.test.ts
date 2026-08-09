@@ -10,6 +10,7 @@ const goal = (overrides: Partial<FireGoal>): FireGoal => ({
   targetAmount: 80_000_000,
   annualExpense: 3_600_000,
   withdrawalRate: 4,
+  achievementAxisId: null,
   ...overrides,
 });
 

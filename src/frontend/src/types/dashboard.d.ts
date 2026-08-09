@@ -61,13 +61,32 @@ declare global {
   /** 分類軸ごとの資産データ */
   type AssetAxisData = {
     netWorthSeries: NetWorthPoint[];
+    /** 資産種別の内訳。負債は含まない(符号の扱いが逆なため別に持つ) */
     breakdown: AssetBreakdownEntry[];
+    /**
+     * この分類軸が差し引く負債の残債合計(直近の資産残高の時点)。
+     *
+     * 負債を含まない分類軸は0。円グラフの負債スライスと、差引後の純額の併記に使う
+     * (docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」)。
+     */
+    debtTotal: number;
   };
 
   /** FIRE達成度ゲージの表示値。目標未設定なら`null`が渡る */
   type FireProgress = {
     targetAmount: number;
+    /**
+     * 現在資産額(円)。B8で設定した対象分類で集計する。
+     * B1の分類軸切替セレクタには追従しない(docs/screen-requirements-dashboard.md B1)
+     */
     currentAmount: number;
+    /** 現在資産額に併記する対象分類名。既定なら「総資産(マネーフォワードの合計)」 */
+    achievementAxisName: string;
+    /**
+     * 設定していた対象分類がB4で削除されていた場合に`true`。
+     * 既定で計算したうえで、カードにその旨とB8への導線を出すために使う(同要件B1)
+     */
+    achievementAxisMissing: boolean;
     /**
      * 到達予測日(`yyyy-MM-dd`)。想定利回り(B9)を前提に算出するため、
      * B1では計算せず算出済みの値を表示するだけにする。未算出は`null`
@@ -99,6 +118,13 @@ declare global {
     categories: AssetCategory[];
     /** 分類軸IDをキーにした資産データ */
     byAxis: Record<string, AssetAxisData>;
+    /**
+     * 登録済みの負債(B11)。負債サマリがそのまま並べる。
+     *
+     * 分類軸で絞ったものは渡さない。負債サマリは分類軸切替セレクタの影響を受けず、
+     * 絞ると「登録したのに出てこない負債」が生まれるため(同要件B1「負債サマリ」)。
+     */
+    debts: Debt[];
     fireProgress: FireProgress | null;
     cashflow: CashflowSummary | null;
   };
@@ -174,6 +200,14 @@ declare global {
     /** 見出しに添える分類軸の名前 */
     axisName: string;
     slices: AssetBreakdownSlice[];
+    /**
+     * 差引後の純額(対象の資産合計 - 対象の負債合計)。負債を含まない分類軸は`null`。
+     *
+     * 負債のスライスを置くと構成比の分母が「資産合計 + 負債合計」になり、%が純資産に
+     * 対する割合ではなくなる。そのことが分かるよう、負債を含む軸でだけ純額を併記する
+     * (docs/screen-requirements-dashboard.md B1)。
+     */
+    netAmount: number | null;
   };
 
   /** FIRE達成度カードのProps */

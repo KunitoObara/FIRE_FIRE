@@ -13,6 +13,17 @@ declare global {
     name: string;
     /** 集計対象の資産種別名(B2 CSV取込で実際に取り込まれた種別のみを選択肢にする) */
     assetTypeNames: string[];
+    /**
+     * 集計から差し引く負債のID(B11で登録した負債。B4「集計対象に負債を含める」)。
+     *
+     * 資産種別と**別のフィールド**で持つ。資産種別はCSVの列名(名前)が唯一の識別子だが、
+     * 負債はIDを持ち同じ名前の負債を複数登録できるため、同じ配列に混ぜると区別できない。
+     *
+     * `assetTypeNames`と違い、**空配列は「負債を差し引かない」を意味する**。
+     * 「未選択=すべて」の読み替えは資産種別にだけ適用する — 両方に適用すると、
+     * 負債の選択を持たない既存の分類軸が、負債の登録と同時に黙って純資産の軸へ変わる。
+     */
+    debtIds: string[];
     /** 登録日時(ISO 8601)。書き込み直後でサーバー時刻が未確定の間は`null` */
     createdAt: string | null;
   };
@@ -21,6 +32,7 @@ declare global {
   type AssetCategoryAxisFormValues = {
     name: string;
     assetTypeNames: string[];
+    debtIds: string[];
   };
 
   /**
@@ -54,12 +66,27 @@ declare global {
     | { status: "error"; message: string }
     | { status: "ready"; assetTypeNames: string[] };
 
+  /**
+   * 負債の選択肢の状態。読み込み中・取得失敗・取得済みを1つの値で表す。
+   *
+   * `AssetTypeOptionsState`と同じ理由で3つを型で分ける。空配列に倒すと「まだ読み込んで
+   * いない」「取得に失敗した」「負債を1件も登録していない」の区別が付かず、案内の文言と
+   * 保存の可否がずれる。負債では実害がさらに大きく、選択肢が出ないまま保存すると
+   * 選択済みの負債が黙って外れた分類軸で上書きされる。
+   */
+  type DebtOptionsState =
+    | { status: "loading" }
+    | { status: "error"; message: string }
+    | { status: "ready"; debts: Debt[] };
+
   /** 分類軸の追加・編集フォームのProps */
   type AssetCategoryAxisFormProps = {
     /** 新規追加は空値、編集は対象の分類軸の値を渡す */
     initialValues: AssetCategoryAxisFormValues;
     /** 集計対象チェックボックスの選択肢(既知の資産種別名)と、その取得状態 */
     assetTypeOptions: AssetTypeOptionsState;
+    /** 集計対象に含める負債の選択肢(B11で登録済みの負債)と、その取得状態 */
+    debtOptions: DebtOptionsState;
     submitLabel: string;
     onSubmit: (values: AssetCategoryAxisFormValues) => Promise<SaveCategoryAxisResult>;
     onCancel: () => void;

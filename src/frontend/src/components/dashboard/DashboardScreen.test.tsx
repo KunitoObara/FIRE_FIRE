@@ -47,6 +47,7 @@ const data: DashboardData = {
         { categoryId: "投資信託", amount: 1_600_000 },
         { categoryId: "預金・現金", amount: 4_400_000 },
       ],
+      debtTotal: 0,
     },
     investment: {
       netWorthSeries: [{ date: "2026-08-05", amount: 7_000_000 }],
@@ -54,11 +55,15 @@ const data: DashboardData = {
         { categoryId: "株式(現物)", amount: 5_400_000 },
         { categoryId: "投資信託", amount: 1_600_000 },
       ],
+      debtTotal: 0,
     },
   },
+  debts: [],
   fireProgress: {
     targetAmount: 80_000_000,
     currentAmount: 11_400_000,
+    achievementAxisName: "投資性資産",
+    achievementAxisMissing: false,
     projectedAchievementDate: null,
   },
   cashflow: null,
@@ -126,6 +131,7 @@ describe("DashboardScreen", () => {
           total: {
             netWorthSeries: [{ date: "2000-01-31", amount: 1_000_000 }],
             breakdown: data.byAxis.total?.breakdown ?? [],
+            debtTotal: 0,
           },
         },
       },
@@ -159,7 +165,48 @@ describe("DashboardScreen", () => {
   });
 
   /**
-   * FIRE達成度は目標資産額との比較で、分類軸を参照しない(要件B1)。
+   * ゲージの現在資産額はB8で設定した対象分類で集計しており、この画面のセレクタには
+   * 追従しない(要件B1)。どちらの数字か判別できるよう分類名を併記する
+   */
+  it("FIRE達成度の現在資産額に対象分類名を併記する", async () => {
+    renderScreen();
+
+    expect(await screen.findByText("(投資性資産)")).toBeInTheDocument();
+  });
+
+  /** 切替ひとつで同じ目標への達成率が別の値になると「どこまで来たか」として読めなくなる */
+  it("分類軸を切り替えてもFIRE達成度の現在資産額は変わらない", async () => {
+    renderScreen({ axisParam: "investment" });
+
+    expect(await screen.findByText("¥ 11,400,000")).toBeInTheDocument();
+    expect(screen.getByText("(投資性資産)")).toBeInTheDocument();
+  });
+
+  /** 比較対象が失われただけなので、ゲージを消したり0%にしたりはしない(要件B1) */
+  it("対象分類の分類軸が削除されていたら、総資産で計算した旨をカードに出す", async () => {
+    fetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: {
+        ...data,
+        fireProgress: {
+          ...data.fireProgress,
+          achievementAxisName: "総資産(マネーフォワードの合計)",
+          achievementAxisMissing: true,
+        },
+      },
+    });
+    renderScreen();
+
+    expect(
+      await screen.findByText("設定していた対象分類が見つからないため、総資産で計算しています。"),
+    ).toBeInTheDocument();
+    // 注意書きを出すだけで、ゲージと数字はそのまま残す
+    expect(screen.getByText("¥ 11,400,000")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "目標を設定する" })).toBeInTheDocument();
+  });
+
+  /**
+   * FIRE達成度は目標資産額との比較で、B1の分類軸セレクタを参照しない(要件B1)。
    * ゲージごと消えるとB8への導線も一緒に失われるので、リンクの有無まで見る
    */
   it("分類軸が1件も無くてもFIRE達成度は出す", async () => {
@@ -314,5 +361,116 @@ describe("DashboardScreen", () => {
     await user.click(await screen.findByRole("option", { name: "投資性資産" }));
 
     expect(replace).toHaveBeenCalledWith("/dashboard?axis=investment&period=1y");
+  });
+});
+
+/**
+ * 負債(B11)の反映(docs/screen-requirements-dashboard.md B1)。
+ */
+describe("DashboardScreen(負債)", () => {
+  const debts: Debt[] = [
+    {
+      id: "debt-1",
+      name: "住宅ローン",
+      balance: 18_400_000,
+      interestRate: 0.475,
+      repaymentMonths: 280,
+      updatedAt: "2026-07-12",
+      balanceHistory: { "2026-07-12": 18_400_000 },
+    },
+    {
+      id: "debt-2",
+      name: "奨学金",
+      balance: 2_300_000,
+      interestRate: null,
+      repaymentMonths: null,
+      updatedAt: "2026-05-02",
+      balanceHistory: { "2026-05-02": 2_300_000 },
+    },
+  ];
+
+  beforeEach(() => {
+    fetchDashboardData.mockReset();
+  });
+
+  it("負債サマリを残債の多い順に出し、未登録の金利・返済期間は空欄にする", async () => {
+    fetchDashboardData.mockResolvedValue({ ok: true, data: { ...data, debts } });
+    renderScreen({ axisParam: "total", periodParam: "all" });
+
+    expect(await screen.findByText("負債サマリ")).toBeInTheDocument();
+    expect(screen.getByText("¥ 20,700,000")).toBeInTheDocument();
+    expect(screen.getByText("0.475%")).toBeInTheDocument();
+    expect(screen.getByText("23年4ヶ月")).toBeInTheDocument();
+    expect(screen.getByText("最終更新")).toBeInTheDocument();
+  });
+
+  /** 分類軸で絞ると「登録したのに出てこない負債」が生まれる(同要件B1) */
+  it("負債サマリは分類軸切替の影響を受けない", async () => {
+    fetchDashboardData.mockResolvedValue({ ok: true, data: { ...data, debts } });
+    renderScreen({ axisParam: "investment", periodParam: "all" });
+
+    expect(await screen.findByText("住宅ローン")).toBeInTheDocument();
+    expect(screen.getByText("奨学金")).toBeInTheDocument();
+  });
+
+  it("負債が1件も無ければ空状態とB11への導線を出す", async () => {
+    fetchDashboardData.mockResolvedValue({ ok: true, data: { ...data, debts: [] } });
+    renderScreen({ axisParam: "total", periodParam: "all" });
+
+    expect(await screen.findByText(/負債がまだ登録されていません/u)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "負債を登録する" })).toBeInTheDocument();
+  });
+
+  /** 円グラフの分母が資産+負債になることが分かるようにする(同要件B1) */
+  it("負債を含む分類軸では、内訳のカードに差引後の純額を併記する", async () => {
+    fetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: {
+        ...data,
+        debts,
+        byAxis: {
+          ...data.byAxis,
+          total: {
+            /*
+              推移の各点は`sumAxisAmount`を通った値なので、既に負債が引かれている。
+              純額はこの最新点をそのまま採る(スライスの足し直しはしない。
+              `resolveAxisNetAmount`)ので、資産11,400,000 - 負債2,000,000 = 9,400,000
+            */
+            netWorthSeries: [{ date: "2026-08-05", amount: 9_400_000 }],
+            breakdown: data.byAxis.total?.breakdown ?? [],
+            debtTotal: 2_000_000,
+          },
+        },
+      },
+    });
+    renderScreen({ axisParam: "total", periodParam: "all" });
+
+    expect(await screen.findByText("資産 - 負債")).toBeInTheDocument();
+    expect(screen.getByText("¥ 9,400,000")).toBeInTheDocument();
+  });
+
+  it("負債を含まない分類軸では純額を併記しない", async () => {
+    fetchDashboardData.mockResolvedValue({ ok: true, data: { ...data, debts } });
+    renderScreen({ axisParam: "total", periodParam: "all" });
+
+    await screen.findByText("負債サマリ");
+
+    expect(screen.queryByText("資産 - 負債")).not.toBeInTheDocument();
+  });
+
+  /** B11-3 ケース1の決定。達成率は0%に丸め、金額はマイナスのまま出す */
+  it("現在資産額がマイナスなら、丸めた旨を出しつつ金額は負のまま出す", async () => {
+    fetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: {
+        ...data,
+        debts,
+        fireProgress: { ...data.fireProgress, currentAmount: -1_400_000 } as FireProgress,
+      },
+    });
+    renderScreen({ axisParam: "total", periodParam: "all" });
+
+    expect(await screen.findByText(/負債が資産を上回っているため/u)).toBeInTheDocument();
+    expect(screen.getByText("- ¥ 1,400,000")).toBeInTheDocument();
   });
 });

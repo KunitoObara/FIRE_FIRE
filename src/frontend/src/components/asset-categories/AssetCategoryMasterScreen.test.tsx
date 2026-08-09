@@ -9,6 +9,7 @@ import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 import type { RenderResult } from "@testing-library/react";
 
 const fetchCategoryAxes = vi.fn();
+const fetchDebts = vi.fn();
 const fetchAssetTypeOptions = vi.fn();
 const createCategoryAxis = vi.fn();
 const updateCategoryAxis = vi.fn();
@@ -23,6 +24,10 @@ vi.mock("@/lib/asset-categories/category-axis-repository", () => ({
   deleteCategoryAxis: (...args: unknown[]) => deleteCategoryAxis(...args),
 }));
 
+vi.mock("@/lib/debts/debt-repository", () => ({
+  fetchDebts: (...args: unknown[]) => fetchDebts(...args),
+}));
+
 vi.mock("sonner", () => ({
   toast: { success: (...args: unknown[]) => toastSuccess(...args) },
 }));
@@ -31,6 +36,7 @@ const TOTAL_ASSETS_AXIS: AssetCategoryAxisDocument = {
   id: "total-assets",
   name: "総資産",
   assetTypeNames: [],
+  debtIds: [],
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
@@ -38,6 +44,7 @@ const NET_FINANCIAL_AXIS: AssetCategoryAxisDocument = {
   id: "net-financial",
   name: "純金融資産",
   assetTypeNames: ["預金・現金", "投資信託"],
+  debtIds: [],
   createdAt: "2026-01-02T00:00:00.000Z",
 };
 
@@ -58,6 +65,10 @@ const renderScreen = (): RenderResult => {
 describe("AssetCategoryMasterScreen", () => {
   beforeEach(() => {
     fetchCategoryAxes.mockReset();
+    // 負債の選択肢(B4「集計対象に負債を含める」)。既定は取得成功・0件にして、
+    // 負債を扱わない既存のケースが読み込み中で止まらないようにする
+    fetchDebts.mockReset();
+    fetchDebts.mockResolvedValue({ ok: true, debts: [] });
     fetchAssetTypeOptions.mockReset();
     createCategoryAxis.mockReset();
     updateCategoryAxis.mockReset();
@@ -178,6 +189,7 @@ describe("AssetCategoryMasterScreen", () => {
       expect(createCategoryAxis).toHaveBeenCalledWith({
         name: "生活防衛資金",
         assetTypeNames: ["預金・現金"],
+        debtIds: [],
       });
     });
     expect(toastSuccess).toHaveBeenCalledWith("分類を追加しました");
@@ -243,6 +255,7 @@ describe("AssetCategoryMasterScreen", () => {
       expect(updateCategoryAxis).toHaveBeenCalledWith("net-financial", {
         name: "純金融資産",
         assetTypeNames: ["預金・現金", "投資信託"],
+        debtIds: [],
       });
     });
     // 新規追加と同じくB1の表示データも無効化する(片方の分岐だけ外れても気づけるように)
@@ -280,6 +293,7 @@ describe("AssetCategoryMasterScreen", () => {
       expect(updateCategoryAxis).toHaveBeenCalledWith("total-assets", {
         name: "総資産",
         assetTypeNames: [],
+        debtIds: [],
       });
     });
   });
@@ -297,7 +311,7 @@ describe("AssetCategoryMasterScreen", () => {
     await user.click(within(row).getByRole("button", { name: "削除" }));
 
     expect(await screen.findByText("この分類は削除できません")).toBeInTheDocument();
-    expect(screen.getByText(/先に紐づく資産種別の割り当てを解除してください/u)).toBeInTheDocument();
+    expect(screen.getByText(/先に編集で割り当てを解除してください/u)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
     expect(deleteCategoryAxis).not.toHaveBeenCalled();
   });
@@ -323,5 +337,125 @@ describe("AssetCategoryMasterScreen", () => {
     expect(toastSuccess).toHaveBeenCalledWith("分類を削除しました");
     // 削除した軸がB1の軸セレクタに残らないよう、新規追加・編集と同じくB1も無効化する
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
+  });
+});
+
+/**
+ * 集計対象に負債を含める(docs/screen-requirements-dashboard.md B4)。
+ */
+describe("AssetCategoryMasterScreen(負債)", () => {
+  const mortgage: Debt = {
+    id: "debt-mortgage",
+    name: "住宅ローン",
+    balance: 18_400_000,
+    interestRate: null,
+    repaymentMonths: null,
+    updatedAt: "2026-07-12",
+    balanceHistory: {},
+  };
+
+  beforeEach(() => {
+    fetchCategoryAxes.mockReset();
+    fetchAssetTypeOptions.mockReset();
+    createCategoryAxis.mockReset();
+    updateCategoryAxis.mockReset();
+    fetchDebts.mockReset();
+    toastSuccess.mockReset();
+
+    fetchCategoryAxes.mockResolvedValue({ ok: true, axes: [TOTAL_ASSETS_AXIS] });
+    fetchAssetTypeOptions.mockResolvedValue({ ok: true, assetTypeNames: ["預金・現金"] });
+    fetchDebts.mockResolvedValue({ ok: true, debts: [mortgage] });
+    createCategoryAxis.mockResolvedValue({ ok: true });
+    updateCategoryAxis.mockResolvedValue({ ok: true });
+  });
+
+  /** 未選択の意味が資産種別と非対称なので、画面上に明示する(B4) */
+  it("集計対象を資産種別と負債の2グループに分け、未選択時の意味を出し分ける", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "新規分類を追加" }));
+
+    expect(
+      await screen.findByText(/1つも選ばない場合はすべての資産種別が対象になります/u),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/1つも選ばない場合は負債は差し引かない/u)).toBeInTheDocument();
+  });
+
+  it("選んだ負債を分類軸のdebtIdsとして保存する", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "新規分類を追加" }));
+    await user.type(await screen.findByLabelText("分類名"), "純金融資産");
+    await user.click(screen.getByRole("checkbox", { name: /住宅ローン/u }));
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(createCategoryAxis).toHaveBeenCalledWith({
+        name: "純金融資産",
+        assetTypeNames: [],
+        debtIds: ["debt-mortgage"],
+      });
+    });
+  });
+
+  /** 選択肢が出ないまま保存すると、選択済みの負債が黙って外れた軸で上書きされる */
+  it("負債の選択肢を取得できないあいだは保存させない", async () => {
+    const user = userEvent.setup();
+    fetchDebts.mockResolvedValue({ ok: false, reason: "unknown" });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "新規分類を追加" }));
+
+    expect(await screen.findByText(/選択肢を読み込めるまで保存できません/u)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  });
+
+  /** 存在しない負債を選択中として出さない(B4) */
+  it("B11で削除された負債への参照は編集フォームに出さず、保存し直せば消える", async () => {
+    const user = userEvent.setup();
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage", "debt-deleted"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "編集" }));
+    await user.click(await screen.findByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(updateCategoryAxis).toHaveBeenCalledWith(
+        "total-assets",
+        expect.objectContaining({ debtIds: ["debt-mortgage"] }),
+      );
+    });
+  });
+
+  /** 負債を含む軸かどうかが一覧で分からないと、B1の値が資産合計と違う理由が追えない */
+  it("一覧には負債を含む軸だけ件数を添える", async () => {
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [TOTAL_ASSETS_AXIS, { ...NET_FINANCIAL_AXIS, debtIds: ["debt-mortgage"] }],
+    });
+    renderScreen();
+
+    expect(await screen.findByText(/負債 1件/u)).toBeInTheDocument();
+    expect(screen.getByText("すべての資産種別が対象")).toBeInTheDocument();
+  });
+
+  /** 集計対象が割り当てられた軸を消させない制約を資産・負債で分ける理由が無い(B4) */
+  it("負債だけが紐づいている分類の削除もブロックする", async () => {
+    const user = userEvent.setup();
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+
+    expect(await screen.findByText("この分類は削除できません")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-/** 認証系画面(A1〜A7)で使う定数 */
+/** 認証系画面(A1〜A8)で使う定数 */
 
 import {
   DASHBOARD_PATH,
@@ -538,7 +538,7 @@ export const RECOVERY_CODE_FILE_NOTES = [
 ];
 
 /**
- * ログイン後画面(B1〜B10)に入れなかったときに戻す先(`src/lib/auth/app-access.ts`)。
+ * ログイン後画面(B1〜B11)に入れなかったときに戻す先(`src/lib/auth/app-access.ts`)。
  * いずれも認証フローの未完了であり、その手順を行う画面へ戻す。
  */
 export const APP_ACCESS_REDIRECTS: Record<AppAccessRedirectState, string> = {
@@ -565,7 +565,7 @@ export const LOGOUT_DIALOG_TITLE = "ログアウトしますか?";
 export const LOGOUT_DIALOG_CONFIRM_LABEL = "ログアウトする";
 export const LOGOUT_DIALOG_CANCEL_LABEL = "キャンセル";
 
-/** 共通ヘッダー(B1〜B10)から開いたときの注記。2FAは全ユーザー必須のため再ログインの条件を伝える */
+/** 共通ヘッダー(B1〜B11)から開いたときの注記。2FAは全ユーザー必須のため再ログインの条件を伝える */
 export const LOGOUT_DIALOG_HEADER_NOTE =
   "次回のログインでは、パスワードに加えて認証アプリの確認コードの入力が必要です。";
 

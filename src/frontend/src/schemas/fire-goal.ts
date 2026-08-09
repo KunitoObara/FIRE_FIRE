@@ -141,5 +141,14 @@ export const fireGoalDocumentSchema = z.object({
   targetAmount: z.number().nullable(),
   annualExpense: z.number().nullable(),
   withdrawalRate: z.number().nullable(),
+  /**
+   * 達成度の対象分類(B4の分類軸ID)。既定の「総資産」は`null`。
+   *
+   * **キーそのものが無い場合も通す。** 対象分類を持たない状態で保存された既存の目標が
+   * あり、必須にするとそれらが「解釈できないドキュメント」として未設定に倒れ、
+   * 設定済みの目標額まで消えたように見えるため(要件B1「既存ユーザーはこれまでどおりの
+   * 値のままになる」)。読み出し側が`null`(=既定)として扱う。
+   */
+  achievementAxisId: z.string().nullable().optional(),
   updatedAt: z.instanceof(Timestamp).nullable(),
 });

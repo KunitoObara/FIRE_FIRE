@@ -8,11 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `docs/.env` is a real secrets file (excluded via `.gitignore`) — never read, print, or commit its contents.
 
+**This repository is public.** The developer's own financial figures must never enter it: fixtures, docstrings, and mock screens use obviously-fake round amounts, not rows pasted out of a real Money Forward export. The same goes for real addresses and personal email addresses — sample screens use `〇〇マンション101号室` / `taro.yamada@example.com`. Firebase's `NEXT_PUBLIC_*` values are already public in the deployed bundle and are supplied via GitHub Secrets / Secret Manager, so nothing about them belongs in a committed file either. Note that pull requests can now come from forks, where secrets are unavailable — a fork PR's `frontend` and `claude-review` jobs are expected to fail, and that is not a regression to chase.
+
 ## Documentation map
 
 - [docs/fire-asset-management-requirements.md](docs/fire-asset-management-requirements.md) — top-level requirements: architecture, features, phased MVP scope. Read this first; other docs detail specific sections of it.
 - [docs/auth-login-requirements.md](docs/auth-login-requirements.md) — detailed spec for §4.1 (auth)
-- [docs/screen-list-and-transitions.md](docs/screen-list-and-transitions.md) — full screen inventory (IDs A1–A8, B1–B10) and Mermaid transition diagrams
+- [docs/screen-list-and-transitions.md](docs/screen-list-and-transitions.md) — full screen inventory (IDs A1–A8, B1–B11) and Mermaid transition diagrams
 - [docs/screen-requirements-auth.md](docs/screen-requirements-auth.md), [screen-requirements-dashboard.md](docs/screen-requirements-dashboard.md), [screen-requirements-real-estate.md](docs/screen-requirements-real-estate.md), [screen-requirements-fire-goal.md](docs/screen-requirements-fire-goal.md), [screen-requirements-account.md](docs/screen-requirements-account.md) — per-screen field/behavior detail, keyed to the screen IDs above
 - [DESIGN.md](DESIGN.md) — frontend design system: Tailwind/shadcn-based stack, color/typography rules, layout patterns, and the screen-ID-to-library mapping. Read this before adding any UI library or component pattern.
 - [src/frontend/docs/TECH_STACK.md](src/frontend/docs/TECH_STACK.md), [src/backend/docs/TECH_STACK.md](src/backend/docs/TECH_STACK.md) — full technical stack per side (language, data fetching, testing, lint/format, deployment). Read these before adding a dependency or scaffolding either project; they complement rather than repeat DESIGN.md.
@@ -43,13 +45,16 @@ The frontend does **not** use Firebase Emulator locally (B0-1): `.env.local` poi
 
 ## Development flow
 
-Work is driven by cards on the private Trello board **FIRE-FIRE**, reached through the `mcp__trello__*` tools (`WebFetch` cannot read it). Three skills carry a card from start to merge, with [docs/development-workflow.md](docs/development-workflow.md) as their canonical source of list/label IDs and rules:
+Work is driven by cards on the private Trello board **FIRE-FIRE**, reached through the `mcp__trello__*` tools (`WebFetch` cannot read it). Four skills carry a card from start to merge, with [docs/development-workflow.md](docs/development-workflow.md) as their canonical source of list/label IDs and rules:
 
 | | |
 |---|---|
-| `/card-start` | Sync merged cards to 完了 → pick a 進行中 card labelled 詳細設計・実装 or テスト実装 → read the specs → **ask every open question at once** → cut `feature/fire-fire-<id>` off `develop` |
+| `/card-start` | Sync merged cards to 完了 → pick a 進行中 card labelled 詳細設計・実装 or テスト実装 → read the specs → **ask every open question at once** → plan the PR split → cut `feature/fire-fire-<id>` off `develop` |
+| `/card-split` | Slice one card's work into several PRs that each pass CI alone — planned before implementation (cheap) or carved out of an already-large branch (expensive). A card is the unit of requirements, a PR is the unit of review; **one card may carry several PRs** |
 | `/card-ship` | Run the CI commands and the relevant project skills → commit → push → open the PR against `develop` → move the card to 確認中 |
 | `/card-review` | Wait for CI and claude-review → fix findings, **max 3 rounds** → past that, fix only CI failures / security / data-loss / broken-screen findings and file the rest as new backlog cards |
+
+PRs are kept small for review accuracy, not for the CI's sake: B11 (PR #83, 68 files) hid two data-loss bugs that local tests passed and that only surfaced across successive review rounds. The size thresholds and the slicing order live in [docs/development-workflow.md](docs/development-workflow.md) §5. Note this is a separate concern from claude-review occasionally finishing green without posting anything — that one reproduces on re-runs of the *same* commit, so it is not explained by PR size.
 
 Merging is the PO's call: **never run `gh pr merge`**. `.claude/settings.json` denies it, along with `firebase deploy`, `rm -rf`, and reading `docs/.env`; force-push is blocked by a `PreToolUse` hook instead, because prefix patterns cannot catch trailing `--force` or `+refspec` pushes. The card reaches 完了 on the next `/card-start`, which detects the merge.
 
@@ -57,7 +62,7 @@ Merging is the PO's call: **never run `gh pr merge`**. `.claude/settings.json` d
 
 Branch model: feature branch → PR → `develop` (deploys to `fire-fire-dev`) → PR → `main` (deploys to `fire-fire-prod`).
 
-- **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on PRs targeting `develop`/`main`: `wip-check` (fails if the PR title contains `WIP`), `hooks` (runs `.claude/hooks/run-dangerous-command-tests.sh`, the regression test for the dangerous-command `PreToolUse` hooks), `frontend`, and `backend`. Branch protection cannot be enabled on this repo (private repo on a plan without it), so a red check does *not* block the merge button — treat these four as required by convention and don't merge a PR that fails them.
+- **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on PRs targeting `develop`/`main`: `wip-check` (fails if the PR title contains `WIP`), `hooks` (runs `.claude/hooks/run-dangerous-command-tests.sh`, the regression test for the dangerous-command `PreToolUse` hooks), `frontend`, and `backend`. These four are the required status checks on `develop` and `main` — a red check blocks the merge button. That protection only became available when the repo went public (branch protection on a personal free account is a public-repo feature; while it was private both the Rulesets and the branch-protection APIs answered 403), so anything written as "treat them as required by convention" predates the move. `claude-review` is deliberately excluded from the required set. Setup steps are in [docs/ci-cd-setup.md](docs/ci-cd-setup.md) §6.
 - **Claude review** ([.github/workflows/claude-review.yml](.github/workflows/claude-review.yml)) posts review comments on every PR. It is deliberately *not* a required check. The action only runs when the workflow file matches the copy on the default branch (`main`) — edits to it stay inert, and the job still reports success, until they land on `main`.
 - **Deploy** ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) runs on push to `develop`/`main`: `firebase deploy --only functions,firestore,storage`, then an App Hosting rollout for the frontend. Auth is via Workload Identity — no service account keys in the repo. There is no automatic rollback; a failed deploy is caught via GitHub notifications.
 - Files excluded from deploy artifacts live in [.gcloudignore](.gcloudignore) (repo-wide) and the `functions.ignore` list in [firebase.json](firebase.json). App Hosting builds only `src/frontend`, configured by [src/frontend/apphosting.yaml](src/frontend/apphosting.yaml). Keep `docs/` and other non-runtime files out — App Hosting build minutes are billed.
@@ -89,7 +94,7 @@ Single-user (developer-only) in the initial release; multi-tenant/role-based acc
 
 ### Screen navigation model
 
-Post-login, the app is a dashboard-app-style shell: common header/sidebar gives free navigation between primary screens (B1 Dashboard, B2 CSV Import, B3 Transactions, B4 Category Master, B5 Real Estate List, B8 FIRE Goal, B9 Assumption Settings, B10 Account Settings). Auth screens (A1–A8) instead follow a linear flow (signup → email verify → forced MFA setup → dashboard; login → MFA verify → dashboard; Google sign-in → [A8 account link] → MFA setup/verify → dashboard) — see the Mermaid diagrams in [screen-list-and-transitions.md](docs/screen-list-and-transitions.md) for exact edges before adding new transitions.
+Post-login, the app is a dashboard-app-style shell: common header/sidebar gives free navigation between primary screens (B1 Dashboard, B2 CSV Import, B3 Transactions, B4 Category Master, B5 Real Estate List, B11 Debt Input, B8 FIRE Goal, B9 Assumption Settings, B10 Account Settings). Auth screens (A1–A8) instead follow a linear flow (signup → email verify → forced MFA setup → dashboard; login → MFA verify → dashboard; Google sign-in → [A8 account link] → MFA setup/verify → dashboard) — see the Mermaid diagrams in [screen-list-and-transitions.md](docs/screen-list-and-transitions.md) for exact edges before adding new transitions.
 
 ### Auth-specific constraints worth knowing before touching auth flows
 
@@ -107,6 +112,6 @@ Work should generally respect this phase order (see §7 of the main requirements
 
 1. Auth (Identity Platform) + manual CSV upload (balance history) + basic dashboard
 2. Transaction CSV import + income/expense summary
-3. Real estate management
+3. Real estate management + debt management (manual entry only — Money Forward does not export liabilities to CSV; debts feed the category axes and the dashboard)
 4. FIRE goal setting/progress/ETA + yield/risk assumptions and simulation
 5. (Future) Automated Money Forward sync, SaaS multi-tenancy — out of scope for now

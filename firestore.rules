@@ -69,6 +69,46 @@ service cloud.firestore {
         );
     }
 
+    // 負債の残債(円)。上限は src/frontend/src/constants/debts.ts の DEBT_BALANCE_MAX と揃える。
+    // 0を許すのは、完済した負債を0円のまま残せるようにするため(B11)
+    function isDebtBalance(value) {
+      return value is number && value >= 0 && value <= 999999999999;
+    }
+
+    // 負債1件の中身(B11で保存する形)。作成・更新のどちらでも同じ形を要求する。
+    // 上限値は src/frontend/src/constants/debts.ts と揃える
+    function isValidDebt(debt) {
+      return debt.keys().hasAll(
+          ['name', 'balance', 'interestRate', 'repaymentMonths', 'updatedAt', 'balanceHistory', 'createdAt']
+        )
+        && debt.keys().hasOnly(
+          ['name', 'balance', 'interestRate', 'repaymentMonths', 'updatedAt', 'balanceHistory', 'createdAt']
+        )
+        // 項目名の上限60文字はB7の物件名に揃える(DEBT_NAME_MAX_LENGTH)。重複は許すので一意性は見ない
+        && debt.name is string
+        && debt.name.size() > 0
+        && debt.name.size() <= 60
+        && isDebtBalance(debt.balance)
+        // 金利(年利%)と残りの返済期間(総月数)は任意入力。未登録はnullで保存され、
+        // 0%・0ヶ月とは区別する(B11「入力項目の補足」)
+        && (
+          debt.interestRate == null
+          || (debt.interestRate is number && debt.interestRate >= 0 && debt.interestRate <= 100)
+        )
+        // 総月数の上限1199は「99年11ヶ月」(DEBT_REPAYMENT_TOTAL_MONTHS_MAX)
+        && (
+          debt.repaymentMonths == null
+          || (debt.repaymentMonths is number && debt.repaymentMonths >= 0 && debt.repaymentMonths <= 1199)
+        )
+        // 最終更新日は入力項目ではなく保存時に付く日付(B11)。B1の負債サマリが表示するため形を崩させない
+        && isIsoDate(debt.updatedAt)
+        // 残債の履歴は「日付→残債」のマップ。キーも値もルールでは検査しきれないため
+        // (byType・assumptions.entriesと同じ制約)、形はパース側(src/schemas/debts.ts)で
+        // 担保し、ここでは件数の上限だけを見る。上限は DEBT_BALANCE_HISTORY_MAX と揃える
+        && debt.balanceHistory is map
+        && debt.balanceHistory.size() <= 600;
+    }
+
     // FIRE目標の金額(目標資産額・想定年間支出額)。上限は
     // src/frontend/src/constants/fire-goal.ts の FIRE_GOAL_AMOUNT_MAX と揃える。
     // 使っていない方式の欄はnullで保存されるため、nullも許す。
@@ -81,6 +121,13 @@ service cloud.firestore {
     // 上限は src/frontend/src/constants/fire-goal.ts の FIRE_GOAL_WITHDRAWAL_RATE_MAX と揃える
     function isWithdrawalRate(value) {
       return value == null || (value is number && value > 0 && value <= 100);
+    }
+
+    // 分類軸(`users/{userId}/categoryAxes`)のドキュメントIDを指す参照。
+    // 既定を表すnullを許し、空文字は許さない(どの軸も指さないなら既定のnullで表す)。
+    // 上限はFirestoreのドキュメントIDの上限(1500バイト)より十分に小さい値で足りる
+    function isCategoryAxisId(value) {
+      return value == null || (value is string && value.size() > 0 && value.size() <= 200);
     }
 
     function isOwner(userId) {
@@ -139,10 +186,15 @@ service cloud.firestore {
 
       // 分類軸(B4 資産分類マスタ設定画面)。総資産のように集計対象を1件も選ばない軸を
       // 表せるよう、`assetTypeNames`は空配列を許可する(すべての資産種別が対象という意味になる)。
+      //
+      // `debtIds`はB11の負債のうちこの軸から差し引くものを指す(B4「集計対象に負債を含める」)。
+      // 資産種別と別のフィールドにしているのは、資産種別はCSVの列名(名前)が唯一の識別子なのに対し
+      // 負債はIDを持ち、同じ名前の負債を複数登録できるため。`assetTypeNames`と違い、
+      // **空配列は「負債を差し引かない」を意味する**(「未選択=すべて」の読み替えを適用しない)。
       match /categoryAxes/{axisId} {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId)
-          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'createdAt'])
           && request.resource.data.name is string
           // 文字数の上限はsrc/constants/asset-categories.tsのCATEGORY_AXIS_NAME_MAX_LENGTHと揃える
           && request.resource.data.name.size() > 0
@@ -152,20 +204,52 @@ service cloud.firestore {
           // (src/schemas/asset-categories.ts)で担保する
           && request.resource.data.assetTypeNames is list
           && request.resource.data.assetTypeNames.size() <= 50
+          // 負債IDの上限は登録できる負債の件数(src/constants/debts.tsのDEBT_MAX_COUNT)と揃える
+          && request.resource.data.debtIds is list
+          && request.resource.data.debtIds.size() <= 50
           && request.resource.data.createdAt is timestamp;
         allow update: if isOwner(userId)
-          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'createdAt'])
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.name.size() <= 40
           && request.resource.data.assetTypeNames is list
           && request.resource.data.assetTypeNames.size() <= 50
+          && request.resource.data.debtIds is list
+          && request.resource.data.debtIds.size() <= 50
           // 登録順が分類別内訳の色スロットに対応するため、登録日時は編集で変えさせない(DESIGN.md 3章)
           && request.resource.data.createdAt == resource.data.createdAt;
         // 集計対象が1件以上割り当てられた分類の削除は禁止する(画面の要件そのものを
         // ルール側でも担保する。クライアント側の判定はscreen-requirements-dashboard.md B4参照)。
-        // 先に編集で割り当てを解除すれば`assetTypeNames`が空になり削除できるようになる。
-        allow delete: if isOwner(userId) && resource.data.assetTypeNames.size() == 0;
+        // 先に編集で割り当てを解除すれば削除できるようになる。
+        //
+        // **負債だけが割り当てられた分類軸も削除できない。** 集計対象が割り当てられた軸を
+        // 消させないという制約を資産・負債で分ける理由が無いため(B4の遷移条件)。
+        // `debtIds`は後から足したフィールドなので、持たない既存のドキュメントでも
+        // 評価が落ちないよう`get`の既定値で受ける(持たない=負債を差し引かない、と同じ意味)。
+        allow delete: if isOwner(userId)
+          && resource.data.assetTypeNames.size() == 0
+          && resource.data.get('debtIds', []).size() == 0;
+      }
+
+      // 負債(B11 負債入力画面)。マネーフォワードが負債をCSVに出力しないため、
+      // すべてB11の手入力になる(要件定義書 4.8)。書ける形をここで縛る。
+      //
+      // 他のコレクションと違い`delete`を許可する。完済した負債を整理できることは
+      // B11の要件そのもので(「削除」ボタン + 保存時の確認ダイアログ)、分類軸から
+      // 参照されているだけの負債も消せる。参照が残った分類軸は、その負債を集計対象から
+      // 外して計算する(B1「負債を含む分類軸の集計」)。
+      match /debts/{debtId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidDebt(request.resource.data)
+          && request.resource.data.createdAt is timestamp;
+        // B11のフォームの並び順(登録順)が保存のたびに入れ替わらないよう、
+        // 登録日時は編集で変えさせない(categoryAxes・propertiesと同じ扱い)
+        allow update: if isOwner(userId)
+          && isValidDebt(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
       }
 
       // FIRE目標(B8 FIRE目標設定画面)。ユーザーごとに1件で、ドキュメントIDは`fireGoal`固定。
@@ -178,10 +262,10 @@ service cloud.firestore {
         // create/updateで同じ形を要求する
         allow create, update: if isOwner(userId)
           && request.resource.data.keys().hasOnly(
-            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'updatedAt']
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'updatedAt']
           )
           && request.resource.data.keys().hasAll(
-            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'updatedAt']
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'updatedAt']
           )
           // 有効な設定方式。src/frontend/src/types/fire-goal.d.ts の`FireGoalMode`と揃える
           && request.resource.data.mode in ['direct', 'reverse']
@@ -190,6 +274,11 @@ service cloud.firestore {
           && isFireGoalAmount(request.resource.data.targetAmount)
           && isFireGoalAmount(request.resource.data.annualExpense)
           && isWithdrawalRate(request.resource.data.withdrawalRate)
+          // 達成度の対象分類(B4の分類軸ID)。既定の「総資産」はnullで保存される。
+          // 分類軸が実在するかはここでは確かめられない(ルールから他のドキュメントを
+          // 引くと読み取りが増え、B4での削除と競合もする)。存在しない軸を指したままでも
+          // 参照側が既定へフォールバックする作りなので、ここは形だけを見る
+          && isCategoryAxisId(request.resource.data.achievementAxisId)
           && request.resource.data.updatedAt is timestamp;
         // FIRE目標を消す画面は無い。方式の切替も上書きで表せる
         allow delete: if false;

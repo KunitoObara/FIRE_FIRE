@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DASHBOARD_EMPTY_STATES } from "@/constants/dashboard";
+import { buildNetWorthSeriesKey, DASHBOARD_EMPTY_STATES } from "@/constants/dashboard";
 
 import type { JSX } from "react";
 
@@ -33,7 +33,16 @@ export const NetWorthTrendCard = ({ axisName, series }: NetWorthTrendCardProps):
       {series.length === 0 ? (
         <DashboardEmptyState {...DASHBOARD_EMPTY_STATES.netWorth} />
       ) : (
-        <NetWorthTrendChart axisName={axisName} series={series} />
+        /*
+          `key`にデータの署名を渡し、分類軸・表示期間の切替でデータが差し替わったときだけ
+          作り直して登場アニメーションを最初から再生する(DESIGN.md 9章)。同じデータのままの
+          再レンダリング(ホバー・リサイズ・再取得)では署名が変わらないので再生しない。
+        */
+        <NetWorthTrendChart
+          key={buildNetWorthSeriesKey(axisName, series)}
+          axisName={axisName}
+          series={series}
+        />
       )}
     </CardContent>
   </Card>
