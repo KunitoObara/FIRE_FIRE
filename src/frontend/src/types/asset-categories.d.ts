@@ -79,6 +79,20 @@ declare global {
     | { status: "error"; message: string }
     | { status: "ready"; debts: Debt[] };
 
+  /**
+   * 分類軸が参照している負債の内訳(B11で削除された参照を見分ける)。
+   *
+   * 件数だけでなく残っているIDも持つのは、一覧の件数表示と編集フォームの初期値が
+   * **同じ判定**から出るようにするため。別々に絞り込むと、一覧が「負債 1件」と出して
+   * いるのにフォームには2件チェックが入る、のようなずれが起こりうる。
+   */
+  type CategoryAxisDebtReferences = {
+    /** 実際に集計から差し引かれる負債のID(B11に残っているもの) */
+    activeIds: string[];
+    /** B11で削除されていて集計対象にならない参照の件数 */
+    missingCount: number;
+  };
+
   /** 分類軸の追加・編集フォームのProps */
   type AssetCategoryAxisFormProps = {
     /** 新規追加は空値、編集は対象の分類軸の値を渡す */
@@ -87,6 +101,13 @@ declare global {
     assetTypeOptions: AssetTypeOptionsState;
     /** 集計対象に含める負債の選択肢(B11で登録済みの負債)と、その取得状態 */
     debtOptions: DebtOptionsState;
+    /**
+     * `initialValues`から落とした、B11で削除済みの負債への参照の件数。
+     *
+     * 落としたこと自体を負債の選択欄に出すために要る(B4)。フォーム側で数え直せないのは、
+     * `initialValues.debtIds`が既に絞り込み後の値だから。新規追加では常に`0`。
+     */
+    missingDebtCount: number;
     submitLabel: string;
     onSubmit: (values: AssetCategoryAxisFormValues) => Promise<SaveCategoryAxisResult>;
     onCancel: () => void;
@@ -95,6 +116,12 @@ declare global {
   /** 登録済み分類一覧のProps */
   type AssetCategoryAxisListProps = {
     axes: AssetCategoryAxisDocument[];
+    /**
+     * 負債の選択肢と取得状態。一覧そのものには要らないが、**紐付け状況の件数を
+     * 実際に差し引かれる負債の数で出す**ために要る(B4)。参照の数をそのまま出すと、
+     * 一覧の件数とB1で差し引かれている額が食い違う。
+     */
+    debtOptions: DebtOptionsState;
     onEdit: (axis: AssetCategoryAxisDocument) => void;
     onDelete: (axis: AssetCategoryAxisDocument) => void;
   };

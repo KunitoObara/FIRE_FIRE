@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import {
   ASSET_TYPE_OPTIONS_LOADING_LABEL,
   ASSET_TYPE_OPTIONS_UNAVAILABLE_NOTICE,
+  buildCategoryAxisMissingDebtMessage,
   CATEGORY_AXIS_ALL_TYPES_HINT,
   CATEGORY_AXIS_ASSET_TYPE_GROUP_LABEL,
   CATEGORY_AXIS_DEBT_GROUP_LABEL,
@@ -40,6 +41,7 @@ export const AssetCategoryAxisForm = ({
   initialValues,
   assetTypeOptions,
   debtOptions,
+  missingDebtCount,
   submitLabel,
   onSubmit,
   onCancel,
@@ -172,6 +174,17 @@ export const AssetCategoryAxisForm = ({
           1つも選ばない場合は{CATEGORY_AXIS_NO_DEBT_HINT}
           。選んだ負債はこの分類軸の集計から差し引かれます。
         </p>
+        {/*
+          B11で削除された負債への参照を選択から外したことを出す(B4)。黙って外すと、
+          この分類軸が何を差し引いているかが変わったことに気付けず、B1の値が前と違う理由を
+          追えなくなる。B8が対象分類の削除で既定へ戻すときに出しているのと同じ扱い。
+          エラーではなく集計の基準が変わった事実の通知なので、保存自体は妨げない
+        */}
+        {missingDebtCount > 0 ? (
+          <p role="status" className="text-sm text-destructive">
+            {buildCategoryAxisMissingDebtMessage(missingDebtCount)}
+          </p>
+        ) : null}
         {debtOptions.status === "loading" ? (
           <p role="status" className="text-sm text-muted-foreground">
             {DEBT_OPTIONS_LOADING_LABEL}

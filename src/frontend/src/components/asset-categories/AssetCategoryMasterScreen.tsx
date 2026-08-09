@@ -24,6 +24,7 @@ import {
   fetchCategoryAxes,
   updateCategoryAxis,
 } from "@/lib/asset-categories/category-axis-repository";
+import { resolveCategoryAxisDebtReferences } from "@/lib/asset-categories/debt-references";
 import { fetchDebts } from "@/lib/debts/debt-repository";
 
 import type { JSX } from "react";
@@ -58,25 +59,20 @@ const resolveDebtOptionsState = (result: DebtsResult | undefined): DebtOptionsSt
  *
  * **B11で削除された負債への参照は落とす。** 存在しない負債を選択中として出すことはできず、
  * 集計対象にもしないため(docs/screen-requirements-dashboard.md B4)。保存し直せば
- * ドキュメント側の参照も消える。負債の選択肢がまだ読めていない間は絞り込めないので、
- * その状態では保存自体をフォーム側が止める。
+ * ドキュメント側の参照も消える。落としたこと自体はフォームが案内として出す(黙って外すと、
+ * 分類軸が何を差し引いているかが変わったことに気付けない)。
+ *
+ * 負債の選択肢がまだ読めていない間(`references`が`null`)は絞り込めないので参照をそのまま
+ * 渡す。その状態では保存自体をフォーム側が止める。
  */
 const toEditingFormValues = (
   axis: AssetCategoryAxisDocument,
-  debtOptions: DebtOptionsState,
-): AssetCategoryAxisFormValues => {
-  if (debtOptions.status !== "ready") {
-    return { name: axis.name, assetTypeNames: axis.assetTypeNames, debtIds: axis.debtIds };
-  }
-
-  const existingIds = new Set(debtOptions.debts.map((debt) => debt.id));
-
-  return {
-    name: axis.name,
-    assetTypeNames: axis.assetTypeNames,
-    debtIds: axis.debtIds.filter((debtId) => existingIds.has(debtId)),
-  };
-};
+  references: CategoryAxisDebtReferences | null,
+): AssetCategoryAxisFormValues => ({
+  name: axis.name,
+  assetTypeNames: axis.assetTypeNames,
+  debtIds: references === null ? axis.debtIds : references.activeIds,
+});
 
 /**
  * 集計対象の選択肢の状態を1つの値にまとめる。
@@ -140,6 +136,16 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
   const assetTypeOptions = resolveAssetTypeOptionsState(assetTypeOptionsQuery.data);
   const debtOptions = resolveDebtOptionsState(debtsQuery.data);
 
+  /*
+    編集中の分類軸が参照している負債の内訳。フォームの初期値(残っている参照)と、案内に
+    出す件数(削除済みの参照)を同じ判定から出す。別々に絞り込むと、案内の件数とチェックの
+    数がずれうる
+  */
+  const editingDebtReferences =
+    editingAxis === null
+      ? null
+      : resolveCategoryAxisDebtReferences(editingAxis.debtIds, debtOptions);
+
   const closeForm = (): void => {
     setFormMode("closed");
     setEditingAxis(null);
@@ -158,10 +164,21 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
   const handleSubmit = async (
     values: AssetCategoryAxisFormValues,
   ): Promise<SaveCategoryAxisResult> => {
+    /*
+      保存の直前にもう一度、存在しない負債への参照を落とす。フォームは初期値をマウント時に
+      一度だけstateへ写し取るので、**編集を開いたあとに負債の一覧が読み終わった**場合は
+      絞り込み前の値がstateに残る。そのまま保存すると、画面に「選択から外しました」と
+      出しながら参照だけが書き戻り、案内と保存内容が食い違う(参照も消えない)。
+      落ちるのは選択肢に出ていない負債だけなので、ユーザーが選んだものには影響しない
+    */
+    const references = resolveCategoryAxisDebtReferences(values.debtIds, debtOptions);
+    const saving: AssetCategoryAxisFormValues =
+      references === null ? values : { ...values, debtIds: references.activeIds };
+
     const result =
       formMode === "edit" && editingAxis !== null
-        ? await updateCategoryAxis(editingAxis.id, values)
-        : await createCategoryAxis(values);
+        ? await updateCategoryAxis(editingAxis.id, saving)
+        : await createCategoryAxis(saving);
 
     if (result.ok) {
       toast.success(formMode === "edit" ? "分類を更新しました" : "分類を追加しました");
@@ -211,6 +228,8 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
               initialValues={EMPTY_FORM_VALUES}
               assetTypeOptions={assetTypeOptions}
               debtOptions={debtOptions}
+              // 新規追加は参照を1つも持たないので、落とす参照も常に無い
+              missingDebtCount={0}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
@@ -225,9 +244,10 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
             <h2 className="mb-4 text-sm font-semibold">分類を編集</h2>
             <AssetCategoryAxisForm
               key={editingAxis.id}
-              initialValues={toEditingFormValues(editingAxis, debtOptions)}
+              initialValues={toEditingFormValues(editingAxis, editingDebtReferences)}
               assetTypeOptions={assetTypeOptions}
               debtOptions={debtOptions}
+              missingDebtCount={editingDebtReferences?.missingCount ?? 0}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
@@ -250,7 +270,12 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
       ) : null}
 
       {!axesQuery.isPending && axesFailureReason === null ? (
-        <AssetCategoryAxisList axes={axes} onEdit={handleEdit} onDelete={setDeletingAxis} />
+        <AssetCategoryAxisList
+          axes={axes}
+          debtOptions={debtOptions}
+          onEdit={handleEdit}
+          onDelete={setDeletingAxis}
+        />
       ) : null}
 
       <DeleteCategoryAxisDialog
