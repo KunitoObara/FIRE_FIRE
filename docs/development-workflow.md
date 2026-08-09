@@ -1,7 +1,7 @@
 # 開発フロー
 
-Trelloカードを起点に、着手 → 実装 → PR → レビュー対応 → 完了までを進めるための手順書。
-4つのスキル([.claude/skills/](../.claude/skills/))がこの文書を正本として動く。IDや判断基準を変えるときはこの文書を直す。
+Trelloカードを起点に、着手 → 実装 → PR → レビュー対応 → 完了までを進めるための手順書。カードから離れて `develop` を本番へ出すリリース(10章)もここに含める。
+5つのスキル([.claude/skills/](../.claude/skills/))がこの文書を正本として動く。IDや判断基準を変えるときはこの文書を直す。
 
 ## 1. 全体の流れ
 
@@ -14,6 +14,7 @@ Trelloカードを起点に、着手 → 実装 → PR → レビュー対応 �
 | レビュー対応 | `/card-review` | CI・レビューの完了待ち → 指摘の分類 → 修正して push(=1往復) |
 | マージ | **人間(PO)のみ** | Claudeはマージしない |
 | 完了 | 次回の `/card-start` | **そのカードのPRが全部**マージ済みなら**完了**へ移動 |
+| リリース | `/release` | `develop` → `main` のPRを作る → マージ後にデプロイ結果を確認する(10章)。カードを起点にしない唯一の工程 |
 
 Claudeが自発的にTrelloの変化を検知することはできない(Webhookを受ける口がない)。
 着手はユーザーが `/card-start` を叩くことで始まり、マージ検知は次回の `/card-start` 冒頭でまとめて行う。
@@ -30,6 +31,7 @@ Claudeが自発的にTrelloの変化を検知することはできない(Webhook
 | `/card-split` | 5章 |
 | `/card-ship` | 5章(PR規約・分ける目安)・6章(検証とセルフレビュー) |
 | `/card-review` | 7章(レビュー対応)・9章(前提と制約) |
+| `/release` | 9章(前提と制約)・10章(リリース) |
 
 8章の歯止めは全スキル共通の禁止事項で、実装の詳細は [command-guards.md](./command-guards.md) にある。**歯止めを変えるとき以外は読まなくてよい。**
 
@@ -356,3 +358,34 @@ B11の `categoryAxes.debtIds` はこの形にできた(実際、既存ドキュ�
 - `gh pr create` とWeb UIの既定のベースが `develop` になる。feature ブランチのPRが欲しいベースそのものなので、`--base` の付け忘れで `main` に向く事故が消える
 - 逆に **`develop` → `main` のリリースPRは `--base main` の明示が要る**。本番向けのPRを明示的に作る形になるのは望ましい
 - claude-review の検証先もデフォルトブランチなので、`claude-review.yml` の変更が1段早く効くようになった(上の項目を参照)
+
+## 10. リリース(`develop` → `main`)
+
+`develop` に溜まった差分を `main` へ入れて本番(`fire-fire-prod`)へ出す工程。手順は [`/release`](../.claude/skills/release/SKILL.md) が担う。
+
+**章の位置について。** 流れとしては7章のあとに来るが、8章・9章の番号を動かすと `.claude/settings.json` のフックが拒否理由で指している「8章」がずれる。歯止めの設定を文言のためだけに触るのは割に合わないので、末尾に置いてある。
+
+### この工程が他と違うところ
+
+| | feature → `develop` | `develop` → `main` |
+|---|---|---|
+| CI(4ジョブ) | 走る | 走る |
+| claude-review | 走る | **走らない**(9章。同じ差分をレビュー済みのため) |
+| マージ後に起きること | `fire-fire-dev`(STG)へデプロイ | **`fire-fire-prod`(本番)へデプロイ** |
+| 戻し方 | `develop` を直すPRを出す | **自動ロールバックは無い**([ci-cd-setup.md](./ci-cd-setup.md)) |
+
+`main` への push が [deploy.yml](../.github/workflows/deploy.yml) を起動し、Functions / Firestore / Storage のデプロイと App Hosting のロールアウトが走る。GitHub Environment `production` に承認ルールは設定していないので、**マージした時点でデプロイが始まる**。押し戻す仕組みは無い。
+
+### 単位
+
+**都度出す。ためない。** `develop` に未リリースの差分があれば、そのつどリリースしてよい。差分が小さいほど、本番で問題が出たときにどのカードが原因かの切り分けが早い。
+
+### 手順の要点
+
+1. **STGに出ているか確かめる。** CIはPRにしか走らないので、`develop` が「緑」であることは `develop` への push で走った `deploy.yml` の成功で確かめる。**その成功が `develop` の先端に対するものか**(`headSha` の一致)まで見る。失敗している/古いなら、STGで動いていないものを本番へ入れることになる
+2. **未リリースの差分を出す。** `git log --oneline origin/main..origin/develop` で、前回のリリース以降に入ったものを一覧する。1件も無ければリリースするものが無い
+3. **`--base main` を明示してPRを作る。** デフォルトブランチが `develop` なので、付け忘れると `develop` 宛てのPRになる(9章)
+4. タイトルは `リリース YYYY-MM-DD`。同じ日に2本目を出すときは `リリース YYYY-MM-DD-2` のように連番を足す
+5. 本文には**含まれるカード**と、**STGで確認した範囲 / していない範囲**を書く。claude-review が走らない以上、ここが唯一の申し送りになる
+6. **マージはPO。** feature のPRと同じ
+7. **マージしたら `deploy.yml` の結果を見る。** 失敗は GitHub の通知でしか気づけない。デプロイが途中で落ちると、Functions だけ新しくフロントエンドが古い、のような中途半端な状態が本番に残りうる
