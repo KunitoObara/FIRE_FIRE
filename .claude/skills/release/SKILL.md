@@ -28,9 +28,13 @@ description: Ships what has accumulated on develop to production by opening the 
 ### A-1. STGに出ているか確かめる
 
 ```bash
+git fetch origin
+git rev-parse origin/develop
 gh run list --workflow deploy.yml --branch develop --limit 3 \
   --json conclusion,headSha,createdAt,url
 ```
+
+**`git fetch origin` を先に流す。** ローカルのリモート追跡ブランチが古いままだと、`origin/develop` は過去のSHAを指す。GitHub側から取った実行一覧と突き合わせる比較なので、片方だけが古いと判定にならない。
 
 **CIは `develop` への push では走らない**(PRにしか走らない)。`develop` が健全であることの手がかりは、この `deploy.yml` の成功しかない。
 
@@ -39,19 +43,18 @@ gh run list --workflow deploy.yml --branch develop --limit 3 \
 - 最新が `in_progress`(`conclusion` が空) → まだ出ている途中。終わるまで待つ
 - 実行が1件も無い → 想定外。`deploy.yml` が `develop` で一度も走っていないことになるので、リリースを進めずワークフローの状態を確認する
 
-**`headSha` が `origin/develop` の先端と一致しているかを見る。** 一致していなければ、その成功は**いまリリースしようとしている内容のものではない**。直近のマージ分がまだSTGに出ていない状態で本番へ出すことになる。
+**最新の実行の `headSha` が `origin/develop` の先端と一致しているかを見る。** 一致していなければ、その成功は**いまリリースしようとしている内容のものではない**。直近のマージ分がまだSTGに出ていない状態で本番へ出すことになる。
 
-```bash
-git rev-parse origin/develop
-```
+**一致を探しに行かない。** 一覧を3件出しているのは経緯を見るためで、2件目・3件目のどれかが `origin/develop` と一致していても「STGに出ている」ことにはならない。見るのは最新の1件だけ。
 
 ### A-2. 未リリースの差分を出す
 
 ```bash
-git fetch origin
 git log --oneline origin/main..origin/develop
 git diff origin/main...origin/develop --stat | tail -1
 ```
+
+A-1で `git fetch origin` を済ませてあるので、ここでは取り直さない。
 
 1件も無ければ**リリースするものが無い**。そう報告して終わる。
 
