@@ -7,6 +7,23 @@
 - **Cloud Functions for Firebase(2nd gen)**: Cloud Runベースで実行時間・メモリの制約が1st genより緩く、今後のCSV処理やシミュレーション計算の負荷増にも対応しやすい
 - **Node.js LTS** + **TypeScript**
 - **npm**
+- **Volta**: 開発時のNode.js / npmを`package.json`の`volta`フィールドで固定する。フロントエンドと同じ組み合わせ(`node 22.23.1` / `npm 11.18.0`)にしてある
+
+  固定が要るのは、**ロックファイルを生成するnpmのバージョンが揃わないと、CIの`npm ci`が通らない差分を作りうる**ため。固定が無い間は、シェルで有効なNodeがそのまま使われる(実際に[X10]の作業ではNode 26が使われ、CIの22と食い違っていた)。
+
+  `engines.node`の`22`はデプロイ先のCloud Functionsランタイムを決める宣言で、こちらとは役割が違う。npmは`engines`を既定では強制しないため、宣言だけでは手元の切り替えは起きない。
+
+  **自動で切り替わるのは、Voltaのshim(`~/.volta/bin`)がPATHで他のNodeより先に来ている場合だけ。** Homebrewなどで入れたNodeが先にあると、`volta`フィールドがあっても切り替わらない。確かめ方は次のとおりで、`which -a node` の先頭が `~/.volta/bin/node` でなければPATHの順序を直す(フロントエンドも同じ条件)。
+
+  ```bash
+  which -a node          # 先頭が ~/.volta/bin/node か
+  node -v                # src/backend 内で 22.23.1 になるか
+  volta run node -v      # PATHに関わらず固定が解決できるかの確認
+  ```
+
+  npm 11は依存のinstallスクリプトを既定でブロックする。`package.json`の`allowScripts`で`@firebase/util` / `protobufjs` / `fsevents`の3つを承認してあり、フロントエンドと同じ扱いに揃えている。CIの`backend`ジョブも`npm ci`の前に固定したnpmを入れ直すので、手元とCIでインストール結果が変わらない。
+
+  **`allowScripts`はバージョンごとの承認**なので、これらのパッケージが上がると承認が外れて`npm ci`が警告を出す。Dependabotの更新後に警告が出たら、新しいバージョンで承認し直す(`npm install-scripts approve <pkg>`)。
 
 ## 2. Firebase連携
 
