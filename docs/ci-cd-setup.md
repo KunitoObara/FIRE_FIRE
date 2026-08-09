@@ -256,6 +256,24 @@ identical content to the version on the repository's default branch.
 - `claude-review.yml` を編集した場合、その変更は `develop` に入るまで反映されない（編集を含む PR 自体は再びスキップされる）
 - **デフォルトブランチが `main` だった頃は `develop` → `main` のマージまで済ませないと反映されなかった。** 1段ぶん早く効くようになっている
 
+### 外部PRを手動でレビューする
+
+**fork から出た PR は自動レビューの対象外**である。`claude-review.yml` の `review` ジョブに、PR の head がこのリポジトリ内にあり、かつ作成者が `OWNER` / `COLLABORATOR` / `MEMBER` のときだけ走る条件を付けてある。
+
+除いているのは、**fork からの PR には Secrets が渡らず `claude_code_oauth_token` が空になり、レビューを投稿しないままジョブが失敗するから**である。失敗させても得るものが無いので、スキップに倒している。あわせて Actions の fork PR 承認ポリシーを `all_external_contributors` にしてあり、そもそもオーナーが承認するまで外部 PR ではどのワークフローも起動しない。
+
+外部 PR をレビューしたいときは、オーナーが手動で実行する。
+
+```bash
+gh workflow run claude-review.yml -f pr_number=<PR番号>
+```
+
+Actions タブの "Claude PR Review" → "Run workflow" からでも同じ。`workflow_dispatch` は**ベースリポジトリの文脈で走るため Secrets が使え**、fork からの PR でもレビューできる。
+
+- 実行できるのは書き込み権限を持つ者だけなので、「オーナーが承認したときだけレビューする」という運用がこれで成立する
+- 手動実行は対象 PR の `refs/pull/<番号>/head` をチェックアウトする（`merge` ではない。コンフリクトしている PR では `merge` ref が作られずチェックアウトごと失敗するため）
+- **`workflow_dispatch` はワークフローファイルがデフォルトブランチに載って初めて選べるようになる。** トリガーを足した PR の時点では実行できない
+
 `main` 向けには GitHub Environment `production` を作成し、承認を必須にするかを判断する（`deploy.yml` は `main` で `production`、`develop` で `development` の Environment を参照する）。
 
 ## 4. App Hosting バックエンドの作成
@@ -400,7 +418,8 @@ Upgrade to GitHub Pro or make this repository public to enable this feature.
 - 必須ステータスチェック: `wip-check` / `hooks` / `frontend` / `backend`
   - これにより Lint・テストが NG の PR、タイトルに `WIP` を含む PR はマージボタンが押せなくなる
   - `claude-review` は**含めない**（レビューはコメントのみで、人間の判断を残す）
-  - **fork からの PR では `frontend` と `claude-review` が必ず失敗する。** Secrets が渡らないためで、ビルドは `NEXT_PUBLIC_FIREBASE_*` を要求する（[3 章](#3-github-の-secrets--variables)）。必須チェックにしている以上そのままではマージできないが、これは意図した状態であり、外部からの PR を取り込む必要が出たときに改めて考える
+  - **fork からの PR では `frontend` が必ず失敗する。** Secrets が渡らないためで、ビルドは `NEXT_PUBLIC_FIREBASE_*` を要求する（[3 章](#3-github-の-secrets--variables)）。必須チェックにしている以上そのままではマージできないが、これは意図した状態であり、外部からの PR を取り込む必要が出たときに改めて考える
+  - `claude-review` は fork からの PR では**スキップ**される（失敗ではない）。必須チェックに含めていないのでマージ判定には影響しない。レビューする手順は [3 章](#外部prを手動でレビューする)
 - 「Require branches to be up to date before merging」を有効化
 - Force push / ブランチ削除を禁止
   - force push はローカルでも `.claude/settings.json` の `PreToolUse` フックが止めている。こちらはサーバー側の裏付けで、二重に掛ける
