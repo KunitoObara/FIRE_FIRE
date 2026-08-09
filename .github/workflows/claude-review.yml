@@ -10,6 +10,19 @@ on:
     types:
       - opened
       - synchronize
+    # `develop`宛てのPRだけを自動レビューの対象にする。
+    #
+    # `develop` → `main` のリリースPRは、同じ差分が`develop`へ入る時点で既に
+    # レビュー済みで、2度目に新しい情報は出ない。1回2〜4分ぶんの実行を丸ごと重複させる
+    # だけなので外す。`claude-review`は必須ステータスチェックに含めていないため、
+    # チェックが現れなくなってもマージ判定に影響しない。
+    #
+    # ジョブの`if`で弾く案は採らない。`branches`ならそもそもrunが起動しない。
+    #
+    # 副作用として、`main`宛てのhotfix PRも自動レビューされなくなる。現在の運用に
+    # その経路は無く、必要になったら`workflow_dispatch`で個別に実行する。
+    branches:
+      - develop
   # 外部PRをレビューするための手動実行。`pull_request`と違いベースリポジトリの文脈で
   # 走るため、fork からのPRでもSecretsが使える。実行できるのは書き込み権限を持つ者だけ。
   workflow_dispatch:
