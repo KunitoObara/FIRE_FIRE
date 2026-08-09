@@ -119,6 +119,14 @@ jobs:
           cache: npm
           cache-dependency-path: src/backend/package-lock.json
 
+      # frontendジョブと同じ理由。package.jsonのvoltaフィールドで固定しているnpmに
+      # 合わせる。npm 11はinstallスクリプトを既定でブロックし(allowScriptsで承認済み)、
+      # setup-nodeが入れるnpm 10はブロックしないため、揃えないと手元とCIで依存の
+      # インストール結果が変わる。backendのinstallスクリプトは
+      # @firebase/util / protobufjs / fsevents の3つ。
+      - name: npmをvoltaで固定したバージョンに合わせる
+        run: npm i -g "npm@$(node -p "require('./package.json').volta.npm")"
+
       - run: npm ci
 
       - name: Lint(ESLint)

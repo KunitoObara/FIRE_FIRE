@@ -251,7 +251,7 @@ identical content to the version on the repository's default branch.
 
 スキップされてもジョブは**成功扱いで終わる**ため、「CI は緑なのにレビューコメントだけ付かない」という見え方になる。原因を調べるときはジョブのログを確認する。
 
-本リポジトリのデフォルトブランチは **`develop`** である（`main` ではない。理由は [X9] — Dependabot のセキュリティ更新PRがデフォルトブランチに向くため、`main` のままだと本番へ直行する）。したがって検証先も `develop` になる。
+本リポジトリのデフォルトブランチは **`develop`** である（`main` ではない。理由は Trelloカード [X9](https://trello.com/c/2o49Qdli) — Dependabot のセキュリティ更新PRがデフォルトブランチに向くため、`main` のままだと本番へ直行する）。したがって検証先も `develop` になる。
 
 - `claude-review.yml` を編集した場合、その変更は `develop` に入るまで反映されない（編集を含む PR 自体は再びスキップされる）
 - **デフォルトブランチが `main` だった頃は `develop` → `main` のマージまで済ませないと反映されなかった。** 1段ぶん早く効くようになっている

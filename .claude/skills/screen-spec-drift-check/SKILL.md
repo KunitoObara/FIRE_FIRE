@@ -9,9 +9,41 @@ description: Cross-checks implemented frontend screens/pages against the screen 
 
 docs/screen-list-and-transitions.md と各 docs/screen-requirements-*.md は、画面ID(A1〜A8, B1〜B11)ごとに表示項目・入力項目・主な操作・遷移条件を細かく定義している。画面実装が積み上がるにつれて、要件定義書の更新漏れや実装側の解釈違いによる乖離が起きやすい。このスキルは実装後に定期的に差分を検出するためのものであり、実装前の設計フェーズでは単に要件定義書を読めばよい。
 
+## ルートと画面IDの対応
+
+**この表がこのリポジトリでの正本**。ディレクトリ名は機能名で、画面IDそのものではない。[`card-split`](../card-split/SKILL.md) の B-1(触る画面IDを数える手順)もここを引く。
+
+ルートは `src/frontend/src/app/`、コンポーネントは `src/frontend/src/components/` からの相対で書いてある。
+
+| 画面ID | ルート | コンポーネント |
+|---|---|---|
+| A1 サインアップ | `(auth)/signup` | `components/auth/` |
+| A2 メール確認待ち | `(auth)/verify-email` | 同上 |
+| A3 2FA登録 | `(auth)/mfa-setup` | 同上 |
+| A4 ログイン | `(auth)/login` | 同上 |
+| A5 2FA検証 | `(auth)/mfa-verify` | 同上 |
+| A6 パスワードをお忘れの方 | `(auth)/forgot-password` | 同上 |
+| A7 パスワード再設定 | `(auth)/reset-password` | 同上 |
+| A8 アカウント連携 | `(auth)/link-account` | 同上 |
+| (画面IDなし) | `(auth)/auth/action` | Firebaseのメールリンクの受け口。`mode` でA7へ振り分ける |
+| B1 ダッシュボード | `(dashboard)/dashboard` | `components/dashboard/` |
+| B2 CSV取込 | `(dashboard)/csv-import` | `components/csv-import/` |
+| B3 収支明細一覧 | `(dashboard)/transactions` | `components/transactions/` |
+| B4 資産分類マスタ | `(dashboard)/asset-categories` | `components/asset-categories/` |
+| B5 不動産一覧 | `(dashboard)/real-estate` | `components/real-estate/` |
+| B6 不動産詳細 | `(dashboard)/real-estate/[id]` | 同上 |
+| B7 不動産登録・編集 | `(dashboard)/real-estate/new`、`(dashboard)/real-estate/[id]/edit` | 同上 |
+| B8 FIRE目標設定 | `(dashboard)/fire-goal` | `components/fire-goal/` |
+| B9 想定利回り・リスク設定 | `(dashboard)/assumptions` | `components/assumptions/` |
+| B10 アカウント設定 | `(dashboard)/account` | `components/account/` |
+| B11 負債入力 | `(dashboard)/debts` | `components/debts/` |
+| (画面IDなし) | `(setup-check)`、`(setup-check)/spa-check` | 環境確認用。画面要件の対象外 |
+
+`real-estate` のように**1つのディレクトリが複数の画面IDに対応する**ことがあるので、ディレクトリ数を画面IDの数として数えない。画面を増やしたらこの表も足す。
+
 ## チェック手順
 
-1. 対象の画面IDを特定する(実装したファイルパスから `src/frontend` 配下のルーティング構造を見て、どの画面IDに対応するか判断する)。
+1. 対象の画面IDを上の表から特定する。
 2. 該当する要件定義書のセクションを読む。
    - 認証系(A1〜A8) → docs/auth-login-requirements.md 4章、docs/screen-requirements-auth.md
    - ダッシュボード・データ管理系(B1〜B4、B11) → docs/screen-requirements-dashboard.md
