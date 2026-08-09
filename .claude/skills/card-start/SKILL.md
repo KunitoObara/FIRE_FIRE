@@ -21,10 +21,18 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
    - **PRのURLが1件も見つからない場合だけ**、カード名 `[B7] ...` → ブランチ `feature/fire-fire-b7` → `gh pr list --head feature/fire-fire-b7 --state all --json number,state,createdAt,mergedAt,url` で引く(フォールバック)
    - **判定するのはコメントの件数ではなくPR URLの抽出結果。** 「コメントが1件も無い場合だけ」にすると、`分割計画:` のコメントだけが付いていて `PR:` のコメントが漏れたカードでフォールバックが働かない。分割カードには計画のコメントが必ず付くので、その組み合わせは実際に起こる
 5. **フォールバックで見つけたPRは、カードより後に作られたものだけ採る**(コメント由来のPRには要らない)
-   - カードの作成日時は**カードIDから導ける**。TrelloのIDはMongoDBのObjectIdで、先頭8桁(16進)がepoch秒
+   - カードの作成日時は**TrelloのカードID(内部の `id`)から導ける**。IDはMongoDBのObjectIdで、先頭8桁(16進)がepoch秒
      ```bash
-     python3 -c "import datetime,sys; print(datetime.datetime.fromtimestamp(int(sys.argv[1][:8],16), datetime.UTC))" <カードID>
+     python3 -c "
+     import datetime, re, sys
+     cid = sys.argv[1]
+     if not re.fullmatch(r'[0-9a-f]{24}', cid):
+         sys.exit('TrelloのカードID(24桁の16進)を渡すこと。[B7] のような表示上のIDではない')
+     print(datetime.datetime.fromtimestamp(int(cid[:8], 16), datetime.UTC))
+     " 6a7751a96c0eebb2a2d97faa
      ```
+   - **渡すのは `mcp__trello__get_cards_by_list_id` / `get_card` が返す24桁の `id`。** カード名の `[B7]` や `[X0-8]` ではない。この文書の他の箇所(§2 の引数、§6 のブランチ名)で「カードID」と呼んでいるのは後者なので、ここだけ指すものが違う
+   - **桁数の検査を外さない。** `B7` や `A8` や `B11` は**16進として妥当な文字列**なので、検査が無いと `int()` は例外を出さず1970年台の日時を返す。そうなるとすべてのPRが「カード作成より後」と判定され、**このガードがエラーも出さずに無効化される**(`X0-8` のように `-` を含むIDだけは `ValueError` で気づける)
    - **見るのは `createdAt`。`mergedAt` ではない。** カードが存在する前に作られたPRは、そのカードのものではありえない。`createdAt` がカード作成より**前**のPRは**捨てる**。捨てた結果0件になったらフォールバックは失敗
    - `mergedAt` で判定すると、**未マージ(open / closed)の古いPRが素通りする**。値が無いので「カード作成より前」に当てはまらず残り、手順6の「見つかったPRがすべて `MERGED`」を永久に満たせなくなる。カードは完了へ動かないまま毎回一覧に出続ける
 6. **完了**リストへ移動してよいのは次を**すべて**満たすカードだけ(`mcp__trello__move_card`)
