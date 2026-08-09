@@ -61,7 +61,9 @@ const CODES = ["7F2K-9QRT", "M3XZ-2LDS"];
 /** 連携状況。パスワードとGoogleの両方が連携済みの状態を既定にする */
 const linkedProviders = (google: boolean, password = true): LinkedProviderStatus[] => [
   { id: "password", isLinked: password, email: password ? "taro.yamada@example.com" : null },
-  { id: "google.com", isLinked: google, email: google ? "taro.yamada@gmail.com" : null },
+  // 登録メールアドレスとは別の文字列にしておく。同じにするとGoogle行に出ている
+  // ことを画面上の他の箇所と区別して確認できない
+  { id: "google.com", isLinked: google, email: google ? "taro.google@example.com" : null },
 ];
 
 const renderScreen = (): RenderResult =>
@@ -276,7 +278,7 @@ describe("AccountSettingsScreen", () => {
       expect(await screen.findByText("ログイン方法")).toBeInTheDocument();
       expect(screen.getByText("メールアドレス / パスワード")).toBeInTheDocument();
       expect(screen.getByText("Google")).toBeInTheDocument();
-      expect(screen.getByText("taro.yamada@gmail.com")).toBeInTheDocument();
+      expect(screen.getByText("taro.google@example.com")).toBeInTheDocument();
       expect(screen.getAllByText("連携済み")).toHaveLength(2);
     });
 

@@ -375,13 +375,13 @@ firebase functions:artifacts:setpolicy --project "$FIREBASE_PROJECT" --location 
 
 ## 6. ブランチ保護ルール
 
-> **現時点では設定できない。** プライベートリポジトリでのブランチ保護は有料プランの機能で、クラシックな Branch protection・Rulesets のどちらも API が 403 を返す。
->
-> ```
-> Upgrade to GitHub Pro or make this repository public to enable this feature.
-> ```
->
-> このため **CI が失敗してもマージボタンは押せる**。CI 自体は動作しているので、赤いチェックが付いた PR はマージしない運用でカバーする。解消するには GitHub Pro へのアップグレードか、リポジトリの公開が必要（本アプリは個人資産データを扱うため公開は現実的でない）。以下は有効化できるようになった時点で設定する内容。
+**リポジトリを公開した時点で設定できるようになる。** 個人アカウントの無料プランでは、ブランチ保護はパブリックリポジトリの機能であり、プライベートの間はクラシックな Branch protection・Rulesets のどちらも API が 403 を返していた。
+
+```
+Upgrade to GitHub Pro or make this repository public to enable this feature.
+```
+
+保護が無い間は **CI が失敗してもマージボタンが押せる**状態で、「赤いチェックが付いた PR はマージしない」という運用でカバーしていた。公開後はそれを GitHub 側に強制させる。
 
 `develop` と `main` の両方に設定する（Settings → Branches）。
 
@@ -389,13 +389,26 @@ firebase functions:artifacts:setpolicy --project "$FIREBASE_PROJECT" --location 
 - 必須ステータスチェック: `wip-check` / `hooks` / `frontend` / `backend`
   - これにより Lint・テストが NG の PR、タイトルに `WIP` を含む PR はマージボタンが押せなくなる
   - `claude-review` は**含めない**（レビューはコメントのみで、人間の判断を残す）
+  - **fork からの PR では `frontend` と `claude-review` が必ず失敗する。** Secrets が渡らないためで、ビルドは `NEXT_PUBLIC_FIREBASE_*` を要求する（[3 章](#3-github-の-secrets--variables)）。必須チェックにしている以上そのままではマージできないが、これは意図した状態であり、外部からの PR を取り込む必要が出たときに改めて考える
 - 「Require branches to be up to date before merging」を有効化
 - Force push / ブランチ削除を禁止
+  - force push はローカルでも `.claude/settings.json` の `PreToolUse` フックが止めている。こちらはサーバー側の裏付けで、二重に掛ける
+- 「Do not allow bypassing the above settings」（管理者にも適用）
+  - 入れないと、リポジトリ管理者である開発者本人は既定ですべてを迂回できる。1 人開発なので迂回しない運用も成り立つが、規律をツール側に持たせる方針（`gh pr merge` の deny、force push のフック）と揃える
+- 「Require approvals」は**設定しない**。1 人開発では自分の PR を自分で承認できず、マージが不可能になる
 - `main` は加えて、`develop` からの PR のみ受け付ける運用とする
+
+### マージできるユーザーを名指しで限定することについて
+
+**個人アカウントのリポジトリではできない。** 「Restrict who can push to matching branches」は Organization 所有のリポジトリ専用の設定で（GitHub Free の Organization が持つパブリックリポジトリ、および Team / Enterprise の全リポジトリ）、個人アカウントの設定画面には現れない。
+
+ただし**必要でもない**。個人リポジトリで push・マージができるのは、明示的に招待したコラボレーターだけであり、現在それは開発者 1 人（admin）である。パブリックにしても外部の人間にできるのは fork して PR を出すところまでで、マージ権限は生じない。「限定されたユーザーだけがマージできる」状態は既に満たされている。
+
+将来「push はできるがマージはできない協力者」のような区別が要るようになったら、Organization への移管が必要になる（Free の Organization + パブリックリポジトリで branch restrictions が使えるので、費用は増えない）。**その際は Workload Identity 連携が壊れる**ことに注意する。[2 章](#2-サービスアカウントと-workload-identity-連携)の principalSet が `attribute.repository/${GITHUB_REPO}` でリポジトリのフルネームに紐づいているため、IAM バインディングの貼り直しと Secrets / Variables の再登録が要る。1 人で開発している間は移管する利点が無いので、人を増やすときに初めて検討する。
 
 ## 7. 動作確認
 
-1. わざと Lint エラーを含む PR を出し、CI が落ちることを確認（6章のとおり、マージのブロック自体は現行プランでは効かない）
+1. わざと Lint エラーを含む PR を出し、CI が落ち、6 章の必須ステータスチェックによってマージボタンが押せなくなることを確認
 2. タイトルを `WIP: ...` にした PR で `wip-check` が落ち、`WIP` を外して再実行するとパスすることを確認
 3. PR 作成時に Claude のレビューコメントが自動で付くことを確認（3章のとおり、`claude-review.yml` が `main` に入った後の PR で確認する）
 4. `develop` へマージし、`fire-fire-dev` にデプロイされて画面が開くことを確認

@@ -61,7 +61,7 @@ const passwordProvider: Partial<UserInfo> = {
 };
 const googleProvider: Partial<UserInfo> = {
   providerId: "google.com",
-  email: "taro.yamada@gmail.com",
+  email: "taro.google@example.com",
 };
 
 const authError = (code: string): FirebaseError => new FirebaseError(code, "");
@@ -87,7 +87,7 @@ describe("getLinkedProviders", () => {
   it("パスワード・Googleの順で連携状況とメールアドレスを返す", () => {
     expect(getLinkedProviders()).toEqual([
       { id: "password", isLinked: true, email: "taro.yamada@example.com" },
-      { id: "google.com", isLinked: true, email: "taro.yamada@gmail.com" },
+      { id: "google.com", isLinked: true, email: "taro.google@example.com" },
     ]);
   });
 
