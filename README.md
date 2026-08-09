@@ -6,7 +6,7 @@
 
 ## 現在の状況
 
-Phase 1 を実装中。認証(A1〜A8)、ダッシュボード(B1)、CSV取込(B2)、負債入力(B11)などが動く状態で、B1 は一部サンプルデータのまま。
+Phase 1 を実装中。認証(A1〜A8)とダッシュボード系(B1〜B11)の画面が一通り動く状態で、B1 は取り込んだ資産残高を Firestore から読む。入出金明細CSVの取込がまだ無いため、収支明細一覧(B3)だけはサンプルデータを表示している。
 
 要件は `docs/` 配下がすべての起点で、**ドキュメントがコードに先行する**。実装から挙動を推測する前にそちらを見てほしい。
 
@@ -18,6 +18,7 @@ Phase 1 を実装中。認証(A1〜A8)、ダッシュボード(B1)、CSV取込(B
 | [DESIGN.md](DESIGN.md) | フロントエンドのデザインシステム |
 | [docs/ci-cd-setup.md](docs/ci-cd-setup.md) | CI/デプロイと、リポジトリ外の手動セットアップ手順 |
 | [docs/development-workflow.md](docs/development-workflow.md) | カード駆動の開発フロー |
+| [docs/command-guards.md](docs/command-guards.md) | 危険なコマンドを止める設定とその限界 |
 
 ## 構成
 

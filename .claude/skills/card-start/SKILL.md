@@ -5,7 +5,7 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
 
 # カード着手
 
-[docs/development-workflow.md](../../../docs/development-workflow.md) が正本。**まずこの文書を読む**。リストID・ラベルID・着手条件・ブランチ規約はすべてそこにある。
+[docs/development-workflow.md](../../../docs/development-workflow.md) が正本。**先に2〜5章を読む**(ボードとID・着手時に読むもの・質問のまとめ方・ブランチ規約と分割の要否)。リストID・ラベルID・着手条件・ブランチ名の規約はそこにある。文書全体を読む必要はない。
 
 ## 手順
 

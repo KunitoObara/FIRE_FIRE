@@ -5,9 +5,7 @@ description: Splits one card's work into several small pull requests that each p
 
 # PRの分割
 
-[docs/development-workflow.md](../../../docs/development-workflow.md) 5章「PRの分割」が正本。**まずそこを読む**。分ける目安・順序・型の波及の切り方・積み方はすべてそこにある。本ファイルは手順だけを持つ。
-
-分割は**レビューの精度**のために行う。B11(PR #83)では、ローカルのテストが緑のまま通ったデータ損失のバグが2件、レビューの往復を重ねて初めて出てきた。claude-review が無投稿で終わる問題とは別の話として扱う(正本に理由あり)。
+[docs/development-workflow.md](../../../docs/development-workflow.md) 5章「PRの分割」が正本。**先にそこだけ読む**。分ける目安・順序・型の波及の切り方・積み方、そして**なぜ分けるのか**はすべてそこにある。本ファイルは手順だけを持つので、根拠が要る場面では正本を引く。
 
 ## どちらのモードか最初に決める
 
@@ -86,7 +84,7 @@ git diff develop...HEAD --numstat -- ':(exclude)*.test.ts' ':(exclude)*.test.tsx
 
 **`develop...HEAD`(3点)を使う。`git diff develop`(2点)にしない。** 2点は `develop` の**現在の先端**との差分なので、ブランチを切ったあとに他のPRが `develop` へ入ると、このブランチが触っていない変更まで数に混ざる。`/card-ship` の「1. 変更内容の把握」も3点で測っており、同じ指標は同じ基準で測る。
 
-触る画面IDの数は、差分のパスを**画面IDに読み替えてから**数える。`src/app/(dashboard)/` と `src/components/` 配下は `dashboard` / `debts` / `real-estate` のような**機能名のディレクトリで、画面IDそのものではない**(B1 → `dashboard`、B11 → `debts`、B5〜B7 → `real-estate`)。対応は [docs/screen-list-and-transitions.md](../../../docs/screen-list-and-transitions.md) の画面一覧で引く。`real-estate` のように1つのディレクトリが複数の画面ID(B5・B6・B7)に対応することもあるので、ディレクトリ数をそのまま画面IDの数として数えない。
+触る画面IDの数は、差分のパスを**画面IDに読み替えてから**数える。`src/app/(dashboard)/` と `src/components/` 配下は `dashboard` / `debts` / `real-estate` のような**機能名のディレクトリで、画面IDそのものではない**。対応表は [`screen-spec-drift-check`](../screen-spec-drift-check/SKILL.md) が持っているのでそれを引く(同じ表を2箇所に置かない)。`real-estate` のように1つのディレクトリが複数の画面ID(B5・B6・B7)に対応することもあるので、ディレクトリ数をそのまま画面IDの数として数えない。
 
 正本 5章「分ける目安」と突き合わせ、**そもそも分ける必要があるか**を判断する。目安を下回っているなら分けずに終わってよい。その場合はそう報告する。
 
