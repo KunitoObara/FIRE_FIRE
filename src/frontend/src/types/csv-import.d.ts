@@ -1,4 +1,4 @@
-export {};
+import type { TRANSACTION_CSV_COLUMNS } from "@/constants/transactions-import";
 
 declare global {
   /** B2の取込種別タブ(docs/screen-requirements-dashboard.md B2) */
@@ -94,6 +94,14 @@ declare global {
   type AssetBalanceParseResult =
     | { ok: true; parsed: AssetBalanceParsed }
     | { ok: false; reason: CsvParseFailureReason; detail?: string };
+
+  /**
+   * 入出金明細CSVの列を指すキー(`TRANSACTION_CSV_COLUMNS`のキー)。
+   *
+   * 列名の一覧そのものから導く。列を増減したときに、キーを取り違えた参照が
+   * コンパイル時に落ちるようにするため(`OPTIONAL_TRANSACTION_CSV_COLUMN_KEYS`)。
+   */
+  type TransactionCsvColumnKey = keyof typeof TRANSACTION_CSV_COLUMNS;
 
   /**
    * 入出金明細CSVの1行分(docs/transaction-import-requirements.md 2.1・3.1)。
