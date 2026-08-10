@@ -54,13 +54,26 @@ export const DeleteCategoryAxisDialog = ({
   const references =
     axis === null ? null : resolveCategoryAxisDebtReferences(axis.debtIds, debtOptions);
 
-  // 負債の情報が揃っていないと削除してよいか決められない。安全側に倒して止めるが、
-  // 「集計対象が紐づいている」とは言わない — 紐づいていると判明したわけではないため
-  const undetermined = axis !== null && axis.debtIds.length > 0 && references === null;
-
   const blocked =
     axis !== null &&
     (axis.assetTypeNames.length > 0 || (references !== null && references.activeIds.length > 0));
+
+  /**
+   * 負債の情報が揃っていないと削除してよいか決められない状態。安全側に倒して止めるが、
+   * 「集計対象が紐づいている」とは言わない — 紐づいていると判明したわけではないため。
+   *
+   * **資産種別が1件でもある軸はここに含めない。** その軸は負債の情報が取れても削除できない
+   * ままなので、「時間をおいてもう一度」と促す文言を出すと、永久に叶わない再試行を勧める
+   * ことになる。確定してブロックされる軸は`blocked`側の文言で扱う。
+   *
+   * この条件により`blocked`とは排他になる(資産種別が0件で`references`が`null`なら、
+   * `blocked`の2つの条件はどちらも成立しない)。
+   */
+  const undetermined =
+    axis !== null &&
+    axis.assetTypeNames.length === 0 &&
+    axis.debtIds.length > 0 &&
+    references === null;
 
   /**
    * 見出しと本文をここで決める。3状態あるので式の中で分岐させると三項が入れ子になり、
