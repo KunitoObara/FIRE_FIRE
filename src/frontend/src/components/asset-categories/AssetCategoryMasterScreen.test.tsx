@@ -360,6 +360,7 @@ describe("AssetCategoryMasterScreen(負債)", () => {
     createCategoryAxis.mockReset();
     updateCategoryAxis.mockReset();
     fetchDebts.mockReset();
+    deleteCategoryAxis.mockReset();
     toastSuccess.mockReset();
 
     fetchCategoryAxes.mockResolvedValue({ ok: true, axes: [TOTAL_ASSETS_AXIS] });
@@ -559,5 +560,81 @@ describe("AssetCategoryMasterScreen(負債)", () => {
 
     expect(await screen.findByText("この分類は削除できません")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 参照が残っているだけの軸は何も集計していない。ブロックの理由(集計対象がある)と
+   * 実態が食い違うので、参照の件数ではなく実際に差し引かれる件数で判定する(B4-3)。
+   */
+  it("参照している負債がすべてB11で削除済みなら削除できる", async () => {
+    const user = userEvent.setup();
+    deleteCategoryAxis.mockResolvedValue({ ok: true });
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-deleted"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+    await user.click(await screen.findByRole("button", { name: "削除する" }));
+
+    await waitFor(() => {
+      expect(deleteCategoryAxis).toHaveBeenCalledWith("total-assets");
+    });
+  });
+
+  it("削除済みの参照に混じって生きている負債が1件でも残っていればブロックする", async () => {
+    const user = userEvent.setup();
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage", "debt-deleted"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+
+    expect(await screen.findByText("この分類は削除できません")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
+    expect(deleteCategoryAxis).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 取得に失敗しただけの状態を「集計対象が紐づいている」と読ませない(B11-2の一覧表示と
+   * 同じ考え方)。止めはするが、理由は別の文言で示す。
+   */
+  it("負債の情報を取得できないあいだは削除を止め、判定できない旨を出す", async () => {
+    const user = userEvent.setup();
+    fetchDebts.mockResolvedValue({ ok: false, reason: "unknown" });
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+
+    expect(await screen.findByText("この分類を削除できるか判定できません")).toBeInTheDocument();
+    expect(screen.queryByText(/先に編集で割り当てを解除してください/u)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
+    expect(deleteCategoryAxis).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 負債を1件も参照していない軸は、負債の取得に失敗していても判定できる。
+   * 取得失敗を理由に、関係のない分類軸まで消せなくしない(B4-3)。
+   */
+  it("負債を参照していない分類は、負債の取得に失敗していても削除できる", async () => {
+    const user = userEvent.setup();
+    deleteCategoryAxis.mockResolvedValue({ ok: true });
+    fetchDebts.mockResolvedValue({ ok: false, reason: "unknown" });
+    fetchCategoryAxes.mockResolvedValue({ ok: true, axes: [TOTAL_ASSETS_AXIS] });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+    await user.click(await screen.findByRole("button", { name: "削除する" }));
+
+    await waitFor(() => {
+      expect(deleteCategoryAxis).toHaveBeenCalledWith("total-assets");
+    });
   });
 });

@@ -130,6 +130,11 @@ declare global {
   type DeleteCategoryAxisDialogProps = {
     /** 削除対象。`null`は非表示 */
     axis: AssetCategoryAxisDocument | null;
+    /**
+     * 登録済みの負債。削除可否を「参照の件数」ではなく「実際に集計対象になっている件数」で
+     * 判定するために要る(B4-3)。読み込み中・取得失敗のあいだは判定できない
+     */
+    debtOptions: DebtOptionsState;
     onOpenChange: (open: boolean) => void;
     onConfirm: (axis: AssetCategoryAxisDocument) => Promise<DeleteCategoryAxisResult>;
   };

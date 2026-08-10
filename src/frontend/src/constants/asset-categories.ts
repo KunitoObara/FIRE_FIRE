@@ -111,9 +111,23 @@ export const CATEGORY_AXIS_NAME_TOO_LONG_MESSAGE = `分類名は${CATEGORY_AXIS_
  *
  * 負債だけが紐づいている分類も同じく削除できない。集計対象が割り当てられた分類軸を
  * 消させないという制約を資産・負債で分ける理由が無いため(B4の遷移条件)。
+ *
+ * **数えるのは「実際に集計対象になっている件数」で、参照の件数ではない。** B11で削除済みの
+ * 負債しか参照していない分類軸は何も集計していないので、この文言の対象にならない(B4-3)。
  */
 export const DELETE_CATEGORY_AXIS_BLOCKED_MESSAGE =
   "この分類には集計対象(資産種別・負債)が紐づいているため、削除できません。先に編集で割り当てを解除してください。";
+
+/**
+ * 負債の情報が揃っておらず、削除してよいかを判定できないときの本文。
+ *
+ * 上の「集計対象が紐づいている」とは**別の文言にする**。参照している負債がB11に残って
+ * いるかどうかが分からない状態であって、紐づいていると判明したわけではない。同じ文言に
+ * すると、取得に失敗しただけの分類軸を「集計対象がある」と読ませることになる
+ * (`resolveCategoryAxisDebtReferences`が`null`を返すときの扱いと揃える)。
+ */
+export const DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGE =
+  "負債の情報を取得できていないため、この分類を削除してよいか判定できません。時間をおいて画面を更新してから、もう一度お試しください。";
 
 /** 削除確認ダイアログの本文 */
 export const buildDeleteCategoryAxisConfirmMessage = (name: string): string =>
