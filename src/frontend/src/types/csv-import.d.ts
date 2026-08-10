@@ -173,6 +173,31 @@ declare global {
     | { ok: true; parsed: TransactionCsvParsed }
     | { ok: false; reason: TransactionCsvParseFailureReason; detail?: string };
 
+  /**
+   * 取引の取込前に既存データと突き合わせた結果
+   * (docs/transaction-import-requirements.md 7章のプレビュー)。
+   *
+   * 形は`AssetBalanceImportPlan`と同じだが、突き合わせの鍵が違う(あちらは日付、
+   * こちらはマネーフォワードの`ID`)。取り違えないよう型を分ける。
+   */
+  type TransactionImportPlan = {
+    /** まだFirestoreに無い`ID`の件数 */
+    newCount: number;
+    /** 既にある`ID`の件数(取込で上書きされる) */
+    updatedCount: number;
+  };
+
+  /**
+   * 取引の取込実行の結果。
+   *
+   * 500件を超える取込は`writeBatch`の上限で複数回に分けて確定するため、途中で失敗しても
+   * それまでのバッチはFirestoreに残る。失敗時も何件反映されたかを返し、画面が
+   * 「全部失敗した」と誤解させないようにする(`AssetBalanceImportResult`と同じ扱い)。
+   */
+  type TransactionImportResult =
+    | { ok: true; writtenCount: number }
+    | { ok: false; reason: CsvImportFailureReason; writtenCount: number };
+
   /** 取込前に既存データと突き合わせた結果 */
   type AssetBalanceImportPlan = {
     /** まだFirestoreに無い日付の件数 */

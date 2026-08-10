@@ -128,6 +128,65 @@ service cloud.firestore {
       return value == null || (value is string && value.size() > 0 && value.size() <= 200);
     }
 
+    // 取引1件の中身(入出金明細CSVから取り込む形)。
+    // フィールドと文字数の上限は docs/transaction-import-requirements.md 3.1 の表、および
+    // src/frontend/src/constants/transactions-import.ts と揃える。
+    //
+    // `hasAll`を書かないのは、下のフィールドごとの`is`検査が欠損も同時に弾くため
+    // (欠けたフィールドは`is string`を満たさない)。`assetSnapshots`と同じ組み方にしてある。
+    //
+    // 中項目・メモは未設定の取引がありうるので空文字を許す(同2.1)。内容・口座・大項目も
+    // 値の非空までは求めない。CSV側が空で返しているものにアプリが名前を与えないため(同6章)
+    function isValidTransaction(transaction) {
+      return transaction.keys().hasOnly(
+          ['date', 'content', 'amount', 'account', 'categoryMajor', 'categoryMinor', 'memo',
+           'isTransfer', 'isCalculationTarget', 'importedAt']
+        )
+        && isIsoDate(transaction.date)
+        // 収入がプラス・支出がマイナスで、符号はCSVのまま保つ(同5章)。したがって範囲は縛らない
+        && transaction.amount is number
+        && transaction.content is string
+        && transaction.content.size() <= 200
+        && transaction.account is string
+        && transaction.account.size() <= 100
+        && transaction.categoryMajor is string
+        && transaction.categoryMajor.size() <= 40
+        && transaction.categoryMinor is string
+        && transaction.categoryMinor.size() <= 40
+        && transaction.memo is string
+        && transaction.memo.size() <= 1000
+        && transaction.isTransfer is bool
+        && transaction.isCalculationTarget is bool
+        && transaction.importedAt is timestamp;
+    }
+
+    // 取引のドキュメントID(docs/transaction-import-requirements.md 3.2)。
+    // マネーフォワードの`ID`列そのものを使う。文字種と長さは
+    // src/frontend/src/constants/transactions-import.ts の TRANSACTION_ID_PATTERN と揃える。
+    //
+    // **パーサー側だけの検証にしない。** 再取込の冪等性(同4章)は「ドキュメントIDが
+    // マネーフォワードの値そのもの」であることに依存しており、パーサーだけで担保すると
+    // クライアントの実装を信頼した検証になる。SDKを直接叩けば形の崩れたIDのドキュメントが
+    // 作れ、同じ取引が別IDで重複しうる。他のフィールドの制約をパース側とルールの両方に
+    // 置いているのと同じ扱い。
+    //
+    // **`__…__`をここで重ねて弾くことはしない。** Firestore自身がその形式のドキュメントIDを
+    // 拒否するため、ルールで再度見ても防げるものが増えないため。エミュレータへルールを
+    // 迂回して(`Authorization: Bearer owner`)直接書き込んで確かめた結果が次のとおり。
+    //
+    //   ID "aaaa1111"   → 200
+    //   ID "__x__"      → 400 Resource id "__x__" is invalid because it is reserved.
+    //   ID "__"         → 200
+    //   ID "__aaaa1111" → 200
+    //
+    // 拒否されるのは`__.*__`(最短4文字)に一致するものだけで、`__`単体は通る。
+    // パーサー側(src/frontend/src/lib/csv/transaction-csv.ts)は要件3.2の文言どおり前後一致で
+    // 弾いており、Firestoreより厳しい。**書き込みを試す前に止めるためのもの**で、
+    // 「1件でも不正なら1件も取り込まない」(同2.3)を満たすにはそちらに置く必要がある。
+    function isValidTransactionId(transactionId) {
+      return transactionId.matches('^[A-Za-z0-9_-]{1,200}$');
+    }
+
     // 2FA(TOTP)まで済ませたセッションからのアクセスか(docs/auth-login-requirements.md 3.3)。
     //
     // 2FAは全ユーザー必須で、登録が済むまで主要機能を使わせない。画面側の`AppAccessGuard`は
@@ -173,6 +232,23 @@ service cloud.firestore {
           // 個々の金額が数値であることはパース側(src/lib/csv/asset-balance-csv.ts)で担保する
           && request.resource.data.byType is map;
         // 資産残高を消す画面はまだ無い。必要になった時点でここに許可を書く
+        allow delete: if false;
+      }
+
+      // 入出金明細CSVから取り込んだ取引(docs/transaction-import-requirements.md 3章)。
+      //
+      // ドキュメントIDはマネーフォワードの`ID`列そのもので、同じ`ID`の再取込は上書きになる。
+      // これが再取込の冪等性そのもの(同4章)なので、`update`も許可する。
+      //
+      // `assetSnapshots`と同じく`create`と`update`を`write`でまとめない(削除では
+      // `request.resource`が存在せず検証式を評価できないため)。
+      match /transactions/{transactionId} {
+        allow read: if canAccessOwnData(userId);
+        allow create, update: if canAccessOwnData(userId)
+          && isValidTransactionId(transactionId)
+          && isValidTransaction(request.resource.data);
+        // 取引を消す画面は無い。マネーフォワード側で削除された取引をアプリから消す手段も
+        // 現状は無く(同10章の検討事項)、必要になった時点でここに許可を書く
         allow delete: if false;
       }
 
