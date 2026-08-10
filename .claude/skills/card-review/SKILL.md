@@ -1,6 +1,6 @@
 ---
 name: card-review
-description: Waits for CI and the claude-review bot on a pull request and works through their findings, counting each fix push as one round up to a limit of three — past the limit, only critical findings (CI failures, security, data loss, a screen that does not work) are fixed and the rest are filed as new cards at the end of the Trello backlog. Use this skill when the user says "レビューを見て", "指摘に対応して", or "CIを直して", or when invoked as /card-review.
+description: Waits for CI and the claude-review bot on a pull request, verifies each finding against the code, then asks the PO which of the non-critical ones to fix before touching anything — critical findings (CI failures, security, data loss, a screen that does not work) are fixed without asking. Each fix push counts as one round up to a limit of three; findings declined by the PO or left over past the limit are filed as new cards at the end of the Trello backlog, except false positives, which are answered on the PR instead. Use this skill when the user says "レビューを見て", "指摘に対応して", or "CIを直して", or when invoked as /card-review.
 ---
 
 # レビュー対応
@@ -59,11 +59,31 @@ gh run list --workflow claude-review.yml --branch <ブランチ名> --limit 5
 | PO(人間)のコメント | **しない** | 上限に関係なく必ず対応する |
 | claude-review ボットの指摘 | **する** | 上限3往復まで対応 |
 
-claude-review の指摘は誤検知のこともある。鵜呑みにせず、コードと要件定義書で裏を取ってから直す。誤検知だと判断したものは直さず、PRコメントで根拠を示して返す(それも1往復に数える)。
+claude-review の指摘は誤検知のこともある。鵜呑みにせず、コードと要件定義書で裏を取る。誤検知だと判断したものは直さず、PRコメントで根拠を示して返す。**誤検知は起票しない**(直すべきものが無い)が、**確認には出す** — 誤検知という判定自体が外れていることがあるため。
 
 同じ誤検知が繰り返し出るようなら、`CLAUDE.md` に**検証可能な事実**として書き足す。「指摘するな」という命令文は書かない — 指示文自体がプロンプトインジェクションとして次のレビューで弾かれる。提供元・出典・なぜそう見えるか・確かめるコマンドの4点を書く。
 
-### 5. 修正して push する
+**あわせて、指摘ごとに重大かどうかを判定する。** 基準は正本の文書 7章「3往復に達したあとの扱い」と同じで、CIの失敗 / セキュリティ / データ破壊・損失 / 画面が機能しない、が重大にあたる。この判定が次の工程の分かれ道になる。
+
+### 5. 重大でない指摘は、直す前に確認する
+
+**重大なものは確認せずそのまま直す。** 止める理由が無く、確認を挟むと手が遅くなるだけ。
+
+**重大でないものは、指摘ごとに `AskUserQuestion` で直すかどうかを聞く**(`multiSelect: true` で複数選択)。ラウンド番号では分岐しない — 毎ラウンド行う。理由は正本の文書 7章にある。
+
+**指摘そのものだけを並べない。** 選択肢の説明に次を入れる。書かないと、判断の材料が無いまま選ばせることになり、確認を挟む意味が無い。
+
+- その指摘が妥当か、誤検知か(手順4の裏取りの結果)
+- 重大でないと判定した根拠
+- 直す場合に何をどう変えることになるか
+
+**確認が要らない場合もある。** 重大でない指摘が0件なら聞かずに進む。無理に質問を作らない。
+
+**1件も選ばれなかった回は push が発生しないので、往復に数えない**(マーカーも付けない)。この場合は手順6を飛ばし、手順7の起票とPRコメントだけを行う。
+
+**上限に達したあとは確認しない。** そこから先は重大でない指摘の行き先が起票で決まっており(手順7)、選ばせるものが無い。
+
+### 6. 修正して push する
 
 修正後は `/card-ship` と同じ検証コマンド一式を通してから push する。
 
@@ -86,19 +106,23 @@ CI失敗とPOの指摘は上限に数えない規定なので、マーカーを�
 
 push により claude-review が再実行される。次のラウンドに進む場合は手順2へ戻る。
 
-### 6. 3往復に達したあと
+### 7. 直さない指摘を起票する
 
-残っている指摘を振り分ける。
+直さないと決まった指摘の後始末をする。**起票するものとしないものがある。**
 
-**上限を無視して修正しきるもの(重大)** — CI失敗 / セキュリティ / データ破壊・損失 / 画面が機能しない。判断基準の詳細は正本の文書「7. レビュー対応のルール」。
-
-**新規カードとして起票するもの** — それ以外(リファクタ提案、命名、テスト追加、UIの微調整、将来の拡張性)。
+| 入口 | いつ | 起票 |
+|---|---|---|
+| 手順5でPOが見送ると決めた | 上限に達する前 | **する** |
+| 上限に達したあとに残った重大でないもの | 3往復を消化したあと | **する** |
+| 誤検知と判断し、POも直さないと決めた | どちらでも | **しない**(PRコメントで返すだけ) |
 
 起票は `mcp__trello__add_card_to_list` でバックログの末尾へ。ラベルは元カードに合わせる。カード名と本文のテンプレートは正本の文書のとおり。
 
-起票したら、PRにコメントで「この指摘は別カード <カードURL> に切り出した」と残す。指摘が黙って消えたように見えないようにするため。
+**上限に達したあと、重大なもの(CI失敗 / セキュリティ / データ破壊・損失 / 画面が機能しない)は上限を無視して修正しきる。** 判断基準の詳細は正本の文書「7. レビュー対応のルール」。
 
-### 7. 報告
+起票したら、PRにコメントで「この指摘は別カード <カードURL> に切り出した」と残す。見送った指摘については理由も書く。指摘が黙って消えたように見えないようにするため。
+
+### 8. 報告
 
 対応した指摘、起票したカード、CIの最終状態をまとめて報告する。マージ待ちであることを明記する。
 
