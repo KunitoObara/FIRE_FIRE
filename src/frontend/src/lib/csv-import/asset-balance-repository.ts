@@ -16,6 +16,7 @@ import {
   FIRESTORE_BATCH_LIMIT,
   IMPORT_HISTORY_LIMIT,
 } from "@/constants/csv-import";
+import { chunk } from "@/lib/csv-import/batch";
 import { resolveFirestoreUserContext, toFirestoreFailureReason } from "@/lib/firebase/user-context";
 import { assetSnapshotDocumentSchema, csvImportHistoryDocumentSchema } from "@/schemas/csv-import";
 
@@ -45,12 +46,6 @@ const assetSnapshotsRef = (firestore: Firestore, uid: string) =>
 /** 取込履歴のコレクション参照 */
 const csvImportsRef = (firestore: Firestore, uid: string) =>
   collection(firestore, USERS_COLLECTION, uid, CSV_IMPORTS_COLLECTION);
-
-/** 500件ずつに区切る。`writeBatch`が1回で扱える書き込みの上限に合わせる */
-const chunk = <T>(items: T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(items.length / size) }, (_unused, index) =>
-    items.slice(index * size, (index + 1) * size),
-  );
 
 /**
  * 取り込もうとしている日付のうち、既にFirestoreにあるものを数える。
