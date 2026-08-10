@@ -43,8 +43,6 @@ import { csvTableSchema } from "@/schemas/csv-import";
  * (`TRANSACTION_CSV_PARSE_FAILURE_MESSAGES`)。
  */
 
-type TransactionCsvColumnKey = keyof typeof TRANSACTION_CSV_COLUMNS;
-
 /** 列名から引いた位置。メモ列だけは存在しないことがあり、その場合は`-1`が入る */
 type TransactionCsvHeader = Record<TransactionCsvColumnKey, number>;
 
@@ -144,7 +142,9 @@ const readHeader = (
     id: trimmed.indexOf(TRANSACTION_CSV_COLUMNS.id),
   };
   const hasMissing = Object.entries(header).some(
-    ([key, index]) => index === -1 && !OPTIONAL_TRANSACTION_CSV_COLUMN_KEYS.includes(key),
+    ([key, index]) =>
+      index === -1 &&
+      !OPTIONAL_TRANSACTION_CSV_COLUMN_KEYS.some((optionalKey) => optionalKey === key),
   );
 
   if (hasMissing) {
@@ -263,8 +263,25 @@ export const parseTransactionCsv = (text: string): TransactionCsvParseResult => 
   const seenIds = new Set<string>();
 
   for (const [index, cells] of dataRows.entries()) {
-    // 列が足りない行は形式が違う。ヘッダーより多い分は「知らない列」として無視する(2.1)
-    if (cells.length < headerCells.length) {
+    // ヘッダーと列数が食い違う行は形式が違う。**多い側も弾く**。
+    //
+    // 2.1の「知らない列は無視する」はヘッダーに余分な**列名**がある場合の話で、
+    // 全行の列数は揃っている。特定の1行だけがヘッダーより多いのは、たとえば内容やメモの
+    // 自由記述にエスケープされていない`"`が入ってpapaparseが列を余分に割った場合で、
+    // その行だけ固定位置から読む値が右へずれる。
+    //
+    // ずれた値がたまたま各列の検査を通ると`ok: true`のまま取り込まれる。実際に
+    // `振替`の値が`ID`として読まれる並びを作れてしまい、そうなると無関係の取引の
+    // ドキュメントを上書きする(取込は`ID`をドキュメントIDにした`set`。4章)。
+    // 2.3が「1件でも不正なら1件も取り込まない」としているので、ここで止める。
+    //
+    // 末尾のカンマで空の列が1つ増えるだけなら無視してよいので、値の有無で見る
+    // (`asset-balance-csv.ts`の`hasValueBeyondHeader`と同じ扱い)。
+    const hasValueBeyondHeader = cells
+      .slice(headerCells.length)
+      .some((cell) => cell.trim().length > 0);
+
+    if (cells.length < headerCells.length || hasValueBeyondHeader) {
       return { ok: false, reason: "missing-column", detail: `${toLineNumber(index)}行目` };
     }
 

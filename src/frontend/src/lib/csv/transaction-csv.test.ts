@@ -230,6 +230,29 @@ describe("parseTransactionCsv", () => {
       expect(expectFailure(csv)).toBe("missing-column");
     });
 
+    it("ヘッダーより多い列に値がある行も`missing-column`", () => {
+      const csv = buildCsv([...VALID_CELLS, "余分な値"]);
+
+      expect(expectFailure(csv)).toBe("missing-column");
+    });
+
+    it("行の途中で列がずれたファイルを、値がすべて検査を通っても取り込まない", () => {
+      // 保有金融機関が2つのセルに割れた行。以降の値が右へずれ、`振替`の`0`が`ID`として
+      // 読まれる。列数を見ないと`ok: true`で通り、無関係の取引を上書きする(4章の`set`)
+      const csv = [
+        HEADER,
+        '"1","2026/07/31","スーパー〇〇","-3200","〇〇","銀行","食費","食料品","1","0","aaaa1111"',
+      ].join("\r\n");
+
+      expect(expectFailure(csv)).toBe("missing-column");
+    });
+
+    it("末尾のカンマで空の列が増えただけの行は取り込める", () => {
+      const csv = [HEADER, `${VALID_CELLS.map((cell) => `"${cell}"`).join(",")},`].join("\r\n");
+
+      expect(expectParsed(csv).rows[0]?.id).toBe("aaaa1111");
+    });
+
     it("同じ名前の列が複数あるファイルは`duplicate-column`", () => {
       const csv = buildCsv([...VALID_CELLS, "2026/07/01"], `${HEADER},"日付"`);
 

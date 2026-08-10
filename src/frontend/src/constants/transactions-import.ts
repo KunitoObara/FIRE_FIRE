@@ -28,7 +28,7 @@ export const TRANSACTION_CSV_COLUMNS = {
  * メモだけは3.1が「未設定・**列が無い場合**は空文字」と決めている。他の列は
  * 存在しなければ`missing-column`で弾く(値が空であることは許す。2.1)。
  */
-export const OPTIONAL_TRANSACTION_CSV_COLUMN_KEYS: string[] = ["memo"];
+export const OPTIONAL_TRANSACTION_CSV_COLUMN_KEYS: TransactionCsvColumnKey[] = ["memo"];
 
 /** `計算対象` / `振替` が取る値。これ以外は`invalid-flag`(2.3) */
 export const TRANSACTION_FLAG_TRUE = "1";
@@ -90,7 +90,9 @@ export const MAX_TRANSACTION_ROWS = 20_000;
 
 /** 必須列の一覧。`missing-column`の文言でどの列が要るかを示すために使う */
 const REQUIRED_COLUMN_LABELS = Object.entries(TRANSACTION_CSV_COLUMNS)
-  .filter(([key]) => !OPTIONAL_TRANSACTION_CSV_COLUMN_KEYS.includes(key))
+  .filter(
+    ([key]) => !OPTIONAL_TRANSACTION_CSV_COLUMN_KEYS.some((optionalKey) => optionalKey === key),
+  )
   .map(([, columnName]) => `「${columnName}」`)
   .join("");
 
@@ -108,7 +110,7 @@ export const TRANSACTION_CSV_PARSE_FAILURE_MESSAGES: Record<
     "ファイルサイズが大きすぎます。マネーフォワードの「収入・支出詳細」からエクスポートしたCSVを選択してください。",
   "empty-file":
     "ファイルが空です。マネーフォワードの「収入・支出詳細」からエクスポートしたCSVを選択してください。",
-  "missing-column": `CSVの形式を読み取れませんでした。${REQUIRED_COLUMN_LABELS}の列を持つ、マネーフォワードの「収入・支出詳細」エクスポート形式のファイルを選択してください。`,
+  "missing-column": `CSVの形式を読み取れませんでした。${REQUIRED_COLUMN_LABELS}の列を持つ、マネーフォワードの「収入・支出詳細」エクスポート形式のファイルを選択してください(ヘッダーと列数が食い違う行がある場合も、その行を示してこのエラーになります)。`,
   "duplicate-column":
     "同じ名前の列が複数あります。どちらの値を採用すべきか判断できないため取り込めません。",
   "no-data-rows": "取り込めるデータ行がありません。期間を指定してエクスポートし直してください。",
