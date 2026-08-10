@@ -95,6 +95,76 @@ declare global {
     | { ok: true; parsed: AssetBalanceParsed }
     | { ok: false; reason: CsvParseFailureReason; detail?: string };
 
+  /**
+   * 入出金明細CSVの1行分(docs/transaction-import-requirements.md 2.1・3.1)。
+   *
+   * 取込前のCSVの1行を表す型で、Firestoreに保存済みの取引(`Transaction`)とは分けてある。
+   * `AssetBalanceRow`と`AssetSnapshot`を分けているのと同じ理由で、出所が違うものを
+   * 同じ型で扱うと取り違えるため。保存時に`importedAt`が足される。
+   */
+  type TransactionCsvRow = {
+    /** マネーフォワードの`ID`列。FirestoreのドキュメントIDにそのまま使う(3.2) */
+    id: string;
+    /** 取引日(`yyyy-MM-dd`) */
+    date: string;
+    /** 内容(摘要) */
+    content: string;
+    /** 収入がプラス、支出がマイナス。CSVの符号をそのまま保つ(5章) */
+    amount: number;
+    /** 保有金融機関 */
+    account: string;
+    /** 費目の上位(例: 食費) */
+    categoryMajor: string;
+    /** 費目の下位(例: 外食)。未設定は空文字のまま扱い、アプリ側で名前を与えない(6章) */
+    categoryMinor: string;
+    /** マネーフォワード側で付けた自由記述。未設定・列が無い場合は空文字 */
+    memo: string;
+    /** `振替`列が`1`。自口座間の移動で、収支の集計からは外す(5章) */
+    isTransfer: boolean;
+    /** `計算対象`列が`1`。`false`の行も保存はするが収支の集計からは外す(5章) */
+    isCalculationTarget: boolean;
+  };
+
+  /** パースに成功した入出金明細CSVの中身 */
+  type TransactionCsvParsed = {
+    /**
+     * CSVに現れた順の行。マネーフォワードのエクスポートは新しい日付が先頭で、
+     * 並べ替えない。取引は同じ日に何件でも並ぶため日付の昇順に直しても順序が一意に
+     * 定まらず、プレビューの「先頭N件」も画面で見た並びと一致しなくなる
+     */
+    rows: TransactionCsvRow[];
+    /** 最も古い取引日(`yyyy-MM-dd`) */
+    periodFrom: string;
+    /** 最も新しい取引日(`yyyy-MM-dd`) */
+    periodTo: string;
+  };
+
+  /**
+   * 入出金明細CSVのパースに失敗した理由
+   * (docs/transaction-import-requirements.md 2.3)。
+   *
+   * 資産残高推移と共通の理由から2つを外し、入出金明細固有の4つを足したもの。
+   *
+   * - `duplicate-date` — **同じ日付に複数の取引があるのは正常**で、1日1行の資産残高推移とは
+   *   前提が逆になる
+   * - `unnamed-column` — 知らない列は無視する(2.1)ため、名前で引けない列は失敗にしない
+   */
+  type TransactionCsvParseFailureReason =
+    | Exclude<CsvParseFailureReason, "duplicate-date" | "unnamed-column">
+    /** `ID`列の値がFirestoreのドキュメントIDとして使えない(3.2) */
+    | "invalid-id"
+    /** 同一ファイル内に同じ`ID`の行が複数ある */
+    | "duplicate-id"
+    /** `計算対象` / `振替` が`0` / `1`以外 */
+    | "invalid-flag"
+    /** 文字列の列が3.1の上限文字数を超えている */
+    | "too-long";
+
+  /** 入出金明細CSVのパース結果。失敗時は理由と、原因の行など補足できる情報を返す */
+  type TransactionCsvParseResult =
+    | { ok: true; parsed: TransactionCsvParsed }
+    | { ok: false; reason: TransactionCsvParseFailureReason; detail?: string };
+
   /** 取込前に既存データと突き合わせた結果 */
   type AssetBalanceImportPlan = {
     /** まだFirestoreに無い日付の件数 */
