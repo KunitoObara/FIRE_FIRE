@@ -620,6 +620,27 @@ describe("AssetCategoryMasterScreen(負債)", () => {
   });
 
   /**
+   * 資産種別が紐づいている軸は、負債の情報が取れても削除できないままである。
+   * ここで「時間をおいてもう一度」と促すと、永久に叶わない再試行を勧めることになる。
+   */
+  it("資産種別が紐づいた分類は、負債の取得に失敗していても確定ブロックの文言を出す", async () => {
+    const user = userEvent.setup();
+    fetchDebts.mockResolvedValue({ ok: false, reason: "unknown" });
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...NET_FINANCIAL_AXIS, debtIds: ["debt-mortgage"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+
+    expect(await screen.findByText("この分類は削除できません")).toBeInTheDocument();
+    expect(screen.getByText(/先に編集で割り当てを解除してください/u)).toBeInTheDocument();
+    expect(screen.queryByText(/時間をおいて画面を更新して/u)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
+  });
+
+  /**
    * 負債を1件も参照していない軸は、負債の取得に失敗していても判定できる。
    * 取得失敗を理由に、関係のない分類軸まで消せなくしない(B4-3)。
    */
