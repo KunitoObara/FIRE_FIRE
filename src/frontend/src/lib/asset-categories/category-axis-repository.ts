@@ -189,13 +189,25 @@ export const updateCategoryAxis = async (
 /**
  * 分類軸を削除する。
  *
- * 集計対象が1件以上割り当てられた分類は`firestore.rules`側でも削除を拒否しており
- * (先に編集で割り当てを解除する必要がある)、呼び出し側は`permission-denied`として受け取る。
- * 実際の禁止判定は画面側で`assetTypeNames`と`debtIds`の件数から先に行い、確認ダイアログの
- * 時点でブロックする(この関数まで進むのは削除可能な分類のときだけ)。
+ * 集計対象が割り当てられた分類軸は削除させない(先に編集で割り当てを解除する必要がある。
+ * docs/screen-requirements-dashboard.md B4)。負債だけが割り当てられた軸も同じ扱いで、
+ * 制約を資産・負債で分ける理由が無いため。
  *
- * 負債だけが割り当てられた分類軸も削除できない。集計対象が割り当てられた軸を消させない
- * という制約を資産・負債で分ける理由が無いため(docs/screen-requirements-dashboard.md B4)。
+ * **この2つは担保している層が違う。**
+ *
+ * - 資産種別 — `firestore.rules`が`assetTypeNames.size() == 0`を要求する。ここを直接
+ *   呼んでも通らない
+ * - 負債 — **`firestore.rules`は見ていない。** 判定できるのは`DeleteCategoryAxisDialog`
+ *   だけで、この関数まで進むのは画面がブロックしなかったときに限られる
+ *
+ * ルールが負債を見ないのは、参照が実際に集計対象かどうかが`debts`の存在に依存する一方、
+ * ルールには繰り返しが無く可変長の`debtIds`を1件ずつ確かめられないため(firestore.rulesの
+ * `categoryAxes`のコメント)。件数で代用すると、参照先がすべて削除済みで何も集計していない
+ * 軸の削除を永久に拒否することになる。
+ *
+ * **したがって、ダイアログを経由しない削除経路をここに足すと、生きている負債を参照した
+ * ままの分類軸が消せてしまう。** 呼び出し側を増やすときは、
+ * `resolveCategoryAxisDebtReferences`の`activeIds`で先に判定すること。
  */
 export const deleteCategoryAxis = async (id: string): Promise<DeleteCategoryAxisResult> => {
   const context = resolveFirestoreUserContext();
