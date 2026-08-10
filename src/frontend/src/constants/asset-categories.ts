@@ -125,9 +125,20 @@ export const DELETE_CATEGORY_AXIS_BLOCKED_MESSAGE =
  * いるかどうかが分からない状態であって、紐づいていると判明したわけではない。同じ文言に
  * すると、取得に失敗しただけの分類軸を「集計対象がある」と読ませることになる
  * (`resolveCategoryAxisDebtReferences`が`null`を返すときの扱いと揃える)。
+ *
+ * **読み込み中と取得失敗で分ける。** 前者は待てば必ず判定できるようになり、後者はそうとは
+ * 限らない。同じ文言にすると、読み込み中のユーザーに再試行を促すことになる。
+ *
+ * **どちらも画面の更新を指示しない。** `QueryClient`は既定の設定で使っており、失敗しても
+ * 自動でリトライし、ウィンドウのフォーカスが戻ったときや再マウント時にも取り直す
+ * (`src/components/providers/QueryProvider.tsx`)。手動の再読み込みは要らない。
  */
-export const DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGE =
-  "負債の情報を取得できていないため、この分類を削除してよいか判定できません。時間をおいて画面を更新してから、もう一度お試しください。";
+export const DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES: Record<"loading" | "error", string> = {
+  loading:
+    "負債の情報を読み込んでいるため、この分類を削除してよいか判定できません。読み込みが終わるまでお待ちください。",
+  error:
+    "負債の情報を取得できなかったため、この分類を削除してよいか判定できません。時間をおいて、もう一度お試しください。",
+};
 
 /** 削除確認ダイアログの本文 */
 export const buildDeleteCategoryAxisConfirmMessage = (name: string): string =>

@@ -16,7 +16,7 @@ import {
   buildDeleteCategoryAxisConfirmMessage,
   CATEGORY_AXIS_FAILURE_MESSAGES,
   DELETE_CATEGORY_AXIS_BLOCKED_MESSAGE,
-  DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGE,
+  DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES,
 } from "@/constants/asset-categories";
 import { resolveCategoryAxisDebtReferences } from "@/lib/asset-categories/debt-references";
 
@@ -83,7 +83,11 @@ export const DeleteCategoryAxisDialog = ({
     if (undetermined) {
       return {
         title: "この分類を削除できるか判定できません",
-        description: DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGE,
+        // `undetermined`が真なら`references`は`null`、すなわち`status`は`ready`ではない
+        description:
+          debtOptions.status === "error"
+            ? DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES.error
+            : DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES.loading,
       };
     }
 
