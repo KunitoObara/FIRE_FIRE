@@ -280,6 +280,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
 
       <DeleteCategoryAxisDialog
         axis={deletingAxis}
+        debtOptions={debtOptions}
         onOpenChange={(open) => {
           if (!open) {
             setDeletingAxis(null);
