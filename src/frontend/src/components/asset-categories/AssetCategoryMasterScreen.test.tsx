@@ -614,9 +614,32 @@ describe("AssetCategoryMasterScreen(負債)", () => {
     await user.click(await screen.findByRole("button", { name: "削除" }));
 
     expect(await screen.findByText("この分類を削除できるか判定できません")).toBeInTheDocument();
+    expect(screen.getByText(/負債の情報を取得できなかったため/u)).toBeInTheDocument();
     expect(screen.queryByText(/先に編集で割り当てを解除してください/u)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
     expect(deleteCategoryAxis).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 読み込み中は待てば必ず判定できるようになる。取得失敗と同じ文言にすると、
+   * 待てば済むユーザーに再試行を促すことになる。
+   */
+  it("負債を読み込んでいるあいだは、再試行ではなく待つよう伝える", async () => {
+    const user = userEvent.setup();
+    // 解決しないPromiseで読み込み中のまま留める
+    fetchDebts.mockReturnValue(new Promise(() => {}));
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+
+    expect(await screen.findByText("この分類を削除できるか判定できません")).toBeInTheDocument();
+    expect(screen.getByText(/読み込みが終わるまでお待ちください/u)).toBeInTheDocument();
+    expect(screen.queryByText(/もう一度お試しください/u)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
   });
 
   /**
