@@ -82,15 +82,15 @@ export const buildTransactionsHref = (filters: TransactionFilters): string => {
 
   params.set(TRANSACTION_PERIOD_PARAM, filters.periodId);
 
-  if (filters.category !== "") {
+  if (filters.category) {
     params.set(TRANSACTION_CATEGORY_PARAM, filters.category);
   }
 
-  if (filters.account !== "") {
+  if (filters.account) {
     params.set(TRANSACTION_ACCOUNT_PARAM, filters.account);
   }
 
-  if (filters.keyword !== "") {
+  if (filters.keyword) {
     params.set(TRANSACTION_KEYWORD_PARAM, filters.keyword);
   }
 
@@ -102,7 +102,7 @@ export const buildTransactionsHref = (filters: TransactionFilters): string => {
   }
 
   const query = params.toString();
-  return query === "" ? TRANSACTIONS_PATH : `${TRANSACTIONS_PATH}?${query}`;
+  return query ? `${TRANSACTIONS_PATH}?${query}` : TRANSACTIONS_PATH;
 };
 
 /**

@@ -73,7 +73,7 @@ export const TransactionsScreen = ({ searchParams }: TransactionsScreenProps): J
   const result = transactionsQuery.data;
 
   // 取得の失敗を空状態(未取込)として見せない。次にすべきことが正反対になる
-  if (result === undefined || !result.ok) {
+  if (!result || !result.ok) {
     return (
       <p role="alert" className="text-sm text-destructive">
         {TRANSACTIONS_LOAD_FAILURE_MESSAGES[result?.reason ?? "unknown"]}

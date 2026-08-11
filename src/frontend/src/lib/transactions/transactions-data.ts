@@ -21,7 +21,7 @@ import { fetchTransactions } from "@/lib/csv-import/transaction-repository";
  * 切り替えるたびに同じ費目が別の位置へ動いて探せなくなる。
  */
 const collectOptions = (values: string[]): string[] =>
-  [...new Set(values.filter((value) => value !== ""))].sort((left, right) =>
+  [...new Set(values.filter((value) => value))].sort((left, right) =>
     left.localeCompare(right, "ja"),
   );
 

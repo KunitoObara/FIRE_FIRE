@@ -62,9 +62,9 @@ const buildColumns = (filters: TransactionFilters): ColumnDef<Transaction>[] => 
     cell: ({ row }) => (
       <span className="flex flex-wrap items-center gap-1.5">
         <Badge variant="secondary">{row.original.categoryMajor}</Badge>
-        {row.original.categoryMinor === "" ? null : (
+        {row.original.categoryMinor ? (
           <span className="text-xs text-muted-foreground">{row.original.categoryMinor}</span>
-        )}
+        ) : null}
       </span>
     ),
   },
