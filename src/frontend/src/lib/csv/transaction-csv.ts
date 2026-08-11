@@ -65,7 +65,19 @@ const parseDate = (raw: string | undefined): string | undefined => {
 const parseAmount = (raw: string | undefined): number | undefined => {
   const normalized = (raw ?? "").trim().replace(/,/gu, "");
 
-  return TRANSACTION_AMOUNT_PATTERN.test(normalized) ? Number(normalized) : undefined;
+  if (!TRANSACTION_AMOUNT_PATTERN.test(normalized)) {
+    return undefined;
+  }
+
+  const amount = Number(normalized);
+
+  /*
+    `-0`を`0`に均す。パターンは`"-0"`を通し、`Number("-0")`は負のゼロになる。Firestoreの
+    JS SDKは負のゼロだけを整数ではなく小数として送るため(`isSafeInteger`が負のゼロを除く)、
+    そのまま書くと`firestore.rules`の`amount is int`に弾かれ、**その1行のせいで取込全体が
+    permission-deniedで落ちる**。金額として`0`と`-0`に違いは無いので、ここで均しておく。
+  */
+  return amount === 0 ? 0 : amount;
 };
 
 /** `計算対象` / `振替` の`0` / `1`を真偽値にする。それ以外は`undefined` */

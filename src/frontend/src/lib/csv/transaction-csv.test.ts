@@ -168,6 +168,18 @@ describe("parseTransactionCsv", () => {
     expect(expectParsed(buildCsvWith({ 3: "0" })).rows[0]?.amount).toBe(0);
   });
 
+  /**
+   * `-0`のまま持つと、FirestoreのJS SDKがこれだけを整数ではなく小数として送るため、
+   * `firestore.rules`の`amount is int`に弾かれてその1行のせいで取込全体が落ちる。
+   * 金額として`0`と`-0`に違いは無いので、パース時に均す。
+   */
+  it("マイナスのゼロは0として持つ", () => {
+    const amount = expectParsed(buildCsvWith({ 3: "-0" })).rows[0]?.amount;
+
+    expect(amount).toBe(0);
+    expect(Object.is(amount, -0)).toBe(false);
+  });
+
   it("UTF-8のBOMが付いたファイルでも先頭の列名を引ける", () => {
     // BOMを落とさないと先頭列が`﻿計算対象`になり、`missing-column`で弾かれる。
     // 文字コードの判定は`decode.ts`と共通なので、そこを通した文字列で確かめる
