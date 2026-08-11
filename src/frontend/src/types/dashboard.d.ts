@@ -38,7 +38,54 @@ declare global {
      * 月内でいちばん新しい資産残高の日付をそのまま使う(`buildAxisNetWorthSeries`)
      */
     date: string;
+    /**
+     * 純額(対象の資産種別の合計 - その時点の対象の負債の残債)。**純資産表示が描く値**。
+     *
+     * **`byType`から足し直さない。** FIRE達成度ゲージの現在資産額と一致するのはこの値で
+     * (docs/screen-requirements-dashboard.md B1)、`resolveAxisNetAmount`もこれを採る。
+     */
     amount: number;
+    /**
+     * 対象の資産種別ごとの額(種別名 → 円)。**積み上げ表示が描く値**。
+     *
+     * 負債は引かず、マイナス残高の種別は符号のまま持つ(同要件B1「積み上げ表示」)。
+     * したがって値の総和は`amount`と一致しない(負債を含む分類軸の場合)。
+     */
+    byType: Record<string, number>;
+  };
+
+  /** 資産推移グラフの表示(docs/screen-requirements-dashboard.md B1「資産推移グラフの表示切替」) */
+  type NetWorthTrendModeId = "stacked" | "net";
+
+  /** 表示切替の1選択肢 */
+  type NetWorthTrendMode = {
+    id: NetWorthTrendModeId;
+    label: string;
+  };
+
+  /**
+   * 積み上げ表示の1本の帯。色スロットの割り当ては分類別内訳の円グラフと共有する
+   * (`buildCategoryColorSlots`)。
+   */
+  type NetWorthTrendBand = {
+    /** 資産種別名。スロットに収まらない種別は`OTHER_CATEGORY_ID`にまとめる */
+    categoryId: string;
+    name: string;
+    /** `var(--chart-N)`形式のCSS変数参照 */
+    color: string;
+  };
+
+  /**
+   * 積み上げ表示に渡す1点。`byType`を色スロットごとに寄せ集めたもの。
+   *
+   * 帯の額は`categoryId`をキーに持つ。Rechartsが`dataKey`で引くため、種別名をそのまま
+   * キーにした平らな形にしている。
+   */
+  type NetWorthStackedPoint = {
+    date: string;
+    /** ツールチップに出す合計。**行に並べた資産種別の総和**で、負の種別も符号のまま加える */
+    total: number;
+    amounts: Record<string, number>;
   };
 
   /** 分類別内訳の1分類分の金額 */
@@ -166,6 +213,7 @@ declare global {
   type DashboardScreenProps = {
     axisParam: string | string[] | undefined;
     periodParam: string | string[] | undefined;
+    trendParam: string | string[] | undefined;
   };
 
   /**
@@ -184,13 +232,25 @@ declare global {
     axes: AssetCategoryAxis[];
     selectedAxisId: string;
     selectedPeriodId: DashboardPeriodId;
+    /**
+     * 選択中の資産推移の表示。この切替UI自体は出さない(切替は資産推移カードの中にある)が、
+     * 分類軸・表示期間を変えたときに載せ直さないとURLから落ちてしまうため受け取る。
+     */
+    selectedTrendMode: NetWorthTrendModeId;
   };
 
-  /** 資産推移グラフのProps */
+  /** 資産推移グラフ(純資産表示)のProps */
   type NetWorthTrendChartProps = {
     /** 系列名。分類軸の名前をそのまま使う */
     axisName: string;
     series: NetWorthPoint[];
+  };
+
+  /** 資産推移グラフ(積み上げ表示)のProps */
+  type NetWorthStackedChartProps = {
+    /** 描く順(=色スロット順)に並んだ帯 */
+    bands: NetWorthTrendBand[];
+    points: NetWorthStackedPoint[];
   };
 
   /** 分類別内訳(円グラフ)のProps */
@@ -210,6 +270,22 @@ declare global {
     axisName: string;
     /** 表示期間で絞り込み済みの推移 */
     series: NetWorthPoint[];
+    /** 選択中の表示(積み上げ / 純資産) */
+    mode: NetWorthTrendModeId;
+    /** 色スロットの割り当ての元になる分類の一覧(円グラフと共有する) */
+    categories: AssetCategory[];
+    /**
+     * この分類軸が差し引く負債の残債合計。**0より大きいときだけ**積み上げ表示に
+     * 「負債は差し引いていない」注記を出す(0円の負債でスライスを出さないのと同じ理由)
+     */
+    debtTotal: number;
+    /**
+     * 表示を切り替えたときの遷移先を組み立てる。
+     *
+     * カード側に分類軸IDと表示期間を持たせないための受け渡し。切替でこの2つが
+     * URLから落ちてはいけないが、それはカードの関心事ではない。
+     */
+    buildHref: (mode: NetWorthTrendModeId) => string;
   };
 
   /** 分類別内訳カードのProps */

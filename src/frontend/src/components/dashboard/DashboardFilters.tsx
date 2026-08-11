@@ -31,15 +31,18 @@ export const DashboardFilters = ({
   axes,
   selectedAxisId,
   selectedPeriodId,
+  selectedTrendMode,
 }: DashboardFiltersProps): JSX.Element => {
   const router = useRouter();
 
   const handleAxisChange = (axisId: string): void => {
-    router.replace(buildDashboardHref(axisId, selectedPeriodId));
+    router.replace(buildDashboardHref(axisId, selectedPeriodId, selectedTrendMode));
   };
 
   const handlePeriodChange = (periodId: string): void => {
-    router.replace(buildDashboardHref(selectedAxisId, periodId as DashboardPeriodId));
+    router.replace(
+      buildDashboardHref(selectedAxisId, periodId as DashboardPeriodId, selectedTrendMode),
+    );
   };
 
   return (

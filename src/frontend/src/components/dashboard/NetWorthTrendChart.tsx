@@ -13,9 +13,13 @@ import type { JSX } from "react";
 import type { ChartConfig } from "@/components/ui/chart";
 
 /**
- * 資産推移グラフ(B1)。
+ * 資産推移グラフの純資産表示(B1)。
  *
- * 系列は1本だけなので凡例は置かない(何の値かはカードの見出しが示している)。
+ * 対象の資産種別の合計から対象の負債の残債を差し引いた1本の線で、**この最新点だけが
+ * FIRE達成度ゲージの現在資産額と一致する**(docs/screen-requirements-dashboard.md B1)。
+ * 資産種別ごとの内訳は積み上げ表示(`NetWorthStackedChart`)が描く。
+ *
+ * 系列は1本だけなので凡例は置かない(何の値かはカードの見出しと表示切替が示している)。
  * 代わりに任意の月の値を読めるよう、ホバーで日付と金額を出す。
  *
  * 系列名は選択中の分類軸の名前をそのまま使う。分類軸はユーザーが追加・編集するマスタデータで
@@ -44,13 +48,12 @@ export const NetWorthTrendChart = ({ axisName, series }: NetWorthTrendChartProps
           minTickGap={32}
           tickFormatter={(value: string) => format(parseISO(value), "yyyy/MM")}
         />
-        <YAxis
-          dataKey="amount"
-          tickLine={false}
-          axisLine={false}
-          width={48}
-          tickFormatter={formatCompactJpy}
-        />
+        {/*
+          `dataKey`は渡さない。描いている系列から範囲が決まるので指定しても結果は同じだが、
+          積み上げ表示では指定すると1つの帯の額だけで範囲が決まってしまう。2つのグラフで
+          書き方を分けると、片方を直したときにもう片方を見落とす
+        */}
+        <YAxis tickLine={false} axisLine={false} width={48} tickFormatter={formatCompactJpy} />
         <ChartTooltip
           content={
             <ChartTooltipContent

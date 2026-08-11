@@ -8,6 +8,130 @@ import {
 } from "@/constants/dashboard";
 
 /**
+ * 個別の色を割り当てられる分類の数。
+ * 分類がスロット数に収まるなら全て個別の色にできる。溢れる場合だけ最後のスロットを
+ * 「その他」に使うため、1つ減る。
+ */
+const resolveIndividualSlotCount = (categories: AssetCategory[]): number =>
+  categories.length > CATEGORY_COLOR_SLOT_COUNT
+    ? CATEGORY_COLOR_SLOT_COUNT - 1
+    : CATEGORY_COLOR_SLOT_COUNT;
+
+/**
+ * 分類マスタの登録順を色スロットへ割り当てた一覧を作る。溢れた分の受け皿として
+ * 「その他」を末尾に足す(溢れていなければ足さない)。
+ *
+ * **分類別内訳の円グラフと資産推移グラフの積み上げ表示が、この1つの割り当てを共有する。**
+ * 同じ画面に並ぶ2つのグラフで同じ資産種別が違う色になると、内訳と推移を見比べられない
+ * (docs/screen-requirements-dashboard.md B1「積み上げ表示」/ DESIGN.md 3章)。
+ *
+ * 渡す`categories`は直近1日の資産残高に現れる資産種別で、**符号で絞らない**
+ * (`collectAssetCategories`)。マイナス残高の資産種別も固有の色と凡例を持つ。
+ */
+export const buildCategoryColorSlots = (categories: AssetCategory[]): NetWorthTrendBand[] => {
+  const individualSlotCount = resolveIndividualSlotCount(categories);
+
+  const slots: NetWorthTrendBand[] = categories
+    .slice(0, individualSlotCount)
+    .map((category, index) => ({
+      categoryId: category.id,
+      name: category.name,
+      color: `var(--chart-${index + 1})`,
+    }));
+
+  if (categories.length > individualSlotCount) {
+    slots.push({
+      categoryId: OTHER_CATEGORY_ID,
+      name: OTHER_CATEGORY_NAME,
+      color: `var(--chart-${CATEGORY_COLOR_SLOT_COUNT})`,
+    });
+  }
+
+  return slots;
+};
+
+/**
+ * 資産推移グラフの積み上げ表示に渡す帯と各点を、まとめて組み立てる。
+ *
+ * **帯と点を1つの関数で返す。** 別々に作ると、帯に無いキーを点が持つ(描かれない額が
+ * できる)・点に無い帯が凡例に並ぶ、といったずれが起こりうる。
+ *
+ * 色スロットの割り当ては分類別内訳の円グラフと共有する(`buildCategoryColorSlots`)。
+ * `categories`は直近1日の資産残高に現れる資産種別なので、**過去にだけ保有していた
+ * 資産種別はここに無く、「その他」へまとめられる**(docs/screen-requirements-dashboard.md
+ * B1「積み上げ表示」。許容と決めた挙動)。
+ *
+ * **`categories`がスロットをちょうど使い切っている(8件)ところへ過去だけの資産種別が
+ * 現れた場合に限り、「その他」の色が8番目の資産種別と同じになる。** 円グラフ側の色を
+ * 動かしてまで避けない — 同じ資産種別が2つのグラフで違う色になるほうが、このカードの
+ * 目的そのものを外すため。どちらも凡例に名前が出る。
+ *
+ * 帯に出すのは**期間内のどこかで0以外の額を持つもの**だけにする。全点で0の帯は、
+ * 面としては見えないまま凡例だけを埋める。
+ */
+export const buildStackedTrend = (
+  series: NetWorthPoint[],
+  categories: AssetCategory[],
+): { bands: NetWorthTrendBand[]; points: NetWorthStackedPoint[] } => {
+  const slots = buildCategoryColorSlots(categories);
+  const individualSlotIds = new Set(
+    slots.filter((slot) => slot.categoryId !== OTHER_CATEGORY_ID).map((slot) => slot.categoryId),
+  );
+
+  // どのスロットに寄せるか。スロットを持たない資産種別(過去だけの保有・溢れた分)は「その他」へ
+  const toSlotId = (assetTypeName: string): string =>
+    individualSlotIds.has(assetTypeName) ? assetTypeName : OTHER_CATEGORY_ID;
+
+  const usedSlotIds = new Set<string>();
+
+  const points = series.map((point) => {
+    const amounts: Record<string, number> = {};
+
+    Object.entries(point.byType).forEach(([assetTypeName, amount]) => {
+      const slotId = toSlotId(assetTypeName);
+
+      amounts[slotId] = (amounts[slotId] ?? 0) + amount;
+    });
+
+    Object.entries(amounts).forEach(([slotId, amount]) => {
+      if (amount !== 0) {
+        usedSlotIds.add(slotId);
+      }
+    });
+
+    return {
+      date: point.date,
+      /*
+        ツールチップに出す合計は**行に並べた資産種別の総和**で、負の種別も符号のまま加える
+        (同要件B1)。面の上端(正の資産種別だけの合計)とは一致しないことがある。
+        `point.amount`(純額)を使わないのは、こちらは負債を差し引いた別の値のため
+      */
+      total: Object.values(amounts).reduce((sum, amount) => sum + amount, 0),
+      amounts,
+    };
+  });
+
+  const bands = slots.filter((slot) => usedSlotIds.has(slot.categoryId));
+
+  /*
+    「その他」はスロットが溢れたときにしか`buildCategoryColorSlots`に現れないが、
+    過去にだけ保有していた資産種別の受け皿としても要る。溢れていない場合はここで足す
+  */
+  if (
+    usedSlotIds.has(OTHER_CATEGORY_ID) &&
+    !bands.some((band) => band.categoryId === OTHER_CATEGORY_ID)
+  ) {
+    bands.push({
+      categoryId: OTHER_CATEGORY_ID,
+      name: OTHER_CATEGORY_NAME,
+      color: `var(--chart-${CATEGORY_COLOR_SLOT_COUNT})`,
+    });
+  }
+
+  return { bands, points };
+};
+
+/**
  * 分類別内訳を、色と構成比を解決した表示用の形へ変換する。
  *
  * **色は分類そのものに紐づける。** 金額順・表示順といった「その時の並び」に色を割り当てると、
@@ -40,11 +164,7 @@ export const buildBreakdownSlices = (
   const total = entries.reduce((sum, entry) => sum + entry.amount, 0) + debtTotal;
   const toRatio = (amount: number): number => (total === 0 ? 0 : amount / total);
 
-  // 分類がスロット数に収まるなら全て個別の色にできる。溢れる場合だけ最後のスロットを「その他」に使う
-  const individualSlotCount =
-    categories.length > CATEGORY_COLOR_SLOT_COUNT
-      ? CATEGORY_COLOR_SLOT_COUNT - 1
-      : CATEGORY_COLOR_SLOT_COUNT;
+  const individualSlotCount = resolveIndividualSlotCount(categories);
 
   const slices: AssetBreakdownSlice[] = [];
   let otherAmount = 0;

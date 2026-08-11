@@ -1,6 +1,10 @@
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
 import { GoogleLinkFailureNotice } from "@/components/dashboard/GoogleLinkFailureNotice";
-import { DASHBOARD_AXIS_PARAM, DASHBOARD_PERIOD_PARAM } from "@/constants/dashboard";
+import {
+  DASHBOARD_AXIS_PARAM,
+  DASHBOARD_PERIOD_PARAM,
+  DASHBOARD_TREND_PARAM,
+} from "@/constants/dashboard";
 
 import type { Metadata } from "next";
 import type { JSX } from "react";
@@ -29,6 +33,7 @@ const DashboardPage = async (props: PageProps<"/dashboard">): Promise<JSX.Elemen
       <DashboardScreen
         axisParam={searchParams[DASHBOARD_AXIS_PARAM]}
         periodParam={searchParams[DASHBOARD_PERIOD_PARAM]}
+        trendParam={searchParams[DASHBOARD_TREND_PARAM]}
       />
     </>
   );

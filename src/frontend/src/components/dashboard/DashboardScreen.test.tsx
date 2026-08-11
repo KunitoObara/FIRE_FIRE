@@ -41,7 +41,13 @@ const data: DashboardData = {
   ],
   byAxis: {
     total: {
-      netWorthSeries: [{ date: "2026-08-05", amount: 11_400_000 }],
+      netWorthSeries: [
+        {
+          date: "2026-08-05",
+          amount: 11_400_000,
+          byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000, "預金・現金": 4_400_000 },
+        },
+      ],
       breakdown: [
         { categoryId: "株式(現物)", amount: 5_400_000 },
         { categoryId: "投資信託", amount: 1_600_000 },
@@ -50,7 +56,13 @@ const data: DashboardData = {
       debtTotal: 0,
     },
     investment: {
-      netWorthSeries: [{ date: "2026-08-05", amount: 7_000_000 }],
+      netWorthSeries: [
+        {
+          date: "2026-08-05",
+          amount: 7_000_000,
+          byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000 },
+        },
+      ],
       breakdown: [
         { categoryId: "株式(現物)", amount: 5_400_000 },
         { categoryId: "投資信託", amount: 1_600_000 },
@@ -81,7 +93,12 @@ const renderScreen = (props: Partial<DashboardScreenProps> = {}): RenderResult =
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <DashboardScreen axisParam={undefined} periodParam={undefined} {...props} />
+      <DashboardScreen
+        axisParam={undefined}
+        periodParam={undefined}
+        trendParam={undefined}
+        {...props}
+      />
     </QueryClientProvider>,
   );
 };
@@ -129,7 +146,9 @@ describe("DashboardScreen", () => {
         byAxis: {
           ...data.byAxis,
           total: {
-            netWorthSeries: [{ date: "2000-01-31", amount: 1_000_000 }],
+            netWorthSeries: [
+              { date: "2000-01-31", amount: 1_000_000, byType: { "預金・現金": 1_000_000 } },
+            ],
             breakdown: data.byAxis.total?.breakdown ?? [],
             debtTotal: 0,
           },
@@ -360,7 +379,7 @@ describe("DashboardScreen", () => {
     await user.click(await screen.findByLabelText("分類軸"));
     await user.click(await screen.findByRole("option", { name: "投資性資産" }));
 
-    expect(replace).toHaveBeenCalledWith("/dashboard?axis=investment&period=1y");
+    expect(replace).toHaveBeenCalledWith("/dashboard?axis=investment&period=1y&trend=stacked");
   });
 });
 
@@ -436,7 +455,14 @@ describe("DashboardScreen(負債)", () => {
               純額はこの最新点をそのまま採る(スライスの足し直しはしない。
               `resolveAxisNetAmount`)ので、資産11,400,000 - 負債2,000,000 = 9,400,000
             */
-            netWorthSeries: [{ date: "2026-08-05", amount: 9_400_000 }],
+            netWorthSeries: [
+              {
+                date: "2026-08-05",
+                amount: 9_400_000,
+                // 積み上げが描くのは資産種別だけなので、負債を引く前の額を持つ
+                byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000, "預金・現金": 4_400_000 },
+              },
+            ],
             breakdown: data.byAxis.total?.breakdown ?? [],
             debtTotal: 2_000_000,
           },

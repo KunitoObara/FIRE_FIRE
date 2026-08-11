@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { DEBT_CATEGORY_COLOR, DEBT_CATEGORY_ID, DEBT_CATEGORY_NAME } from "@/constants/dashboard";
-import { buildBreakdownSlices } from "@/lib/dashboard/category-color";
+import {
+  DEBT_CATEGORY_COLOR,
+  DEBT_CATEGORY_ID,
+  DEBT_CATEGORY_NAME,
+  OTHER_CATEGORY_ID,
+} from "@/constants/dashboard";
+import { buildBreakdownSlices, buildStackedTrend } from "@/lib/dashboard/category-color";
 
 /** 分類マスタ(B4)を模したもの。並び順が色の割り当て順になる */
 const categories: AssetCategory[] = [
@@ -172,5 +177,122 @@ describe("buildBreakdownSlices(負債)", () => {
 
     expect(slices.at(-1)?.categoryId).toBe(DEBT_CATEGORY_ID);
     expect(slices.at(-1)?.name).toBe(DEBT_CATEGORY_NAME);
+  });
+});
+
+/** 積み上げ表示の帯と各点(docs/screen-requirements-dashboard.md B1「積み上げ表示」) */
+describe("buildStackedTrend", () => {
+  const point = (date: string, byType: Record<string, number>): NetWorthPoint => ({
+    date,
+    // 純額は積み上げ表示では使わない。負債を引いた別の値であることを示すため、あえてずらす
+    amount: 0,
+    byType,
+  });
+
+  /**
+   * 同じ画面に並ぶ2つのグラフで同じ資産種別が違う色になると、内訳と推移を見比べられない。
+   * 円グラフと同じスロット割り当てを共有していることを、色の並びで確かめる。
+   */
+  it("分類マスタの登録順に、円グラフと同じスロットの色を割り当てる", () => {
+    const { bands } = buildStackedTrend(
+      [point("2026-08-05", { stock: 100, fund: 300, deposit: 100 })],
+      categories,
+    );
+
+    expect(bands.map((band) => [band.name, band.color])).toEqual([
+      ["投資信託", "var(--chart-1)"],
+      ["現金・預金", "var(--chart-2)"],
+      ["株式", "var(--chart-3)"],
+    ]);
+  });
+
+  /**
+   * 色スロットの基準は直近1日の資産残高なので、すでに売却した資産種別はそこに現れない。
+   * 過去の区間で「その他」へまとめる(許容と決めた挙動)。合計が欠けてはいけない。
+   */
+  it("直近1日に現れない資産種別(売却済み)を「その他」にまとめ、額を落とさない", () => {
+    const { bands, points } = buildStackedTrend(
+      [point("2025-08-31", { fund: 300, 暗号資産: 200 })],
+      categories,
+    );
+
+    expect(bands.map((band) => band.categoryId)).toEqual(["fund", OTHER_CATEGORY_ID]);
+    expect(points[0]?.amounts[OTHER_CATEGORY_ID]).toBe(200);
+    expect(points[0]?.total).toBe(500);
+  });
+
+  /** 色スロットは8つしかないので、溢れた分は円グラフと同じく「その他」へ落ちる */
+  it("スロットに収まらない資産種別も「その他」にまとめる", () => {
+    const many: AssetCategory[] = Array.from({ length: 10 }, (_, index) => ({
+      id: `type-${index}`,
+      name: `資産${index}`,
+    }));
+    const { bands, points } = buildStackedTrend(
+      [point("2026-08-05", Object.fromEntries(many.map((category) => [category.id, 100])))],
+      many,
+    );
+
+    // 個別の色は7つまでで、8つ目のスロットが「その他」になる(円グラフと同じ規則)
+    expect(bands).toHaveLength(8);
+    expect(bands.at(-1)?.categoryId).toBe(OTHER_CATEGORY_ID);
+    expect(points[0]?.amounts[OTHER_CATEGORY_ID]).toBe(300);
+  });
+
+  /**
+   * マイナス残高の資産種別(借入・信用取引など)は0で止めず符号のまま積む。
+   * 0に丸めると、その種別を保有していること自体が画面から消える。
+   */
+  it("マイナス残高の資産種別を符号のまま持ち、合計にも符号のまま加える", () => {
+    const { points } = buildStackedTrend(
+      [point("2026-08-05", { fund: 300, deposit: -100 })],
+      categories,
+    );
+
+    expect(points[0]?.amounts.deposit).toBe(-100);
+    expect(points[0]?.total).toBe(200);
+  });
+
+  /**
+   * 色の割り当ての基準は符号を問わない(同節)。円グラフの「0円以下を除く」フィルタを
+   * 掛けると、負の帯だけが常に「その他」になり凡例で識別できなくなる。
+   */
+  it("マイナス残高の資産種別にも固有の色を割り当てる", () => {
+    const { bands } = buildStackedTrend(
+      [point("2026-08-05", { fund: 300, deposit: -100 })],
+      categories,
+    );
+
+    expect(bands.map((band) => band.categoryId)).toEqual(["fund", "deposit"]);
+  });
+
+  /** 全点で0の帯は面としては見えないまま凡例だけを埋める */
+  it("期間内のどこでも0の資産種別は帯に出さない", () => {
+    const { bands } = buildStackedTrend(
+      [
+        point("2026-07-31", { fund: 300, deposit: 0 }),
+        point("2026-08-05", { fund: 400, deposit: 0 }),
+      ],
+      categories,
+    );
+
+    expect(bands.map((band) => band.categoryId)).toEqual(["fund"]);
+  });
+
+  /**
+   * ツールチップの合計は行に並べた資産種別の総和で、**負債は含まない**(同節)。
+   * 純額(`amount`)を使うと、積み上げが差し引いていないものを合計だけが差し引くことになる。
+   */
+  it("合計に純額(負債を引いた値)を使わない", () => {
+    const withDebt: NetWorthPoint = {
+      date: "2026-08-05",
+      amount: 100,
+      byType: { fund: 300, deposit: 200 },
+    };
+
+    expect(buildStackedTrend([withDebt], categories).points[0]?.total).toBe(500);
+  });
+
+  it("点が1つも無ければ帯も点も空になる", () => {
+    expect(buildStackedTrend([], categories)).toEqual({ bands: [], points: [] });
   });
 });
