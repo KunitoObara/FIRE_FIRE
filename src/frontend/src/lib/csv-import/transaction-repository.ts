@@ -2,6 +2,8 @@ import {
   collection,
   doc,
   getDocs,
+  limit,
+  orderBy,
   query,
   serverTimestamp,
   where,
@@ -9,18 +11,25 @@ import {
 } from "firebase/firestore";
 
 import { FIRESTORE_BATCH_LIMIT } from "@/constants/csv-import";
+import { TRANSACTION_SCAN_LIMIT } from "@/constants/transactions";
 import { chunk } from "@/lib/csv-import/batch";
 import { resolveFirestoreUserContext, toFirestoreFailureReason } from "@/lib/firebase/user-context";
+import { resolveTransactionDateRange } from "@/lib/transactions/period";
+import { transactionDocumentSchema } from "@/schemas/transactions";
 
-import type { Firestore } from "firebase/firestore";
+import type { Firestore, QueryConstraint } from "firebase/firestore";
 
 /**
- * 取引データのFirestore入出力(B2 CSV取込の入出金明細タブ)。
+ * 取引データのFirestore入出力(B2 CSV取込の入出金明細タブと、B3 収支明細一覧の読み取り)。
  *
  * ```
  * users/{uid}/transactions/{ID}   マネーフォワードの`ID`をそのままドキュメントIDにする
  * users/{uid}/csvImports/{importId}   取込履歴。資産残高推移と共通で`typeId`だけ変える
  * ```
+ *
+ * 読み出し(`fetchTransactions`)を書き込みと同じファイルに置くのは、資産残高推移の
+ * `asset-balance-repository.ts`が取込と`fetchAssetSnapshots`を同居させているのと同じ扱い。
+ * コレクションの形を知っている場所を1つにする。
  *
  * 資産残高推移(`asset-balance-repository.ts`)と同じ形にしてあるが、冪等性の取り方だけが
  * 違う。あちらは「同じ日付を上書きする」、こちらは**「同じ`ID`を上書きする」**ことで
@@ -42,6 +51,100 @@ const transactionsRef = (firestore: Firestore, uid: string) =>
 /** 取込履歴のコレクション参照(資産残高推移と同じコレクション) */
 const csvImportsRef = (firestore: Firestore, uid: string) =>
   collection(firestore, USERS_COLLECTION, uid, CSV_IMPORTS_COLLECTION);
+
+/**
+ * B3が表示する取引を取得する(docs/transaction-import-requirements.md 8章)。
+ *
+ * **読むのは選択中の期間の分だけ。** 費目・口座・キーワードの絞り込みと並び替えは、読み込んだ
+ * 範囲に対してクライアント側で行う(`lib/transactions/query.ts`)。Firestoreの複合条件に
+ * 載せると組み合わせごとに複合インデックスが要り、キーワードの部分一致は元々表現できない。
+ * 範囲は`date`の単一フィールドなので複合インデックスは要らない。
+ *
+ * **打ち切りは1件余分に読んで判定する。** `TRANSACTION_SCAN_LIMIT`件を超えて返ってきたら
+ * 打ち切りとし、表示に使うのは先頭の`TRANSACTION_SCAN_LIMIT`件。「取得件数が上限と一致したか」
+ * で判定すると、該当件数がちょうど上限と同じだった場合にも打ち切りの案内が出る。データは
+ * 欠けていないので実害は小さいが、一度でも誤った案内を見ると本当に打ち切られたときの案内も
+ * 信じられなくなる。取引は際限なく増えるデータなので、ちょうど一致する状況は他のコレクション
+ * より起こりやすい。
+ *
+ * **判定は選択中の期間で分岐しない。** 実際に上限へ達しやすいのは「全期間」だが、取引が
+ * 増えれば短い期間でも起こる。`periodId === 'all'`で分岐すると、その日が来たときに黙って
+ * 古い側が欠ける。
+ *
+ * 日付の新しい順に読むので、打ち切りで落ちるのは古い側だけになる。
+ *
+ * 形が違うドキュメントはその1件だけを飛ばす。1件の不整合で一覧全体を空にする方が情報が減る
+ * (`fetchAssetSnapshots`と同じ扱い)。
+ */
+export const fetchTransactions = async (
+  periodId: TransactionPeriodId,
+  now: Date,
+): Promise<TransactionsFetchResult> => {
+  const context = resolveFirestoreUserContext();
+
+  if (!context.ok) {
+    return context;
+  }
+
+  const range = resolveTransactionDateRange(periodId, now);
+  // 「全期間」は境界を持たない。`null`のまま`where`に渡すと日付として比較されてしまうので、
+  // 条件そのものを付けない
+  const rangeConstraints: QueryConstraint[] = [
+    range.from === null ? null : where("date", ">=", range.from),
+    range.to === null ? null : where("date", "<=", range.to),
+  ].filter((constraint) => constraint !== null);
+
+  try {
+    const snapshot = await getDocs(
+      query(
+        transactionsRef(context.firestore, context.uid),
+        ...rangeConstraints,
+        orderBy("date", "desc"),
+        // 1件余分に読んで「上限を超えて存在するか」を見る。`TRANSACTION_SCAN_LIMIT`が
+        // `FIRESTORE_QUERY_LIMIT_MAX - 1`なのは、この`+ 1`が上限を超えないようにするため
+        limit(TRANSACTION_SCAN_LIMIT + 1),
+      ),
+    );
+
+    const truncated = snapshot.docs.length > TRANSACTION_SCAN_LIMIT;
+    const transactions = snapshot.docs
+      .slice(0, TRANSACTION_SCAN_LIMIT)
+      .flatMap((document): Transaction[] => {
+        const parsed = transactionDocumentSchema.safeParse(document.data());
+
+        if (!parsed.success) {
+          console.error("取引を解釈できませんでした", document.id, parsed.error.issues);
+          return [];
+        }
+
+        return [
+          {
+            id: document.id,
+            date: parsed.data.date,
+            content: parsed.data.content,
+            amount: parsed.data.amount,
+            account: parsed.data.account,
+            categoryMajor: parsed.data.categoryMajor,
+            categoryMinor: parsed.data.categoryMinor,
+            memo: parsed.data.memo,
+            isTransfer: parsed.data.isTransfer,
+            isCalculationTarget: parsed.data.isCalculationTarget,
+            // `category` / `description`はサンプルデータ時代の旧来のフィールドで、B3の絞り込みと
+            // 一覧がまだこちらを見ている。**画面をFirestoreへ繋ぐ次のスライスで、型ごと落とす**
+            // (docs/development-workflow.md 5章「型の波及を切る手口」)。それまでは同じ値を
+            // 入れておき、参照側を一度に壊さない
+            category: parsed.data.categoryMajor,
+            description: parsed.data.content,
+          },
+        ];
+      });
+
+    return { ok: true, transactions, truncated };
+  } catch (error) {
+    console.error("取引を取得できませんでした", error);
+    return { ok: false, reason: toFirestoreFailureReason(error) };
+  }
+};
 
 /**
  * 取り込もうとしている取引のうち、既にFirestoreにあるものを数える

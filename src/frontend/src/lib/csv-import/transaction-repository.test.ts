@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FIRESTORE_BATCH_LIMIT } from "@/constants/csv-import";
+import { TRANSACTION_SCAN_LIMIT } from "@/constants/transactions";
 import {
   buildTransactionImportPlan,
+  fetchTransactions,
   importTransactions,
 } from "@/lib/csv-import/transaction-repository";
 
@@ -24,6 +26,8 @@ vi.mock("firebase/firestore", () => ({
   // 自動IDのドキュメント(取込履歴)は`id`を渡さずに引く
   doc: (ref: { path: string }, id?: string) => ({ path: `${ref.path}/${id ?? "auto-id"}` }),
   getDocs: (...args: unknown[]) => getDocs(...args),
+  limit: (count: number) => ({ limit: count }),
+  orderBy: (field: string, direction: string) => ({ orderBy: field, direction }),
   query: (ref: unknown, ...constraints: unknown[]) => ({ ref, constraints }),
   serverTimestamp: () => "server-timestamp",
   where: (field: string, operator: string, value: unknown) => ({ field, operator, value }),
@@ -31,6 +35,7 @@ vi.mock("firebase/firestore", () => ({
     set: (...args: unknown[]) => set(...args),
     commit: () => commit(),
   }),
+  Timestamp: class {},
 }));
 
 vi.mock("@/lib/firebase/user-context", () => ({
@@ -230,6 +235,163 @@ describe("buildTransactionImportPlan", () => {
     resolveFirestoreUserContext.mockReturnValue({ ok: false, reason: "signed-out" });
 
     const result = await buildTransactionImportPlan(buildParsed([buildRow()]));
+
+    expect(result).toEqual({ ok: false, reason: "signed-out" });
+    expect(getDocs).not.toHaveBeenCalled();
+  });
+});
+
+/** B3が読むときの基準時刻。「直近1ヶ月」の境界が2026-06-30になる */
+const NOW = new Date("2026-07-30T12:00:00+09:00");
+
+/** Firestoreから返る取引ドキュメント1件分 */
+const buildDocument = (
+  id: string,
+  overrides: Partial<Record<string, unknown>> = {},
+): { id: string; data: () => Record<string, unknown> } => ({
+  id,
+  data: () => ({
+    date: "2026-07-20",
+    content: "スーパー〇〇",
+    amount: -3200,
+    account: "〇〇銀行",
+    categoryMajor: "食費",
+    categoryMinor: "食料品",
+    memo: "",
+    isTransfer: false,
+    isCalculationTarget: true,
+    importedAt: null,
+    ...overrides,
+  }),
+});
+
+describe("fetchTransactions", () => {
+  it("選択中の期間で範囲を絞り、新しい順に1件余分読む", async () => {
+    await fetchTransactions("1m", NOW);
+
+    expect(getDocs).toHaveBeenCalledWith({
+      ref: { path: "users/uid-1/transactions" },
+      constraints: [
+        { field: "date", operator: ">=", value: "2026-06-30" },
+        { field: "date", operator: "<=", value: "2026-07-30" },
+        { orderBy: "date", direction: "desc" },
+        { limit: TRANSACTION_SCAN_LIMIT + 1 },
+      ],
+    });
+  });
+
+  /** 「全期間」は境界を持たない。`null`を`where`に渡すと日付として比較されてしまう */
+  it("全期間では日付の条件を付けない", async () => {
+    await fetchTransactions("all", NOW);
+
+    expect(getDocs).toHaveBeenCalledWith({
+      ref: { path: "users/uid-1/transactions" },
+      constraints: [{ orderBy: "date", direction: "desc" }, { limit: TRANSACTION_SCAN_LIMIT + 1 }],
+    });
+  });
+
+  it("ドキュメントIDを取引のIDにして返す", async () => {
+    getDocs.mockResolvedValue({ docs: [buildDocument("aaaa1111")] });
+
+    const result = await fetchTransactions("1m", NOW);
+
+    expect(result).toEqual({
+      ok: true,
+      truncated: false,
+      transactions: [
+        expect.objectContaining({
+          id: "aaaa1111",
+          date: "2026-07-20",
+          amount: -3200,
+          content: "スーパー〇〇",
+          categoryMajor: "食費",
+          categoryMinor: "食料品",
+          isTransfer: false,
+          isCalculationTarget: true,
+        }),
+      ],
+    });
+  });
+
+  /** 振替・計算対象外の行も一覧には出す(取り込んだのに消えたように見せない。5章) */
+  it("振替・計算対象外の取引も返す", async () => {
+    getDocs.mockResolvedValue({
+      docs: [
+        buildDocument("aaaa1111", { isTransfer: true }),
+        buildDocument("bbbb2222", { isCalculationTarget: false }),
+      ],
+    });
+
+    const result = await fetchTransactions("all", NOW);
+
+    expect(result.ok && result.transactions).toHaveLength(2);
+  });
+
+  it("1件も無ければ失敗ではなく空で返す", async () => {
+    getDocs.mockResolvedValue({ docs: [] });
+
+    const result = await fetchTransactions("1m", NOW);
+
+    expect(result).toEqual({ ok: true, transactions: [], truncated: false });
+  });
+
+  /**
+   * 上限ちょうどで打ち切りの案内を出さない。データは欠けていないのに案内が出ると、
+   * 本当に打ち切られたときの案内も信じられなくなる(8章)
+   */
+  it("上限ちょうどの件数では打ち切りと判定しない", async () => {
+    getDocs.mockResolvedValue({
+      docs: Array.from({ length: TRANSACTION_SCAN_LIMIT }, (_, index) =>
+        buildDocument(`id-${index}`),
+      ),
+    });
+
+    const result = await fetchTransactions("all", NOW);
+
+    expect(result).toMatchObject({ ok: true, truncated: false });
+    expect(result.ok && result.transactions).toHaveLength(TRANSACTION_SCAN_LIMIT);
+  });
+
+  it("上限を超えて返ってきたら打ち切りとして、余分に読んだ1件は表示に使わない", async () => {
+    getDocs.mockResolvedValue({
+      docs: Array.from({ length: TRANSACTION_SCAN_LIMIT + 1 }, (_, index) =>
+        buildDocument(`id-${index}`),
+      ),
+    });
+
+    const result = await fetchTransactions("all", NOW);
+
+    expect(result).toMatchObject({ ok: true, truncated: true });
+    expect(result.ok && result.transactions).toHaveLength(TRANSACTION_SCAN_LIMIT);
+  });
+
+  /** 1件の不整合で一覧全体を空にする方が情報が減る(`fetchAssetSnapshots`と同じ扱い) */
+  it("形の違うドキュメントはその1件だけ飛ばす", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getDocs.mockResolvedValue({
+      docs: [buildDocument("aaaa1111"), buildDocument("bbbb2222", { amount: "-3200" })],
+    });
+
+    const result = await fetchTransactions("all", NOW);
+
+    expect(result.ok && result.transactions.map((transaction) => transaction.id)).toEqual([
+      "aaaa1111",
+    ]);
+  });
+
+  it("取得に失敗したら理由を返す", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getDocs.mockRejectedValue(new Error("失敗"));
+
+    const result = await fetchTransactions("1m", NOW);
+
+    expect(result).toEqual({ ok: false, reason: "permission-denied" });
+  });
+
+  it("未ログインなら読みに行かない", async () => {
+    resolveFirestoreUserContext.mockReturnValue({ ok: false, reason: "signed-out" });
+
+    const result = await fetchTransactions("1m", NOW);
 
     expect(result).toEqual({ ok: false, reason: "signed-out" });
     expect(getDocs).not.toHaveBeenCalled();
