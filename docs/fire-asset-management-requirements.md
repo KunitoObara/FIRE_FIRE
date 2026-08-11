@@ -177,5 +177,5 @@
 | `importedAt` / `createdAt` / `updatedAt`(timestamp)がサーバー時刻であること | `isServerTime()`(`== request.time`)。`createdAt` は**作成時だけ**要求する — 更新では既存の値が `request.resource.data` に現れるため |
 | `csvImports` の `periodFrom <= periodTo` | `yyyy-MM-dd` は辞書順が日付順なので文字列比較 |
 | `settings/fireGoal` の方式ごとの必須 | `mode` ごとに必要な欄が `null` でないことを要求 |
-| `debts.balanceHistory` の改ざん防止(追記だけを許す) | `diff()` の `removedKeys()` / `changedKeys()` がどちらも0件 |
+| `debts.balanceHistory` の改ざん防止(過去へ遡って書き換えさせない) | `diff()` の `removedKeys()` が0件、`changedKeys()` が `updatedAt` の日だけ。B11は同じ日に2回保存するとその日の記録を上書きするので、一律に禁じると通常の保存し直しが落ちる |
 | `transactions.amount` が整数であること | `is int`。JS SDKは安全な整数を `integerValue`、小数を `doubleValue` で送る |
