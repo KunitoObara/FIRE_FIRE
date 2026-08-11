@@ -2,7 +2,7 @@ import { format, parseISO } from "date-fns";
 
 import { NO_PROJECTED_DATE_LABEL } from "@/constants/dashboard";
 import { DEFAULT_ACHIEVEMENT_AXIS_NAME } from "@/constants/fire-goal";
-import { resolveAxisDebts, sumAxisAmount } from "@/lib/dashboard/aggregation";
+import { resolveAxisDebts, sumAxisAmount, sumDebtBalance } from "@/lib/dashboard/aggregation";
 import { resolveFireGoalTargetAmount } from "@/lib/fire-goal/calculation";
 
 /**
@@ -66,6 +66,11 @@ export const resolveAchievementAxis = (
  * 逆に、分類軸を選んだときは資産推移グラフ・分類別内訳と同じ`sumAxisAmount`で集計する。
  * B1のセレクタで同じ分類軸を選んだときに、推移グラフの最新点とゲージの現在資産額が
  * 一致することを、集計方法を共有することで保証する。
+ *
+ * **差し引くのは現在の残債(`sumDebtBalance`)。** ここは「いま」を表す表示なので、
+ * 履歴から直近の資産残高の日の残債を引く形にはしない
+ * (docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」)。推移グラフの
+ * 最新点も同じ値を引いており、上記の一致はその一致でもある。
  */
 export const resolveAchievementAmount = (
   resolution: AchievementAxisResolution,
@@ -78,7 +83,11 @@ export const resolveAchievementAmount = (
 
   return resolution.assetTypeNames === null
     ? latest.total
-    : sumAxisAmount(latest, resolution.assetTypeNames, resolveAxisDebts(debts, resolution.debtIds));
+    : sumAxisAmount(
+        latest,
+        resolution.assetTypeNames,
+        sumDebtBalance(resolveAxisDebts(debts, resolution.debtIds)),
+      );
 };
 
 /**

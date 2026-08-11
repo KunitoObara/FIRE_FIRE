@@ -9,6 +9,7 @@ import {
   resolveAxisNetAmount,
   resolveDebtBalanceAt,
   sumAxisAmount,
+  sumDebtBalance,
   sumDebtBalanceAt,
 } from "@/lib/dashboard/aggregation";
 
@@ -42,20 +43,20 @@ const snapshots: AssetSnapshot[] = [
 
 describe("sumAxisAmount", () => {
   it("集計対象の資産種別だけを合計する", () => {
-    expect(sumAxisAmount(latestSnapshot, ["株式(現物)", "投資信託"], [])).toBe(7_000_000);
+    expect(sumAxisAmount(latestSnapshot, ["株式(現物)", "投資信託"], 0)).toBe(7_000_000);
   });
 
   /** 空配列は「すべての資産種別が対象」を意味する(B4) */
   it("集計対象が空配列なら全種別を合計する", () => {
-    expect(sumAxisAmount(latestSnapshot, [], [])).toBe(11_400_000);
+    expect(sumAxisAmount(latestSnapshot, [], 0)).toBe(11_400_000);
   });
 
   it("その日に存在しない資産種別が指定されていても無視する", () => {
-    expect(sumAxisAmount(latestSnapshot, ["株式(現物)", "暗号資産"], [])).toBe(5_400_000);
+    expect(sumAxisAmount(latestSnapshot, ["株式(現物)", "暗号資産"], 0)).toBe(5_400_000);
   });
 
   it("対象が1件も残らなければ0を返す", () => {
-    expect(sumAxisAmount(latestSnapshot, ["暗号資産"], [])).toBe(0);
+    expect(sumAxisAmount(latestSnapshot, ["暗号資産"], 0)).toBe(0);
   });
 });
 
@@ -227,27 +228,80 @@ describe("sumDebtBalanceAt", () => {
   });
 });
 
+describe("sumDebtBalance", () => {
+  it("対象の負債の現在の残債を合計する", () => {
+    expect(sumDebtBalance([mortgage, carLoan])).toBe(3_000_000 + 1_000_000);
+  });
+
+  /**
+   * 「いま」を表す表示は履歴を見ない。ここが履歴に従うと、資産残高の最新日より後に
+   * 保存された負債が全ての点で0として扱われる(B1-15の起票理由)
+   */
+  it("履歴が1件も無くても現在の残債を返す", () => {
+    expect(sumDebtBalance([{ ...mortgage, balanceHistory: {} }])).toBe(3_000_000);
+  });
+
+  it("対象が1件も無ければ0を返す", () => {
+    expect(sumDebtBalance([])).toBe(0);
+  });
+});
+
 describe("sumAxisAmount(負債を含む分類軸)", () => {
-  it("対象の資産種別の合計から、その時点の残債を差し引く", () => {
-    expect(sumAxisAmount(latestSnapshot, [], [mortgage])).toBe(11_400_000 - 3_000_000);
+  it("対象の資産種別の合計から、渡された残債を差し引く", () => {
+    expect(sumAxisAmount(latestSnapshot, [], sumDebtBalance([mortgage]))).toBe(
+      11_400_000 - 3_000_000,
+    );
   });
 
   /** 負債が資産を上回る状態そのものなので0で止めない(丸めるのは表示側の達成率だけ) */
   it("負債が資産を上回れば負の値になる", () => {
-    const hugeDebt: Debt = { ...mortgage, balanceHistory: { "2026-08-01": 20_000_000 } };
-
-    expect(sumAxisAmount(latestSnapshot, [], [hugeDebt])).toBe(11_400_000 - 20_000_000);
+    expect(sumAxisAmount(latestSnapshot, [], 20_000_000)).toBe(11_400_000 - 20_000_000);
   });
 });
 
 describe("buildAxisNetWorthSeries(負債を含む分類軸)", () => {
-  it("各時点で、その時点以前の最も新しい残債を差し引く", () => {
+  it("過去の点は、その時点以前の最も新しい残債を差し引く", () => {
     expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [mortgage]))).toEqual([
       // 6月末は負債の登録前なので差し引かない
       { date: "2026-06-30", amount: 10_000_000 },
       { date: "2026-07-31", amount: 11_000_000 - 4_000_000 },
+      // 最新点は履歴ではなく現在の残債(この負債は履歴の最後と同じ300万)
       { date: "2026-08-05", amount: 11_400_000 - 3_000_000 },
     ]);
+  });
+
+  /**
+   * **この並びが B1-15 の不具合そのもの。** 残債の履歴に付く日付は保存した日だが、
+   * 資産残高の最新日はCSVを最後に取り込んだ日なので、負債を登録した直後は
+   * 「資産残高の最新日 < 負債の最初の履歴日」になる。履歴を最新点にも当てると
+   * 全ての点で記録が見つからず、負債がグラフにも円グラフにもゲージにも出なくなる
+   * (docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」)。
+   */
+  it("資産残高の最新日より後に登録された負債も、最新点では差し引く", () => {
+    const justRegistered: Debt = {
+      ...mortgage,
+      balance: 2_500_000,
+      // 資産残高の最新日(2026-08-05)より後の日付しか履歴に無い
+      balanceHistory: { "2026-08-10": 2_500_000 },
+    };
+
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [justRegistered]))).toEqual([
+      // 過去は履歴に無いので差し引かない(遡って負債を作らない)
+      { date: "2026-06-30", amount: 10_000_000 },
+      { date: "2026-07-31", amount: 11_000_000 },
+      // 最新点にだけ段差が出る。「そこから負債を管理し始めた」段差が右端に寄った状態
+      { date: "2026-08-05", amount: 11_400_000 - 2_500_000 },
+    ]);
+  });
+
+  /** 残債を手で更新したあと、CSVを取り込み直す前でも最新点は最新の残債で描く */
+  it("最新点は履歴の最後の記録ではなく現在の残債を引く", () => {
+    const repaid: Debt = { ...mortgage, balance: 1_000_000 };
+
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [repaid])).at(-1)).toEqual({
+      date: "2026-08-05",
+      amount: 11_400_000 - 1_000_000,
+    });
   });
 
   /**
@@ -281,11 +335,12 @@ describe("resolveAxisNetAmount", () => {
   const axisDataWithNegative: AssetAxisData = {
     netWorthSeries: buildAxisNetWorthSeries([snapshotWithNegative], [], [mortgage]),
     breakdown: buildAxisBreakdown(snapshotWithNegative, []),
-    debtTotal: sumDebtBalanceAt([mortgage], snapshotWithNegative.date),
+    // 円グラフも推移グラフの最新点も「いま」なので、どちらも現在の残債を引く
+    debtTotal: sumDebtBalance([mortgage]),
   };
 
   it("マイナス残高の資産種別があっても、推移グラフの最新点と一致する", () => {
-    // 10,000,000 - 600,000 - 3,000,000(2026-08-01時点の残債) = 6,400,000
+    // 10,000,000 - 600,000 - 3,000,000(現在の残債) = 6,400,000
     expect(resolveAxisNetAmount(axisDataWithNegative)).toBe(6_400_000);
     expect(resolveAxisNetAmount(axisDataWithNegative)).toBe(
       axisDataWithNegative.netWorthSeries.at(-1)?.amount,

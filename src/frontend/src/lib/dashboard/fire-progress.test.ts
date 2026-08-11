@@ -300,7 +300,11 @@ describe("負債を含む対象分類", () => {
   });
 
   it("負債が資産を上回れば現在資産額はマイナスになる", () => {
-    const hugeDebt: Debt = { ...debt, balanceHistory: { "2026-08-01": 60_000_000 } };
+    const hugeDebt: Debt = {
+      ...debt,
+      balance: 60_000_000,
+      balanceHistory: { "2026-08-01": 60_000_000 },
+    };
 
     expect(
       buildFireProgress(
@@ -310,6 +314,36 @@ describe("負債を含む対象分類", () => {
         [hugeDebt],
       )?.currentAmount,
     ).toBe(49_000_000 - 60_000_000);
+  });
+
+  /**
+   * ゲージは「いま」を表す表示なので、履歴ではなく現在の残債を引く
+   * (docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」)。
+   * 履歴に従うと、資産残高の最新日より後に負債を保存した直後だけゲージが
+   * 「負債なし」と同じ額を出す(B1-15の起票理由)。
+   */
+  it("資産残高の最新日より後に登録された負債も差し引く", () => {
+    const justRegistered: Debt = {
+      ...debt,
+      balance: 15_000_000,
+      // 資産残高の最新日(latest.date)より後の日付しか履歴に無い
+      balanceHistory: { "2026-08-20": 15_000_000 },
+    };
+
+    expect(
+      resolveAchievementAmount(resolveAchievementAxis(netAxis.id, [netAxis]), latest, [
+        justRegistered,
+      ]),
+    ).toBe(49_000_000 - 15_000_000);
+  });
+
+  /** 残債を手で更新したあと、CSVを取り込み直す前でも最新の残債で出す */
+  it("履歴の最後の記録ではなく現在の残債を引く", () => {
+    const repaid: Debt = { ...debt, balance: 12_000_000 };
+
+    expect(
+      resolveAchievementAmount(resolveAchievementAxis(netAxis.id, [netAxis]), latest, [repaid]),
+    ).toBe(49_000_000 - 12_000_000);
   });
 });
 
