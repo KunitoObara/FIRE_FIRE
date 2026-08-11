@@ -286,9 +286,9 @@ service cloud.firestore {
       // 取込履歴(B2の「直近の取込履歴」)。取り消し・改ざんの余地を残さないよう、
       // 追加と参照だけを許し、更新・削除は禁じる。
       //
-      // **期間の前後関係(`periodFrom <= periodTo`)と、`importedAt`がサーバー時刻であることは
-      // 見ていない**(要件8.1)。どちらもルールで書ける部類だが、単一ユーザー運用では画面を
-      // 経由しない書き込みの動機が無く、現状は形だけを検査している。
+      // 期間の前後関係(`periodFrom <= periodTo`)と`importedAt`がサーバー時刻であることも、
+      // 形だけの検査から進めて[B4-6]でここに入れた(要件8.1)。改ざんの余地を残さないという
+      // このブロックの方針そのもので、どちらもルールで表せる。
       match /csvImports/{importId} {
         allow read: if canAccessOwnData(userId);
         allow create: if canAccessOwnData(userId)
@@ -383,10 +383,9 @@ service cloud.firestore {
       // そのものであること(形だけ検査している)、`balanceHistory`の扱い(下記)。
       //
       // `balanceHistory`は2つに分かれる。**過去の記録を書き換えない・消さないことは
-      // `diff()`で書ける**(`removedKeys()`と`changedKeys()`がどちらも0件であることを要求する。
-      // マップ同士の差分を返すAPIなので繰り返しは要らない)。回収の候補として要件8.1に挙げてある。
+      // [B4-6]で`update`側に入れた**(下記。`diff()`の`removedKeys()`と`changedKeys()`を見る)。
       // **追記するのが残債の変わった日だけであることは書けない** — 追記されたキーの値を
-      // 直前の記録と比べる必要があり、キーの前後関係を辿れないため。
+      // 直前の記録と比べる必要があり、キーの前後関係を辿れないため、そちらは画面側の担保のまま。
       match /debts/{debtId} {
         allow read: if canAccessOwnData(userId);
         allow create: if canAccessOwnData(userId)
@@ -426,10 +425,11 @@ service cloud.firestore {
           )
           // 有効な設定方式。src/frontend/src/types/fire-goal.d.ts の`FireGoalMode`と揃える
           && request.resource.data.mode in ['direct', 'reverse']
-          // 使っていない方式の欄はnullで保存される。形の検査(nullを許す)と、選んだ方式で
+          // 使っていない方式の欄はnullで保存される。**方式ごとの必須は[B4-6]でここに入れた**
+          // (それまでは画面側だけの担保だった)。形の検査(nullを許す)と、選んだ方式で
           // 必須になる欄の検査を分けて書く。後者が無いと、どの欄も空の目標が保存でき、
           // 達成率(現在資産 ÷ 目標資産)も逆算(年間支出額 ÷ 係数)も出せない状態を作れる。
-          // 画面側(src/frontend/src/schemas/fire-goal.ts)と同じ判定をここにも置く
+          // 画面側(src/frontend/src/schemas/fire-goal.ts)と同じ判定をここにも置いてある
           && isFireGoalAmount(request.resource.data.targetAmount)
           && isFireGoalAmount(request.resource.data.annualExpense)
           && isWithdrawalRate(request.resource.data.withdrawalRate)
