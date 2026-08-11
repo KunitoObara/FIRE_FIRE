@@ -5,7 +5,12 @@ import { filterSeriesByPeriod } from "@/lib/dashboard/period";
 const NOW = new Date("2026-07-31T00:00:00.000Z");
 
 /** 期間の絞り込みは日付しか見ないので、内訳(`byType`)は空のままでよい */
-const point = (date: string, amount: number): NetWorthPoint => ({ date, amount, byType: {} });
+const point = (date: string, amount: number): NetWorthPoint => ({
+  date,
+  amount,
+  byType: {},
+  debtBalance: 0,
+});
 
 const series: NetWorthPoint[] = [
   point("2019-01-01", 1_000_000),

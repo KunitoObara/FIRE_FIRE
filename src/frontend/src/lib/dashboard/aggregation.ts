@@ -233,16 +233,19 @@ export const buildAxisNetWorthSeries = (
   const monthly = [...byMonth.values()];
   const currentDebtTotal = sumDebtBalance(axisDebts);
 
-  return monthly.map((snapshot, index) => ({
-    date: snapshot.date,
-    amount: sumAxisAmount(
-      snapshot,
-      assetTypeNames,
-      index === monthly.length - 1 ? currentDebtTotal : sumDebtBalanceAt(axisDebts, snapshot.date),
-    ),
-    // 積み上げ表示が描く値。純額(`amount`)とは別に持つ(型の取り決め)
-    byType: pickAxisAmountsByType(snapshot, assetTypeNames),
-  }));
+  return monthly.map((snapshot, index) => {
+    const debtBalance =
+      index === monthly.length - 1 ? currentDebtTotal : sumDebtBalanceAt(axisDebts, snapshot.date);
+
+    return {
+      date: snapshot.date,
+      amount: sumAxisAmount(snapshot, assetTypeNames, debtBalance),
+      // 積み上げ表示が描く値。純額(`amount`)とは別に持つ(型の取り決め)
+      byType: pickAxisAmountsByType(snapshot, assetTypeNames),
+      // 負債の帯が描く値。`byType`の総和と`amount`の差から逆算させない(型の取り決め)
+      debtBalance,
+    };
+  });
 };
 
 /**

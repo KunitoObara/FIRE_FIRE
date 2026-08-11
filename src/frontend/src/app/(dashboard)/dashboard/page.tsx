@@ -3,7 +3,7 @@ import { GoogleLinkFailureNotice } from "@/components/dashboard/GoogleLinkFailur
 import {
   DASHBOARD_AXIS_PARAM,
   DASHBOARD_PERIOD_PARAM,
-  DASHBOARD_TREND_PARAM,
+  DASHBOARD_DEBT_PARAM,
 } from "@/constants/dashboard";
 
 import type { Metadata } from "next";
@@ -33,7 +33,7 @@ const DashboardPage = async (props: PageProps<"/dashboard">): Promise<JSX.Elemen
       <DashboardScreen
         axisParam={searchParams[DASHBOARD_AXIS_PARAM]}
         periodParam={searchParams[DASHBOARD_PERIOD_PARAM]}
-        trendParam={searchParams[DASHBOARD_TREND_PARAM]}
+        debtParam={searchParams[DASHBOARD_DEBT_PARAM]}
       />
     </>
   );

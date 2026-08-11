@@ -2,7 +2,7 @@ import {
   DASHBOARD_AXIS_PARAM,
   DASHBOARD_PERIODS,
   DASHBOARD_PERIOD_PARAM,
-  DASHBOARD_TREND_PARAM,
+  DASHBOARD_DEBT_PARAM,
   DEFAULT_DASHBOARD_PERIOD_ID,
   DEFAULT_NET_WORTH_TREND_MODE_ID,
   NET_WORTH_TREND_MODES,
@@ -33,8 +33,8 @@ export const resolvePeriodId = (value: string | string[] | undefined): Dashboard
 };
 
 /**
- * URLの`trend`から資産推移グラフの表示を決める。未指定・不正な値は既定(積み上げ)に落とす
- * (docs/screen-requirements-dashboard.md B1「資産推移グラフの表示切替」)。
+ * URLの`debt`から負債を反映するかどうかを決める。未指定・不正な値は既定(反映ON)に落とす
+ * (docs/screen-requirements-dashboard.md B1「資産推移グラフの負債反映切替」)。
  * 表示期間の解決と同じ形にしてある。
  */
 export const resolveTrendModeId = (value: string | string[] | undefined): NetWorthTrendModeId => {
@@ -43,10 +43,10 @@ export const resolveTrendModeId = (value: string | string[] | undefined): NetWor
 };
 
 /**
- * 分類軸・表示期間・資産推移の表示を反映したB1のURLを組み立てる。
+ * 分類軸・表示期間・負債の反映を反映したB1のURLを組み立てる。
  *
  * **3つとも必ず載せる。** 1つだけを変えたときに他の選択が落ちないようにするため
- * (資産推移の表示は切替UIの置き場所がカードの中で別だが、URLの扱いは同じ)。
+ * (負債の反映は切替UIの置き場所がカードの中で別だが、URLの扱いは同じ)。
  */
 export const buildDashboardHref = (
   axisId: string | undefined,
@@ -60,7 +60,7 @@ export const buildDashboardHref = (
   }
 
   params.set(DASHBOARD_PERIOD_PARAM, periodId);
-  params.set(DASHBOARD_TREND_PARAM, trendMode);
+  params.set(DASHBOARD_DEBT_PARAM, trendMode);
 
   return `${DASHBOARD_PATH}?${params.toString()}`;
 };

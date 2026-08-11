@@ -23,17 +23,19 @@ import {
 const seriesKey = (
   axisName: string,
   points: NetWorthPoint[],
-  mode: NetWorthTrendModeId = "stacked",
+  mode: NetWorthTrendModeId = "with-debt",
 ): string => buildNetWorthSeriesKey(axisName, points, mode);
 
 const point = (
   date: string,
   amount: number,
   byType: Record<string, number> = {},
+  debtBalance = 0,
 ): NetWorthPoint => ({
   date,
   amount,
   byType,
+  debtBalance,
 });
 
 const series: NetWorthPoint[] = [point("2026-07-31", 11_000_000), point("2026-08-05", 11_400_000)];
@@ -177,9 +179,23 @@ describe("buildNetWorthSeriesKey", () => {
     expect(seriesKey("総資産", right)).toBe(seriesKey("総資産", left));
   });
 
-  /** 表示切替は描くもの自体が入れ替わるので、切り替えた先を最初から描く(DESIGN.md 9章) */
-  it("積み上げと純資産を切り替えると署名が変わる", () => {
-    expect(seriesKey("総資産", series, "net")).not.toBe(seriesKey("総資産", series, "stacked"));
+  /** 切替は帯の構成が入れ替わるので、切り替えた先を最初から描く(DESIGN.md 9章) */
+  it("負債反映を切り替えると署名が変わる", () => {
+    expect(seriesKey("総資産", series, "assets-only")).not.toBe(
+      seriesKey("総資産", series, "with-debt"),
+    );
+  });
+
+  /**
+   * 負債の帯は`debtBalance`から描くので、資産が同じまま負債だけが更新された保存でも
+   * 絵が変わる。残債を署名に含めないと、この取込直し(B11の保存)で再生が漏れる。
+   */
+  it("資産が同じで残債だけが変わると署名が変わる", () => {
+    const repaid = series.map((point, index) =>
+      index === series.length - 1 ? { ...point, debtBalance: 1_000_000 } : point,
+    );
+
+    expect(seriesKey("総資産", repaid)).not.toBe(seriesKey("総資産", series));
   });
 });
 

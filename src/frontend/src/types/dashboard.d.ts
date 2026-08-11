@@ -52,12 +52,22 @@ declare global {
      * したがって値の総和は`amount`と一致しない(負債を含む分類軸の場合)。
      */
     byType: Record<string, number>;
+    /**
+     * その時点で対象の負債から差し引いた残債(0以上)。**負債反映ONの帯が描く値**。
+     *
+     * 負債の帯の高さを`byType`の総和と`amount`の差から逆算しない。逆算はフィルタの有無に
+     * 依存する脆い読み方になるため、集計側(`buildAxisNetWorthSeries`)で明示的に持たせる
+     * (docs/screen-requirements-dashboard.md B1「実装時に直すもの」)。
+     *
+     * 最新点だけは履歴ではなく現在の残債(同要件「いま」の扱い)。
+     */
+    debtBalance: number;
   };
 
-  /** 資産推移グラフの表示(docs/screen-requirements-dashboard.md B1「資産推移グラフの表示切替」) */
-  type NetWorthTrendModeId = "stacked" | "net";
+  /** 資産推移グラフの負債反映切替(docs/screen-requirements-dashboard.md B1「資産推移グラフの負債反映切替」) */
+  type NetWorthTrendModeId = "with-debt" | "assets-only";
 
-  /** 表示切替の1選択肢 */
+  /** 切替の1選択肢 */
   type NetWorthTrendMode = {
     id: NetWorthTrendModeId;
     label: string;
@@ -83,7 +93,12 @@ declare global {
    */
   type NetWorthStackedPoint = {
     date: string;
-    /** ツールチップに出す合計。**行に並べた資産種別の総和**で、負の種別も符号のまま加える */
+    /**
+     * ツールチップに出す合計。**行に並べた額の総和**で、負の資産種別も符号のまま加える。
+     *
+     * 負債反映ONのときは負債の行(負の値)も含むので、合計はその時点の純資産そのものになる。
+     * OFFのときは資産種別だけの合計(docs/screen-requirements-dashboard.md B1「積み上げ表示」)。
+     */
     total: number;
     amounts: Record<string, number>;
   };
@@ -213,7 +228,7 @@ declare global {
   type DashboardScreenProps = {
     axisParam: string | string[] | undefined;
     periodParam: string | string[] | undefined;
-    trendParam: string | string[] | undefined;
+    debtParam: string | string[] | undefined;
   };
 
   /**
@@ -270,17 +285,12 @@ declare global {
     axisName: string;
     /** 表示期間で絞り込み済みの推移 */
     series: NetWorthPoint[];
-    /** 選択中の表示(積み上げ / 純資産) */
+    /** 選択中の切替(負債反映 / 資産のみ) */
     mode: NetWorthTrendModeId;
     /** 色スロットの割り当ての元になる分類の一覧(円グラフと共有する) */
     categories: AssetCategory[];
     /**
-     * この分類軸が差し引く負債の残債合計。**0より大きいときだけ**積み上げ表示に
-     * 「負債は差し引いていない」注記を出す(0円の負債でスライスを出さないのと同じ理由)
-     */
-    debtTotal: number;
-    /**
-     * 表示を切り替えたときの遷移先を組み立てる。
+     * 切替を切り替えたときの遷移先を組み立てる。
      *
      * カード側に分類軸IDと表示期間を持たせないための受け渡し。切替でこの2つが
      * URLから落ちてはいけないが、それはカードの関心事ではない。

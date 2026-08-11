@@ -72,6 +72,7 @@ export const buildCategoryColorSlots = (categories: AssetCategory[]): NetWorthTr
 export const buildStackedTrend = (
   series: NetWorthPoint[],
   categories: AssetCategory[],
+  includeDebt: boolean,
 ): { bands: NetWorthTrendBand[]; points: NetWorthStackedPoint[] } => {
   const slots = buildCategoryColorSlots(categories);
   const individualSlotIds = new Set(
@@ -99,12 +100,24 @@ export const buildStackedTrend = (
       }
     });
 
+    /*
+      負債は0より下の帯として積むので、額に-1を掛けて持つ(docs/screen-requirements-dashboard.md
+      B1「積み上げ表示」)。差し引くのではなく負の帯として積むため、面の上端(正の帯の合計)は
+      負債の有無で動かない。項目ごとには分けず、円グラフの負債スライスと同じく1本にまとめる
+    */
+    if (includeDebt && point.debtBalance !== 0) {
+      amounts[DEBT_CATEGORY_ID] = -point.debtBalance;
+      usedSlotIds.add(DEBT_CATEGORY_ID);
+    }
+
     return {
       date: point.date,
       /*
-        ツールチップに出す合計は**行に並べた資産種別の総和**で、負の種別も符号のまま加える
-        (同要件B1)。面の上端(正の資産種別だけの合計)とは一致しないことがある。
-        `point.amount`(純額)を使わないのは、こちらは負債を差し引いた別の値のため
+        ツールチップに出す合計は**行に並べた額の総和**で、負の資産種別も符号のまま加える
+        (同要件B1)。負債反映ONのときは負債の行(負の値)も含むので、合計はその時点の
+        純資産そのものになる。面の上端(正の帯だけの合計)とは一致しないことがある。
+        `point.amount`(純額)を使わないのは、こちらが「0円以下の資産種別を除く」等の
+        フィルタと無関係に組み立てた行の総和であるべきだから
       */
       total: Object.values(amounts).reduce((sum, amount) => sum + amount, 0),
       amounts,
@@ -125,6 +138,20 @@ export const buildStackedTrend = (
       categoryId: OTHER_CATEGORY_ID,
       name: OTHER_CATEGORY_NAME,
       color: `var(--chart-${CATEGORY_COLOR_SLOT_COUNT})`,
+    });
+  }
+
+  /*
+    負債の帯は**資産種別のスロット順の後ろに固定**する(同要件B1「積み上げ表示」)。
+    描かれる位置は0より下だが、凡例の並びは常に「資産種別 → 負債」になる。
+    色スロット(--chart-1〜8)は消費せず、円グラフの負債スライスと同じ固定色を使う
+    (DESIGN.md 3章)。実際に保有している資産の分類が「その他」へ押し出されないため
+  */
+  if (usedSlotIds.has(DEBT_CATEGORY_ID)) {
+    bands.push({
+      categoryId: DEBT_CATEGORY_ID,
+      name: DEBT_CATEGORY_NAME,
+      color: DEBT_CATEGORY_COLOR,
     });
   }
 

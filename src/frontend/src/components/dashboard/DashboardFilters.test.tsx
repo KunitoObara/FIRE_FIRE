@@ -21,7 +21,7 @@ const renderFilters = (props: Partial<DashboardFiltersProps> = {}): void => {
       axes={axes}
       selectedAxisId="total-assets"
       selectedPeriodId="1y"
-      selectedTrendMode="stacked"
+      selectedTrendMode="with-debt"
       {...props}
     />,
   );
@@ -59,7 +59,7 @@ describe("DashboardFilters", () => {
     await user.click(screen.getByRole("tab", { name: "3年" }));
 
     expect(replace).toHaveBeenCalledWith(
-      "/dashboard?axis=investment-assets&period=3y&trend=stacked",
+      "/dashboard?axis=investment-assets&period=3y&debt=with-debt",
     );
   });
 
@@ -71,7 +71,7 @@ describe("DashboardFilters", () => {
     await user.click(screen.getByRole("option", { name: "投資性資産" }));
 
     expect(replace).toHaveBeenCalledWith(
-      "/dashboard?axis=investment-assets&period=5y&trend=stacked",
+      "/dashboard?axis=investment-assets&period=5y&debt=with-debt",
     );
   });
 

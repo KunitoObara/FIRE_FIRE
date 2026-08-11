@@ -89,7 +89,7 @@ const formatLastImportedAt = (isoDateTime: string | null): string =>
 export const DashboardScreen = ({
   axisParam,
   periodParam,
-  trendParam,
+  debtParam,
 }: DashboardScreenProps): JSX.Element => {
   const dashboardQuery = useQuery({
     queryKey: DASHBOARD_DATA_QUERY_KEY,
@@ -130,7 +130,7 @@ export const DashboardScreen = ({
 
   const selectedAxisId = resolveAxisId(axisParam, axes);
   const selectedPeriodId = resolvePeriodId(periodParam);
-  const selectedTrendMode = resolveTrendModeId(trendParam);
+  const selectedTrendMode = resolveTrendModeId(debtParam);
   const selectedAxis = axes.find((axis) => axis.id === selectedAxisId);
   const axisData = selectedAxisId ? data?.byAxis[selectedAxisId] : undefined;
 
@@ -211,7 +211,6 @@ export const DashboardScreen = ({
                 資産種別が違う色になると見比べられない(同要件B1「積み上げ表示」)
               */
               categories={data.categories}
-              debtTotal={debtTotal}
               buildHref={(mode) => buildDashboardHref(selectedAxisId, selectedPeriodId, mode)}
             />
           ) : (

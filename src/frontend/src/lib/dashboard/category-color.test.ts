@@ -182,11 +182,12 @@ describe("buildBreakdownSlices(負債)", () => {
 
 /** 積み上げ表示の帯と各点(docs/screen-requirements-dashboard.md B1「積み上げ表示」) */
 describe("buildStackedTrend", () => {
-  const point = (date: string, byType: Record<string, number>): NetWorthPoint => ({
+  const point = (date: string, byType: Record<string, number>, debtBalance = 0): NetWorthPoint => ({
     date,
     // 純額は積み上げ表示では使わない。負債を引いた別の値であることを示すため、あえてずらす
     amount: 0,
     byType,
+    debtBalance,
   });
 
   /**
@@ -197,6 +198,7 @@ describe("buildStackedTrend", () => {
     const { bands } = buildStackedTrend(
       [point("2026-08-05", { stock: 100, fund: 300, deposit: 100 })],
       categories,
+      false,
     );
 
     expect(bands.map((band) => [band.name, band.color])).toEqual([
@@ -214,6 +216,7 @@ describe("buildStackedTrend", () => {
     const { bands, points } = buildStackedTrend(
       [point("2025-08-31", { fund: 300, 暗号資産: 200 })],
       categories,
+      false,
     );
 
     expect(bands.map((band) => band.categoryId)).toEqual(["fund", OTHER_CATEGORY_ID]);
@@ -230,6 +233,7 @@ describe("buildStackedTrend", () => {
     const { bands, points } = buildStackedTrend(
       [point("2026-08-05", Object.fromEntries(many.map((category) => [category.id, 100])))],
       many,
+      false,
     );
 
     // 個別の色は7つまでで、8つ目のスロットが「その他」になる(円グラフと同じ規則)
@@ -246,6 +250,7 @@ describe("buildStackedTrend", () => {
     const { points } = buildStackedTrend(
       [point("2026-08-05", { fund: 300, deposit: -100 })],
       categories,
+      false,
     );
 
     expect(points[0]?.amounts.deposit).toBe(-100);
@@ -260,6 +265,7 @@ describe("buildStackedTrend", () => {
     const { bands } = buildStackedTrend(
       [point("2026-08-05", { fund: 300, deposit: -100 })],
       categories,
+      false,
     );
 
     expect(bands.map((band) => band.categoryId)).toEqual(["fund", "deposit"]);
@@ -273,6 +279,7 @@ describe("buildStackedTrend", () => {
         point("2026-08-05", { fund: 400, deposit: 0 }),
       ],
       categories,
+      false,
     );
 
     expect(bands.map((band) => band.categoryId)).toEqual(["fund"]);
@@ -287,12 +294,62 @@ describe("buildStackedTrend", () => {
       date: "2026-08-05",
       amount: 100,
       byType: { fund: 300, deposit: 200 },
+      debtBalance: 400,
     };
 
-    expect(buildStackedTrend([withDebt], categories).points[0]?.total).toBe(500);
+    expect(buildStackedTrend([withDebt], categories, false).points[0]?.total).toBe(500);
   });
 
   it("点が1つも無ければ帯も点も空になる", () => {
-    expect(buildStackedTrend([], categories)).toEqual({ bands: [], points: [] });
+    expect(buildStackedTrend([], categories, false)).toEqual({ bands: [], points: [] });
+  });
+
+  /**
+   * 負債反映ONの帯(docs/screen-requirements-dashboard.md B1「積み上げ表示」)。
+   * 差し引くのではなく0より下の帯として積むので、面の上端(正の帯の合計)は動かない。
+   */
+  describe("負債の帯", () => {
+    const withDebt = [point("2026-08-05", { fund: 300, deposit: 200 }, 400)];
+
+    it("残債に-1を掛けた値を、擬似的な分類IDの帯として積む", () => {
+      const { points } = buildStackedTrend(withDebt, categories, true);
+
+      expect(points[0]?.amounts[DEBT_CATEGORY_ID]).toBe(-400);
+    });
+
+    /** 資産のスロットを奪うと、実際に保有している分類が「その他」へ押し出される */
+    it("色スロットを消費せず、円グラフと同じ固定色を使う", () => {
+      const { bands } = buildStackedTrend(withDebt, categories, true);
+
+      expect(bands.map((band) => [band.categoryId, band.color])).toEqual([
+        ["fund", "var(--chart-1)"],
+        ["deposit", "var(--chart-2)"],
+        [DEBT_CATEGORY_ID, DEBT_CATEGORY_COLOR],
+      ]);
+    });
+
+    /** 合計は行に並べた額の総和。負債の行を含むので、その時点の純資産そのものになる */
+    it("合計に負債の行を含める", () => {
+      expect(buildStackedTrend(withDebt, categories, true).points[0]?.total).toBe(100);
+    });
+
+    it("資産のみのときは帯も合計への算入もしない", () => {
+      const { bands, points } = buildStackedTrend(withDebt, categories, false);
+
+      expect(bands.some((band) => band.categoryId === DEBT_CATEGORY_ID)).toBe(false);
+      expect(points[0]?.amounts[DEBT_CATEGORY_ID]).toBeUndefined();
+      expect(points[0]?.total).toBe(500);
+    });
+
+    /** 全点で0の帯は、面としては見えないまま凡例だけを埋める(資産種別と同じ扱い) */
+    it("残債が0の期間だけなら帯を出さない", () => {
+      const { bands } = buildStackedTrend(
+        [point("2026-08-05", { fund: 300 }, 0)],
+        categories,
+        true,
+      );
+
+      expect(bands.some((band) => band.categoryId === DEBT_CATEGORY_ID)).toBe(false);
+    });
   });
 });
