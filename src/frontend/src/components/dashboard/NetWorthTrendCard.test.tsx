@@ -12,10 +12,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 /** グラフはブラウザ専用(next/dynamic)なので、ここでは中身を描画対象にしない */
-vi.mock("@/components/dashboard/NetWorthTrendChart", () => ({
-  NetWorthTrendChart: () => <div data-testid="net-worth-trend-chart" />,
-}));
-
 vi.mock("@/components/dashboard/NetWorthStackedChart", () => ({
   NetWorthStackedChart: () => <div data-testid="net-worth-stacked-chart" />,
 }));

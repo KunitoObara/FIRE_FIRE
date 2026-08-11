@@ -254,14 +254,7 @@ declare global {
     selectedTrendMode: NetWorthTrendModeId;
   };
 
-  /** 資産推移グラフ(純資産表示)のProps */
-  type NetWorthTrendChartProps = {
-    /** 系列名。分類軸の名前をそのまま使う */
-    axisName: string;
-    series: NetWorthPoint[];
-  };
-
-  /** 資産推移グラフ(積み上げ表示)のProps */
+  /** 資産推移グラフ(積み上げ)のProps */
   type NetWorthStackedChartProps = {
     /** 描く順(=色スロット順)に並んだ帯 */
     bands: NetWorthTrendBand[];

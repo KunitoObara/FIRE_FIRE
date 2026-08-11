@@ -20,10 +20,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 /** 資産推移・内訳のグラフはブラウザ専用(next/dynamic)なので、ここでは描画対象にしない */
-vi.mock("@/components/dashboard/NetWorthTrendChart", () => ({
-  NetWorthTrendChart: () => <div data-testid="net-worth-trend-chart" />,
-}));
-
 vi.mock("@/components/dashboard/CategoryBreakdownChart", () => ({
   CategoryBreakdownChart: () => <div data-testid="category-breakdown-chart" />,
 }));
