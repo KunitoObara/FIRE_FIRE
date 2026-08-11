@@ -174,9 +174,21 @@
 
       <!-- 資産推移グラフ。見出しには選択中の分類軸名を添える
            (docs/screen-requirements-dashboard.md B1「分類軸の切り替えが及ぶ範囲」)。
-           負債を含む分類軸では、各時点で「その時点以前で最も新しい残債」を差し引いた線になる -->
+
+           表示は「積み上げ」と「純資産」の2つで、既定は積み上げ(同B1「資産推移グラフの表示切替」)。
+           積み上げの上端は対象の資産種別の合計(グロス)で、負債は差し引かない。純資産に切り替えると
+           各時点で「その時点以前で最も新しい残債」を差し引いた1本の線になり、B8の対象分類にこの分類軸を
+           選んでいる場合はその最新点がFIRE達成度ゲージの現在資産額と一致する(このモックの対象分類は
+           「投資性資産」なので一致しない)。ここでは既定の積み上げを表示した状態を示す -->
       <section class="card p-5">
-        <h2 class="text-sm font-semibold mb-4">資産推移(純金融資産)</h2>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold">資産推移(純金融資産)</h2>
+          <!-- 分類軸・表示期間と同じ切替の見た目にする。選択状態はURLのクエリに載る -->
+          <div class="tab-row" style="border-bottom: none;">
+            <span class="tab tab-active">積み上げ</span>
+            <span class="tab">純資産</span>
+          </div>
+        </div>
         <svg viewBox="0 0 640 200" class="w-full h-48">
           <line x1="0" y1="40" x2="640" y2="40" stroke="hsl(var(--border))" stroke-width="1"/>
           <line x1="0" y1="90" x2="640" y2="90" stroke="hsl(var(--border))" stroke-width="1"/>
@@ -187,16 +199,51 @@
               <rect class="chart-anim-reveal" x="0" y="0" height="200" />
             </clipPath>
           </defs>
+          <!--
+            帯は1つのクリップでまとめて広げる。帯ごとに時間差を付けると、途中のフレームで
+            積み上げの合計が実在しない額になる(DESIGN.md 9章)。
+
+            色と並び順は分類別内訳の円グラフと同じスロット割り当てをそのまま使う
+            (投資信託=--chart-1、現金・預金=--chart-2、株式=--chart-6)。同じ画面の2つのグラフで
+            同じ資産種別が違う色になると見比べられないため。下から順にスロット順で積む。
+            最新月の額は円グラフ側と揃えてある(30,070,000 + 11,900,000 + 8,400,000 = 50,370,000円)
+          -->
           <g clip-path="url(#trend-reveal)">
-            <polyline fill="hsl(var(--primary) / 0.08)" stroke="none"
-              points="0,170 60,165 120,158 180,150 240,145 300,130 360,120 420,105 480,95 540,70 600,55 640,42 640,200 0,200" />
-            <polyline fill="none" stroke="hsl(var(--primary))" stroke-width="2.5"
-              points="0,170 60,165 120,158 180,150 240,145 300,130 360,120 420,105 480,95 540,70 600,55 640,42" />
+            <polygon fill="var(--chart-1)" fill-opacity="0.85"
+              points="0,124 60,122 120,120 180,117 240,115 300,112 360,109 420,106 480,104 540,102 600,101 640,100 640,190 0,190" />
+            <polygon fill="var(--chart-2)" fill-opacity="0.85"
+              points="0,97 60,94 120,91 180,88 240,85 300,81 360,77 420,73 480,70 540,67 600,66 640,64 640,100 600,101 540,102 480,104 420,106 360,109 300,112 240,115 180,117 120,120 60,122 0,124" />
+            <polygon fill="var(--chart-6)" fill-opacity="0.85"
+              points="0,82 60,78 120,74 180,70 240,66 300,61 360,56 420,51 480,47 540,43 600,41 640,39 640,64 600,66 540,67 480,70 420,73 360,77 300,81 240,85 180,88 120,91 60,94 0,97" />
+            <!-- 各帯の上端をその帯自身の色で描く(Rechartsのエリアチャートが帯ごとに
+                 strokeを引くのと同じ)。いちばん上の線だけを強めると、合計を表す別の系列が
+                 あるように見えてしまう -->
+            <polyline fill="none" stroke="var(--chart-1)" stroke-width="1.5"
+              points="0,124 60,122 120,120 180,117 240,115 300,112 360,109 420,106 480,104 540,102 600,101 640,100" />
+            <polyline fill="none" stroke="var(--chart-2)" stroke-width="1.5"
+              points="0,97 60,94 120,91 180,88 240,85 300,81 360,77 420,73 480,70 540,67 600,66 640,64" />
+            <polyline fill="none" stroke="var(--chart-6)" stroke-width="1.5"
+              points="0,82 60,78 120,74 180,70 240,66 300,61 360,56 420,51 480,47 540,43 600,41 640,39" />
           </g>
         </svg>
         <div class="flex justify-between text-xs text-slate-400 mt-1">
           <span>2025/08</span><span>2025/11</span><span>2026/02</span><span>2026/04</span><span>2026/07</span>
         </div>
+        <!-- 1本の線だったときと違い、色以外に資産種別を識別する手掛かりが無いので凡例を出す
+             (DESIGN.md 1章・3章)。色見本は円グラフの凡例と同じ形にする -->
+        <ul class="flex flex-wrap items-center gap-4 text-xs mt-3">
+          <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-1);"></span>投資信託</li>
+          <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-2);"></span>現金・預金</li>
+          <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-6);"></span>株式</li>
+        </ul>
+        <!--
+          負債を含む分類軸を積み上げで表示しているあいだの注記。隣の円グラフは負債のスライスと
+          差引後の純額を出しているので、これが無いと同じ画面の2つのグラフが同じ分類軸について
+          違う合計を示しているように見える(docs/screen-requirements-dashboard.md B1「積み上げ表示」)
+        -->
+        <p class="text-xs text-slate-400 mt-2">
+          この分類軸が対象にしている負債2件(-19,630,000円)は差し引いていません。差引後の推移は「純資産」に切り替えてください。
+        </p>
       </section>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
