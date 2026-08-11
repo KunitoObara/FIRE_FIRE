@@ -74,20 +74,40 @@ export const resolveDebtBalanceAt = (debt: Debt, date: string): number => {
   return latestBalance;
 };
 
-/** ある時点で分類軸が差し引く残債の合計 */
+/** ある時点で分類軸が差し引く残債の合計(**過去の点に使う**。「いま」は`sumDebtBalance`) */
 export const sumDebtBalanceAt = (axisDebts: Debt[], date: string): number =>
   axisDebts.reduce((sum, debt) => sum + resolveDebtBalanceAt(debt, date), 0);
 
 /**
- * 1日分の資産残高を、分類軸の集計対象に絞って合計し、対象の負債の残債を差し引く。
+ * 分類軸が差し引く**現在の**残債の合計(B11で最後に保存した残債)。
+ *
+ * **「いま」を表す表示はこちらを使う**(docs/screen-requirements-dashboard.md B1
+ * 「負債を含む分類軸の集計」)。対象は資産推移グラフの最新点・分類別内訳の負債スライスと
+ * 純額の併記・FIRE達成度ゲージの現在資産額の3つで、履歴(`sumDebtBalanceAt`)に従うのは
+ * 過去の点だけ。
+ *
+ * 履歴を「いま」にも当てると、**負債を登録した直後に負債がどこにも現れない**。残債の履歴に
+ * 付く日付は保存した日だが、資産残高の最新の日付はマネーフォワードのCSVを最後に取り込んだ日で、
+ * 後者が古いのが普通の状態(CSVは日次で増えるものではない)。「その時点以前で最も新しい記録」を
+ * 最新点にも当てると全ての点で記録が見つからず、残債が0として扱われる。
+ */
+export const sumDebtBalance = (axisDebts: Debt[]): number =>
+  axisDebts.reduce((sum, debt) => sum + debt.balance, 0);
+
+/**
+ * 1日分の資産残高を、分類軸の集計対象に絞って合計し、渡された残債を差し引く。
  *
  * CSVの「合計（円）」列(`total`)は使わない。分類軸が資産種別の部分集合を指す以上、
  * 合計は常に対象種別の足し合わせで求める必要があり、全種別が対象の軸だけ別の値を
  * 使うと同じ画面の中で合計の出所が2つに分かれるため。
  *
- * 負債はその資産残高の**集計日時点**の残債を引く。現在の残債で全期間を引く形にしないのは
- * `resolveDebtBalanceAt`のとおりで、資産推移グラフの各点とFIRE達成度ゲージの現在資産額が
- * この関数を共有することで一致する(B1)。
+ * **差し引く残債は呼び出し側が決めて`debtTotal`で渡す。** この関数は推移グラフの過去の点
+ * (履歴の残債)と「いま」を表す表示(現在の残債)の両方から呼ばれ、どちらを引くかは
+ * 呼び出し元の意味で決まるため(docs/screen-requirements-dashboard.md B1)。負債の一覧を
+ * 受け取って中で時点を決める形にすると、1つの関数が2つの意味を抱えることになる。
+ *
+ * 資産推移グラフの最新点とFIRE達成度ゲージの現在資産額が一致するという約束は、両者が
+ * この関数に**同じ`debtTotal`**(`sumDebtBalance`)を渡すことで保たれる。
  *
  * 差し引いた結果は**負になりうる**。負債が資産を上回る状態そのものなので0で止めない。
  * ゲージの達成率だけは0%に丸めるが、それは表示側の判断(`FireProgressGauge`)。
@@ -95,13 +115,13 @@ export const sumDebtBalanceAt = (axisDebts: Debt[], date: string): number =>
 export const sumAxisAmount = (
   snapshot: AssetSnapshot,
   assetTypeNames: string[],
-  axisDebts: Debt[],
+  debtTotal: number,
 ): number =>
   Object.entries(snapshot.byType).reduce(
     (sum, [assetTypeName, amount]) =>
       isAxisTarget(assetTypeNames, assetTypeName) ? sum + amount : sum,
     0,
-  ) - sumDebtBalanceAt(axisDebts, snapshot.date);
+  ) - debtTotal;
 
 /**
  * 1日分の資産残高から、分類軸の集計対象になる資産種別だけを取り出す。
@@ -131,6 +151,14 @@ export const pickAxisAmountsByType = (
  *
  * 点の日付は月初ではなく採用した集計日そのものにする。実在しない日付を作らず、
  * 「1年」等の期間の絞り込み(`filterSeriesByPeriod`)も実データの日付で判定できる。
+ *
+ * **差し引く残債は、最後の点だけ現在の残債(`sumDebtBalance`)にする。** 最後の点は
+ * 「いま何をどれだけ持っているか」を表す点で、円グラフ・FIRE達成度ゲージと同じものを
+ * 指すため(docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」)。
+ * 過去の点は当時の残債(`sumDebtBalanceAt`)に従う。
+ *
+ * 資産残高の最新日より後に負債を保存していると、最後の点にだけ段差が出る。これは
+ * 「そこから負債を管理し始めた」段差が右端に寄っただけで、隠す対象ではない(同要件)。
  */
 export const buildAxisNetWorthSeries = (
   snapshots: AssetSnapshot[],
@@ -146,9 +174,17 @@ export const buildAxisNetWorthSeries = (
       byMonth.set(format(parseISO(snapshot.date), MONTH_KEY_FORMAT), snapshot);
     });
 
-  return [...byMonth.values()].map((snapshot) => ({
+  // 昇順に畳み込んでいるので、`Map`の挿入順の末尾が直近の資産残高になる
+  const monthly = [...byMonth.values()];
+  const currentDebtTotal = sumDebtBalance(axisDebts);
+
+  return monthly.map((snapshot, index) => ({
     date: snapshot.date,
-    amount: sumAxisAmount(snapshot, assetTypeNames, axisDebts),
+    amount: sumAxisAmount(
+      snapshot,
+      assetTypeNames,
+      index === monthly.length - 1 ? currentDebtTotal : sumDebtBalanceAt(axisDebts, snapshot.date),
+    ),
     // 積み上げ表示が描く値。純額(`amount`)とは別に持つ(型の取り決め)
     byType: pickAxisAmountsByType(snapshot, assetTypeNames),
   }));
@@ -191,7 +227,7 @@ export const buildAxisBreakdown = (
  *
  * そのため既に`sumAxisAmount`を通した結果である推移の最新点をそのまま採る。推移の各点は
  * その月でいちばん新しい集計日の残高なので、末尾は直近の資産残高そのものになり、
- * `debtTotal`が引いている残債の時点とも一致する。
+ * どちらも現在の残債(`sumDebtBalance`)を引いているため`debtTotal`とも辻褄が合う。
  *
  * **表示期間で絞り込む前の推移を渡すこと。** 絞り込んだ後の末尾は期間内で最も新しい点に
  * すぎず、「いま何をどれだけ持っているか」を表す内訳の相手ではなくなる。

@@ -10,7 +10,7 @@ import {
   buildCashflowSummary,
   collectAssetCategories,
   resolveAxisDebts,
-  sumDebtBalanceAt,
+  sumDebtBalance,
 } from "@/lib/dashboard/aggregation";
 import { buildFireProgress } from "@/lib/dashboard/fire-progress";
 import { fetchDebts } from "@/lib/debts/debt-repository";
@@ -104,11 +104,13 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
               netWorthSeries: buildAxisNetWorthSeries(snapshots, axis.assetTypeNames, axisDebts),
               breakdown: latest ? buildAxisBreakdown(latest, axis.assetTypeNames) : [],
               /*
-                円グラフは「いま何をどれだけ持っているか」なので、直近の資産残高の時点の
-                残債を引く。推移グラフの最新点と同じ時点・同じ求め方にしないと、同じ画面の
-                2つのグラフで差し引いた額が違うことになる
+                円グラフは「いま何をどれだけ持っているか」なので、履歴ではなく現在の残債を
+                引く(docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」)。
+                推移グラフの最新点・FIRE達成度ゲージも同じ`sumDebtBalance`を使う。
+                履歴の時点で引くと、資産残高の最新日より後に負債を保存した直後に、
+                同じ画面の3か所が揃って「負債なし」と同じ表示になる
               */
-              debtTotal: latest ? sumDebtBalanceAt(axisDebts, latest.date) : 0,
+              debtTotal: latest ? sumDebtBalance(axisDebts) : 0,
             },
           ];
         }),

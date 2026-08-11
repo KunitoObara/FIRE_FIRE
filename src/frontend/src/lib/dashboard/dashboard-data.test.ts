@@ -193,6 +193,74 @@ describe("fetchDashboardData", () => {
     expect(result.data.byAxis.investment?.netWorthSeries.at(-1)?.amount).toBe(7_000_000);
   });
 
+  /**
+   * **B1-15の不具合が同時に3か所へ出ることを固定するテスト。**
+   *
+   * 残債の履歴に付く日付は保存した日、資産残高の最新日はCSVを最後に取り込んだ日なので、
+   * 負債を登録した直後は「資産残高の最新日 < 負債の最初の履歴日」になる。履歴を「いま」にも
+   * 当てると、推移グラフの最新点・円グラフの負債スライス(`debtTotal`)・FIRE達成度ゲージの
+   * 現在資産額が揃って「負債なし」と同じ値になり、設定を間違えたのか反映されていないのかを
+   * 画面から切り分けられない(docs/screen-requirements-dashboard.md B1)。
+   */
+  it("資産残高の最新日より後に登録された負債を、推移の最新点・円グラフ・ゲージのすべてに反映する", async () => {
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [
+        ...axes,
+        {
+          id: "net",
+          name: "純資産",
+          assetTypeNames: [],
+          debtIds: ["debt-1"],
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+    });
+    fetchDebts.mockResolvedValue({
+      ok: true,
+      debts: [
+        {
+          id: "debt-1",
+          name: "住宅ローン",
+          balance: 3_000_000,
+          interestRate: null,
+          repaymentMonths: null,
+          updatedAt: "2026-08-20",
+          // 資産残高の最新日(2026-08-05)より後の日付しか履歴に無い
+          balanceHistory: { "2026-08-20": 3_000_000 },
+        },
+      ],
+    });
+    fetchFireGoal.mockResolvedValue({
+      ok: true,
+      goal: {
+        mode: "direct",
+        targetAmount: 80_000_000,
+        annualExpense: null,
+        withdrawalRate: null,
+        achievementAxisId: "net",
+      },
+    });
+
+    const result = await fetchDashboardData();
+
+    if (!result.ok) {
+      throw new Error("取得に失敗した");
+    }
+
+    // 推移グラフの最新点(過去の点は履歴に無いので差し引かないまま)
+    expect(
+      result.data.byAxis.net?.netWorthSeries.map((point) => [point.date, point.amount]),
+    ).toEqual([
+      ["2026-07-31", 11_000_000],
+      ["2026-08-05", 11_400_000 - 3_000_000],
+    ]);
+    // 円グラフの負債スライスと差引後の純額の元になる値
+    expect(result.data.byAxis.net?.debtTotal).toBe(3_000_000);
+    // ゲージの現在資産額。推移グラフの最新点と一致する(要件B1の約束)
+    expect(result.data.fireProgress?.currentAmount).toBe(11_400_000 - 3_000_000);
+  });
+
   /** 月初は正常にこの状態になる。エラーとしても、取込前の状態としても扱わない */
   it("当月の取引が1件も無ければ収支サマリはnullのまま返す", async () => {
     const result = await fetchDashboardData();
