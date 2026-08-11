@@ -104,8 +104,35 @@ describe("fetchTransactionsData", () => {
     expect(result).toEqual({
       ok: true,
       truncated: false,
-      data: { transactions: [], categories: [], accounts: [] },
+      data: { transactions: [], categories: [], categoryMinorsByMajor: {}, accounts: [] },
     });
+  });
+
+  /** 大項目を選ぶと中項目セレクタの選択肢がその配下に絞られる(同書6章) */
+  it("中項目を大項目ごとに分けて返す", async () => {
+    resolveTransactions([
+      buildTransaction({ id: "a", categoryMajor: "食費", categoryMinor: "食料品" }),
+      buildTransaction({ id: "b", categoryMajor: "食費", categoryMinor: "外食" }),
+      buildTransaction({ id: "c", categoryMajor: "住居費", categoryMinor: "家賃" }),
+    ]);
+
+    const result = await fetchTransactionsData("1m", NOW);
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: { categoryMinorsByMajor: { 食費: ["外食", "食料品"], 住居費: ["家賃"] } },
+    });
+  });
+
+  it("中項目が空の取引は中項目の選択肢に出さない", async () => {
+    resolveTransactions([
+      buildTransaction({ id: "a", categoryMajor: "食費", categoryMinor: "" }),
+      buildTransaction({ id: "b", categoryMajor: "食費", categoryMinor: "外食" }),
+    ]);
+
+    const result = await fetchTransactionsData("1m", NOW);
+
+    expect(result).toMatchObject({ ok: true, data: { categoryMinorsByMajor: { 食費: ["外食"] } } });
   });
 
   /** 取得の失敗を空状態(未取込)にすり替えない */

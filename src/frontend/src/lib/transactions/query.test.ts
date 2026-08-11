@@ -9,6 +9,7 @@ import {
 const baseFilters: TransactionFilters = {
   periodId: "all",
   category: "",
+  categoryMinor: "",
   account: "",
   keyword: "",
   sortKey: "date",
@@ -85,6 +86,35 @@ describe("filterTransactions", () => {
     ];
 
     expect(filterTransactions(sameMinor, { ...baseFilters, category: "食費" })).toEqual([]);
+  });
+
+  it("費目(中項目)で絞り込む", () => {
+    expect(
+      idsOf(filterTransactions(transactions, { ...baseFilters, categoryMinor: "家賃" })),
+    ).toEqual(["b"]);
+  });
+
+  /** セレクタの選択肢は大項目に連動して絞られるが、絞り込みそのものは独立している */
+  it("中項目だけを選ぶと大項目をまたいで一致させる", () => {
+    const sameMinorAcrossMajors = [
+      buildTransaction({ id: "e", categoryMajor: "食費", categoryMinor: "外食" }),
+      buildTransaction({ id: "f", categoryMajor: "交際費", categoryMinor: "外食" }),
+    ];
+
+    expect(
+      idsOf(filterTransactions(sameMinorAcrossMajors, { ...baseFilters, categoryMinor: "外食" })),
+    ).toEqual(["e", "f"]);
+  });
+
+  it("大項目と中項目を両方選ぶとAND条件になる", () => {
+    const rows = [
+      buildTransaction({ id: "e", categoryMajor: "食費", categoryMinor: "外食" }),
+      buildTransaction({ id: "f", categoryMajor: "交際費", categoryMinor: "外食" }),
+    ];
+
+    expect(
+      idsOf(filterTransactions(rows, { ...baseFilters, category: "食費", categoryMinor: "外食" })),
+    ).toEqual(["e"]);
   });
 
   it("口座で絞り込む", () => {

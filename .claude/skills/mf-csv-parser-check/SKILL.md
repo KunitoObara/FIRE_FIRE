@@ -31,7 +31,7 @@ docs/fire-asset-management-requirements.md の4.2と、docs/screen-requirements-
 
 **B3 収支明細一覧も [B3-1] でFirestoreに接続済み。** `src/frontend/src/lib/transactions/transactions-data.ts` の `fetchTransactionsData` が選択中の期間だけを読み、サンプルデータは撤去した。
 
-**ただし接続済み = 要件を満たしている、ではない。** B3には未実装が残っており(費目の絞り込みが大項目の1段のみ・振替/計算対象外のバッジが無い・選択中の値がその期間に無いと選択肢から外れる)、B1の収支サマリに至っては実データを集計していない(`fetchDashboardData` の `cashflow` が `null`)。いずれも既知で、一覧表は docs/transaction-import-requirements.md 9章にある。**これらを見つけてもB2・B3側の退行ではない。**
+**まだ実データを見ていないのはB1の収支サマリだけ**で(`fetchDashboardData` の `cashflow` が `null`)、これは [B1-8] の範囲であり**B2・B3側の退行ではない**。B3側は費目の2段絞り込み・振替/計算対象外のバッジ・選択中の値をその期間に無くても選択肢へ残す扱いまで実装済みで、状況は docs/transaction-import-requirements.md 9章にある。
 
 ## 検証手順
 

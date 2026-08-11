@@ -18,20 +18,65 @@ import {
 import {
   ALL_TRANSACTION_ACCOUNTS_VALUE,
   ALL_TRANSACTION_CATEGORIES_VALUE,
+  ALL_TRANSACTION_CATEGORY_MINORS_VALUE,
   TRANSACTIONS_CSV_IMPORT_LINK,
   TRANSACTION_PERIODS,
 } from "@/constants/transactions";
-import { buildTransactionsHref } from "@/lib/transactions/filters";
+import {
+  buildTransactionSelectOptions,
+  buildTransactionsHref,
+  resolveCategoryMinorOptions,
+} from "@/lib/transactions/filters";
 
 import type { ChangeEvent, FormEvent, JSX } from "react";
 
 const PERIOD_SELECT_ID = "transactions-period";
 const CATEGORY_SELECT_ID = "transactions-category";
+const CATEGORY_MINOR_SELECT_ID = "transactions-category-minor";
 const ACCOUNT_SELECT_ID = "transactions-account";
 const KEYWORD_INPUT_ID = "transactions-keyword";
 
 /**
- * B3の絞り込み条件(期間・費目・口座・キーワード)。
+ * 費目・中項目・口座のセレクタ(このフォーム専用)。
+ *
+ * 3つとも「すべて + 取引から抽出した選択肢」という同じ形で、違うのはラベルと幅だけになる。
+ * 選択中の値がその期間に無い場合は`buildTransactionSelectOptions`が但し書き付きの選択肢を
+ * 足してくるので、ここはそれをそのまま並べる。
+ */
+const TransactionFilterSelect = ({
+  id,
+  label,
+  allValue,
+  options,
+  value,
+  widthClassName,
+  onChange,
+}: TransactionFilterSelectProps): JSX.Element => (
+  <div className="flex flex-col gap-1.5">
+    <Label htmlFor={id} className="text-xs text-muted-foreground">
+      {label}
+    </Label>
+    <Select
+      value={value || allValue}
+      onValueChange={(next) => onChange(next === allValue ? "" : next)}
+    >
+      <SelectTrigger id={id} size="sm" className={widthClassName}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={allValue}>すべて</SelectItem>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+);
+
+/**
+ * B3の絞り込み条件(期間・費目(大項目/中項目)・口座・キーワード)。
  *
  * B1の分類軸・期間セレクタと異なり即時反映にはせず、「絞り込む」ボタンで確定させる
  * (HTMLモック・docs/screen-requirements-dashboard.md B3の構成に合わせる)。複数条件を
@@ -47,25 +92,55 @@ const KEYWORD_INPUT_ID = "transactions-keyword";
  */
 export const TransactionsFilterBar = ({
   categories,
+  categoryMinorsByMajor,
   accounts,
   filters,
 }: TransactionsFilterBarProps): JSX.Element => {
   const router = useRouter();
   const [periodId, setPeriodId] = useState<TransactionPeriodId>(filters.periodId);
   const [category, setCategory] = useState(filters.category);
+  const [categoryMinor, setCategoryMinor] = useState(filters.categoryMinor);
   const [account, setAccount] = useState(filters.account);
   const [keyword, setKeyword] = useState(filters.keyword);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     router.push(
-      buildTransactionsHref({ ...filters, periodId, category, account, keyword, page: 1 }),
+      buildTransactionsHref({
+        ...filters,
+        periodId,
+        category,
+        categoryMinor,
+        account,
+        keyword,
+        page: 1,
+      }),
     );
+  };
+
+  /**
+   * 大項目を変えたら中項目は「すべて」に戻す。
+   *
+   * 中項目の選択肢は大項目の配下に絞られるので、そのまま残すと選ばれている中項目が選択肢に
+   * 無い状態になり、送信すれば必ず0件になる。**期間の切り替えで選択が消えるのを嫌うのとは
+   * 別の話** — あちらはユーザーが触っていない値が黙って変わることで、こちらはユーザー自身が
+   * いま費目を選び直している最中の連動になる。
+   */
+  const handleCategoryChange = (value: string): void => {
+    setCategory(value);
+    setCategoryMinor("");
   };
 
   const handleKeywordChange = (event: ChangeEvent<HTMLInputElement>): void => {
     setKeyword(event.target.value);
   };
+
+  const categoryOptions = buildTransactionSelectOptions(categories, category);
+  const categoryMinorOptions = buildTransactionSelectOptions(
+    resolveCategoryMinorOptions(categoryMinorsByMajor, category),
+    categoryMinor,
+  );
+  const accountOptions = buildTransactionSelectOptions(accounts, account);
 
   return (
     <Card>
@@ -92,53 +167,35 @@ export const TransactionsFilterBar = ({
             </Select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={CATEGORY_SELECT_ID} className="text-xs text-muted-foreground">
-              費目
-            </Label>
-            <Select
-              value={category || ALL_TRANSACTION_CATEGORIES_VALUE}
-              onValueChange={(value) =>
-                setCategory(value === ALL_TRANSACTION_CATEGORIES_VALUE ? "" : value)
-              }
-            >
-              <SelectTrigger id={CATEGORY_SELECT_ID} size="sm" className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_TRANSACTION_CATEGORIES_VALUE}>すべて</SelectItem>
-                {categories.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <TransactionFilterSelect
+            id={CATEGORY_SELECT_ID}
+            label="費目(大項目)"
+            allValue={ALL_TRANSACTION_CATEGORIES_VALUE}
+            options={categoryOptions}
+            value={category}
+            widthClassName="w-36"
+            onChange={handleCategoryChange}
+          />
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={ACCOUNT_SELECT_ID} className="text-xs text-muted-foreground">
-              口座
-            </Label>
-            <Select
-              value={account || ALL_TRANSACTION_ACCOUNTS_VALUE}
-              onValueChange={(value) =>
-                setAccount(value === ALL_TRANSACTION_ACCOUNTS_VALUE ? "" : value)
-              }
-            >
-              <SelectTrigger id={ACCOUNT_SELECT_ID} size="sm" className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_TRANSACTION_ACCOUNTS_VALUE}>すべて</SelectItem>
-                {accounts.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {item}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <TransactionFilterSelect
+            id={CATEGORY_MINOR_SELECT_ID}
+            label="費目(中項目)"
+            allValue={ALL_TRANSACTION_CATEGORY_MINORS_VALUE}
+            options={categoryMinorOptions}
+            value={categoryMinor}
+            widthClassName="w-36"
+            onChange={setCategoryMinor}
+          />
+
+          <TransactionFilterSelect
+            id={ACCOUNT_SELECT_ID}
+            label="口座"
+            allValue={ALL_TRANSACTION_ACCOUNTS_VALUE}
+            options={accountOptions}
+            value={account}
+            widthClassName="w-40"
+            onChange={setAccount}
+          />
 
           <div className="flex min-w-48 flex-1 flex-col gap-1.5">
             <Label htmlFor={KEYWORD_INPUT_ID} className="text-xs text-muted-foreground">

@@ -82,7 +82,7 @@ export const TransactionsScreen = ({ searchParams }: TransactionsScreenProps): J
   }
 
   const { data, truncated } = result;
-  const filters = resolveTransactionFilters(searchParams, data);
+  const filters = resolveTransactionFilters(searchParams);
   const filtered = filterTransactions(data.transactions, filters);
   const sorted = sortTransactions(filtered, filters.sortKey, filters.sortDirection);
   const paged = paginateTransactions(sorted, filters.page, TRANSACTIONS_PAGE_SIZE);
@@ -93,6 +93,7 @@ export const TransactionsScreen = ({ searchParams }: TransactionsScreenProps): J
       <TransactionsFilterBar
         key={buildTransactionsFilterBarKey(resolvedFilters)}
         categories={data.categories}
+        categoryMinorsByMajor={data.categoryMinorsByMajor}
         accounts={data.accounts}
         filters={resolvedFilters}
       />
