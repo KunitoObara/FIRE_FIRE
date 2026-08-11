@@ -16,7 +16,7 @@
 | UIコンポーネント | shadcn/ui | 指定。CLI経由で必要なコンポーネントのみ`src/frontend`に追加する(フルインストールしない) |
 | アイコン | lucide-react(既定) + FontAwesome | lucide-reactはshadcn/uiの標準アイコンセットで、既定はこちらを使う。FontAwesome(`@fortawesome/react-fontawesome` + `free-solid-svg-icons`)は指定により併用する。**同じ用途のアイコンで2つを混ぜない**(例: パスワード表示トグルは全画面でFontAwesomeの`eye`/`eye-slash`)。1画面に両方が現れること自体は許容する — shadcn/uiのコンポーネントが内部でlucideを使っており(`ui/checkbox.tsx`の`CheckIcon`等)、画面単位で片方に統一することは構造上できないため |
 | フォーム/バリデーション | react-hook-form + zod | shadcn/uiのForm系コンポーネントが前提とする組み合わせ |
-| チャート | Recharts(shadcn/uiの`chart`コンポーネント経由) | 資産推移(折れ線)・分類別内訳(円グラフ)・FIRE達成度ゲージ(RadialBarChartで代用)に使用 |
+| チャート | Recharts(shadcn/uiの`chart`コンポーネント経由) | 資産推移(資産種別の積み上げ面/純資産の折れ線を切替)・分類別内訳(円グラフ)・FIRE達成度ゲージ(RadialBarChartで代用)に使用 |
 | データテーブル | @tanstack/react-table(shadcn/uiの`data-table`パターン) | 収支明細一覧(B3)の検索・並び替えに使用 |
 | 6桁確認コード入力 | shadcn/ui `input-otp` | 2FA登録(A3)・2FA検証(A5)で使用 |
 | QRコード表示 | react-qr-code 等の軽量ライブラリ | 2FA登録(A3)・2FA再設定(B10経由)で使用 |
