@@ -78,6 +78,10 @@
 - `STACKED_DEBT_NOT_DEDUCTED_NOTICE` の文面は「純資産で見られます」と旧切替の名前を指しているため、反映OFF側の案内として書き直す
 - `buildNetWorthSeriesKey` の署名に**負債反映の状態と残債**を含める。負債の帯が出入りしただけではデータの署名が変わらず、アニメーションの再生が漏れる(DESIGN.md 9章)
 - `src/frontend/src/lib/dashboard/category-color.ts` の `buildStackedTrend` は資産種別の帯しか組み立てない。負債の帯(専用色・スロットを消費しない・並びは末尾)を足す
+- **帯・凡例・ツールチップを実際に描く `src/frontend/src/components/dashboard/NetWorthStackedChart.tsx` が、この改定でいちばん手の入るファイルになる。** `buildStackedTrend` を直しただけでは表示は変わらないので、次の3点を漏らさない
+  - docstringの「負債は帯にせず、差し引いた推移は純資産表示が描く」は、廃止する旧切替を前提にした説明になっている
+  - ツールチップの合計を組み立てている箇所のコメント「負債は含まない(積み上げが差し引いていないものをツールチップだけが差し引くと…)」は、**反映ONでは負債の行を出して合計にも含める**という本改定と正面から食い違う
+  - `bands` から組み立てている系列と凡例に負債の帯が入っていない(ハッチングの描き分けもここに要る。[DESIGN.md](../DESIGN.md) 3章)
 
 **FIRE達成度の現在資産額(対象分類)**
 
