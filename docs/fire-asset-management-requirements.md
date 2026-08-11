@@ -162,7 +162,8 @@
 | `assetSnapshots.byType` / `settings/assumptions.entries` / `debts.balanceHistory` | 値が数値であること(キーが動的に増減するマップ) | 数値でない値が混じり、集計側で弾かれる。1件の不整合で画面が空になる箇所がある | **書けない** — ルールに繰り返しが無い。件数の上限だけ見ている |
 | `categoryAxes.assetTypeNames` / `.debtIds` | 要素が文字列であること | 同上 | **書けない**(同上) |
 | `debts` | 登録できる負債は50件まで(`DEBT_MAX_COUNT`) | 51件目以降が作れる。B4の `debtIds` の上限(50)と食い違う | **書けない** — ルールはコレクションの件数を数えられない |
-| `debts.balanceHistory` | 残債が変わった日だけ追記し、過去の履歴は書き換えない | 資産推移グラフが過去に遡って別の値を描く | **書けない**(値の比較に繰り返しが要る) |
+| `debts.balanceHistory` | 過去の履歴を書き換えない・消さない(追記だけを許す) | 資産推移グラフが過去に遡って別の値を描く | **書ける** — `diff()` の `removedKeys()` / `changedKeys()` がどちらも0件であることを要求すればよい。マップ同士の差分を返すAPIなので繰り返しは要らない |
+| `debts.balanceHistory` | 追記するのは**残債が変わった日だけ**であること | 値が変わっていない日の記録が増える。履歴の件数上限(600件)に早く届く | **書けない** — 追記されたキーの値を「直前の記録」と比べる必要があり、キーの前後関係を辿れない |
 | `debts.updatedAt` / `properties.updatedAt` | 保存した日そのものであること(形は `yyyy-MM-dd` で検査済み) | 「最終更新日」が実際と違う日付になり、いつ時点の残債・時価か分からなくなる | **書けるが要検討** — `request.time` はUTCで、クライアントが入れるのはローカル日付。日付が変わる前後でずれるため、許容幅を決めないと正常な保存を弾く |
 | `assetSnapshots` / `transactions` / `csvImports` / `categoryAxes` / `debts` / `properties` などの `importedAt` / `createdAt` / `updatedAt`(timestamp) | サーバー時刻であること(形は `is timestamp` で検査済み) | 取込履歴の並び順やB1の「直近CSV取込日時」が任意の時刻になる | **書ける** — `== request.time` を足せる |
 | `csvImports` | `periodFrom <= periodTo` | 取込履歴の期間が反転して表示される | **書ける** — 文字列比較で足せる |
