@@ -73,8 +73,12 @@ export const DEBT_INTEGER_PATTERN = /^[0-9]+$/u;
  * 日まで持たないのは、資産推移グラフが月次の点で描かれるため
  * (docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。日を入れても描画は
  * 変わらず、何年も前の借入の「日」を思い出させることになる。
+ *
+ * **月は01〜12だけを通す。** 桁だけを見る形(`\d{2}`)にすると`2020-13`が通り、当月との
+ * 比較も文字列の辞書順なので保存まで素通りする(`2020-13` < 当月)。`type="month"`の欄からは
+ * 作れない値だが、その前提はブラウザ任せで、パースを通った値はそのままグラフの起点になる。
  */
-export const DEBT_ORIGINATED_ON_PATTERN = /^\d{4}-\d{2}$/u;
+export const DEBT_ORIGINATED_ON_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/u;
 
 /** 発生年月の日付フォーマット(`date-fns`)。上のパターンと同じ形を指す */
 export const DEBT_ORIGINATED_ON_FORMAT = "yyyy-MM";

@@ -35,6 +35,16 @@ describe("validateOriginatedOn", () => {
     expect(validateOriginatedOn("2019-04-01", now)).toBe(DEBT_ORIGINATED_ON_FORMAT_MESSAGE);
   });
 
+  /**
+   * 桁だけを見る形にすると、当月との比較も文字列の辞書順なので`2020-13`は保存まで素通りし、
+   * グラフの起点が12月と1月のあいだに入る(PR #143 のレビュー指摘)
+   */
+  it("実在しない月は弾く", () => {
+    expect(validateOriginatedOn("2020-13", now)).toBe(DEBT_ORIGINATED_ON_FORMAT_MESSAGE);
+    expect(validateOriginatedOn("2020-00", now)).toBe(DEBT_ORIGINATED_ON_FORMAT_MESSAGE);
+    expect(validateOriginatedOn("2020-12", now)).toBeNull();
+  });
+
   /** 桁を打ち間違えた年を止める歯止め。実在しうる借入年は締め出さない */
   it("下限より前は弾く", () => {
     expect(validateOriginatedOn("0202-04", now)).toBe(DEBT_ORIGINATED_ON_TOO_OLD_MESSAGE);

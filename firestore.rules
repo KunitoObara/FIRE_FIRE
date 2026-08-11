@@ -98,9 +98,11 @@ service cloud.firestore {
         // **当月より後でないことはここでは見ない。** request.timeはUTCで、クライアントが入れるのは
         // ローカルの年月なので、月をまたぐ前後で正常な入力を弾きうる(updatedAtと同じ制約。
         // 要件定義書 8.1)。その判定は画面側(src/schemas/debts.ts)が持つ
+        // 月は01〜12だけを通す(DEBT_ORIGINATED_ON_PATTERNと同じ形)。桁だけを見ると
+        // 2020-13のような実在しない月が保存でき、グラフの起点が想定外の位置に入る
         && (
           debt.originatedOn == null
-          || (debt.originatedOn is string && debt.originatedOn.matches('^[0-9]{4}-[0-9]{2}$'))
+          || (debt.originatedOn is string && debt.originatedOn.matches('^[0-9]{4}-(0[1-9]|1[0-2])$'))
         )
         // 金利(年利%)と残りの返済期間(総月数)は任意入力。未登録はnullで保存され、
         // 0%・0ヶ月とは区別する(B11「入力項目の補足」)
