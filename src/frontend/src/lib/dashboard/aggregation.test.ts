@@ -244,6 +244,20 @@ describe("sumDebtBalance", () => {
   it("対象が1件も無ければ0を返す", () => {
     expect(sumDebtBalance([])).toBe(0);
   });
+
+  /**
+   * B11は完済した負債を残債0円のまま残せる(B11「入力項目の補足」)。履歴には返済中の
+   * 記録が残っているが、「いま」差し引く額は0になる。
+   */
+  it("完済して残債0円になった負債は、履歴が残っていても差し引かない", () => {
+    const repaid: Debt = {
+      ...mortgage,
+      balance: 0,
+      balanceHistory: { "2026-07-31": 4_000_000, "2026-08-01": 0 },
+    };
+
+    expect(sumDebtBalance([repaid])).toBe(0);
+  });
 });
 
 describe("sumAxisAmount(負債を含む分類軸)", () => {
