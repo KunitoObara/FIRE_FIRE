@@ -94,17 +94,34 @@ declare global {
     projectedAchievementDate: string | null;
   };
 
-  /** 収支サマリの費目別支出の1行 */
+  /** 収支サマリの費目別支出の1行(費目は大項目。粒度は同書6章) */
   type ExpenseByCategory = {
     name: string;
+    /** **0以上。** 支出は絶対値で持つ(`CashflowSummary`の取り決め) */
     amount: number;
   };
 
-  /** 収支サマリ(当月) */
+  /**
+   * 収支サマリ(当月)。
+   *
+   * **`expense` と `expenseByCategory[].amount` は0以上の値で組み立てる**
+   * (docs/transaction-import-requirements.md 5章「集計した値の符号」)。収入は `amount > 0`
+   * の合計、支出は `amount < 0` の合計の**絶対値**で、符号を落とすのは集計の時点。
+   * 表示側では反転しない。
+   *
+   * `CashflowSummaryCard`が値を加工せず受け取る契約になっているため。収支を `income - expense`
+   * で出し、支出も費目別支出も`formatJpy`へそのまま渡す。`formatJpy`は負の値を `- ¥ 84,200` と
+   * 符号付きにするので、支出を負のまま入れると**支出にマイナスが付く**うえ、収支が
+   * `income + |支出|` になって**赤字が黒字として出る**。
+   *
+   * 生CSVの符号(支出がマイナス)を保つのは`Transaction.amount`とB3の一覧だけ。
+   */
   type CashflowSummary = {
     /** 対象月(`yyyy-MM`) */
     month: string;
+    /** 0以上 */
     income: number;
+    /** 0以上(絶対値) */
     expense: number;
     expenseByCategory: ExpenseByCategory[];
   };

@@ -193,6 +193,72 @@ export const resolveAxisNetAmount = (axisData: AssetAxisData | undefined): numbe
  * 対象は直近の1日分に現れる資産種別だけにする。過去にだけ存在した種別まで含めると、
  * もう保有していない種別が色スロット(8つ)を占め、現在の内訳が「その他」に押し出される。
  */
+/**
+ * 収支サマリの集計対象になる取引かどうか(docs/transaction-import-requirements.md 5章)。
+ *
+ * **振替と計算対象外は取り込んだうえで集計から外す。** 自口座間の移動は収入と支出の両方に
+ * 現れるため、数えると収支が0のまま両者だけが膨らみ、費目別支出でも実態のない支出が
+ * 最上位に来る。計算対象はマネーフォワード側でユーザーが下した判断そのものなので、
+ * アプリ側で読み替えない。どちらもB3の一覧には印付きで出る。
+ */
+const isCashflowTarget = (transaction: Transaction): boolean =>
+  !transaction.isTransfer && transaction.isCalculationTarget;
+
+/**
+ * 費目別支出を大項目で集計する(同書6章)。
+ *
+ * 中項目まで割ると項目数が多くなりすぎ、ダッシュボードのカードとして読めない。中項目まで
+ * 見たい場合はB3へ渡す。金額の多い順に並べるのは、限られた高さのカードで先に目に入る位置へ
+ * 大きい支出を置くため(負債サマリと同じ考え方)。
+ */
+const buildExpenseByCategory = (expenses: Transaction[]): ExpenseByCategory[] => {
+  const totals = new Map<string, number>();
+
+  expenses.forEach((transaction) => {
+    const name = transaction.categoryMajor;
+    // 支出は負の値で入っているので、ここで絶対値にする(型の取り決め)
+    totals.set(name, (totals.get(name) ?? 0) + Math.abs(transaction.amount));
+  });
+
+  return [...totals]
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((left, right) => right.amount - left.amount);
+};
+
+/**
+ * 当月の取引から収支サマリを組み立てる(B1「収支サマリ」)。
+ *
+ * 渡すのは**当月分の取引だけ**(`fetchMonthlyTransactions`)。この関数は期間で絞らない。
+ *
+ * **収入・支出とも0以上で返す。** 符号を落とすのは集計のこの時点で、表示側では反転しない
+ * (`CashflowSummary`の取り決め。同書5章)。
+ *
+ * 取引が1件も無ければ`null`を返し、カードは空状態のまま(月初は正常にこの状態になるので
+ * エラーとして扱わない)。**取引はあるが全てが集計対象外だった場合は`null`にしない** —
+ * 0円として出す。空状態は「まだ取り込んでいない」と読める案内を出すので、振替しかない月に
+ * それを見せると、取り込んである取引を「無い」と伝えることになる。
+ */
+export const buildCashflowSummary = (
+  transactions: Transaction[],
+  now: Date,
+): CashflowSummary | null => {
+  if (transactions.length === 0) {
+    return null;
+  }
+
+  const targets = transactions.filter(isCashflowTarget);
+  const expenses = targets.filter((transaction) => transaction.amount < 0);
+
+  return {
+    month: format(now, MONTH_KEY_FORMAT),
+    income: targets
+      .filter((transaction) => transaction.amount > 0)
+      .reduce((total, transaction) => total + transaction.amount, 0),
+    expense: expenses.reduce((total, transaction) => total + Math.abs(transaction.amount), 0),
+    expenseByCategory: buildExpenseByCategory(expenses),
+  };
+};
+
 export const collectAssetCategories = (snapshot: AssetSnapshot | undefined): AssetCategory[] =>
   snapshot
     ? Object.keys(snapshot.byType)
