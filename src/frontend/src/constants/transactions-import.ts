@@ -126,3 +126,30 @@ export const TRANSACTION_CSV_PARSE_FAILURE_MESSAGES: Record<
     "文字数の上限を超える値があります。列がずれていないか、ファイルが編集されていないか確認してください。",
   unreadable: "ファイルを読み取れませんでした。破損していないか確認してください。",
 };
+
+/**
+ * 取込実行が失敗した理由ごとの文言。
+ *
+ * 理由の集合(`CsvImportFailureReason`)は資産残高推移と同じだが、`CSV_IMPORT_FAILURE_MESSAGES`は
+ * `history-write-failed`が「資産残高は反映しましたが」と種別名を含むため共有できない。
+ * 取込種別タブは両方が同時に組み立てられたまま並ぶので(`forceMount`)、どちらのタブの
+ * 結果なのかが文言から分かる必要がある。
+ */
+export const TRANSACTION_IMPORT_FAILURE_MESSAGES: Record<CsvImportFailureReason, string> = {
+  "signed-out": "ログイン状態が切れています。ログインし直してから取り込んでください。",
+  "configuration-error": "Firebaseの設定が読み込めないため取り込めません。",
+  "permission-denied": "このデータへの書き込みが許可されていません。ログインし直してください。",
+  "history-write-failed":
+    "取引は反映しましたが、取込履歴を残せませんでした。データは取り込めているため、取り込み直す必要はありません。",
+  unknown: "取込に失敗しました。時間をおいて再度お試しください。",
+};
+
+/**
+ * 途中まで反映された状態で失敗したときに添える説明。
+ *
+ * 500件を超える取込は`FIRESTORE_BATCH_LIMIT`ごとに確定するため、失敗しても手前のバッチは
+ * 残る(docs/transaction-import-requirements.md 4章)。取り込み直せば揃うのは、同じ`ID`の
+ * ドキュメントを上書きするためで、資産残高推移が日付で得ている性質と根拠が違う。
+ */
+export const buildTransactionPartialImportNotice = (writtenCount: number): string =>
+  `${writtenCount.toLocaleString("ja-JP")}件はすでに反映されています。同じファイルを取り込み直すと残りも揃います(同じ取引IDは上書きされます)。`;

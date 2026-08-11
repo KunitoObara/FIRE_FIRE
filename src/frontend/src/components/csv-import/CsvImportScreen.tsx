@@ -4,15 +4,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AssetBalanceImportPanel } from "@/components/csv-import/AssetBalanceImportPanel";
 import { ImportHistoryCard } from "@/components/csv-import/ImportHistoryCard";
-import { Card, CardContent } from "@/components/ui/card";
+import { TransactionImportPanel } from "@/components/csv-import/TransactionImportPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CSV_IMPORT_TYPES,
   DEFAULT_CSV_IMPORT_TYPE_ID,
   IMPORT_HISTORY_QUERY_KEY,
-  UNIMPLEMENTED_IMPORT_TYPE_NOTICE,
 } from "@/constants/csv-import";
 import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
+import { TRANSACTIONS_DATA_QUERY_KEY } from "@/constants/transactions";
 import { fetchImportHistory } from "@/lib/csv-import/asset-balance-repository";
 
 import type { JSX } from "react";
@@ -34,6 +34,24 @@ export const CsvImportScreen = (): JSX.Element => {
     queryKey: IMPORT_HISTORY_QUERY_KEY,
     queryFn: fetchImportHistory,
   });
+
+  /**
+   * 取込完了(および途中まで反映されての失敗)後の後始末。
+   *
+   * 取り込んだ内容は他の画面の表示そのものなので、戻ったときに古い集計を見せないよう
+   * キャッシュを落とす。落とす先は取込種別で変わる。
+   *
+   * - 資産残高推移 → B1(資産推移グラフ・分類別内訳)
+   * - 入出金明細 → B1(収支サマリ)とB3(収支明細一覧)
+   */
+  const handleImported = (typeId: CsvImportTypeId): void => {
+    void history.refetch();
+    void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
+
+    if (typeId === "transaction") {
+      void queryClient.invalidateQueries({ queryKey: TRANSACTIONS_DATA_QUERY_KEY });
+    }
+  };
 
   // 取得できない場合(未ログイン・権限なし)は履歴を空のまま見せる。取込そのものは
   // 実行時に理由付きで失敗するので、ここで重ねてエラーを出しても増える情報が無い
@@ -66,23 +84,10 @@ export const CsvImportScreen = (): JSX.Element => {
             <div className="flex flex-col gap-6">
               <p className="text-sm text-muted-foreground">{type.description}</p>
 
-              {type.implemented ? (
-                <AssetBalanceImportPanel
-                  onImported={() => {
-                    void history.refetch();
-                    // 取り込んだ残高はB1の表示内容そのもの。B1に戻ったとき古い集計を
-                    // 見せないよう、ここで無効化しておく
-                    void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
-                  }}
-                />
+              {type.id === "transaction" ? (
+                <TransactionImportPanel onImported={() => handleImported(type.id)} />
               ) : (
-                <Card>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {UNIMPLEMENTED_IMPORT_TYPE_NOTICE}
-                    </p>
-                  </CardContent>
-                </Card>
+                <AssetBalanceImportPanel onImported={() => handleImported(type.id)} />
               )}
             </div>
           </TabsContent>

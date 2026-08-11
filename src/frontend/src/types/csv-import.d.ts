@@ -4,14 +4,18 @@ declare global {
   /** B2の取込種別タブ(docs/screen-requirements-dashboard.md B2) */
   type CsvImportTypeId = "asset-balance" | "transaction";
 
-  /** 取込種別タブの1選択肢 */
+  /**
+   * 取込種別タブの1選択肢。
+   *
+   * 未実装の種別に案内だけを出すための`implemented`は、入出金明細の取込(B2-3)で
+   * 両方の種別が実装済みになったため落とした
+   * (docs/screen-requirements-dashboard.md B2「入出金明細タブ」)。
+   */
   type CsvImportType = {
     id: CsvImportTypeId;
     label: string;
     /** マネーフォワードのどのエクスポートを指すかの補足 */
     description: string;
-    /** この種別の取込が実装済みかどうか。未実装の種別はタブに案内だけを出す */
-    implemented: boolean;
   };
 
   /**
@@ -248,6 +252,35 @@ declare global {
     entries: CsvImportHistoryEntry[];
     /** 履歴をまだ読み込めていない間は`true` */
     loading: boolean;
+  };
+
+  /**
+   * 取り込む取引のうち、収支の集計から外れる行の内訳
+   * (docs/transaction-import-requirements.md 5章・7章)。
+   *
+   * **内訳は重複しないように数える。** 振替かつ計算対象外の行は実際にあるため、
+   * それぞれで数えると内訳の合計が`excludedCount`を超え、どちらの数字を信じてよいか
+   * 読めなくなる。数え方は`summarizeExcludedTransactions`のコメントに残してある。
+   */
+  type TransactionExclusionSummary = {
+    /** 集計から外れる行の合計。内訳の和と必ず一致する */
+    excludedCount: number;
+    /** `振替`が`1`の行 */
+    transferCount: number;
+    /** 振替ではないが`計算対象`が`0`の行 */
+    nonCalculationTargetCount: number;
+  };
+
+  /** 入出金明細のプレビュー表(日付・内容・金額・口座・大項目/中項目)のProps */
+  type TransactionPreviewTableProps = {
+    /** 先頭から`CSV_PREVIEW_ROW_LIMIT`件に絞った行 */
+    rows: TransactionCsvRow[];
+  };
+
+  /** 入出金明細タブの中身のProps */
+  type TransactionImportPanelProps = {
+    /** 取込完了を親に伝えて履歴とB1・B3のキャッシュを取り直させる */
+    onImported: () => void;
   };
 
   /** プレビュー表(全列を横スクロールで見せる)のProps */

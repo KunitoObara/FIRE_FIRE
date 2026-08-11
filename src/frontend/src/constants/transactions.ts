@@ -5,8 +5,9 @@ import { CSV_IMPORT_PATH } from "@/constants/routes";
 /**
  * サンプルデータを表示するかどうか。
  *
- * 入出金明細CSVの取込(B2)がまだ無く、Firestoreに取引データが存在しないため、画面の見た目を
- * 確認できるようサンプルデータを流し込んでいる。入出金明細CSVの取込が実装されたら`false`に
+ * B3がまだFirestoreの取引データを読んでおらず、画面の見た目を確認できるようサンプルデータを
+ * 流し込んでいる。**入出金明細CSVの取込(B2)自体はB2-3で実装済み**で、取り込んだ取引は
+ * `users/{uid}/transactions`に入るが、ここを繋ぐのは[B3-1]の範囲になる。繋いだ時点で`false`に
  * して`src/lib/transactions/sample-data.ts`ごと外す。B1が同じ形のフラグで暫定表示していたのを
  * 実データ接続時に外したのと同じ手順になる(カード[B1-2])。
  *
@@ -16,7 +17,21 @@ export const USE_SAMPLE_TRANSACTIONS_DATA = true;
 
 /** サンプルデータ表示中であることを画面に明示する文言。実データと取り違えないためのもの */
 export const SAMPLE_TRANSACTIONS_DATA_NOTICE =
-  "表示中の取引はすべてサンプルです。入出金明細CSVの取込(B2)実装後に実データへ切り替わります。";
+  "表示中の取引はすべてサンプルです。取り込んだ入出金明細の表示は今後のアップデートで対応します。";
+
+/**
+ * B3が表示する取引データのキャッシュキー(TanStack Query)。
+ *
+ * B2で入出金明細を取り込んだ直後にこのキーを無効化する。取り込んだ取引はB3の一覧そのもので、
+ * 戻ったときに古い内容を見せないため(docs/screen-requirements-dashboard.md B2
+ * 「入出金明細タブ」。資産残高推移タブが`DASHBOARD_DATA_QUERY_KEY`を落としているのと同じ)。
+ *
+ * **現時点でこのキーを購読しているものは無い。** B3はまだServer Componentのまま
+ * サンプルデータを表示しており(`USE_SAMPLE_TRANSACTIONS_DATA`)、Firestoreへ繋ぎ込む
+ * [B3-1]でこのキーを読む側が入る。取込の側だけ後から足すと、B2を触らないカードで
+ * 「取り込んだのに一覧が古い」に気付く必要が出るため、先に置いてある。
+ */
+export const TRANSACTIONS_DATA_QUERY_KEY = ["transactions-data"] as const;
 
 /** 期間絞り込みの選択肢(docs/screen-requirements-dashboard.md B3) */
 export const TRANSACTION_PERIODS: TransactionPeriod[] = [
