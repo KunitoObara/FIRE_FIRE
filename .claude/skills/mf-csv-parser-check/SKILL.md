@@ -21,14 +21,15 @@ docs/fire-asset-management-requirements.md の4.2と、docs/screen-requirements-
 | | パス |
 |---|---|
 | パーサー本体(資産残高推移) | `src/frontend/src/lib/csv/asset-balance-csv.ts` |
+| パーサー本体(入出金明細) | `src/frontend/src/lib/csv/transaction-csv.ts` |
 | 文字コードの判定・デコード | `src/frontend/src/lib/csv/decode.ts`(両種別で共通) |
-| Firestoreへの書き込み | `src/frontend/src/lib/csv-import/asset-balance-repository.ts` |
-| スキーマ・上限値 | `src/frontend/src/schemas/csv-import.ts`、`src/frontend/src/constants/csv-import.ts` |
+| Firestoreへの書き込み | `src/frontend/src/lib/csv-import/asset-balance-repository.ts`、`src/frontend/src/lib/csv-import/transaction-repository.ts` |
+| スキーマ・上限値 | `src/frontend/src/schemas/csv-import.ts`、`src/frontend/src/constants/csv-import.ts`、`src/frontend/src/constants/transactions-import.ts` |
 | B2 画面 | `src/frontend/src/components/csv-import/`、`src/frontend/src/app/(dashboard)/csv-import/page.tsx` |
 
-**入出金明細CSVの取込はまだ実装されていない(Phase 2)。** B2の入出金明細タブは `implemented: false` の案内だけを出し、B3は `src/frontend/src/lib/transactions/sample-data.ts` を `USE_SAMPLE_TRANSACTIONS_DATA` 越しに表示している。**そのパーサーを探し回らない** — 無いことが現状であり、退行ではない。
+**入出金明細CSVの取込は実装済み(B2-1〜B2-3)。** タブごとにパーサー・リポジトリ・失敗時の文言・プレビュー表が別々にあり、共有しているのは文字コードの判定とファイルサイズの歯止めだけになる。「未実装だから探さない」と書いてあった時期のメモを見つけたら、それは B2-3 より前の記述で古い。
 
-実装されたかどうかは `src/frontend/src/constants/csv-import.ts` の `CSV_IMPORT_TYPES` で `transaction` の `implemented` が `true` になっているかで判定できる。着手するときは、docs/transaction-import-requirements.md 2.3 の失敗理由と下の異常系リストを先にテストとして書く。
+**ただしB3 収支明細一覧はまだFirestoreに繋がっていない。** `src/frontend/src/lib/transactions/transactions-data.ts` が `USE_SAMPLE_TRANSACTIONS_DATA` 越しに `sample-data.ts` を返しており、取り込んだ取引は画面に出ない。差し替えは [B3-1]、B1の収支サマリの集計は [B1-8] の範囲で、**B2側の退行ではない**。
 
 ## 検証手順
 

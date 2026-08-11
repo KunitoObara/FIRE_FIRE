@@ -11,9 +11,9 @@ const EMPTY_TRANSACTIONS_DATA: TransactionsData = {
 /**
  * B3が表示する取引データを取得する。
  *
- * 現時点では入出金明細CSVの取込(B2)が無くFirestoreに実データが無いため、
- * `USE_SAMPLE_TRANSACTIONS_DATA`に従ってサンプルデータか空のデータを返すだけの関数である。
- * 入出金明細CSVの取込が実装された時点で、ここをFirestoreからの取得に差し替える
+ * 現時点では`USE_SAMPLE_TRANSACTIONS_DATA`に従ってサンプルデータか空のデータを返すだけの
+ * 関数である。**入出金明細CSVの取込(B2)はB2-3で実装済み**で`users/{uid}/transactions`に
+ * 実データが入るが、ここをFirestoreからの取得に差し替えるのは[B3-1]の範囲になる
  * (B1の`src/lib/dashboard/dashboard-data.ts`が`fetchDashboardData`で行ったのと同じ差し替え)。
  */
 export const getTransactionsData = (now: Date): TransactionsData =>

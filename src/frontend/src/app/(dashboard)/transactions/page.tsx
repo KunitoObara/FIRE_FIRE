@@ -36,7 +36,7 @@ export const metadata: Metadata = {
  *
  * 表示データはまだFirestoreに繋がっておらず、`getTransactionsData`がサンプルデータを返す
  * (`src/constants/transactions.ts`の`USE_SAMPLE_TRANSACTIONS_DATA`)。入出金明細CSVの取込
- * (B2)自体がまだ未実装のため、実データへの繋ぎ込みは別カードで行う。
+ * (B2)はB2-3で実装済みだが、取り込んだ取引をこの画面へ繋ぐのは[B3-1]の範囲になる。
  */
 const TransactionsPage = async (props: PageProps<"/transactions">): Promise<JSX.Element> => {
   const searchParams = await props.searchParams;

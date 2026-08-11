@@ -5,30 +5,25 @@ import { FIRESTORE_QUERY_LIMIT_MAX } from "@/constants/firebase";
 /**
  * 取込種別タブ。
  *
- * 入出金明細は要件定義書7章のPhase 2の範囲で、B3 収支明細一覧もまだ無い。
- * タブ自体は要件の表示項目なので残し、中身は案内だけにする(`implemented`)。
+ * どちらもCSVの形・データモデル・冪等性の取り方が別物で、共通するのは文字コードの判定と
+ * ファイルサイズの歯止めだけになる(docs/screen-requirements-dashboard.md B2
+ * 「取込種別ごとの違い」)。そのため画面もタブごとに別のコンポーネントを割り当てる。
  */
 export const CSV_IMPORT_TYPES: CsvImportType[] = [
   {
     id: "asset-balance",
     label: "資産残高推移",
     description: "マネーフォワードの「資産推移」からエクスポートしたCSV",
-    implemented: true,
   },
   {
     id: "transaction",
     label: "入出金明細",
     description: "マネーフォワードの「収入・支出詳細」からエクスポートしたCSV",
-    implemented: false,
   },
 ];
 
 /** 既定で開くタブ */
 export const DEFAULT_CSV_IMPORT_TYPE_ID: CsvImportTypeId = "asset-balance";
-
-/** 未実装の取込種別タブに出す案内 */
-export const UNIMPLEMENTED_IMPORT_TYPE_NOTICE =
-  "入出金明細の取込はPhase 2で対応します。現在は資産残高推移のCSVのみ取り込めます。";
 
 /**
  * 資産残高推移CSVの列名。
