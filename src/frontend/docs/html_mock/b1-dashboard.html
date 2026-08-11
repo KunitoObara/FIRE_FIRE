@@ -175,34 +175,44 @@
       <!-- 資産推移グラフ。見出しには選択中の分類軸名を添える
            (docs/screen-requirements-dashboard.md B1「分類軸の切り替えが及ぶ範囲」)。
 
-           表示は「積み上げ」と「純資産」の2つで、既定は積み上げ(同B1「資産推移グラフの表示切替」)。
-           積み上げは正を0より上・負を0より下に分けて積むので(Rechartsの stackOffset="sign")、面の上端は
-           正の資産種別だけの合計で、負債も負の資産種別も引かれていない。純資産に切り替えると
-           各時点で「その時点以前で最も新しい残債」を差し引いた1本の線になり、B8の対象分類にこの分類軸を
-           選んでいる場合はその最新点がFIRE達成度ゲージの現在資産額と一致する(このモックの対象分類は
-           「投資性資産」なので一致しない)。ここでは既定の積み上げを表示した状態を示す -->
+           グラフは常に資産種別の積み上げで、切替は「負債反映」のON/OFFだけ(同B1
+           「資産推移グラフの負債反映切替」)。既定はON。正を0より上・負を0より下に分けて積むので
+           (Rechartsの stackOffset="sign")、対象の負債は0より下の帯として積まれ、面の上端は
+           正の資産種別だけの合計のまま動かない。その時点の純資産は上端ではなくツールチップの
+           合計で読む。B8の対象分類にこの分類軸を選んでいる場合、その最新点の合計がFIRE達成度
+           ゲージの現在資産額と一致する(このモックの対象分類は「投資性資産」なので一致しない)。
+           ここでは既定(反映ON)を表示した状態を示す -->
       <section class="card p-5">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-sm font-semibold">資産推移(純金融資産)</h2>
-          <!-- 分類軸・表示期間と同じ切替の見た目にする。選択状態はURLのクエリに載る -->
+          <!-- 分類軸・表示期間と同じ切替の見た目にする。選択状態はURLのクエリに載る。
+               対象の負債が1件も無い分類軸ではこの切替そのものを出さない -->
           <div class="tab-row" style="border-bottom: none;">
-            <span class="tab tab-active">積み上げ</span>
-            <span class="tab">純資産</span>
+            <span class="tab tab-active">負債反映</span>
+            <span class="tab">資産のみ</span>
           </div>
         </div>
-        <svg viewBox="0 0 640 200" class="w-full h-48">
-          <line x1="0" y1="40" x2="640" y2="40" stroke="hsl(var(--border))" stroke-width="1"/>
-          <line x1="0" y1="90" x2="640" y2="90" stroke="hsl(var(--border))" stroke-width="1"/>
-          <line x1="0" y1="140" x2="640" y2="140" stroke="hsl(var(--border))" stroke-width="1"/>
-          <line x1="0" y1="190" x2="640" y2="190" stroke="hsl(var(--border))" stroke-width="1"/>
+        <svg viewBox="0 0 640 210" class="w-full h-52">
+          <line x1="0" y1="11" x2="640" y2="11" stroke="hsl(var(--border))" stroke-width="1"/>
+          <line x1="0" y1="56" x2="640" y2="56" stroke="hsl(var(--border))" stroke-width="1"/>
+          <line x1="0" y1="100" x2="640" y2="100" stroke="hsl(var(--border))" stroke-width="1"/>
+          <!-- 0の線。負債の帯がこの下に積まれるので、他の目盛りより強く引く -->
+          <line x1="0" y1="145" x2="640" y2="145" stroke="hsl(var(--muted-foreground))" stroke-width="1"/>
           <defs>
             <clipPath id="trend-reveal">
-              <rect class="chart-anim-reveal" x="0" y="0" height="200" />
+              <rect class="chart-anim-reveal" x="0" y="0" height="210" />
             </clipPath>
+            <!-- 負債の帯のハッチング(DESIGN.md 3章)。0の線を挟んで資産の帯と隣り合い、
+                 マイナス残高の資産種別の帯とも並ぶため、色だけでは区別が付かない。
+                 円グラフの負債スライスと同じ色・同じ模様にする -->
+            <pattern id="debt-hatch-trend" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+              <rect width="6" height="6" fill="hsl(var(--destructive))"/>
+              <line x1="0" y1="0" x2="0" y2="6" stroke="hsl(var(--card))" stroke-width="2" stroke-opacity="0.55"/>
+            </pattern>
           </defs>
           <!--
             帯は1つのクリップでまとめて広げる。帯ごとに時間差を付けると、途中のフレームで
-            積み上げの合計が実在しない額になる(DESIGN.md 9章)。
+            積み上げの合計が実在しない額になる(DESIGN.md 9章)。0より下の負債の帯も同じクリップ。
 
             色と並び順は分類別内訳の円グラフと同じスロット割り当てをそのまま使う
             (投資信託=--chart-1、現金・預金=--chart-2、株式=--chart-6)。同じ画面の2つのグラフで
@@ -211,40 +221,55 @@
           -->
           <g clip-path="url(#trend-reveal)">
             <polygon fill="var(--chart-1)" fill-opacity="0.85"
-              points="0,124 60,122 120,120 180,117 240,115 300,112 360,109 420,106 480,104 540,102 600,101 640,100 640,190 0,190" />
+              points="0,86 60,84.2 120,82.4 180,79.7 240,78 300,75.3 360,72.6 420,69.9 480,68.1 540,66.3 600,65.4 640,64.5 640,145 0,145" />
             <polygon fill="var(--chart-2)" fill-opacity="0.85"
-              points="0,97 60,94 120,91 180,88 240,85 300,81 360,77 420,73 480,70 540,67 600,66 640,64 640,100 600,101 540,102 480,104 420,106 360,109 300,112 240,115 180,117 120,120 60,122 0,124" />
+              points="0,61.9 60,59.2 120,56.5 180,53.8 240,51.1 300,47.6 360,44 420,40.4 480,37.7 540,35 600,34.1 640,32.4 640,64.5 600,65.4 540,66.3 480,68.1 420,69.9 360,72.6 300,75.3 240,78 180,79.7 120,82.4 60,84.2 0,86" />
             <polygon fill="var(--chart-6)" fill-opacity="0.85"
-              points="0,82 60,78 120,74 180,70 240,66 300,61 360,56 420,51 480,47 540,43 600,41 640,39 640,64 600,66 540,67 480,70 420,73 360,77 300,81 240,85 180,88 120,91 60,94 0,97" />
+              points="0,48.4 60,44.9 120,41.3 180,37.7 240,34.1 300,29.7 360,25.2 420,20.7 480,17.2 540,13.6 600,11.8 640,10 640,32.4 600,34.1 540,35 480,37.7 420,40.4 360,44 300,47.6 240,51.1 180,53.8 120,56.5 60,59.2 0,61.9" />
+            <!--
+              負債の帯。項目ごとに分けず「負債」1つにまとめ、0の線から下向きに積む
+              (docs/screen-requirements-dashboard.md B1「積み上げ表示」)。
+              各時点の額はB11が保存のたびに残す残債の履歴から取るので、返済が進むぶん
+              右へ行くほど薄くなる。最新点だけは履歴ではなく現在の残債で描く
+              (資産残高の最新日より後に負債を保存していると、履歴からは見つからないため)。
+              最新点の -19,630,000円 は円グラフの負債スライス・差引後の純額と同じ額
+            -->
+            <polygon fill="url(#debt-hatch-trend)" fill-opacity="0.85"
+              points="0,145 640,145 640,197.6 600,197.8 540,197.9 480,198.2 420,198.5 360,198.9 300,199.1 240,199.7 180,199.9 120,200.5 60,200.7 0,201" />
             <!-- 各帯の上端をその帯自身の色で描く(Rechartsのエリアチャートが帯ごとに
                  strokeを引くのと同じ)。いちばん上の線だけを強めると、合計を表す別の系列が
                  あるように見えてしまう -->
             <polyline fill="none" stroke="var(--chart-1)" stroke-width="1.5"
-              points="0,124 60,122 120,120 180,117 240,115 300,112 360,109 420,106 480,104 540,102 600,101 640,100" />
+              points="0,86 60,84.2 120,82.4 180,79.7 240,78 300,75.3 360,72.6 420,69.9 480,68.1 540,66.3 600,65.4 640,64.5" />
             <polyline fill="none" stroke="var(--chart-2)" stroke-width="1.5"
-              points="0,97 60,94 120,91 180,88 240,85 300,81 360,77 420,73 480,70 540,67 600,66 640,64" />
+              points="0,61.9 60,59.2 120,56.5 180,53.8 240,51.1 300,47.6 360,44 420,40.4 480,37.7 540,35 600,34.1 640,32.4" />
             <polyline fill="none" stroke="var(--chart-6)" stroke-width="1.5"
-              points="0,82 60,78 120,74 180,70 240,66 300,61 360,56 420,51 480,47 540,43 600,41 640,39" />
+              points="0,48.4 60,44.9 120,41.3 180,37.7 240,34.1 300,29.7 360,25.2 420,20.7 480,17.2 540,13.6 600,11.8 640,10" />
+            <!-- 負債の帯も下端を同じ扱いで描く(帯の切れ目が0の線と紛れないように) -->
+            <polyline fill="none" stroke="hsl(var(--destructive))" stroke-width="1.5"
+              points="0,201 60,200.7 120,200.5 180,199.9 240,199.7 300,199.1 360,198.9 420,198.5 480,198.2 540,197.9 600,197.8 640,197.6" />
           </g>
         </svg>
         <div class="flex justify-between text-xs text-slate-400 mt-1">
           <span>2025/08</span><span>2025/11</span><span>2026/02</span><span>2026/04</span><span>2026/07</span>
         </div>
         <!-- 1本の線だったときと違い、色以外に資産種別を識別する手掛かりが無いので凡例を出す
-             (DESIGN.md 1章・3章)。色見本は円グラフの凡例と同じ形にする -->
+             (DESIGN.md 1章・3章)。色見本は円グラフの凡例と同じ形にする。
+             負債は資産種別のスロット順の後ろに固定で並べる -->
         <ul class="flex flex-wrap items-center gap-4 text-xs mt-3">
           <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-1);"></span>投資信託</li>
           <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-2);"></span>現金・預金</li>
           <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-6);"></span>株式</li>
+          <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: repeating-linear-gradient(45deg, hsl(var(--destructive)) 0 2px, hsl(var(--card)) 2px 3px);"></span>負債</li>
         </ul>
         <!--
-          負債を含む分類軸を積み上げで表示しているあいだの注記。隣の円グラフは負債のスライスと
-          差引後の純額を出しているので、これが無いと同じ画面の2つのグラフが同じ分類軸について
-          違う合計を示しているように見える(docs/screen-requirements-dashboard.md B1「積み上げ表示」)
+          反映OFFに切り替えているあいだは、ここに「対象の負債を反映していない」注記を出す
+          (docs/screen-requirements-dashboard.md B1「積み上げ表示」)。隣の円グラフは負債のスライスと
+          差引後の純額を出し続けるので、注記が無いと同じ画面の2つのグラフが同じ分類軸について
+          違う合計を示しているように見える。文面の例:
+          「この分類軸が対象にしている負債2件(-19,630,000円)は反映していません。『負債反映』に切り替えると差引後の推移が見られます。」
+          既定は反映ONなので、このモックでは出していない
         -->
-        <p class="text-xs text-slate-400 mt-2">
-          この分類軸が対象にしている負債2件(-19,630,000円)は差し引いていません。差引後の推移は「純資産」に切り替えてください。
-        </p>
       </section>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
