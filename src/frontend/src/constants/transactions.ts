@@ -1,5 +1,6 @@
 /** B3 収支明細一覧画面で使う定数 */
 
+import { FIRESTORE_QUERY_LIMIT_MAX } from "@/constants/firebase";
 import { CSV_IMPORT_PATH } from "@/constants/routes";
 
 /**
@@ -32,6 +33,25 @@ export const SAMPLE_TRANSACTIONS_DATA_NOTICE =
  * 「取り込んだのに一覧が古い」に気付く必要が出るため、先に置いてある。
  */
 export const TRANSACTIONS_DATA_QUERY_KEY = ["transactions-data"] as const;
+
+/**
+ * B3が1回の表示で読む取引の上限件数(docs/transaction-import-requirements.md 8章)。
+ *
+ * 取引は資産残高と違って際限なく増える。資産推移は当月が日次・それ以前は月末のみで10年分でも
+ * 数百件にしかならないが、取引は月に数百件のペースで積み上がるため、全件を読むと表示のたびに
+ * 読み取りが増え続ける。選択中の期間で範囲クエリを掛けたうえで、さらにこの件数で打ち切る。
+ *
+ * **`limit()`に渡すのは`TRANSACTION_SCAN_LIMIT + 1`で、`FIRESTORE_QUERY_LIMIT_MAX`を
+ * 超えられないのはそちらの値。** 1件余分に読むのは「上限を超えて存在するか」を判定するためで、
+ * 取得件数が上限とちょうど一致しただけの場合に打ち切りの案内を出さないようにする。
+ *
+ * 要件が定める9,999をそのまま書かず`- 1`で導いてあるのは、**この2つの値が必ずセットで動く**
+ * ことを値の側で保証するため。9,999と10,000を別々に置くと、読める件数を増やすつもりで
+ * 前者だけを10,000にしたときに`limit()`へ10,001が渡り、クエリごと`invalid-argument`で
+ * 拒否されて**1件も読めなくなる**(B1-3で踏んだのと同じ罠)。読み取りコストの都合でこれより
+ * 小さくするのは構わないので、`firestore-scan-limit.test.ts`は一致ではなく上限として検査する。
+ */
+export const TRANSACTION_SCAN_LIMIT = FIRESTORE_QUERY_LIMIT_MAX - 1;
 
 /** 期間絞り込みの選択肢(docs/screen-requirements-dashboard.md B3) */
 export const TRANSACTION_PERIODS: TransactionPeriod[] = [

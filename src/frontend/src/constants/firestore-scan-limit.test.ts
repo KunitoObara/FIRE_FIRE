@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ASSET_TYPE_SCAN_LIMIT } from "@/constants/asset-categories";
 import { ASSET_SNAPSHOT_SCAN_LIMIT } from "@/constants/csv-import";
 import { FIRESTORE_QUERY_LIMIT_MAX } from "@/constants/firebase";
+import { TRANSACTION_SCAN_LIMIT } from "@/constants/transactions";
 
 /**
  * 走査件数の上限がFirestoreの`limit()`の最大値を超えていないことを固定する。
@@ -22,5 +23,15 @@ describe("Firestoreの走査件数の上限", () => {
   ])("%s はFirestoreが許す上限を超えない", (_name, scanLimit) => {
     expect(scanLimit).toBeLessThanOrEqual(FIRESTORE_QUERY_LIMIT_MAX);
     expect(scanLimit).toBeGreaterThan(0);
+  });
+
+  /**
+   * 取引だけは`limit()`へ渡す値が`+ 1`される(打ち切りを判定するために1件余分に読む。
+   * docs/transaction-import-requirements.md 8章)。**上限を超えてはならないのはそちらの値**
+   * なので、`TRANSACTION_SCAN_LIMIT`そのものではなく`+ 1`した値で検査する。
+   */
+  it("TRANSACTION_SCAN_LIMIT は1件余分に読んでもFirestoreが許す上限を超えない", () => {
+    expect(TRANSACTION_SCAN_LIMIT + 1).toBeLessThanOrEqual(FIRESTORE_QUERY_LIMIT_MAX);
+    expect(TRANSACTION_SCAN_LIMIT).toBeGreaterThan(0);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filterTransactionsByPeriod } from "@/lib/transactions/period";
+import { filterTransactionsByPeriod, resolveTransactionDateRange } from "@/lib/transactions/period";
 
 const NOW = new Date("2026-07-31T00:00:00.000Z");
 
@@ -62,5 +62,31 @@ describe("filterTransactionsByPeriod", () => {
 
   it("データが無ければ空のまま返す", () => {
     expect(filterTransactionsByPeriod([], "all", NOW)).toEqual([]);
+  });
+});
+
+describe("resolveTransactionDateRange", () => {
+  it.each([
+    ["1m", "2026-06-30"],
+    ["3m", "2026-04-30"],
+    ["this-year", "2026-01-01"],
+  ] as const)("%s は %s 以降を今日まで読む", (periodId, from) => {
+    expect(resolveTransactionDateRange(periodId, NOW)).toEqual({ from, to: "2026-07-31" });
+  });
+
+  /** 境界を持たないので条件そのものを付けない。`null`を`where`に渡すと日付として比較される */
+  it("全期間は境界を持たない", () => {
+    expect(resolveTransactionDateRange("all", NOW)).toEqual({ from: null, to: null });
+  });
+
+  /**
+   * 範囲クエリで読む境界と、クライアント側で絞り込む境界が食い違うと、読めているのに
+   * 表示から落ちる(またはその逆)取引が出る。両者は同じ関数から境界を決めている
+   */
+  it("クライアント側の期間絞り込みと同じ境界になる", () => {
+    const range = resolveTransactionDateRange("1m", NOW);
+    const boundary = [buildTransaction("boundary", range.from ?? "")];
+
+    expect(filterTransactionsByPeriod(boundary, "1m", NOW)).toHaveLength(1);
   });
 });

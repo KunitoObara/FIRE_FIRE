@@ -50,6 +50,37 @@ declare global {
     label: string;
   };
 
+  /**
+   * 表示期間をFirestoreの範囲クエリに直したもの(`yyyy-MM-dd`)。
+   * 「全期間」は境界を持たないので両方`null`になり、その条件はクエリに付けない。
+   */
+  type TransactionDateRange = {
+    /** この日を含む */
+    from: string | null;
+    /** この日を含む */
+    to: string | null;
+  };
+
+  /**
+   * B3が表示する取引の取得結果(docs/transaction-import-requirements.md 8章)。
+   *
+   * 1件も取り込んでいないアカウントでは空配列になる。失敗ではないので`ok: true`で返す
+   * (`AssetSnapshotsResult`と同じ扱い)。
+   */
+  type TransactionsFetchResult =
+    | {
+        ok: true;
+        /** 取引日の新しい順。上限に達した場合に欠けるのは古い側だけになる */
+        transactions: Transaction[];
+        /**
+         * `TRANSACTION_SCAN_LIMIT`件を超える取引があり、古い側を切り落としたか。
+         * 打ち切ったことは画面に出す — 黙って欠けると、一覧に無いことを
+         * 「取り込んでいない」と読み違える
+         */
+        truncated: boolean;
+      }
+    | { ok: false; reason: FirestoreAccessFailureReason };
+
   /** 並び替え対象の列。要件上「並び替え(日付/金額)」の2列のみ対応する */
   type TransactionSortKey = "date" | "amount";
 
