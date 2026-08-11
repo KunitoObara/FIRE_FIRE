@@ -397,14 +397,26 @@ service cloud.firestore {
         allow update: if canAccessOwnData(userId)
           && isValidDebt(request.resource.data)
           && request.resource.data.createdAt == resource.data.createdAt
-          // 残債の履歴は**追記だけ**を許す。既にある日の記録を書き換え・削除させない
-          // (資産推移グラフが過去に遡って別の値を描くため)。`diff()`はマップ同士の差分を
-          // 返すので、要素を1件ずつ辿らずに書ける。**追記が「残債の変わった日」だけかは
-          // ここでは見られない**(直前の記録と比べる必要があり、キーの前後関係を辿れない)
+          // 残債の履歴は**過去へ遡って書き換えさせない**。資産推移グラフが過去の時点で
+          // 別の値を描くようになるため。`diff()`はマップ同士の差分を返すので、要素を
+          // 1件ずつ辿らずに書ける。
+          //
+          // 消すのは一切許さない。書き換えは**その保存が最終更新日として刻む日**の記録だけ
+          // 許す。B11は同じ日に2回保存するとその日の記録を上書きする作りで
+          // (`buildNextBalanceHistory`。CSV取込が同じ日付を上書きするのと同じ冪等な扱い)、
+          // 一律に禁じると**同じ日に残債を直しての保存し直しが落ちる**。
+          //
+          // 変更を`updatedAt`の日に限れば、書き換えられるのは「今まさに保存している日」に
+          // なる。古い日を書き換えるには最終更新日もその日に戻す必要があり、それはB1の
+          // 負債サマリとB6の最終更新日に見える形で現れる。
+          //
+          // **追記が「残債の変わった日」だけかはここでは見られない**(直前の記録と比べる
+          // 必要があり、キーの前後関係を辿れない)。そちらは画面側の担保のまま。
           && request.resource.data.balanceHistory
             .diff(resource.data.balanceHistory).removedKeys().size() == 0
           && request.resource.data.balanceHistory
-            .diff(resource.data.balanceHistory).changedKeys().size() == 0;
+            .diff(resource.data.balanceHistory).changedKeys()
+            .hasOnly([request.resource.data.updatedAt]);
         allow delete: if canAccessOwnData(userId);
       }
 
