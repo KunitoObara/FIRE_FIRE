@@ -4,6 +4,7 @@ import { FIRESTORE_BATCH_LIMIT } from "@/constants/csv-import";
 import { TRANSACTION_SCAN_LIMIT } from "@/constants/transactions";
 import {
   buildTransactionImportPlan,
+  fetchMonthlyTransactions,
   fetchTransactions,
   importTransactions,
 } from "@/lib/csv-import/transaction-repository";
@@ -394,6 +395,42 @@ describe("fetchTransactions", () => {
     const result = await fetchTransactions("1m", NOW);
 
     expect(result).toEqual({ ok: false, reason: "signed-out" });
+    expect(getDocs).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchMonthlyTransactions", () => {
+  /** B1の収支サマリは当月だけを読む(docs/transaction-import-requirements.md 8章) */
+  it("当月の1日から月末までを範囲にして読む", async () => {
+    await fetchMonthlyTransactions(new Date("2026-08-05T12:00:00+09:00"));
+
+    expect(getDocs).toHaveBeenCalledWith({
+      ref: { path: "users/uid-1/transactions" },
+      constraints: [
+        { field: "date", operator: ">=", value: "2026-08-01" },
+        { field: "date", operator: "<=", value: "2026-08-31" },
+        { orderBy: "date", direction: "desc" },
+        { limit: TRANSACTION_SCAN_LIMIT + 1 },
+      ],
+    });
+  });
+
+  it("B3の一覧と同じ形で取引を返す", async () => {
+    getDocs.mockResolvedValue({ docs: [buildDocument("aaaa1111")] });
+
+    const result = await fetchMonthlyTransactions(NOW);
+
+    expect(result).toMatchObject({
+      ok: true,
+      truncated: false,
+      transactions: [expect.objectContaining({ id: "aaaa1111", amount: -3200 })],
+    });
+  });
+
+  it("未ログインなら読みに行かない", async () => {
+    resolveFirestoreUserContext.mockReturnValue({ ok: false, reason: "signed-out" });
+
+    expect(await fetchMonthlyTransactions(NOW)).toEqual({ ok: false, reason: "signed-out" });
     expect(getDocs).not.toHaveBeenCalled();
   });
 });

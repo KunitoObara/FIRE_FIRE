@@ -1,4 +1,4 @@
-import { format, startOfDay, startOfYear, subMonths } from "date-fns";
+import { endOfMonth, format, startOfDay, startOfMonth, startOfYear, subMonths } from "date-fns";
 
 import { STORED_DATE_FORMAT } from "@/constants/csv-import";
 
@@ -36,3 +36,16 @@ export const resolveTransactionDateRange = (
         from: format(resolvePeriodStart(periodId, now), STORED_DATE_FORMAT),
         to: format(now, STORED_DATE_FORMAT),
       };
+
+/**
+ * 当月の範囲を出す(docs/transaction-import-requirements.md 8章
+ * 「B1の収支サマリは当月だけを読む」)。
+ *
+ * **月末まで含める。** 当月の収支を出すカードなので、今日より後の日付が付いた取引もその月の
+ * ものとして数える。B3の「直近1ヶ月」等が今日で閉じるのは「直近」が今を終点とする言葉だから
+ * で、こちらは月そのものを指している。
+ */
+export const resolveTransactionMonthRange = (now: Date): TransactionDateRange => ({
+  from: format(startOfMonth(now), STORED_DATE_FORMAT),
+  to: format(endOfMonth(now), STORED_DATE_FORMAT),
+});

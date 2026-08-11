@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveTransactionDateRange } from "@/lib/transactions/period";
+import {
+  resolveTransactionDateRange,
+  resolveTransactionMonthRange,
+} from "@/lib/transactions/period";
 
 const NOW = new Date("2026-07-31T00:00:00.000Z");
 
@@ -24,5 +27,31 @@ describe("resolveTransactionDateRange", () => {
    */
   it("ちょうどNヶ月前の日付を境界に含める", () => {
     expect(resolveTransactionDateRange("1m", NOW).from).toBe("2026-06-30");
+  });
+});
+
+describe("resolveTransactionMonthRange", () => {
+  it("当月の1日から月末までを範囲にする", () => {
+    expect(resolveTransactionMonthRange(new Date("2026-08-05T12:00:00+09:00"))).toEqual({
+      from: "2026-08-01",
+      to: "2026-08-31",
+    });
+  });
+
+  /**
+   * B1の収支サマリは「当月の収支」を出すカードなので、今日より後の日付が付いた取引も
+   * その月のものとして数える(B3の「直近1ヶ月」が今日で閉じるのとは扱いが違う)
+   */
+  it("今日ではなく月末までを含める", () => {
+    expect(resolveTransactionMonthRange(new Date("2026-02-10T12:00:00+09:00")).to).toBe(
+      "2026-02-28",
+    );
+  });
+
+  it("月末の日数が月ごとに違っても取り違えない", () => {
+    expect(resolveTransactionMonthRange(new Date("2026-09-30T12:00:00+09:00"))).toEqual({
+      from: "2026-09-01",
+      to: "2026-09-30",
+    });
   });
 });

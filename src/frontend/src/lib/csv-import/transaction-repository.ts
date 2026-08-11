@@ -14,7 +14,10 @@ import { FIRESTORE_BATCH_LIMIT } from "@/constants/csv-import";
 import { TRANSACTION_SCAN_LIMIT } from "@/constants/transactions";
 import { chunk } from "@/lib/csv-import/batch";
 import { resolveFirestoreUserContext, toFirestoreFailureReason } from "@/lib/firebase/user-context";
-import { resolveTransactionDateRange } from "@/lib/transactions/period";
+import {
+  resolveTransactionDateRange,
+  resolveTransactionMonthRange,
+} from "@/lib/transactions/period";
 import { transactionDocumentSchema } from "@/schemas/transactions";
 
 import type { Firestore, QueryConstraint } from "firebase/firestore";
@@ -53,9 +56,12 @@ const csvImportsRef = (firestore: Firestore, uid: string) =>
   collection(firestore, USERS_COLLECTION, uid, CSV_IMPORTS_COLLECTION);
 
 /**
- * B3が表示する取引を取得する(docs/transaction-import-requirements.md 8章)。
+ * 日付の範囲で取引を読む(docs/transaction-import-requirements.md 8章)。
  *
- * **読むのは選択中の期間の分だけ。** 費目・口座・キーワードの絞り込みと並び替えは、読み込んだ
+ * B3の一覧(選択中の期間)とB1の収支サマリ(当月)で共有する。読む範囲の決め方だけが違い、
+ * クエリの組み立て・打ち切りの判定・ドキュメントの検証は同じにしたいため。
+ *
+ * **読むのは渡された範囲の分だけ。** 費目・口座・キーワードの絞り込みと並び替えは、読み込んだ
  * 範囲に対してクライアント側で行う(`lib/transactions/query.ts`)。Firestoreの複合条件に
  * 載せると組み合わせごとに複合インデックスが要り、キーワードの部分一致は元々表現できない。
  * 範囲は`date`の単一フィールドなので複合インデックスは要らない。
@@ -67,18 +73,16 @@ const csvImportsRef = (firestore: Firestore, uid: string) =>
  * 信じられなくなる。取引は際限なく増えるデータなので、ちょうど一致する状況は他のコレクション
  * より起こりやすい。
  *
- * **判定は選択中の期間で分岐しない。** 実際に上限へ達しやすいのは「全期間」だが、取引が
- * 増えれば短い期間でも起こる。`periodId === 'all'`で分岐すると、その日が来たときに黙って
- * 古い側が欠ける。
+ * **判定は範囲の広さで分岐しない。** 実際に上限へ達しやすいのは「全期間」だが、取引が
+ * 増えれば短い期間でも起こる。範囲で分岐すると、その日が来たときに黙って古い側が欠ける。
  *
  * 日付の新しい順に読むので、打ち切りで落ちるのは古い側だけになる。
  *
  * 形が違うドキュメントはその1件だけを飛ばす。1件の不整合で一覧全体を空にする方が情報が減る
  * (`fetchAssetSnapshots`と同じ扱い)。
  */
-export const fetchTransactions = async (
-  periodId: TransactionPeriodId,
-  now: Date,
+const fetchTransactionsInRange = async (
+  range: TransactionDateRange,
 ): Promise<TransactionsFetchResult> => {
   const context = resolveFirestoreUserContext();
 
@@ -86,7 +90,6 @@ export const fetchTransactions = async (
     return context;
   }
 
-  const range = resolveTransactionDateRange(periodId, now);
   // 「全期間」は境界を持たない。`null`のまま`where`に渡すと日付として比較されてしまうので、
   // 条件そのものを付けない
   const rangeConstraints: QueryConstraint[] = [
@@ -139,6 +142,30 @@ export const fetchTransactions = async (
     return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };
+
+/** B3が表示する取引を、選択中の期間だけ取得する(8章) */
+export const fetchTransactions = async (
+  periodId: TransactionPeriodId,
+  now: Date,
+): Promise<TransactionsFetchResult> =>
+  fetchTransactionsInRange(resolveTransactionDateRange(periodId, now));
+
+/**
+ * B1の収支サマリが集計する当月の取引を取得する(8章「B1の収支サマリは当月だけを読む」)。
+ *
+ * B3の期間IDを流用せず専用の入口にしてあるのは、`TransactionPeriodId`に「当月」を足すと
+ * B3の期間セレクタにもその選択肢が並んでしまうため。B1が当月固定なのは表示するものが
+ * 当月の収入・支出・費目別支出だからで、B3の期間絞り込みとは別の都合になる。
+ *
+ * **月末まで読む。** 当月の収支なので、今日より後の日付が付いた取引もその月のものとして
+ * 数える(B3の「直近1ヶ月」等が今日で閉じるのとは扱いが違う)。
+ *
+ * 打ち切り(`truncated`)は呼び出し側で使っていない。月に数百件のペースで積み上がるデータに
+ * 対して上限は9,999件で、1ヶ月で超えるには2桁足りない。超えた場合は古い側が落ちて収支が
+ * 過少に出るが、その状況では収支サマリより先に取込側が破綻している。
+ */
+export const fetchMonthlyTransactions = async (now: Date): Promise<TransactionsFetchResult> =>
+  fetchTransactionsInRange(resolveTransactionMonthRange(now));
 
 /**
  * 取り込もうとしている取引のうち、既にFirestoreにあるものを数える

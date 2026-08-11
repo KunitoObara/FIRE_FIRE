@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAxisBreakdown,
   buildAxisNetWorthSeries,
+  buildCashflowSummary,
   collectAssetCategories,
   resolveAxisDebts,
   resolveAxisNetAmount,
@@ -271,5 +272,123 @@ describe("resolveAxisNetAmount", () => {
     expect(
       resolveAxisNetAmount({ netWorthSeries: [], breakdown: [], debtTotal: 3_000_000 }),
     ).toBeNull();
+  });
+});
+
+/** 収支サマリの検証用。当月(2026-08)の取引を作る */
+const NOW = new Date("2026-08-05T12:00:00+09:00");
+
+const buildTransaction = (transaction: Partial<Transaction> & { id: string }): Transaction => ({
+  date: "2026-08-05",
+  content: "スーパー〇〇",
+  amount: -3_280,
+  account: "〇〇カード",
+  categoryMajor: "食費",
+  categoryMinor: "食料品",
+  memo: "",
+  isTransfer: false,
+  isCalculationTarget: true,
+  ...transaction,
+});
+
+describe("buildCashflowSummary", () => {
+  it("収入と支出を分けて集計し、対象月を`yyyy-MM`で返す", () => {
+    const summary = buildCashflowSummary(
+      [
+        buildTransaction({ id: "a", amount: 420_000, categoryMajor: "収入" }),
+        buildTransaction({ id: "b", amount: -98_000, categoryMajor: "住居費" }),
+      ],
+      NOW,
+    );
+
+    expect(summary).toMatchObject({ month: "2026-08", income: 420_000, expense: 98_000 });
+  });
+
+  /**
+   * 支出を負のまま返すと、`CashflowSummaryCard`が収支を`income - expense`で出す作りのため
+   * `income + |支出|`になり、赤字が黒字として出る(同書5章「集計した値の符号」)
+   */
+  it("支出は絶対値で持つ(0以上)", () => {
+    const summary = buildCashflowSummary([buildTransaction({ id: "a", amount: -84_200 })], NOW);
+
+    expect(summary?.expense).toBe(84_200);
+    expect(summary?.expenseByCategory[0]?.amount).toBe(84_200);
+  });
+
+  /** 自口座間の移動を数えると、収支が0のまま収入と支出だけが膨らむ(同書5章) */
+  it("振替は収入にも支出にも数えない", () => {
+    const summary = buildCashflowSummary(
+      [
+        buildTransaction({ id: "a", amount: 1_000_000, isTransfer: true, categoryMajor: "振替" }),
+        buildTransaction({ id: "b", amount: -1_000_000, isTransfer: true, categoryMajor: "振替" }),
+        buildTransaction({ id: "c", amount: -3_280 }),
+      ],
+      NOW,
+    );
+
+    expect(summary).toMatchObject({ income: 0, expense: 3_280 });
+    expect(summary?.expenseByCategory).toEqual([{ name: "食費", amount: 3_280 }]);
+  });
+
+  /** マネーフォワード側でユーザーが下した判断を、アプリ側で読み替えない(同書5章) */
+  it("計算対象外の取引も数えない", () => {
+    const summary = buildCashflowSummary(
+      [
+        buildTransaction({ id: "a", amount: -50_000, isCalculationTarget: false }),
+        buildTransaction({ id: "b", amount: -3_280 }),
+      ],
+      NOW,
+    );
+
+    expect(summary?.expense).toBe(3_280);
+  });
+
+  /** 中項目まで割るとカードに収まらない(同書6章) */
+  it("費目別支出は大項目でまとめ、金額の多い順に並べる", () => {
+    const summary = buildCashflowSummary(
+      [
+        buildTransaction({
+          id: "a",
+          amount: -3_280,
+          categoryMajor: "食費",
+          categoryMinor: "食料品",
+        }),
+        buildTransaction({ id: "b", amount: -2_720, categoryMajor: "食費", categoryMinor: "外食" }),
+        buildTransaction({ id: "c", amount: -98_000, categoryMajor: "住居費" }),
+      ],
+      NOW,
+    );
+
+    expect(summary?.expenseByCategory).toEqual([
+      { name: "住居費", amount: 98_000 },
+      { name: "食費", amount: 6_000 },
+    ]);
+  });
+
+  it("収入は費目別支出に混ぜない", () => {
+    const summary = buildCashflowSummary(
+      [buildTransaction({ id: "a", amount: 420_000, categoryMajor: "収入" })],
+      NOW,
+    );
+
+    expect(summary?.expenseByCategory).toEqual([]);
+  });
+
+  /** 月初は正常にこの状態になるので、エラーとしては扱わない */
+  it("取引が1件も無ければnullを返す(空状態のまま)", () => {
+    expect(buildCashflowSummary([], NOW)).toBeNull();
+  });
+
+  /**
+   * 空状態は「まだ取り込んでいない」と読める案内を出す。振替しかない月にそれを見せると、
+   * 取り込んである取引を「無い」と伝えることになる
+   */
+  it("取引はあるが全て集計対象外なら、nullではなく0円で返す", () => {
+    const summary = buildCashflowSummary(
+      [buildTransaction({ id: "a", amount: -1_000_000, isTransfer: true })],
+      NOW,
+    );
+
+    expect(summary).toMatchObject({ income: 0, expense: 0, expenseByCategory: [] });
   });
 });
