@@ -113,6 +113,33 @@ service cloud.firestore {
         && debt.balanceHistory.size() <= 600;
     }
 
+    // 残債の履歴を**過去へ遡って書き換えさせない**ための条件(要件8.1)。書き換えを許すと
+    // 資産推移グラフが過去の時点で別の値を描くようになる。`diff()`はマップ同士の差分を
+    // 返すので、要素を1件ずつ辿らずに書ける。
+    //
+    // 消すのは一切許さない。**触ってよいのは`editableDate`(その保存が最終更新日として
+    // 刻む日)の記録だけ**で、それ以外の日は追加も書き換えもできない。`affectedKeys()`は
+    // 追加・削除・変更のすべてを含むため、これ1つで**実在しなかった過去の日付を捏造して
+    // 差し込む経路**も塞がる。`changedKeys()`は更新前後の両方にあるキーしか含まないので、
+    // そちらだけを見ていると新しいキーの追加が素通りする([B4-6]のレビューで塞いだ穴)。
+    //
+    // 触ってよい日を「最終更新日」に限る理由は、B11が同じ日に2回保存するとその日の記録を
+    // 上書きする作りだから(`buildNextBalanceHistory`。CSV取込が同じ日付を上書きするのと
+    // 同じ冪等な扱い)。一律に禁じると**同じ日に残債を直しての保存し直しが落ちる**。
+    //
+    // 触れるのが最終更新日の記録だけなら、動かせるのは「今まさに保存している日」になる。
+    // 過去の日を動かすには最終更新日もその日に戻す必要があり、それはB11のフォームと
+    // B1の負債サマリに見える形で現れる。
+    //
+    // **追記が「残債の変わった日」だけかはここでは見られない**(直前の記録と比べる必要が
+    // あり、キーの前後関係を辿れない)。そちらは画面側の担保のまま(要件8.1)。
+    //
+    // ルールに変数束縛が無いため`diff()`は2回書く。関数へ切り出しても評価回数は変わらない
+    function isAppendOnlyBalanceHistory(next, current, editableDate) {
+      return next.diff(current).removedKeys().size() == 0
+        && next.diff(current).affectedKeys().hasOnly([editableDate]);
+    }
+
     // FIRE目標の金額(目標資産額・想定年間支出額)。上限は
     // src/frontend/src/constants/fire-goal.ts の FIRE_GOAL_AMOUNT_MAX と揃える。
     // 使っていない方式の欄はnullで保存されるため、nullも許す。
@@ -382,8 +409,9 @@ service cloud.firestore {
       // (`DEBT_MAX_COUNT`。ルールはコレクションの件数を数えられない)、`updatedAt`が保存した日
       // そのものであること(形だけ検査している)、`balanceHistory`の扱い(下記)。
       //
-      // `balanceHistory`は2つに分かれる。**過去の記録を書き換えない・消さないことは
-      // [B4-6]で`update`側に入れた**(下記。`diff()`の`removedKeys()`と`changedKeys()`を見る)。
+      // `balanceHistory`は2つに分かれる。**過去の記録を書き換えない・消さない・過去の日付を
+      // 後から差し込まないことは[B4-6]で`update`側に入れた**(`isAppendOnlyBalanceHistory()`。
+      // `diff()`の`removedKeys()`が0件、`affectedKeys()`が最終更新日の記録だけ)。
       // **追記するのが残債の変わった日だけであることは書けない** — 追記されたキーの値を
       // 直前の記録と比べる必要があり、キーの前後関係を辿れないため、そちらは画面側の担保のまま。
       match /debts/{debtId} {
@@ -397,30 +425,14 @@ service cloud.firestore {
         allow update: if canAccessOwnData(userId)
           && isValidDebt(request.resource.data)
           && request.resource.data.createdAt == resource.data.createdAt
-          // 残債の履歴は**過去へ遡って書き換えさせない**。資産推移グラフが過去の時点で
-          // 別の値を描くようになるため。`diff()`はマップ同士の差分を返すので、要素を
-          // 1件ずつ辿らずに書ける。
-          //
-          // 消すのは一切許さない。**触ってよいのはその保存が最終更新日として刻む日の記録だけ**で、
-          // それ以外の日は追加も書き換えもできない。`affectedKeys()`は追加・削除・変更の
-          // すべてを含むので、`changedKeys()`だけを見て**新しいキーの追加(`addedKeys()`)を
-          // 素通りさせない**。実在しなかった過去の日付を捏造して差し込む経路がそこにある。
-          //
-          // 「その日だけ」に限る理由は、B11が同じ日に2回保存するとその日の記録を上書きする
-          // 作りだから(`buildNextBalanceHistory`。CSV取込が同じ日付を上書きするのと同じ
-          // 冪等な扱い)。一律に禁じると**同じ日に残債を直しての保存し直しが落ちる**。
-          //
-          // 触れるのが`updatedAt`の日だけなら、動かせるのは「今まさに保存している日」になる。
-          // 過去の日を動かすには最終更新日もその日に戻す必要があり、それはB1の負債サマリと
-          // B6の最終更新日に見える形で現れる。
-          //
-          // **追記が「残債の変わった日」だけかはここでは見られない**(直前の記録と比べる
-          // 必要があり、キーの前後関係を辿れない)。そちらは画面側の担保のまま。
-          && request.resource.data.balanceHistory
-            .diff(resource.data.balanceHistory).removedKeys().size() == 0
-          && request.resource.data.balanceHistory
-            .diff(resource.data.balanceHistory).affectedKeys()
-            .hasOnly([request.resource.data.updatedAt]);
+          // 残債の履歴は消させず、触れるのを**その保存が最終更新日として刻む日の記録だけ**に
+          // 限る。過去へ遡っての書き換えも、過去の日付の捏造も塞がる(条件と理由は
+          // `isAppendOnlyBalanceHistory()`の定義に書いてある)
+          && isAppendOnlyBalanceHistory(
+            request.resource.data.balanceHistory,
+            resource.data.balanceHistory,
+            request.resource.data.updatedAt
+          );
         allow delete: if canAccessOwnData(userId);
       }
 
