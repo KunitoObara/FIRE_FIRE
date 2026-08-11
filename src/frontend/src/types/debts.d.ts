@@ -17,6 +17,18 @@ declare global {
     /** 残債(円)。0以上の整数。完済した負債を0円のまま残せるようにするため0を許す */
     balance: number;
     /**
+     * 発生年月(`yyyy-MM`)。借入を開始した月で、任意入力。未登録は`null`。
+     *
+     * 資産推移グラフがこの負債を反映し始める起点になる
+     * (docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。残債の履歴は
+     * B11で保存したときにしか積まれないため、これが無いと段差が「借りた月」ではなく
+     * 「アプリに登録した月」に出る。
+     *
+     * **未登録の負債はこれまでどおり最初の記録から反映する。** 既に登録済みの負債に値が
+     * 無いため必須にしない(必須にすると開いただけでエラーになり、他の項目も直せなくなる)。
+     */
+    originatedOn: string | null;
+    /**
      * 金利(年利%)。任意入力で、未登録は`null`。
      *
      * 0%(無利子)と未登録を区別するため`0`に倒さない。B1の負債サマリでも未登録の欄は
@@ -67,6 +79,7 @@ declare global {
     id: string | null;
     name: string;
     balance: number;
+    originatedOn: string | null;
     interestRate: number | null;
     repaymentMonths: number | null;
   };

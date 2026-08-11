@@ -67,6 +67,24 @@ export const DEBT_BALANCE_HISTORY_MAX = 600;
 /** 数値欄で受け付ける形式。カンマ区切り・全角数字は受け付けない(B7の金額欄と同じ扱い) */
 export const DEBT_INTEGER_PATTERN = /^[0-9]+$/u;
 
+/**
+ * 発生年月の形式(`yyyy-MM`)。`firestore.rules`の`debts`と一致させる。
+ *
+ * 日まで持たないのは、資産推移グラフが月次の点で描かれるため
+ * (docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。日を入れても描画は
+ * 変わらず、何年も前の借入の「日」を思い出させることになる。
+ */
+export const DEBT_ORIGINATED_ON_PATTERN = /^\d{4}-\d{2}$/u;
+
+/** 発生年月の日付フォーマット(`date-fns`)。上のパターンと同じ形を指す */
+export const DEBT_ORIGINATED_ON_FORMAT = "yyyy-MM";
+
+/**
+ * 発生年月の下限。桁を打ち間違えた年(`0202-04`)を止めるための歯止めで、
+ * 実在しうる借入年は締め出さない値に置く(同要件B11「バリデーション」)。
+ */
+export const DEBT_ORIGINATED_ON_MIN = "1900-01";
+
 /** 金利は小数を許すため整数の形とは別に持つ(`0.375`のような値を通す) */
 export const DEBT_DECIMAL_PATTERN = /^[0-9]+(\.[0-9]+)?$/u;
 
@@ -90,8 +108,18 @@ export const DEBT_SAVE_NOTICE =
 /** 各欄の見出し */
 export const DEBT_NAME_LABEL = "項目名";
 export const DEBT_BALANCE_LABEL = "残債(円)";
+export const DEBT_ORIGINATED_ON_LABEL = "発生年月";
 export const DEBT_INTEREST_RATE_LABEL = "金利(年利%)";
 export const DEBT_REPAYMENT_PERIOD_LABEL = "残りの返済期間";
+
+/**
+ * 発生年月の欄に添える説明。
+ *
+ * 入れても負債サマリ・円グラフ・FIRE達成度ゲージの数字は変わらない(いずれも「いま」の額)
+ * ため、何のための欄かが画面から読めないと入力されないまま残る
+ * (docs/screen-requirements-dashboard.md B11「入力項目の補足」)。
+ */
+export const DEBT_ORIGINATED_ON_HINT = "入力すると、資産推移グラフがこの月から負債を差し引きます。";
 
 /** 任意入力の欄に添える補助ラベル(金利・残りの返済期間) */
 export const DEBT_OPTIONAL_SUFFIX = "任意";
@@ -137,6 +165,15 @@ export const DEBT_REPAYMENT_YEARS_RANGE_MESSAGE = `年は0〜${DEBT_REPAYMENT_YE
 
 /** 返済期間「ヶ月」が範囲外のときのエラー */
 export const DEBT_REPAYMENT_MONTHS_RANGE_MESSAGE = `ヶ月は0〜${DEBT_REPAYMENT_MONTHS_MAX}の整数で入力してください。`;
+
+/** 発生年月が`yyyy-MM`として読めないときのエラー */
+export const DEBT_ORIGINATED_ON_FORMAT_MESSAGE = `${DEBT_ORIGINATED_ON_LABEL}は年月で入力してください。`;
+
+/** 発生年月が当月より後のときのエラー。まだ借りていない負債を過去のグラフに反映させない */
+export const DEBT_ORIGINATED_ON_FUTURE_MESSAGE = `${DEBT_ORIGINATED_ON_LABEL}に未来の年月は入力できません。`;
+
+/** 発生年月が下限より前のときのエラー */
+export const DEBT_ORIGINATED_ON_TOO_OLD_MESSAGE = `${DEBT_ORIGINATED_ON_LABEL}は${DEBT_ORIGINATED_ON_MIN.replace("-", "年")}月以降で入力してください。`;
 
 /** 登録件数の上限に達したときの案内。「負債を追加」を押せなくする理由を示す */
 export const DEBT_MAX_COUNT_REACHED_MESSAGE = `登録できる負債は${DEBT_MAX_COUNT}件までです。`;

@@ -23,6 +23,8 @@ import {
   DEBT_NAME_LABEL,
   DEBT_NOT_SAVED_LABEL,
   DEBT_OPTIONAL_SUFFIX,
+  DEBT_ORIGINATED_ON_HINT,
+  DEBT_ORIGINATED_ON_LABEL,
   DEBT_REAL_ESTATE_LOAN_NOTICE,
   DEBT_REMOVE_ROW_LABEL,
   DEBT_REPAYMENT_PERIOD_LABEL,
@@ -221,6 +223,44 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {/*
+                      発生年月。資産推移グラフがこの月から負債を差し引き始める
+                      (docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。
+                      残債の履歴はB11で保存したときにしか積まれないので、これが無いと
+                      段差が「借りた月」ではなく「アプリに登録した月」に出る。
+                      金額欄と違い`type="month"`にするのは、`yyyy-MM`の形をブラウザに
+                      揃えさせるため(手入力の表記ゆれをこちらで正規化せずに済む)
+                    */}
+                    <Field>
+                      <FieldLabel htmlFor={`debt-originated-on-${field.rowKey}`}>
+                        {DEBT_ORIGINATED_ON_LABEL}
+                        <span className="font-normal text-muted-foreground">
+                          ・{DEBT_OPTIONAL_SUFFIX}
+                        </span>
+                      </FieldLabel>
+                      <Input
+                        id={`debt-originated-on-${field.rowKey}`}
+                        type="month"
+                        autoComplete="off"
+                        className="tabular-nums"
+                        disabled={saving}
+                        aria-invalid={errors.debts?.[index]?.originatedOn !== undefined}
+                        aria-describedby={`debt-originated-on-hint-${field.rowKey}`}
+                        {...register(`debts.${index}.originatedOn`)}
+                      />
+                      <FieldError errors={[errors.debts?.[index]?.originatedOn]} />
+                      {/*
+                        入れても負債サマリ・円グラフ・ゲージの数字は変わらないので、
+                        何のための欄かを添えないと入力されないまま残る(同要件B11)
+                      */}
+                      <p
+                        id={`debt-originated-on-hint-${field.rowKey}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        {DEBT_ORIGINATED_ON_HINT}
+                      </p>
+                    </Field>
+
                     <Field>
                       <FieldLabel htmlFor={`debt-rate-${field.rowKey}`}>
                         {DEBT_INTEREST_RATE_LABEL}

@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
 import { z } from "zod";
 
@@ -14,6 +15,12 @@ import {
   DEBT_NAME_REQUIRED_MESSAGE,
   DEBT_NAME_TOO_LONG_MESSAGE,
   DEBT_NUMBER_FORMAT_MESSAGE,
+  DEBT_ORIGINATED_ON_FORMAT,
+  DEBT_ORIGINATED_ON_FORMAT_MESSAGE,
+  DEBT_ORIGINATED_ON_FUTURE_MESSAGE,
+  DEBT_ORIGINATED_ON_MIN,
+  DEBT_ORIGINATED_ON_PATTERN,
+  DEBT_ORIGINATED_ON_TOO_OLD_MESSAGE,
   DEBT_REPAYMENT_MONTHS_MAX,
   DEBT_REPAYMENT_MONTHS_RANGE_MESSAGE,
   DEBT_REPAYMENT_YEARS_MAX,
@@ -67,11 +74,44 @@ const debtRowSchema = z.object({
   id: z.string().nullable(),
   name: z.string().trim(),
   balance: z.string().trim(),
+  originatedOn: z.string().trim(),
   interestRate: z.string().trim(),
   repaymentYears: z.string().trim(),
   repaymentMonths: z.string().trim(),
   updatedAt: z.string().nullable(),
 });
+
+/**
+ * 発生年月1件分の検証。エラーが無ければ`null`を返す。
+ *
+ * 空文字は「未登録」であってエラーではない(任意入力)。入力されている場合だけ、
+ * 形式・下限・**当月より後でないこと**を見る
+ * (docs/screen-requirements-dashboard.md B11「バリデーション」)。
+ *
+ * **残債の履歴との前後関係はここで見ない。** 履歴はユーザーに見えないところで積まれる
+ * 記録なので、「最初の記録より後の発生年月」を入力エラーとして突き返すと、原因が画面から
+ * 分からないまま保存できなくなる。その場合の集計上の扱いはB1側が決めている
+ * (発生年月を優先し、それより前の記録を無視する)。
+ *
+ * 当月の判定に端末の日付を使うのは`updatedAt`と同じ理由で、`firestore.rules`側は
+ * `request.time`がUTCのため月をまたぐ前後で正常な入力を弾きうる。ルールは形だけを見る。
+ */
+export const validateOriginatedOn = (value: string, now: Date): string | null => {
+  if (value.length === 0) {
+    return null;
+  }
+
+  if (!DEBT_ORIGINATED_ON_PATTERN.test(value)) {
+    return DEBT_ORIGINATED_ON_FORMAT_MESSAGE;
+  }
+
+  if (value < DEBT_ORIGINATED_ON_MIN) {
+    return DEBT_ORIGINATED_ON_TOO_OLD_MESSAGE;
+  }
+
+  // 形が`yyyy-MM`に揃っているので、文字列のままの比較で辞書順=時系列になる
+  return value > format(now, DEBT_ORIGINATED_ON_FORMAT) ? DEBT_ORIGINATED_ON_FUTURE_MESSAGE : null;
+};
 
 /**
  * B11 負債入力フォーム全体の入力値。
@@ -108,6 +148,17 @@ export const debtFormSchema = z.object({
             code: "custom",
             message: DEBT_BALANCE_TOO_LARGE_MESSAGE,
             path: ["balance"],
+          });
+        }
+
+        // 当月の判定は検証のたびに端末の時計から採る(`validateOriginatedOn`の説明のとおり)
+        const originatedOnMessage = validateOriginatedOn(row.originatedOn, new Date());
+
+        if (originatedOnMessage !== null) {
+          ctx.addIssue({
+            code: "custom",
+            message: originatedOnMessage,
+            path: ["originatedOn"],
           });
         }
 
@@ -166,6 +217,12 @@ export const debtFormSchema = z.object({
 export const debtDocumentSchema = z.object({
   name: z.string(),
   balance: z.number(),
+  /*
+    発生年月は[B11-7]で足したキーなので、それ以前に保存された負債のドキュメントには無い。
+    欠損を未登録(`null`)として読み、保存し直すまで他の項目ごと解釈できなくなることを避ける
+    (`categoryAxes.debtIds`に`.default([])`を入れたのと同じ扱い)
+  */
+  originatedOn: z.string().regex(DEBT_ORIGINATED_ON_PATTERN).nullable().default(null),
   interestRate: z.number().nullable(),
   repaymentMonths: z.number().nullable(),
   updatedAt: z.string().regex(HISTORY_DATE_PATTERN),

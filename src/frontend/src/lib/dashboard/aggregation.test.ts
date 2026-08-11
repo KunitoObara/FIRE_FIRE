@@ -166,6 +166,8 @@ const mortgage: Debt = {
   id: "debt-mortgage",
   name: "住宅ローン",
   balance: 3_000_000,
+  // 発生年月は未入力。この場合の起点は最も古い記録(2026-07-31)になる
+  originatedOn: null,
   interestRate: 0.475,
   repaymentMonths: 280,
   updatedAt: "2026-08-01",
@@ -177,6 +179,7 @@ const carLoan: Debt = {
   id: "debt-car",
   name: "自動車ローン",
   balance: 1_000_000,
+  originatedOn: null,
   interestRate: null,
   repaymentMonths: null,
   updatedAt: "2026-08-01",
@@ -215,6 +218,53 @@ describe("resolveDebtBalanceAt", () => {
 
   it("履歴が空なら差し引かない", () => {
     expect(resolveDebtBalanceAt({ ...mortgage, balanceHistory: {} }, "2026-08-05")).toBe(0);
+  });
+});
+
+/**
+ * 発生年月(B11-7)を入れた負債。残債の履歴はB11で保存したときにしか積まれないので、
+ * これが無いと段差が「借りた月」ではなく「アプリに登録した月」に出る
+ * (docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。
+ */
+describe("resolveDebtBalanceAt(発生年月あり)", () => {
+  /** 2026-04に借り、記録は7月末が最初。4〜7月は記録が無い */
+  const withOrigin: Debt = { ...mortgage, originatedOn: "2026-04" };
+
+  it("発生年月より前は差し引かない", () => {
+    expect(resolveDebtBalanceAt(withOrigin, "2026-03-31")).toBe(0);
+  });
+
+  /**
+   * その期間の実際の残債はアプリが知りえないので、知っている中でいちばん古い値を置く。
+   * 実態より少なく出るが、起点が「登録した月」のままである読み違いのほうが大きい
+   */
+  it("発生年月から最初の記録までは、最も古い記録の残債を遡って当てる", () => {
+    expect(resolveDebtBalanceAt(withOrigin, "2026-04-30")).toBe(4_000_000);
+    expect(resolveDebtBalanceAt(withOrigin, "2026-06-30")).toBe(4_000_000);
+  });
+
+  /** 発生年月と同じ月の点も反映する(`yyyy-MM`と`yyyy-MM-dd`の桁を揃えて比べる) */
+  it("発生年月と同じ月の点から差し引く", () => {
+    expect(resolveDebtBalanceAt(withOrigin, "2026-04-01")).toBe(4_000_000);
+  });
+
+  it("記録がある期間は、これまでどおり当時の残債を採る", () => {
+    expect(resolveDebtBalanceAt(withOrigin, "2026-07-31")).toBe(4_000_000);
+    expect(resolveDebtBalanceAt(withOrigin, "2026-08-05")).toBe(3_000_000);
+  });
+
+  /** B11は入力時にこの前後関係をエラーにしないので、集計側が一意に決まる規則を持つ */
+  it("発生年月が最初の記録より後なら、それより前の記録は無視する", () => {
+    const originAfterRecord: Debt = { ...mortgage, originatedOn: "2026-08" };
+
+    // 7月末の記録(400万)は発生年月より前なので使わない
+    expect(resolveDebtBalanceAt(originAfterRecord, "2026-07-31")).toBe(0);
+    expect(resolveDebtBalanceAt(originAfterRecord, "2026-08-05")).toBe(3_000_000);
+  });
+
+  /** 履歴が1件も無ければ、発生年月を入れても遡って当てる値が無い */
+  it("履歴が空なら発生年月があっても差し引かない", () => {
+    expect(resolveDebtBalanceAt({ ...withOrigin, balanceHistory: {} }, "2026-08-05")).toBe(0);
   });
 });
 
@@ -305,6 +355,21 @@ describe("buildAxisNetWorthSeries(負債を含む分類軸)", () => {
       { date: "2026-07-31", amount: 11_000_000 },
       // 最新点にだけ段差が出る。「そこから負債を管理し始めた」段差が右端に寄った状態
       { date: "2026-08-05", amount: 11_400_000 - 2_500_000 },
+    ]);
+  });
+
+  /**
+   * B11-7 の狙いそのもの。発生年月を入れると、段差が「アプリに登録した月」ではなく
+   * 借りた月に移る(docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。
+   */
+  it("発生年月を入れると、その月以降の点から差し引く", () => {
+    // 2026-06に借りたことにする。記録は7月末が最初なので、6月末は遡って当てる
+    const withOrigin: Debt = { ...mortgage, originatedOn: "2026-06" };
+
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [withOrigin]))).toEqual([
+      { date: "2026-06-30", amount: 10_000_000 - 4_000_000 },
+      { date: "2026-07-31", amount: 11_000_000 - 4_000_000 },
+      { date: "2026-08-05", amount: 11_400_000 - 3_000_000 },
     ]);
   });
 

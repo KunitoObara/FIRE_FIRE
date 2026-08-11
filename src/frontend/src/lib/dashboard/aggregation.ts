@@ -47,31 +47,86 @@ export const resolveAxisDebts = (debts: Debt[], debtIds: string[]): Debt[] => {
 };
 
 /**
+ * その負債が資産推移グラフに現れ始める起点(`yyyy-MM-dd`)。記録も発生年月も無い負債は`null`。
+ *
+ * - B11の**発生年月**が入っていれば、**その月の1日**
+ * - 入っていなければ、**最も古い記録の日**(発生年月を入れる前と同じ振る舞い)
+ *
+ * 発生年月は`yyyy-MM`、履歴のキーと資産残高の集計日は`yyyy-MM-dd`なので、**日付の桁に
+ * 揃えてから比べる**(月へ切り詰める向きに揃えない)。月に揃えると、発生年月を入れていない
+ * 負債で「最初の記録と同じ月の、記録より前の日」まで起点に含まれてしまい、
+ * 記録した日から反映するという既存の約束が崩れる。
+ */
+const resolveDebtOriginDate = (debt: Debt): string | null => {
+  if (debt.originatedOn !== null) {
+    return `${debt.originatedOn}-01`;
+  }
+
+  const recordedDates = Object.keys(debt.balanceHistory);
+
+  return recordedDates.length === 0
+    ? null
+    : recordedDates.reduce((left, right) => (left < right ? left : right));
+};
+
+/**
  * ある時点の残債を、残債の履歴から求める。
  *
  * **その時点以前で最も新しい記録**を採る(docs/screen-requirements-dashboard.md B1)。
  * 残債は手動更新だが、B11が保存のたびにその日の残債を履歴として残すため、過去の点も
  * 当時の残債で引ける。
  *
- * **記録が1件も無い時点(=負債を登録する前の期間)は0を返し、差し引かない。** 残債が
- * 分からない期間に現在の値を当てると、実際には無かった負債を過去に作ることになる。
- * 最初の記録の日に段差が出るが、これは「そこから負債を管理し始めた」という事実の表示。
+ * **起点より前の時点は0を返し、差し引かない。** 残債が分からない期間に現在の値を当てると、
+ * 実際には無かった負債を過去に作ることになる。起点の月に段差が出るが、これは
+ * 「そこから負債を負った」という事実の表示。
+ *
+ * **起点以降で、その時点以前の記録がまだ無い期間は、最も古い記録の残債を遡って当てる**
+ * (同要件「発生年月からの反映」)。発生年月を入れた負債は履歴より前から反映されるため、
+ * この期間が生まれる。実際の残債はアプリが知りえないので、知っている中でいちばん古い値を
+ * 置く — 返済前の残債は今より多いのが普通なので実態より少なく出るが、起点が
+ * 「アプリに登録した月」のままである読み違いのほうが大きい([B11-7](https://trello.com/c/zNKoKCOn))。
+ *
+ * 発生年月が最初の記録より後にある場合は、**発生年月を優先し、それより前の記録は無視する**。
+ * B11が入力時にこの前後関係をエラーにしない以上、集計側が一意に決まる規則を持つ必要がある。
  *
  * 履歴のキーは`yyyy-MM-dd`固定なので、日付の比較は文字列のままで辞書順=時系列になる
  * (`Date`へ直すとタイムゾーンの解釈が入る)。
  */
 export const resolveDebtBalanceAt = (debt: Debt, date: string): number => {
+  const originDate = resolveDebtOriginDate(debt);
+
+  if (originDate === null || date < originDate) {
+    return 0;
+  }
+
   let latestDate: string | null = null;
-  let latestBalance = 0;
+  let latestBalance: number | null = null;
+  let earliestDate: string | null = null;
+  let earliestBalance = 0;
 
   for (const [recordedDate, balance] of Object.entries(debt.balanceHistory)) {
+    // 発生年月より前の記録は、起点より前の期間を差し引かないのと同じ理由で無視する
+    if (recordedDate < originDate) {
+      continue;
+    }
+
     if (recordedDate <= date && (latestDate === null || recordedDate > latestDate)) {
       latestDate = recordedDate;
       latestBalance = balance;
     }
+
+    if (earliestDate === null || recordedDate < earliestDate) {
+      earliestDate = recordedDate;
+      earliestBalance = balance;
+    }
   }
 
-  return latestBalance;
+  /*
+    その時点以前の記録が無ければ、起点から最初の記録までの期間にいる。ここに来るのは
+    発生年月を入れた負債だけで、入れていない負債は起点が最初の記録の日そのものなので、
+    「起点以降で記録がまだ無い」区間が存在しない
+  */
+  return latestBalance ?? earliestBalance;
 };
 
 /** ある時点で分類軸が差し引く残債の合計(**過去の点に使う**。「いま」は`sumDebtBalance`) */

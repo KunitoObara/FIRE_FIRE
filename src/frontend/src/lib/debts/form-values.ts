@@ -12,6 +12,7 @@ export const buildEmptyDebtRow = (): DebtRowFormValues => ({
   id: null,
   name: "",
   balance: "",
+  originatedOn: "",
   interestRate: "",
   repaymentYears: "",
   repaymentMonths: "",
@@ -32,6 +33,8 @@ export const toDebtRowFormValues = (debt: Debt): DebtRowFormValues => ({
   id: debt.id,
   name: debt.name,
   balance: String(debt.balance),
+  // 未登録(`null`)は空文字。`<input type="month">`は空文字で「未入力」を表す
+  originatedOn: debt.originatedOn ?? "",
   interestRate: toInputValue(debt.interestRate),
   repaymentYears:
     debt.repaymentMonths === null ? "" : String(Math.floor(debt.repaymentMonths / MONTHS_PER_YEAR)),
@@ -68,6 +71,8 @@ export const toDebtInput = (row: DebtRowFormValues): DebtInput => ({
   id: row.id,
   name: row.name.trim(),
   balance: Number(row.balance),
+  // 空文字は「未登録」。0や今月に倒すと、入力していない負債の反映の起点が勝手に決まる
+  originatedOn: row.originatedOn.length === 0 ? null : row.originatedOn,
   interestRate: toOptionalNumber(row.interestRate),
   repaymentMonths: toRepaymentMonths(row.repaymentYears, row.repaymentMonths),
 });
