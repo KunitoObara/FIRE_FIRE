@@ -2,43 +2,34 @@ export {};
 
 declare global {
   /**
-   * B3の取引1件(入出金明細CSVの1行に対応)。
+   * B3の取引1件。`users/{uid}/transactions`のドキュメント
+   * (docs/transaction-import-requirements.md 3.1)に、ドキュメントIDを`id`として足したもの。
    *
-   * **保存形へ移行する途中の状態にある。** 下の任意フィールドが
-   * `users/{uid}/transactions`のドキュメント(docs/transaction-import-requirements.md 3.1)で、
-   * `category` / `description`はサンプルデータとB3の絞り込みが参照している旧来の形。
-   *
-   * 新しいフィールドを任意(`?`)にしてあるのは、必須にすると参照側が一度に全部壊れて
-   * PRを分割できなくなるため(docs/development-workflow.md 5章「型の波及を切る手口」)。
-   * **B3をFirestoreへ接続する[B3-1]で必須化し、旧来の2つを落とす。**
+   * サンプルデータ時代の`category` / `description`は、B3をFirestoreへ繋いだ時点で落とした。
+   * 移行のあいだ任意にしてあった保存形のフィールドも、参照側(`query.ts` / `TransactionsTable`)
+   * を追随させると同時に必須へ締めてある(docs/development-workflow.md 5章「型の波及を切る手口」)。
    */
   type Transaction = {
+    /** ドキュメントID。マネーフォワードの`ID`列そのもの(3.2) */
     id: string;
     /** 取引日(yyyy-MM-dd) */
     date: string;
-    /**
-     * 費目。費目マスタは存在せず(B4の資産分類軸とは別物)、CSVの値をそのまま使う想定のため
-     * ここでは単純な文字列として扱う。保存形では`categoryMajor` / `categoryMinor`の2階層になる
-     */
-    category: string;
-    /** 口座名。費目と同じ理由でマスタは持たず文字列として扱う */
-    account: string;
-    /** 収入はプラス、支出はマイナス */
-    amount: number;
-    /** 摘要。保存形では`content` */
-    description: string;
     /** 内容(摘要)。CSVの`内容`列(200文字まで) */
-    content?: string;
+    content: string;
+    /** 収入はプラス、支出はマイナス。CSVの符号をそのまま保つ(5章) */
+    amount: number;
+    /** 口座名。費目と同じくマスタは持たず文字列として扱う */
+    account: string;
     /** 費目の上位。B1の費目別支出はこの粒度で集計する(6章) */
-    categoryMajor?: string;
+    categoryMajor: string;
     /** 費目の下位。未設定は空文字のままにし、セレクタの選択肢にも出さない(6章) */
-    categoryMinor?: string;
+    categoryMinor: string;
     /** マネーフォワード側で付けた自由記述(1,000文字まで) */
-    memo?: string;
+    memo: string;
     /** 自口座間の振替。B3には表示するが収支の集計からは外す(5章) */
-    isTransfer?: boolean;
+    isTransfer: boolean;
     /** マネーフォワード側の`計算対象`。`false`はB3に表示しつつ集計から外す(5章) */
-    isCalculationTarget?: boolean;
+    isCalculationTarget: boolean;
   };
 
   /** B3の期間絞り込みの選択肢(docs/screen-requirements-dashboard.md B3) */
@@ -102,10 +93,41 @@ declare global {
   /** B3が表示するデータ一式 */
   type TransactionsData = {
     transactions: Transaction[];
-    /** 費目セレクタの選択肢。マスタが無いため取引データから動的に抽出したもの */
+    /**
+     * 費目セレクタの選択肢。マスタが無いため取引データから動的に抽出したもの。
+     * 抽出の対象は**読み込んだ期間内の取引だけ**で、選択肢のために全期間を読み直さない
+     */
     categories: string[];
     /** 口座セレクタの選択肢。費目と同じ理由で取引データから動的に抽出したもの */
     accounts: string[];
+  };
+
+  /**
+   * B3の表示データの取得結果。
+   *
+   * `truncated`を`TransactionsData`の中に持たせないのは、これが**読み取りの状態**であって
+   * 表示するデータの一部ではないため。絞り込みの解決(`resolveTransactionFilters`)や
+   * セレクタは`TransactionsData`だけを見ればよい。
+   */
+  type TransactionsDataResult =
+    | {
+        ok: true;
+        data: TransactionsData;
+        /** 読み取りが`TRANSACTION_SCAN_LIMIT`件で打ち切られたか。画面に出す */
+        truncated: boolean;
+      }
+    | { ok: false; reason: FirestoreAccessFailureReason };
+
+  /** B3の画面本体(TransactionsScreen)のProps */
+  type TransactionsScreenProps = {
+    /**
+     * URLのクエリパラメータ一式。Server Component側で解決して渡す。
+     *
+     * 画面本体は取得のためにClient Componentである必要があるが、`useSearchParams`を使うと
+     * Suspense境界が要る(Next.jsのuseSearchParamsドキュメント)。B1が同じ理由で
+     * Server Component側からクエリを渡している
+     */
+    searchParams: Record<string, string | string[] | undefined>;
   };
 
   /** 絞り込み・並び替え・ページングを適用した結果 */

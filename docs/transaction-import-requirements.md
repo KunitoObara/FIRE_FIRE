@@ -226,7 +226,7 @@ CSVの `大項目` と `中項目` を両方保存する。
 | [B2 CSV取込](./screen-requirements-dashboard.md#b2-csv取込画面) | 入出金明細タブのCSV形式(2章)・冪等性(4章)・プレビュー(7章) |
 | [B3 収支明細一覧](./screen-requirements-dashboard.md#b3-収支明細一覧画面) | 表示する行(5章)、絞り込みの軸(6章)、読み取り範囲と打ち切り(8章) |
 
-なお **B3 は現在サンプルデータを表示している**(`src/frontend/src/lib/transactions/transactions-data.ts` の `USE_SAMPLE_TRANSACTIONS_DATA`)。取込の実装と同時にこのフラグと `sample-data.ts` を外し、Firestoreからの取得に差し替える。B1が `fetchDashboardData` で行ったのと同じ手順になる。
+なお **B3 は [B3-1] で Firestore に接続済み**で、サンプルデータ(`USE_SAMPLE_TRANSACTIONS_DATA` と `sample-data.ts`)は撤去した。取得は `src/frontend/src/lib/transactions/transactions-data.ts` の `fetchTransactionsData` が担い、B1が `fetchDashboardData` で行ったのと同じ形になっている。**B1の収支サマリ(5章・6章の集計)はまだ実データを見ておらず、[B1-8] の範囲**である。
 
 ## 10. 今後の検討事項
 

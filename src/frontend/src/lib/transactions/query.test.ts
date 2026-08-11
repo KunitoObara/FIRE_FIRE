@@ -6,8 +6,6 @@ import {
   sortTransactions,
 } from "@/lib/transactions/query";
 
-const NOW = new Date("2026-07-31T00:00:00.000Z");
-
 const baseFilters: TransactionFilters = {
   periodId: "all",
   category: "",
@@ -18,94 +16,122 @@ const baseFilters: TransactionFilters = {
   page: 1,
 };
 
+/** 検証に関係する列だけを指定して1件作る(値はすべて架空) */
+const buildTransaction = (transaction: Partial<Transaction> & { id: string }): Transaction => ({
+  date: "2026-07-20",
+  content: "サンプル",
+  amount: -1_000,
+  account: "楽天カード",
+  categoryMajor: "食費",
+  categoryMinor: "食料品",
+  memo: "",
+  isTransfer: false,
+  isCalculationTarget: true,
+  ...transaction,
+});
+
 const transactions: Transaction[] = [
-  {
+  buildTransaction({
     id: "a",
     date: "2026-07-18",
-    category: "給与",
-    account: "普通預金(三井住友)",
+    categoryMajor: "収入",
+    categoryMinor: "給与",
+    account: "普通預金(〇〇銀行)",
     amount: 420_000,
-    description: "給与振込",
-  },
-  {
+    content: "給与振込",
+  }),
+  buildTransaction({
     id: "b",
     date: "2026-07-19",
-    category: "住居費",
-    account: "普通預金(三井住友)",
+    categoryMajor: "住居費",
+    categoryMinor: "家賃",
+    account: "普通預金(〇〇銀行)",
     amount: -98_000,
-    description: "家賃引き落とし",
-  },
-  {
+    content: "家賃引き落とし",
+  }),
+  buildTransaction({
     id: "c",
     date: "2026-07-20",
-    category: "食費",
-    account: "楽天カード",
+    categoryMajor: "食費",
+    categoryMinor: "食料品",
+    account: "〇〇カード",
     amount: -3_280,
-    description: "イオン",
-  },
-  {
+    content: "スーパー〇〇",
+  }),
+  buildTransaction({
     id: "d",
     date: "2026-07-17",
-    category: "交通費",
-    account: "楽天カード",
+    categoryMajor: "交通費",
+    categoryMinor: "電車",
+    account: "〇〇カード",
     amount: -1_200,
-    description: "JR東日本",
-  },
+    content: "〇〇鉄道",
+  }),
 ];
 
 const idsOf = (result: Transaction[]): string[] => result.map((transaction) => transaction.id);
 
 describe("filterTransactions", () => {
-  it("費目で絞り込む", () => {
-    expect(
-      idsOf(filterTransactions(transactions, { ...baseFilters, category: "食費" }, NOW)),
-    ).toEqual(["c"]);
+  /** 費目は大項目で突き合わせる。中項目での絞り込みは別に足す */
+  it("費目(大項目)で絞り込む", () => {
+    expect(idsOf(filterTransactions(transactions, { ...baseFilters, category: "食費" }))).toEqual([
+      "c",
+    ]);
+  });
+
+  it("中項目が一致しても大項目が違えば残さない", () => {
+    const sameMinor = [
+      buildTransaction({ id: "e", categoryMajor: "娯楽費", categoryMinor: "食費" }),
+    ];
+
+    expect(filterTransactions(sameMinor, { ...baseFilters, category: "食費" })).toEqual([]);
   });
 
   it("口座で絞り込む", () => {
     expect(
-      idsOf(filterTransactions(transactions, { ...baseFilters, account: "楽天カード" }, NOW)),
+      idsOf(filterTransactions(transactions, { ...baseFilters, account: "〇〇カード" })),
     ).toEqual(["c", "d"]);
   });
 
   it("摘要のキーワードで絞り込む(大小文字を区別しない)", () => {
     const withMixedCase: Transaction[] = [
       ...transactions,
-      {
-        id: "e",
-        date: "2026-07-21",
-        category: "食費",
-        account: "楽天カード",
-        amount: -2_000,
-        description: "AEON Mall",
-      },
+      buildTransaction({ id: "e", date: "2026-07-21", content: "AEON Mall" }),
     ];
 
-    expect(
-      idsOf(filterTransactions(withMixedCase, { ...baseFilters, keyword: "aeon" }, NOW)),
-    ).toEqual(["e"]);
+    expect(idsOf(filterTransactions(withMixedCase, { ...baseFilters, keyword: "aeon" }))).toEqual([
+      "e",
+    ]);
   });
 
   it("費目・口座・キーワードは組み合わせて絞り込める(AND条件)", () => {
     expect(
       idsOf(
-        filterTransactions(
-          transactions,
-          { ...baseFilters, account: "楽天カード", keyword: "JR" },
-          NOW,
-        ),
+        filterTransactions(transactions, {
+          ...baseFilters,
+          account: "〇〇カード",
+          keyword: "鉄道",
+        }),
       ),
     ).toEqual(["d"]);
   });
 
-  it("条件が無指定なら期間以外は絞り込まない", () => {
-    expect(idsOf(filterTransactions(transactions, baseFilters, NOW))).toEqual(idsOf(transactions));
+  it("条件が無指定なら絞り込まない", () => {
+    expect(idsOf(filterTransactions(transactions, baseFilters))).toEqual(idsOf(transactions));
+  });
+
+  /**
+   * 期間はFirestoreの範囲クエリで絞り済み。ここで重ねて絞ると同じ条件を2箇所で持つことになり、
+   * 片方だけを直したときに読めているのに表示から落ちる取引が出る
+   */
+  it("期間では絞り込まない(選択中の期間はFirestoreから読む時点で絞られている)", () => {
+    const old = [buildTransaction({ id: "old", date: "2020-01-01" })];
+
+    expect(idsOf(filterTransactions(old, { ...baseFilters, periodId: "1m" }))).toEqual(["old"]);
   });
 
   it("該当が無ければ空になる", () => {
-    expect(filterTransactions(transactions, { ...baseFilters, category: "娯楽費" }, NOW)).toEqual(
-      [],
-    );
+    expect(filterTransactions(transactions, { ...baseFilters, category: "娯楽費" })).toEqual([]);
   });
 });
 

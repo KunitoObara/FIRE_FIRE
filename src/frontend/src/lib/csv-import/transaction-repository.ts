@@ -129,12 +129,6 @@ export const fetchTransactions = async (
             memo: parsed.data.memo,
             isTransfer: parsed.data.isTransfer,
             isCalculationTarget: parsed.data.isCalculationTarget,
-            // `category` / `description`はサンプルデータ時代の旧来のフィールドで、B3の絞り込みと
-            // 一覧がまだこちらを見ている。**画面をFirestoreへ繋ぐ次のスライスで、型ごと落とす**
-            // (docs/development-workflow.md 5章「型の波及を切る手口」)。それまでは同じ値を
-            // 入れておき、参照側を一度に壊さない
-            category: parsed.data.categoryMajor,
-            description: parsed.data.content,
           },
         ];
       });

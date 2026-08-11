@@ -1,19 +1,23 @@
-import { filterTransactionsByPeriod } from "@/lib/transactions/period";
-
 /**
- * 費目・口座・キーワードで取引一覧を絞り込む。期間の絞り込みは`filterTransactionsByPeriod`が
- * 別途担う(呼び出し側で先に適用する)。
+ * 費目・口座・キーワードで取引一覧を絞り込む。
+ *
+ * **期間はここで絞らない。** Firestoreから読む時点で選択中の期間の範囲クエリを掛けており
+ * (`resolveTransactionDateRange`)、ここで重ねて絞ると同じ条件を2箇所で持つことになる。
+ * 片方だけを直したときに、読めているのに表示から落ちる取引が出る
+ * (docs/transaction-import-requirements.md 8章)。
+ *
+ * 費目は**大項目**で突き合わせる。キーワードは内容(摘要)に対する部分一致で、大小文字は
+ * 区別しない。Firestoreの複合条件に載せられない絞り込みなので、読み込んだ範囲に対して
+ * クライアント側で行う。
  */
 export const filterTransactions = (
   transactions: Transaction[],
   filters: TransactionFilters,
-  now: Date,
 ): Transaction[] => {
-  const byPeriod = filterTransactionsByPeriod(transactions, filters.periodId, now);
   const keyword = filters.keyword.toLowerCase();
 
-  return byPeriod.filter((transaction) => {
-    if (filters.category !== "" && transaction.category !== filters.category) {
+  return transactions.filter((transaction) => {
+    if (filters.category !== "" && transaction.categoryMajor !== filters.category) {
       return false;
     }
 
@@ -21,7 +25,7 @@ export const filterTransactions = (
       return false;
     }
 
-    return keyword === "" || transaction.description.toLowerCase().includes(keyword);
+    return keyword === "" || transaction.content.toLowerCase().includes(keyword);
   });
 };
 

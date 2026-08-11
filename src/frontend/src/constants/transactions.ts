@@ -4,21 +4,27 @@ import { FIRESTORE_QUERY_LIMIT_MAX } from "@/constants/firebase";
 import { CSV_IMPORT_PATH } from "@/constants/routes";
 
 /**
- * サンプルデータを表示するかどうか。
+ * 取引一覧を**取得**できなかったときの文言。
  *
- * B3がまだFirestoreの取引データを読んでおらず、画面の見た目を確認できるようサンプルデータを
- * 流し込んでいる。**入出金明細CSVの取込(B2)自体はB2-3で実装済み**で、取り込んだ取引は
- * `users/{uid}/transactions`に入るが、ここを繋ぐのは[B3-1]の範囲になる。繋いだ時点で`false`に
- * して`src/lib/transactions/sample-data.ts`ごと外す。B1が同じ形のフラグで暫定表示していたのを
- * 実データ接続時に外したのと同じ手順になる(カード[B1-2])。
- *
- * `false`にすると一覧が空状態(CSV取込への導線)になる。
+ * 取得の失敗を空状態(未取込)として見せないための文言で、B11の`DEBT_LOAD_FAILURE_MESSAGES`と
+ * 同じ役目を持つ。画面ごとに持つのは、次にすべきことが画面によって変わりうるため。
  */
-export const USE_SAMPLE_TRANSACTIONS_DATA = true;
+export const TRANSACTIONS_LOAD_FAILURE_MESSAGES: Record<FirestoreAccessFailureReason, string> = {
+  "signed-out": "ログイン状態が切れています。ログインし直してから表示してください。",
+  "configuration-error": "Firebaseの設定が読み込めないため表示できません。",
+  "permission-denied": "このデータの参照が許可されていません。ログインし直してください。",
+  unknown: "データを取得できませんでした。時間をおいて再度お試しください。",
+};
 
-/** サンプルデータ表示中であることを画面に明示する文言。実データと取り違えないためのもの */
-export const SAMPLE_TRANSACTIONS_DATA_NOTICE =
-  "表示中の取引はすべてサンプルです。取り込んだ入出金明細の表示は今後のアップデートで対応します。";
+/**
+ * 読み取りが`TRANSACTION_SCAN_LIMIT`件で打ち切られたときの案内
+ * (docs/transaction-import-requirements.md 8章)。
+ *
+ * 黙って古い側が欠けると、一覧に無いことを「取り込んでいない」と読み違える。件数と、
+ * 欠けたのがどちら側か(古い側)と、狭い期間を選べば全部見えることまでを添える。
+ */
+export const buildTransactionsTruncatedNotice = (scanLimit: number): string =>
+  `該当する取引が多いため、新しい方から${scanLimit.toLocaleString("ja-JP")}件だけを表示しています。これより古い取引は表示されていません。期間を狭めて絞り込んでください。`;
 
 /**
  * B3が表示する取引データのキャッシュキー(TanStack Query)。
@@ -27,10 +33,8 @@ export const SAMPLE_TRANSACTIONS_DATA_NOTICE =
  * 戻ったときに古い内容を見せないため(docs/screen-requirements-dashboard.md B2
  * 「入出金明細タブ」。資産残高推移タブが`DASHBOARD_DATA_QUERY_KEY`を落としているのと同じ)。
  *
- * **現時点でこのキーを購読しているものは無い。** B3はまだServer Componentのまま
- * サンプルデータを表示しており(`USE_SAMPLE_TRANSACTIONS_DATA`)、Firestoreへ繋ぎ込む
- * [B3-1]でこのキーを読む側が入る。取込の側だけ後から足すと、B2を触らないカードで
- * 「取り込んだのに一覧が古い」に気付く必要が出るため、先に置いてある。
+ * **キーには選択中の期間を足して使う**(`[...TRANSACTIONS_DATA_QUERY_KEY, periodId]`)。
+ * 読む範囲が期間で変わるためで、B2からの無効化はこのキーの前方一致で全期間ぶんに効く。
  */
 export const TRANSACTIONS_DATA_QUERY_KEY = ["transactions-data"] as const;
 
@@ -98,9 +102,24 @@ export const TRANSACTIONS_CSV_IMPORT_LINK = {
   href: CSV_IMPORT_PATH,
 } as const;
 
-/** 取引データが1件も無いときの案内 */
+/** 取引データが1件も無いときの案内(「全期間」で0件のとき) */
 export const NO_TRANSACTIONS_EMPTY_STATE = {
   message: "入出金明細のデータがまだありません。CSVを取り込むと取引が表示されます。",
+  action: TRANSACTIONS_CSV_IMPORT_LINK,
+} as const;
+
+/**
+ * 選択中の期間に取引が1件も無いときの案内。
+ *
+ * **「まだ取り込んでいない」と言い切らない。** Firestoreから読むのは選択中の期間だけなので
+ * (docs/transaction-import-requirements.md 8章)、他の期間に取引があるかどうかをこの画面は
+ * 知らない。既定が「直近1ヶ月」である以上、しばらく取り込んでいないだけで
+ * `NO_TRANSACTIONS_EMPTY_STATE` が出ると、取り込み済みのデータを「無い」と伝えることになる。
+ * 期間を広げる手も添えて、どちらの状態でも次の行動が分かるようにする。
+ */
+export const NO_TRANSACTIONS_IN_PERIOD_EMPTY_STATE = {
+  message:
+    "選択した期間に取引がありません。期間を広げるか、新しい入出金明細CSVを取り込んでください。",
   action: TRANSACTIONS_CSV_IMPORT_LINK,
 } as const;
 

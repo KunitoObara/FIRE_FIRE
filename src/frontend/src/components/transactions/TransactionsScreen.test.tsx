@@ -1,0 +1,174 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { TransactionsScreen } from "@/components/transactions/TransactionsScreen";
+import { TRANSACTION_SCAN_LIMIT } from "@/constants/transactions";
+
+import type { RenderResult } from "@testing-library/react";
+
+const fetchTransactionsData = vi.fn();
+
+vi.mock("@/lib/transactions/transactions-data", () => ({
+  fetchTransactionsData: (...args: unknown[]) => fetchTransactionsData(...args),
+}));
+
+/** 絞り込みバーの送信先。ここでは押さないので記録だけできればよい */
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+const buildTransaction = (transaction: Partial<Transaction> & { id: string }): Transaction => ({
+  date: "2026-07-20",
+  content: "スーパー〇〇",
+  amount: -3_280,
+  account: "〇〇カード",
+  categoryMajor: "食費",
+  categoryMinor: "食料品",
+  memo: "",
+  isTransfer: false,
+  isCalculationTarget: true,
+  ...transaction,
+});
+
+const resolveData = (transactions: Transaction[], truncated = false): void => {
+  fetchTransactionsData.mockResolvedValue({
+    ok: true,
+    truncated,
+    data: {
+      transactions,
+      categories: [...new Set(transactions.map((transaction) => transaction.categoryMajor))],
+      accounts: [...new Set(transactions.map((transaction) => transaction.account))],
+    },
+  });
+};
+
+const renderScreen = (
+  searchParams: Record<string, string | string[] | undefined> = {},
+): RenderResult =>
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <TransactionsScreen searchParams={searchParams} />
+    </QueryClientProvider>,
+  );
+
+describe("TransactionsScreen", () => {
+  beforeEach(() => {
+    fetchTransactionsData.mockReset();
+    resolveData([buildTransaction({ id: "aaaa1111" })]);
+  });
+
+  it("Firestoreから読んだ取引を一覧に出す", async () => {
+    resolveData([
+      buildTransaction({ id: "aaaa1111", content: "スーパー〇〇" }),
+      buildTransaction({ id: "bbbb2222", content: "家賃引き落とし", categoryMajor: "住居費" }),
+    ]);
+    renderScreen();
+
+    expect(await screen.findByRole("cell", { name: "スーパー〇〇" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "家賃引き落とし" })).toBeInTheDocument();
+  });
+
+  /**
+   * 費目は大項目を主・中項目を従として1列に収める(B3)。
+   * 費目名は絞り込みバーのセレクタにも並ぶので、一覧の中だけを見る
+   */
+  it("費目の列に大項目と中項目の両方を出す", async () => {
+    resolveData([buildTransaction({ id: "aaaa1111" })]);
+    renderScreen();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("食費")).toBeInTheDocument();
+    expect(table.getByText("食料品")).toBeInTheDocument();
+  });
+
+  /** 空の中項目に「(未分類)」のような名前をアプリ側で与えない(同書6章) */
+  it("中項目が空の取引は大項目だけを出す", async () => {
+    resolveData([buildTransaction({ id: "aaaa1111", categoryMinor: "" })]);
+    renderScreen();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("食費")).toBeInTheDocument();
+    expect(table.queryByText("食料品")).not.toBeInTheDocument();
+    expect(table.queryByText("(未分類)")).not.toBeInTheDocument();
+  });
+
+  it("選択中の期間で取得する", async () => {
+    renderScreen({ period: "3m" });
+
+    await screen.findByRole("cell", { name: "スーパー〇〇" });
+    expect(fetchTransactionsData).toHaveBeenCalledWith("3m", expect.any(Date));
+  });
+
+  it("不正な期間は既定の直近1ヶ月に落として取得する", async () => {
+    renderScreen({ period: "10y" });
+
+    await screen.findByRole("cell", { name: "スーパー〇〇" });
+    expect(fetchTransactionsData).toHaveBeenCalledWith("1m", expect.any(Date));
+  });
+
+  it("URLの絞り込み条件を一覧に反映する", async () => {
+    resolveData([
+      buildTransaction({ id: "aaaa1111", content: "スーパー〇〇", categoryMajor: "食費" }),
+      buildTransaction({ id: "bbbb2222", content: "家賃引き落とし", categoryMajor: "住居費" }),
+    ]);
+    renderScreen({ category: "住居費" });
+
+    expect(await screen.findByRole("cell", { name: "家賃引き落とし" })).toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "スーパー〇〇" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 黙って古い側が欠けると、一覧に無いことを「取り込んでいない」と読み違える
+   * (docs/transaction-import-requirements.md 8章)
+   */
+  it("読み取りが打ち切られたことを画面に出す", async () => {
+    resolveData([buildTransaction({ id: "aaaa1111" })], true);
+    renderScreen();
+
+    expect(
+      await screen.findByText(
+        new RegExp(`${TRANSACTION_SCAN_LIMIT.toLocaleString("ja-JP")}件だけを表示`, "u"),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("打ち切られていなければ案内を出さない", async () => {
+    renderScreen();
+
+    await screen.findByRole("cell", { name: "スーパー〇〇" });
+    expect(screen.queryByText(/件だけを表示/u)).not.toBeInTheDocument();
+  });
+
+  it("全期間で1件も無ければ「まだありません」を出し、一覧そのものを出さない", async () => {
+    resolveData([]);
+    renderScreen({ period: "all" });
+
+    expect(await screen.findByText(/入出金明細のデータがまだありません/u)).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    // B2への導線。絞り込みバーにも同じリンクがあるので件数では見ない
+    expect(screen.getAllByRole("link", { name: "CSVを取り込む" }).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * 読むのは選択中の期間だけなので、他の期間に取引があるかどうかをこの画面は知らない。
+   * 既定が「直近1ヶ月」である以上、しばらく取り込んでいないだけで「まだありません」と
+   * 出すと、取り込み済みのデータを「無い」と伝えることになる
+   */
+  it("選択中の期間だけが空のときは、取り込み済みかもしれないことを伏せない", async () => {
+    resolveData([]);
+    renderScreen({ period: "1m" });
+
+    expect(await screen.findByText(/選択した期間に取引がありません/u)).toBeInTheDocument();
+    expect(screen.queryByText(/データがまだありません/u)).not.toBeInTheDocument();
+  });
+
+  /** 取得の失敗を空状態(未取込)として見せない。次にすべきことが正反対になる */
+  it("取得に失敗したら理由を出し、空状態にはしない", async () => {
+    fetchTransactionsData.mockResolvedValue({ ok: false, reason: "signed-out" });
+    renderScreen();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("ログイン状態が切れています");
+    expect(screen.queryByText(/入出金明細のデータがまだありません/u)).not.toBeInTheDocument();
+  });
+});
