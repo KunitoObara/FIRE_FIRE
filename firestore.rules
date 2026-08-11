@@ -150,8 +150,12 @@ service cloud.firestore {
         )
         && isIsoDate(transaction.date)
         // 収入がプラス・支出がマイナスで、符号はCSVのまま保つ(同5章)。したがって範囲は縛らない。
-        // 円未満が無いこと(同2.2)はパーサー側だけの担保で、`is number`はintもfloatも通す(要件8.1)
-        && transaction.amount is number
+        //
+        // **`is number`ではなく`is int`にしてある。** 円未満の取引は無い(同2.2)ため、小数が
+        // 現れるのは列がずれているか別のファイルのとき。JS SDKは安全な整数を`integerValue`、
+        // 小数を`doubleValue`で送るので、`is int`が小数だけを弾く。パーサー側も小数を
+        // `invalid-amount`で弾いており、こちらは書き込みを試された場合の歯止めになる
+        && transaction.amount is int
         && transaction.content is string
         && transaction.content.size() <= 200
         && transaction.account is string
@@ -164,7 +168,8 @@ service cloud.firestore {
         && transaction.memo.size() <= 1000
         && transaction.isTransfer is bool
         && transaction.isCalculationTarget is bool
-        && transaction.importedAt is timestamp;
+        && transaction.importedAt is timestamp
+        && isServerTime(transaction.importedAt);
     }
 
     // 取引のドキュメントID(docs/transaction-import-requirements.md 3.2)。
@@ -192,6 +197,19 @@ service cloud.firestore {
     // 「1件でも不正なら1件も取り込まない」(同2.3)を満たすにはそちらに置く必要がある。
     function isValidTransactionId(transactionId) {
       return transactionId.matches('^[A-Za-z0-9_-]{1,200}$');
+    }
+
+    // サーバー時刻で書かれた値か(要件8.1)。
+    //
+    // クライアントは`serverTimestamp()`で書いており、そのとき`request.resource.data`に現れる
+    // 値は`request.time`そのものになる。任意の時刻を書かせないための検査で、これが無いと
+    // 取込履歴の並び順やB1の「直近CSV取込日時」を後から好きな値にできる。
+    //
+    // **`createdAt`には作成時だけ使う。** 更新では`createdAt`に既存の値が現れるため
+    // (クライアントが送らなくてもルールにはドキュメント全体が渡る)、更新でも要求すると
+    // 通常の編集が必ず落ちる。
+    function isServerTime(value) {
+      return value == request.time;
     }
 
     // 2FA(TOTP)まで済ませたセッションからのアクセスか(docs/auth-login-requirements.md 3.3)。
@@ -234,6 +252,7 @@ service cloud.firestore {
           && request.resource.data.date == date
           && request.resource.data.total is number
           && request.resource.data.importedAt is timestamp
+          && isServerTime(request.resource.data.importedAt)
           // `byType`は資産種別が動的に増減するマップなので、キーは列挙できない。
           // ルールに繰り返しが無く値をすべて検査することもできないため、
           // 個々の金額が数値であることはパース側(src/lib/csv/asset-balance-csv.ts)で担保する
@@ -284,7 +303,10 @@ service cloud.firestore {
           && request.resource.data.rowCount >= 0
           && isIsoDate(request.resource.data.periodFrom)
           && isIsoDate(request.resource.data.periodTo)
-          && request.resource.data.importedAt is timestamp;
+          // `yyyy-MM-dd`は辞書順が日付順なので、文字列のまま前後関係を見られる
+          && request.resource.data.periodFrom <= request.resource.data.periodTo
+          && request.resource.data.importedAt is timestamp
+          && isServerTime(request.resource.data.importedAt);
         allow update, delete: if false;
       }
 
@@ -311,7 +333,8 @@ service cloud.firestore {
           // 負債IDの上限は登録できる負債の件数(src/constants/debts.tsのDEBT_MAX_COUNT)と揃える
           && request.resource.data.debtIds is list
           && request.resource.data.debtIds.size() <= 50
-          && request.resource.data.createdAt is timestamp;
+          && request.resource.data.createdAt is timestamp
+          && isServerTime(request.resource.data.createdAt);
         allow update: if canAccessOwnData(userId)
           && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'createdAt'])
           && request.resource.data.name is string
@@ -368,12 +391,21 @@ service cloud.firestore {
         allow read: if canAccessOwnData(userId);
         allow create: if canAccessOwnData(userId)
           && isValidDebt(request.resource.data)
-          && request.resource.data.createdAt is timestamp;
+          && request.resource.data.createdAt is timestamp
+          && isServerTime(request.resource.data.createdAt);
         // B11のフォームの並び順(登録順)が保存のたびに入れ替わらないよう、
         // 登録日時は編集で変えさせない(categoryAxes・propertiesと同じ扱い)
         allow update: if canAccessOwnData(userId)
           && isValidDebt(request.resource.data)
-          && request.resource.data.createdAt == resource.data.createdAt;
+          && request.resource.data.createdAt == resource.data.createdAt
+          // 残債の履歴は**追記だけ**を許す。既にある日の記録を書き換え・削除させない
+          // (資産推移グラフが過去に遡って別の値を描くため)。`diff()`はマップ同士の差分を
+          // 返すので、要素を1件ずつ辿らずに書ける。**追記が「残債の変わった日」だけかは
+          // ここでは見られない**(直前の記録と比べる必要があり、キーの前後関係を辿れない)
+          && request.resource.data.balanceHistory
+            .diff(resource.data.balanceHistory).removedKeys().size() == 0
+          && request.resource.data.balanceHistory
+            .diff(resource.data.balanceHistory).changedKeys().size() == 0;
         allow delete: if canAccessOwnData(userId);
       }
 
@@ -394,18 +426,31 @@ service cloud.firestore {
           )
           // 有効な設定方式。src/frontend/src/types/fire-goal.d.ts の`FireGoalMode`と揃える
           && request.resource.data.mode in ['direct', 'reverse']
-          // 使っていない方式の欄はnullで保存される。必須になるのは有効な方式の欄だけで、
-          // その判定は画面側(src/frontend/src/schemas/fire-goal.ts)が行う。
-          // ルールでも`mode`ごとに書ける部類の制約で、回収の候補として要件8.1に挙げてある
+          // 使っていない方式の欄はnullで保存される。形の検査(nullを許す)と、選んだ方式で
+          // 必須になる欄の検査を分けて書く。後者が無いと、どの欄も空の目標が保存でき、
+          // 達成率(現在資産 ÷ 目標資産)も逆算(年間支出額 ÷ 係数)も出せない状態を作れる。
+          // 画面側(src/frontend/src/schemas/fire-goal.ts)と同じ判定をここにも置く
           && isFireGoalAmount(request.resource.data.targetAmount)
           && isFireGoalAmount(request.resource.data.annualExpense)
           && isWithdrawalRate(request.resource.data.withdrawalRate)
+          && (
+            request.resource.data.mode != 'direct'
+            || request.resource.data.targetAmount != null
+          )
+          && (
+            request.resource.data.mode != 'reverse'
+            || (
+              request.resource.data.annualExpense != null
+              && request.resource.data.withdrawalRate != null
+            )
+          )
           // 達成度の対象分類(B4の分類軸ID)。既定の「総資産」はnullで保存される。
           // 分類軸が実在するかはここでは確かめられない(ルールから他のドキュメントを
           // 引くと読み取りが増え、B4での削除と競合もする)。存在しない軸を指したままでも
           // 参照側が既定へフォールバックする作りなので、ここは形だけを見る
           && isCategoryAxisId(request.resource.data.achievementAxisId)
-          && request.resource.data.updatedAt is timestamp;
+          && request.resource.data.updatedAt is timestamp
+          && isServerTime(request.resource.data.updatedAt);
         // FIRE目標を消す画面は無い。方式の切替も上書きで表せる
         allow delete: if false;
       }
@@ -428,7 +473,8 @@ service cloud.firestore {
           // 上限は src/frontend/src/constants/assumptions.ts の ASSUMPTION_ENTRIES_MAX と揃える
           && request.resource.data.entries is map
           && request.resource.data.entries.size() <= 200
-          && request.resource.data.updatedAt is timestamp;
+          && request.resource.data.updatedAt is timestamp
+          && isServerTime(request.resource.data.updatedAt);
         // 想定利回り・リスクを消す画面は無い。個々の資産種別の設定解除は上書きで表せる
         allow delete: if false;
       }
@@ -439,7 +485,8 @@ service cloud.firestore {
         allow read: if canAccessOwnData(userId);
         allow create: if canAccessOwnData(userId)
           && isValidProperty(request.resource.data)
-          && request.resource.data.createdAt is timestamp;
+          && request.resource.data.createdAt is timestamp
+          && isServerTime(request.resource.data.createdAt);
         // 一覧の並び順(登録順)が編集のたびに入れ替わらないよう、登録日時は編集で変えさせない
         // (categoryAxesと同じ扱い)。`updateDoc`はドキュメント全体に対して評価されるため、
         // クライアントが`createdAt`を送らなくても既存の値がここに現れる。
