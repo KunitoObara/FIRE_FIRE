@@ -204,16 +204,33 @@ describe("TransactionsScreen", () => {
 
     expect(
       await screen.findByText(
-        new RegExp(`${TRANSACTION_SCAN_LIMIT.toLocaleString("ja-JP")}件だけを表示`, "u"),
+        new RegExp(
+          `${TRANSACTION_SCAN_LIMIT.toLocaleString("ja-JP")}件だけを読み込んでいます`,
+          "u",
+        ),
       ),
     ).toBeInTheDocument();
+  });
+
+  /**
+   * 打ち切りは選択中の期間で読み取った件数に対する判定で、費目・口座・キーワードの
+   * 絞り込みには依存しない。案内が絞り込み後の件数の話に読めると、表示中の件数と
+   * 噛み合わないように見えて案内そのものを疑わせる
+   */
+  it("打ち切りの案内は、絞り込み後ではなく選択中の期間の件数を指していると分かる形で出す", async () => {
+    resolveData([buildTransaction({ id: "aaaa1111" })], true);
+    renderScreen({ category: "食費" });
+
+    const notice = await screen.findByText(/件だけを読み込んでいます/u);
+    expect(notice).toHaveTextContent("選択中の期間は取引が多いため");
+    expect(notice).toHaveTextContent("絞り込みもこの範囲に対して行われます");
   });
 
   it("打ち切られていなければ案内を出さない", async () => {
     renderScreen();
 
     await screen.findByRole("cell", { name: "スーパー〇〇" });
-    expect(screen.queryByText(/件だけを表示/u)).not.toBeInTheDocument();
+    expect(screen.queryByText(/件だけを読み込んでいます/u)).not.toBeInTheDocument();
   });
 
   it("全期間で1件も無ければ「まだありません」を出し、一覧そのものを出さない", async () => {
