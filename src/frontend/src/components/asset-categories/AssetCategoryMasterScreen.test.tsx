@@ -643,6 +643,73 @@ describe("AssetCategoryMasterScreen(負債)", () => {
   });
 
   /**
+   * 「判定できません」は**待てば解ける状態**であって行き止まりではない。ダイアログを開いたまま
+   * 負債の取得が終われば、そのまま通常の確認へ切り替わる。
+   *
+   * 現在の実装は`debtOptions`から都度導くので自然にこうなるが、**壊れたときの症状は
+   * 「ダイアログが『判定できません』のまま固まる」**で、ユーザーからは削除機能が壊れたように
+   * しか見えない。参照の判定を`useState`や依存配列付きの`useMemo`で保持する形に変えると
+   * この性質は黙って失われるため、テストで固定しておく。
+   */
+  it("ダイアログを開いたまま負債を読み終えたら、通常の確認へ切り替わる", async () => {
+    const user = userEvent.setup();
+    let resolveDebts: (result: unknown) => void = () => {};
+    fetchDebts.mockReturnValue(
+      new Promise((resolve) => {
+        resolveDebts = resolve;
+      }),
+    );
+    deleteCategoryAxis.mockResolvedValue({ ok: true });
+    // 参照している負債はB11で削除済み。読み終われば「集計していない軸」として削除できる
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-deleted"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+    expect(await screen.findByText("この分類を削除できるか判定できません")).toBeInTheDocument();
+
+    // ダイアログを開いたまま取得が完了する
+    resolveDebts({ ok: true, debts: [mortgage] });
+
+    expect(await screen.findByRole("button", { name: "削除する" })).toBeInTheDocument();
+    expect(screen.queryByText("この分類を削除できるか判定できません")).not.toBeInTheDocument();
+
+    // 切り替わった先がただの表示ではなく、実際に削除まで進めることまで見る
+    await user.click(screen.getByRole("button", { name: "削除する" }));
+    await waitFor(() => {
+      expect(deleteCategoryAxis).toHaveBeenCalledWith("total-assets");
+    });
+  });
+
+  /** 切り替わる先は確定ブロックのこともある。どちらであれ「判定できません」のまま固まらない */
+  it("ダイアログを開いたまま読み終えた結果、生きている負債が残っていれば確定ブロックへ切り替わる", async () => {
+    const user = userEvent.setup();
+    let resolveDebts: (result: unknown) => void = () => {};
+    fetchDebts.mockReturnValue(
+      new Promise((resolve) => {
+        resolveDebts = resolve;
+      }),
+    );
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+    expect(await screen.findByText("この分類を削除できるか判定できません")).toBeInTheDocument();
+
+    resolveDebts({ ok: true, debts: [mortgage] });
+
+    expect(await screen.findByText("この分類は削除できません")).toBeInTheDocument();
+    expect(screen.queryByText("この分類を削除できるか判定できません")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
+    expect(deleteCategoryAxis).not.toHaveBeenCalled();
+  });
+
+  /**
    * 資産種別が紐づいている軸は、負債の情報が取れても削除できないままである。
    * ここで「時間をおいてもう一度」と促すと、永久に叶わない再試行を勧めることになる。
    */
