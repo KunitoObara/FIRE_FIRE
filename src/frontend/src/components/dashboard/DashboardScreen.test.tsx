@@ -46,6 +46,7 @@ const data: DashboardData = {
           date: "2026-08-05",
           amount: 11_400_000,
           byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000, "預金・現金": 4_400_000 },
+          debtBalance: 0,
         },
       ],
       breakdown: [
@@ -61,6 +62,7 @@ const data: DashboardData = {
           date: "2026-08-05",
           amount: 7_000_000,
           byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000 },
+          debtBalance: 0,
         },
       ],
       breakdown: [
@@ -96,7 +98,7 @@ const renderScreen = (props: Partial<DashboardScreenProps> = {}): RenderResult =
       <DashboardScreen
         axisParam={undefined}
         periodParam={undefined}
-        trendParam={undefined}
+        debtParam={undefined}
         {...props}
       />
     </QueryClientProvider>,
@@ -379,7 +381,7 @@ describe("DashboardScreen", () => {
     await user.click(await screen.findByLabelText("分類軸"));
     await user.click(await screen.findByRole("option", { name: "投資性資産" }));
 
-    expect(replace).toHaveBeenCalledWith("/dashboard?axis=investment&period=1y&trend=stacked");
+    expect(replace).toHaveBeenCalledWith("/dashboard?axis=investment&period=1y&debt=with-debt");
   });
 });
 

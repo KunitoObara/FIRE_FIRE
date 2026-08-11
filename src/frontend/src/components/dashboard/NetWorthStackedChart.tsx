@@ -7,6 +7,9 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import {
   CHART_ANIMATION_DURATION_MS,
   CHART_ANIMATION_EASING,
+  DEBT_BAND_HATCH_PATTERN_ID,
+  DEBT_CATEGORY_COLOR,
+  DEBT_CATEGORY_ID,
   NET_WORTH_STACK_OFFSET,
   NET_WORTH_STACK_TOTAL_LABEL,
 } from "@/constants/dashboard";
@@ -24,12 +27,12 @@ const STACK_ID = "net-worth";
  * 資産推移グラフの積み上げ表示(B1)。
  *
  * 帯は対象の資産種別で、色と並び順は分類別内訳の円グラフと同じスロット割り当てを共有する
- * (`buildStackedTrend`)。負債は帯にせず、差し引いた推移は純資産表示が描く
+ * (`buildStackedTrend`)。**負債反映ONのときは、対象の負債が0より下の1本の帯として加わる**
  * (docs/screen-requirements-dashboard.md B1「積み上げ表示」)。
  *
- * **正負は分けて積む**(`stackOffset="sign"`)。マイナス残高の資産種別は0より下側の帯に
- * なり、面の上端は「正の資産種別だけの合計」になる。ツールチップの合計は行に並べた
- * 資産種別の総和なので、上端と一致しないことがある(同節。意図した通り)。
+ * **正負は分けて積む**(`stackOffset="sign"`)。マイナス残高の資産種別と負債の帯は0より下側に
+ * 積まれ、面の上端は「正の帯だけの合計」になる。ツールチップの合計は行に並べた額の総和なので、
+ * 上端と一致しないことがある(同節。意図した通り)。
  *
  * 登場アニメーション(左から右へ描き出す)はRechartsに任せる。**全ての帯に同じ時間・
  * 同じイージングを渡す**ことで、1つのクリップで広がるように見せる。帯ごとに時間差を
@@ -60,6 +63,24 @@ export const NetWorthStackedChart = ({ bands, points }: NetWorthStackedChartProp
         margin={{ left: 8, right: 8, top: 8 }}
         stackOffset={NET_WORTH_STACK_OFFSET}
       >
+        {/*
+          負債の帯のハッチング(DESIGN.md 3章)。帯は0の線を挟んで資産の帯と隣り合い、
+          マイナス残高の資産種別の帯とも並ぶため、色だけでは区別が付かない。
+          円グラフの負債スライスと同じ模様・同じ色にし、`<pattern>`のIDだけを分ける
+          (同じ画面に2つのSVGが並ぶので、同じIDだとどちらを参照するかがDOMの順序で決まる)
+        */}
+        <defs>
+          <pattern
+            id={DEBT_BAND_HATCH_PATTERN_ID}
+            width="4"
+            height="4"
+            patternTransform="rotate(45)"
+            patternUnits="userSpaceOnUse"
+          >
+            <rect width="4" height="4" fill={DEBT_CATEGORY_COLOR} />
+            <line x1="0" y1="0" x2="0" y2="4" stroke="var(--card)" strokeWidth="1.5" />
+          </pattern>
+        </defs>
         {/* 目盛りは値を読む補助でしかないため、横線だけを薄く敷く(純資産表示と揃える) */}
         <CartesianGrid vertical={false} />
         <XAxis
@@ -95,9 +116,9 @@ export const NetWorthStackedChart = ({ bands, points }: NetWorthStackedChartProp
                       {typeof date === "string" ? format(parseISO(date), "yyyy年M月") : ""}
                     </span>
                     {/*
-                      合計は**行に並べた資産種別の総和**で、負の種別も符号のまま加える。
-                      負債は含まない(積み上げが差し引いていないものをツールチップだけが
-                      差し引くと、同じカードに2つの合計が並ぶ。同要件B1)
+                      合計は**行に並べた額の総和**で、負の資産種別も符号のまま加える。
+                      負債反映ONのときは負債の行(負の値)も含むので、合計はその時点の
+                      純資産そのものになる。OFFのときは負債の行自体が無い(同要件B1)
                     */}
                     {typeof total === "number" ? (
                       <span className="text-xs text-muted-foreground">
@@ -147,7 +168,12 @@ export const NetWorthStackedChart = ({ bands, points }: NetWorthStackedChartProp
             type="monotone"
             stroke={band.color}
             strokeWidth={1.5}
-            fill={band.color}
+            // 負債の帯だけ、色ではなくハッチングの`<pattern>`で塗る
+            fill={
+              band.categoryId === DEBT_CATEGORY_ID
+                ? `url(#${DEBT_BAND_HATCH_PATTERN_ID})`
+                : band.color
+            }
             fillOpacity={0.85}
             // 点が60個並ぶと丸が潰れて帯の境界が読めなくなる。ホバー時だけ位置を示す
             dot={false}

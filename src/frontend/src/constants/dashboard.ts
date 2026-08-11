@@ -26,24 +26,32 @@ export const DEFAULT_DASHBOARD_PERIOD_ID: DashboardPeriodId = "1y";
  */
 export const DASHBOARD_AXIS_PARAM = "axis";
 export const DASHBOARD_PERIOD_PARAM = "period";
-export const DASHBOARD_TREND_PARAM = "trend";
+export const DASHBOARD_DEBT_PARAM = "debt";
 
-/** 資産推移グラフの表示切替の選択肢(docs/screen-requirements-dashboard.md B1) */
+/**
+ * 資産推移グラフの負債反映切替の選択肢(docs/screen-requirements-dashboard.md B1)。
+ *
+ * グラフは常に資産種別の積み上げで、切替が動かすのは**負債を反映するかどうかだけ**。
+ * ON/OFFのスイッチ1つにせず2択のタブにするのは、スイッチだとOFF側が何を描く状態なのかが
+ * ラベルから読めず、同じカードに並ぶ表示期間の切替とも操作の形が変わるため(同節)。
+ */
 export const NET_WORTH_TREND_MODES: NetWorthTrendMode[] = [
-  { id: "stacked", label: "積み上げ" },
-  { id: "net", label: "純資産" },
+  { id: "with-debt", label: "負債反映" },
+  { id: "assets-only", label: "資産のみ" },
 ];
 
 /**
- * 資産推移グラフの表示の既定値。
+ * 負債反映の既定値。
  *
- * 既定を積み上げにするのはカードの主旨がそちらのため。純資産表示は切替で出す
- * (docs/screen-requirements-dashboard.md B1「資産推移グラフの表示切替」)。
+ * **既定はON。** 分類軸に負債を選んでいること自体が「この軸では負債を差し引いて見たい」
+ * という設定であり(B4)、既定OFFだとB4でチェックした結果が初期表示に出ない。負債を
+ * 1件も選んでいない分類軸ではONでも描くものが増えないので、既定の違いは現れない
+ * (docs/screen-requirements-dashboard.md B1「資産推移グラフの負債反映切替」)。
  */
-export const DEFAULT_NET_WORTH_TREND_MODE_ID: NetWorthTrendModeId = "stacked";
+export const DEFAULT_NET_WORTH_TREND_MODE_ID: NetWorthTrendModeId = "with-debt";
 
-/** 表示切替のアクセシブルな名前(タブの見た目に対する説明) */
-export const NET_WORTH_TREND_MODE_LABEL = "資産推移の表示";
+/** 切替のアクセシブルな名前(タブの見た目に対する説明) */
+export const NET_WORTH_TREND_MODE_LABEL = "負債の反映";
 
 /**
  * 積み上げ表示の正負の積み方(Rechartsの`stackOffset`)。
@@ -61,13 +69,24 @@ export const NET_WORTH_STACK_OFFSET = "sign";
 export const NET_WORTH_STACK_TOTAL_LABEL = "合計";
 
 /**
- * 負債を含む分類軸を積み上げで表示しているときの注記。
+ * 負債反映OFFのあいだに出す注記。
  *
- * 隣の円グラフは負債のスライスと差引後の純額を出しているので、これが無いと同じ画面の
+ * 隣の円グラフは負債のスライスと差引後の純額を出し続けるので、これが無いと同じ画面の
  * 2つのグラフが同じ分類軸について違う合計を示しているように見える(同要件B1)。
  */
 export const STACKED_DEBT_NOT_DEDUCTED_NOTICE =
-  "この分類軸が対象にしている負債は差し引いていません。差引後の推移は「純資産」で見られます。";
+  "この分類軸が対象にしている負債は反映していません。「負債反映」に切り替えると、差し引いた推移が見られます。";
+
+/**
+ * 負債の帯に重ねるハッチング(斜線)。円グラフの負債スライスと同じ見た目にする
+ * (DESIGN.md 3章)。
+ *
+ * 帯は0の線を挟んで資産の帯と隣り合い、マイナス残高の資産種別の帯とも並ぶため、色だけでは
+ * 「マイナス残高の資産種別」と区別が付かない。円グラフと同じくSVGの`<pattern>`で描くので、
+ * 参照するIDをここで固定する(**円グラフとは別のIDにする** — 同じ画面に2つのSVGが並び、
+ * 同じIDの`<pattern>`が2つあると、どちらを参照するかがDOMの順序で決まってしまう)。
+ */
+export const DEBT_BAND_HATCH_PATTERN_ID = "net-worth-trend-debt-hatch";
 
 /**
  * 分類別内訳で個別の色を割り当てられる分類の数。
@@ -262,6 +281,12 @@ export const buildNetWorthSeriesKey = (
       point.date,
       point.amount,
       Object.entries(point.byType).sort(([left], [right]) => left.localeCompare(right)),
+      /*
+        **残債も署名に含める。** 負債の帯は`debtBalance`から描くので、これを含めないと
+        「負債だけが更新されて資産は同じ」保存のあとに帯の形が変わったことを検出できない。
+        切替(`mode`)自体は上で署名に入っており、帯の出入りはそちらで再生される
+      */
+      point.debtBalance,
     ]),
   ]);
 
