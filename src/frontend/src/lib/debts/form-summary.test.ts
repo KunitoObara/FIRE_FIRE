@@ -11,6 +11,7 @@ const buildDebt = (overrides: Partial<Debt>): Debt => ({
   id: "debt-1",
   name: "住宅ローン",
   balance: 18_400_000,
+  originatedOn: null,
   interestRate: null,
   repaymentMonths: null,
   updatedAt: "2026-07-12",

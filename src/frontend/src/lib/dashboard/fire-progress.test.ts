@@ -271,6 +271,7 @@ const debt: Debt = {
   id: "debt-1",
   name: "住宅ローン",
   balance: 20_000_000,
+  originatedOn: null,
   interestRate: null,
   repaymentMonths: null,
   updatedAt: "2026-08-05",

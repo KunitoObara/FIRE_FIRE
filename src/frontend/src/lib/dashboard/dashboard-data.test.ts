@@ -223,6 +223,8 @@ describe("fetchDashboardData", () => {
           id: "debt-1",
           name: "住宅ローン",
           balance: 3_000_000,
+          // 発生年月は未入力。起点は最初の記録の日のままになる(B11-7)
+          originatedOn: null,
           interestRate: null,
           repaymentMonths: null,
           updatedAt: "2026-08-20",

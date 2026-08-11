@@ -6,6 +6,7 @@ const buildInput = (id: string | null): DebtInput => ({
   id,
   name: "住宅ローン",
   balance: 1_000_000,
+  originatedOn: null,
   interestRate: null,
   repaymentMonths: null,
 });

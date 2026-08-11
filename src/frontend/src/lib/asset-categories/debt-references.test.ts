@@ -6,6 +6,7 @@ const buildDebt = (id: string): Debt => ({
   id,
   name: `負債 ${id}`,
   balance: 1_000_000,
+  originatedOn: null,
   interestRate: null,
   repaymentMonths: null,
   updatedAt: "2026-07-12",
