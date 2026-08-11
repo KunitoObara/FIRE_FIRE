@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDashboardHref, resolveAxisId, resolvePeriodId } from "@/lib/dashboard/filters";
+import {
+  buildDashboardHref,
+  resolveAxisId,
+  resolvePeriodId,
+  resolveTrendModeId,
+} from "@/lib/dashboard/filters";
 
 const axes: AssetCategoryAxis[] = [
   { id: "total-assets", name: "総資産" },
@@ -44,15 +49,36 @@ describe("resolvePeriodId", () => {
   });
 });
 
+describe("resolveTrendModeId", () => {
+  it("選択肢にある表示ならそのまま使う", () => {
+    expect(resolveTrendModeId("net")).toBe("net");
+  });
+
+  /** 既定は積み上げ(docs/screen-requirements-dashboard.md B1) */
+  it("未指定なら既定の積み上げに落とす", () => {
+    expect(resolveTrendModeId(undefined)).toBe("stacked");
+  });
+
+  it("選択肢に無い値も既定の積み上げに落とす", () => {
+    expect(resolveTrendModeId("area")).toBe("stacked");
+  });
+
+  it("同名のクエリが複数あるときも既定の積み上げに落とす", () => {
+    expect(resolveTrendModeId(["net", "stacked"])).toBe("stacked");
+  });
+});
+
 describe("buildDashboardHref", () => {
-  it("分類軸と期間の両方をクエリに載せる", () => {
-    expect(buildDashboardHref("investment-assets", "3y")).toBe(
-      "/dashboard?axis=investment-assets&period=3y",
+  it("分類軸・期間・資産推移の表示をすべてクエリに載せる", () => {
+    expect(buildDashboardHref("investment-assets", "3y", "net")).toBe(
+      "/dashboard?axis=investment-assets&period=3y&trend=net",
     );
   });
 
-  /** 片方だけ載せると、もう片方の選択が切り替えのたびに既定へ戻ってしまう */
-  it("分類軸が無い場合でも期間は載せる", () => {
-    expect(buildDashboardHref(undefined, "all")).toBe("/dashboard?period=all");
+  /** 1つだけ載せると、他の選択が切り替えのたびに既定へ戻ってしまう */
+  it("分類軸が無い場合でも期間と表示は載せる", () => {
+    expect(buildDashboardHref(undefined, "all", "stacked")).toBe(
+      "/dashboard?period=all&trend=stacked",
+    );
   });
 });

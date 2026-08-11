@@ -26,7 +26,12 @@ import {
 import { resolveAxisNetAmount } from "@/lib/dashboard/aggregation";
 import { buildBreakdownSlices } from "@/lib/dashboard/category-color";
 import { fetchDashboardData } from "@/lib/dashboard/dashboard-data";
-import { resolveAxisId, resolvePeriodId } from "@/lib/dashboard/filters";
+import {
+  buildDashboardHref,
+  resolveAxisId,
+  resolvePeriodId,
+  resolveTrendModeId,
+} from "@/lib/dashboard/filters";
 import { filterSeriesByPeriod } from "@/lib/dashboard/period";
 
 import type { JSX } from "react";
@@ -81,7 +86,11 @@ const formatLastImportedAt = (isoDateTime: string | null): string =>
  * 分類軸の切り替えは資産推移グラフと分類別内訳の両方に及ぶ(同要件B1)。切り替えのたびに
  * Firestoreを引き直さず、1度読んだ資産残高を分類軸ごとに集計した結果から選ぶだけにしている。
  */
-export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps): JSX.Element => {
+export const DashboardScreen = ({
+  axisParam,
+  periodParam,
+  trendParam,
+}: DashboardScreenProps): JSX.Element => {
   const dashboardQuery = useQuery({
     queryKey: DASHBOARD_DATA_QUERY_KEY,
     queryFn: fetchDashboardData,
@@ -121,6 +130,7 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
 
   const selectedAxisId = resolveAxisId(axisParam, axes);
   const selectedPeriodId = resolvePeriodId(periodParam);
+  const selectedTrendMode = resolveTrendModeId(trendParam);
   const selectedAxis = axes.find((axis) => axis.id === selectedAxisId);
   const axisData = selectedAxisId ? data?.byAxis[selectedAxisId] : undefined;
 
@@ -143,6 +153,7 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
         axes={axes}
         selectedAxisId={selectedAxisId ?? ""}
         selectedPeriodId={selectedPeriodId}
+        selectedTrendMode={selectedTrendMode}
       />
 
       {dashboardQuery.isPending ? (
@@ -191,7 +202,18 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
           </p>
 
           {selectedAxis ? (
-            <NetWorthTrendCard axisName={selectedAxis.name} series={series} />
+            <NetWorthTrendCard
+              axisName={selectedAxis.name}
+              series={series}
+              mode={selectedTrendMode}
+              /*
+                色スロットの割り当ては分類別内訳と共有する。同じ画面の2つのグラフで同じ
+                資産種別が違う色になると見比べられない(同要件B1「積み上げ表示」)
+              */
+              categories={data.categories}
+              debtTotal={debtTotal}
+              buildHref={(mode) => buildDashboardHref(selectedAxisId, selectedPeriodId, mode)}
+            />
           ) : (
             <Card>
               <CardHeader>

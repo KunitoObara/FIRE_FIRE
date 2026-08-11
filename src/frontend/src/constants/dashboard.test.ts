@@ -16,10 +16,27 @@ import {
  * 同じデータのままの再取得では再生しない。その判定をこの署名が担っている。
  */
 
-const series: NetWorthPoint[] = [
-  { date: "2026-07-31", amount: 11_000_000 },
-  { date: "2026-08-05", amount: 11_400_000 },
-];
+/**
+ * 表示切替(積み上げ / 純資産)も署名の一部だが、ここで確かめたいのはデータ側の変化なので
+ * 既定を積み上げに固定して呼ぶ。表示切替そのものは専用のテストで見る。
+ */
+const seriesKey = (
+  axisName: string,
+  points: NetWorthPoint[],
+  mode: NetWorthTrendModeId = "stacked",
+): string => buildNetWorthSeriesKey(axisName, points, mode);
+
+const point = (
+  date: string,
+  amount: number,
+  byType: Record<string, number> = {},
+): NetWorthPoint => ({
+  date,
+  amount,
+  byType,
+});
+
+const series: NetWorthPoint[] = [point("2026-07-31", 11_000_000), point("2026-08-05", 11_400_000)];
 
 const slices: AssetBreakdownSlice[] = [
   {
@@ -92,21 +109,17 @@ describe("グラフの再生時間・イージング", () => {
 describe("buildNetWorthSeriesKey", () => {
   /** 表示データは取得のたびに組み立て直されるため、配列の参照では判定できない */
   it("中身が同じなら、別インスタンスでも同じ署名になる", () => {
-    expect(buildNetWorthSeriesKey("総資産", series)).toBe(
-      buildNetWorthSeriesKey("総資産", [...series.map((point) => ({ ...point }))]),
+    expect(seriesKey("総資産", series)).toBe(
+      seriesKey("総資産", [...series.map((point) => ({ ...point }))]),
     );
   });
 
   it("分類軸を切り替えると署名が変わる", () => {
-    expect(buildNetWorthSeriesKey("投資性資産", series)).not.toBe(
-      buildNetWorthSeriesKey("総資産", series),
-    );
+    expect(seriesKey("投資性資産", series)).not.toBe(seriesKey("総資産", series));
   });
 
   it("表示期間の切替で点の範囲が変わると署名が変わる", () => {
-    expect(buildNetWorthSeriesKey("総資産", series.slice(1))).not.toBe(
-      buildNetWorthSeriesKey("総資産", series),
-    );
+    expect(seriesKey("総資産", series.slice(1))).not.toBe(seriesKey("総資産", series));
   });
 
   /**
@@ -115,19 +128,17 @@ describe("buildNetWorthSeriesKey", () => {
    */
   it("途中の点の金額が変わると署名が変わる", () => {
     const corrected = [
-      { date: "2026-06-30", amount: 10_000_000 },
-      { date: "2026-07-31", amount: 10_500_000 },
-      { date: "2026-08-05", amount: 11_400_000 },
+      point("2026-06-30", 10_000_000),
+      point("2026-07-31", 10_500_000),
+      point("2026-08-05", 11_400_000),
     ];
     const original = [
-      { date: "2026-06-30", amount: 10_000_000 },
-      { date: "2026-07-31", amount: 11_000_000 },
-      { date: "2026-08-05", amount: 11_400_000 },
+      point("2026-06-30", 10_000_000),
+      point("2026-07-31", 11_000_000),
+      point("2026-08-05", 11_400_000),
     ];
 
-    expect(buildNetWorthSeriesKey("総資産", corrected)).not.toBe(
-      buildNetWorthSeriesKey("総資産", original),
-    );
+    expect(seriesKey("総資産", corrected)).not.toBe(seriesKey("総資産", original));
   });
 
   /** CSVを取り込み直して直近の残高だけが変わった場合(日付も件数も同じ) */
@@ -136,13 +147,39 @@ describe("buildNetWorthSeriesKey", () => {
       index === series.length - 1 ? { ...point, amount: 12_000_000 } : point,
     );
 
-    expect(buildNetWorthSeriesKey("総資産", reimported)).not.toBe(
-      buildNetWorthSeriesKey("総資産", series),
-    );
+    expect(seriesKey("総資産", reimported)).not.toBe(seriesKey("総資産", series));
   });
 
   it("点が1つも無くても署名を作れる", () => {
-    expect(buildNetWorthSeriesKey("総資産", [])).toBe(buildNetWorthSeriesKey("総資産", []));
+    expect(seriesKey("総資産", [])).toBe(seriesKey("総資産", []));
+  });
+
+  /**
+   * 積み上げ表示は資産種別ごとの帯を描くので、純額が同じでも内訳の配分が変われば
+   * 絵が変わる。純額だけを署名にしていると、この取込直しで再生が漏れる。
+   */
+  it("純額が同じで内訳の配分だけが変わると署名が変わる", () => {
+    const before = [point("2026-08-05", 1_000_000, { 現金: 600_000, 投資信託: 400_000 })];
+    const after = [point("2026-08-05", 1_000_000, { 現金: 400_000, 投資信託: 600_000 })];
+
+    expect(seriesKey("総資産", after)).not.toBe(seriesKey("総資産", before));
+  });
+
+  /**
+   * `byType`はFirestoreのマップをそのまま持つので、同じ中身でも取得のたびにキーの順が
+   * 変わりうる。順のまま署名にすると、裏での取り直しだけで再生してしまう
+   * (DESIGN.md 9章が再生しないと定めているケース)。
+   */
+  it("内訳のキーの順が違うだけなら同じ署名になる", () => {
+    const left = [point("2026-08-05", 1_000_000, { 現金: 600_000, 投資信託: 400_000 })];
+    const right = [point("2026-08-05", 1_000_000, { 投資信託: 400_000, 現金: 600_000 })];
+
+    expect(seriesKey("総資産", right)).toBe(seriesKey("総資産", left));
+  });
+
+  /** 表示切替は描くもの自体が入れ替わるので、切り替えた先を最初から描く(DESIGN.md 9章) */
+  it("積み上げと純資産を切り替えると署名が変わる", () => {
+    expect(seriesKey("総資産", series, "net")).not.toBe(seriesKey("総資産", series, "stacked"));
   });
 });
 
@@ -152,11 +189,8 @@ describe("buildNetWorthSeriesKey", () => {
  */
 describe("署名に使う名前が区切り文字を含む場合", () => {
   it("分類軸名に区切り文字が入っていても、別のデータが同じ署名にならない", () => {
-    const left = buildNetWorthSeriesKey('投資性資産","x', [{ date: "2026-08-05", amount: 1 }]);
-    const right = buildNetWorthSeriesKey("投資性資産", [
-      { date: '","x', amount: 0 },
-      { date: "2026-08-05", amount: 1 },
-    ]);
+    const left = seriesKey('投資性資産","x', [point("2026-08-05", 1)]);
+    const right = seriesKey("投資性資産", [point('","x', 0), point("2026-08-05", 1)]);
 
     expect(left).not.toBe(right);
   });

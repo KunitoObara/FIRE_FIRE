@@ -104,6 +104,23 @@ export const sumAxisAmount = (
   ) - sumDebtBalanceAt(axisDebts, snapshot.date);
 
 /**
+ * 1日分の資産残高から、分類軸の集計対象になる資産種別だけを取り出す。
+ *
+ * 積み上げ表示が描く値(docs/screen-requirements-dashboard.md B1「積み上げ表示」)。
+ * **負債は引かず、マイナス残高の資産種別も符号のまま残す。** 0に丸めると、その種別を
+ * 保有していること自体が画面から消える。
+ */
+export const pickAxisAmountsByType = (
+  snapshot: AssetSnapshot,
+  assetTypeNames: string[],
+): Record<string, number> =>
+  Object.fromEntries(
+    Object.entries(snapshot.byType).filter(([assetTypeName]) =>
+      isAxisTarget(assetTypeNames, assetTypeName),
+    ),
+  );
+
+/**
  * 分類軸の資産推移を月次で組み立てる。
  *
  * マネーフォワードの「資産推移」は当月が日次・それ以前は月末日のみという混在で、
@@ -132,6 +149,8 @@ export const buildAxisNetWorthSeries = (
   return [...byMonth.values()].map((snapshot) => ({
     date: snapshot.date,
     amount: sumAxisAmount(snapshot, assetTypeNames, axisDebts),
+    // 積み上げ表示が描く値。純額(`amount`)とは別に持つ(型の取り決め)
+    byType: pickAxisAmountsByType(snapshot, assetTypeNames),
   }));
 };
 

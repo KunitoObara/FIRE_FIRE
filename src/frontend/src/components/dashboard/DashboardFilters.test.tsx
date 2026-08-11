@@ -17,7 +17,13 @@ const axes: AssetCategoryAxis[] = [
 
 const renderFilters = (props: Partial<DashboardFiltersProps> = {}): void => {
   render(
-    <DashboardFilters axes={axes} selectedAxisId="total-assets" selectedPeriodId="1y" {...props} />,
+    <DashboardFilters
+      axes={axes}
+      selectedAxisId="total-assets"
+      selectedPeriodId="1y"
+      selectedTrendMode="stacked"
+      {...props}
+    />,
   );
 };
 
@@ -52,7 +58,9 @@ describe("DashboardFilters", () => {
 
     await user.click(screen.getByRole("tab", { name: "3年" }));
 
-    expect(replace).toHaveBeenCalledWith("/dashboard?axis=investment-assets&period=3y");
+    expect(replace).toHaveBeenCalledWith(
+      "/dashboard?axis=investment-assets&period=3y&trend=stacked",
+    );
   });
 
   it("分類軸を切り替えると、期間を保ったままURLを差し替える", async () => {
@@ -62,7 +70,9 @@ describe("DashboardFilters", () => {
     await user.click(screen.getByLabelText("分類軸"));
     await user.click(screen.getByRole("option", { name: "投資性資産" }));
 
-    expect(replace).toHaveBeenCalledWith("/dashboard?axis=investment-assets&period=5y");
+    expect(replace).toHaveBeenCalledWith(
+      "/dashboard?axis=investment-assets&period=5y&trend=stacked",
+    );
   });
 
   it("分類軸が1つも無ければセレクタを操作できない", () => {

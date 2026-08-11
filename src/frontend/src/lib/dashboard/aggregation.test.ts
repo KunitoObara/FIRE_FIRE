@@ -59,10 +59,17 @@ describe("sumAxisAmount", () => {
   });
 });
 
+/**
+ * 純額(純資産表示が描く値)だけを取り出す。内訳(`byType`)は積み上げ表示のもので、
+ * 別のテストで確かめる。
+ */
+const netAmountsOf = (series: NetWorthPoint[]): { date: string; amount: number }[] =>
+  series.map((point) => ({ date: point.date, amount: point.amount }));
+
 describe("buildAxisNetWorthSeries", () => {
   /** 当月の日次が並ぶと、月次の目盛り・ツールチップと1対1で対応しなくなる */
   it("月ごとに、その月でいちばん新しい集計日の残高を1点にする", () => {
-    expect(buildAxisNetWorthSeries(snapshots, [], [])).toEqual([
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], []))).toEqual([
       { date: "2026-06-30", amount: 10_000_000 },
       { date: "2026-07-31", amount: 11_000_000 },
       { date: "2026-08-05", amount: 11_400_000 },
@@ -70,11 +77,29 @@ describe("buildAxisNetWorthSeries", () => {
   });
 
   it("集計対象の資産種別だけで各月の金額を出す", () => {
-    expect(buildAxisNetWorthSeries(snapshots, ["投資信託"], [])).toEqual([
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, ["投資信託"], []))).toEqual([
       { date: "2026-06-30", amount: 1_000_000 },
       { date: "2026-07-31", amount: 1_500_000 },
       { date: "2026-08-05", amount: 1_600_000 },
     ]);
+  });
+
+  /**
+   * 積み上げ表示が描く値。純額(`amount`)とは別に持ち、**負債を引かない**
+   * (docs/screen-requirements-dashboard.md B1「積み上げ表示」)。
+   */
+  it("各点に集計対象の資産種別ごとの額を持たせる", () => {
+    expect(buildAxisNetWorthSeries(snapshots, ["投資信託"], []).at(-1)?.byType).toEqual({
+      投資信託: 1_600_000,
+    });
+  });
+
+  it("集計対象が空配列なら全種別を内訳に持つ", () => {
+    expect(buildAxisNetWorthSeries(snapshots, [], []).at(-1)?.byType).toEqual({
+      "預金・現金": 4_400_000,
+      "株式(現物)": 5_400_000,
+      投資信託: 1_600_000,
+    });
   });
 
   it("入力の並び順によらず日付の昇順で返す", () => {
@@ -217,12 +242,27 @@ describe("sumAxisAmount(負債を含む分類軸)", () => {
 
 describe("buildAxisNetWorthSeries(負債を含む分類軸)", () => {
   it("各時点で、その時点以前の最も新しい残債を差し引く", () => {
-    expect(buildAxisNetWorthSeries(snapshots, [], [mortgage])).toEqual([
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [mortgage]))).toEqual([
       // 6月末は負債の登録前なので差し引かない
       { date: "2026-06-30", amount: 10_000_000 },
       { date: "2026-07-31", amount: 11_000_000 - 4_000_000 },
       { date: "2026-08-05", amount: 11_400_000 - 3_000_000 },
     ]);
+  });
+
+  /**
+   * 積み上げ表示は資産種別の帯だけを描き、負債は帯にしない(同要件B1)。
+   * 差し引いた推移は純資産表示が描くので、内訳側で引くと二重に引くことになる。
+   */
+  it("負債を差し引くのは純額だけで、資産種別ごとの額からは引かない", () => {
+    const latest = buildAxisNetWorthSeries(snapshots, [], [mortgage]).at(-1);
+
+    expect(latest?.amount).toBe(11_400_000 - 3_000_000);
+    expect(latest?.byType).toEqual({
+      "預金・現金": 4_400_000,
+      "株式(現物)": 5_400_000,
+      投資信託: 1_600_000,
+    });
   });
 });
 

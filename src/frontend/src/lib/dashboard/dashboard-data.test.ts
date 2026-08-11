@@ -125,13 +125,18 @@ describe("fetchDashboardData", () => {
       throw new Error("取得に失敗した");
     }
 
-    expect(result.data.byAxis.total?.netWorthSeries).toEqual([
-      { date: "2026-07-31", amount: 11_000_000 },
-      { date: "2026-08-05", amount: 11_400_000 },
+    // 純額(純資産表示が描く値)。資産種別ごとの内訳は`buildAxisNetWorthSeries`側で確かめる
+    expect(
+      result.data.byAxis.total?.netWorthSeries.map((point) => [point.date, point.amount]),
+    ).toEqual([
+      ["2026-07-31", 11_000_000],
+      ["2026-08-05", 11_400_000],
     ]);
-    expect(result.data.byAxis.investment?.netWorthSeries).toEqual([
-      { date: "2026-07-31", amount: 6_800_000 },
-      { date: "2026-08-05", amount: 7_000_000 },
+    expect(
+      result.data.byAxis.investment?.netWorthSeries.map((point) => [point.date, point.amount]),
+    ).toEqual([
+      ["2026-07-31", 6_800_000],
+      ["2026-08-05", 7_000_000],
     ]);
     expect(result.data.byAxis.investment?.breakdown).toEqual([
       { categoryId: "株式(現物)", amount: 5_400_000 },

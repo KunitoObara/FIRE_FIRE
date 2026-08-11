@@ -26,6 +26,48 @@ export const DEFAULT_DASHBOARD_PERIOD_ID: DashboardPeriodId = "1y";
  */
 export const DASHBOARD_AXIS_PARAM = "axis";
 export const DASHBOARD_PERIOD_PARAM = "period";
+export const DASHBOARD_TREND_PARAM = "trend";
+
+/** 資産推移グラフの表示切替の選択肢(docs/screen-requirements-dashboard.md B1) */
+export const NET_WORTH_TREND_MODES: NetWorthTrendMode[] = [
+  { id: "stacked", label: "積み上げ" },
+  { id: "net", label: "純資産" },
+];
+
+/**
+ * 資産推移グラフの表示の既定値。
+ *
+ * 既定を積み上げにするのはカードの主旨がそちらのため。純資産表示は切替で出す
+ * (docs/screen-requirements-dashboard.md B1「資産推移グラフの表示切替」)。
+ */
+export const DEFAULT_NET_WORTH_TREND_MODE_ID: NetWorthTrendModeId = "stacked";
+
+/** 表示切替のアクセシブルな名前(タブの見た目に対する説明) */
+export const NET_WORTH_TREND_MODE_LABEL = "資産推移の表示";
+
+/**
+ * 積み上げ表示の正負の積み方(Rechartsの`stackOffset`)。
+ *
+ * **正を0より上・負を0より下に分けて積む。** 既定の`"none"`は順にそのまま累積するため、
+ * マイナス残高の資産種別の帯が直前の帯に重なって下向きに描かれ、帯の切れ目が読めなくなる
+ * (docs/screen-requirements-dashboard.md B1「積み上げ表示」)。
+ *
+ * この積み方では面の上端は「正の資産種別だけの合計」になる。ツールチップの合計とは
+ * 一致しないことがあり、それは意図した通り(同節)。
+ */
+export const NET_WORTH_STACK_OFFSET = "sign";
+
+/** 積み上げ表示のツールチップに出す合計の見出し */
+export const NET_WORTH_STACK_TOTAL_LABEL = "合計";
+
+/**
+ * 負債を含む分類軸を積み上げで表示しているときの注記。
+ *
+ * 隣の円グラフは負債のスライスと差引後の純額を出しているので、これが無いと同じ画面の
+ * 2つのグラフが同じ分類軸について違う合計を示しているように見える(同要件B1)。
+ */
+export const STACKED_DEBT_NOT_DEDUCTED_NOTICE =
+  "この分類軸が対象にしている負債は差し引いていません。差引後の推移は「純資産」で見られます。";
 
 /**
  * 分類別内訳で個別の色を割り当てられる分類の数。
@@ -199,8 +241,29 @@ export const CHART_ANIMATION_EASING = "ease-out";
  * 資産種別名(CSVの列名)は自由入力に近く、区切りに使った文字がそのまま値に現れうる。
  * 連結だと、中身の違う2つのデータが同じ署名に潰れて再生が漏れる。
  */
-export const buildNetWorthSeriesKey = (axisName: string, series: NetWorthPoint[]): string =>
-  JSON.stringify([axisName, series.map((point) => [point.date, point.amount])]);
+export const buildNetWorthSeriesKey = (
+  axisName: string,
+  series: NetWorthPoint[],
+  mode: NetWorthTrendModeId,
+): string =>
+  JSON.stringify([
+    axisName,
+    mode,
+    /*
+      **`byType`も署名に含める。** 純額だけでは、CSVを取り込み直して内訳の配分だけが
+      訂正された場合(合計は同じ)に積み上げの帯の形が変わったことを検出できず、再生が漏れる。
+
+      **キーで並べ替えてから並べる。** `byType`はFirestoreのマップをそのまま持つので、
+      同じ中身でも取得のたびにキーの順が変わりうる。順のまま署名にすると、中身が変わって
+      いない裏での取り直しでも署名が変わり、DESIGN.md 9章が再生しないと定めている
+      「データが変わらないままの再レンダリング」で再生してしまう。
+    */
+    series.map((point) => [
+      point.date,
+      point.amount,
+      Object.entries(point.byType).sort(([left], [right]) => left.localeCompare(right)),
+    ]),
+  ]);
 
 /**
  * FIRE達成度ゲージの再生の引き金。**固定値**で、初回描画時にしか再生しない(DESIGN.md 9章)。
