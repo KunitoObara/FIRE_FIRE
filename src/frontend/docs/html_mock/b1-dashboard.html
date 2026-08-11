@@ -188,7 +188,9 @@
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-sm font-semibold">資産推移(純金融資産)</h2>
           <!-- 分類軸・表示期間と同じ切替の見た目にする。選択状態はURLのクエリに載る。
-               対象の負債が1件も無い分類軸ではこの切替そのものを出さない -->
+               この切替を出すのは、表示中の期間のどこかで負債の帯が0でないときだけ。
+               負債の件数では判定しない(完済して残債0円の負債だけを参照している分類軸では、
+               帯の高さが常に0になり、押しても何も変わらない切替が出るため) -->
           <div class="tab-row" style="border-bottom: none;">
             <span class="tab tab-active">負債反映</span>
             <span class="tab">資産のみ</span>
