@@ -32,12 +32,27 @@ const buildTransaction = (transaction: Partial<Transaction> & { id: string }): T
 });
 
 const resolveData = (transactions: Transaction[], truncated = false): void => {
+  const categories = [...new Set(transactions.map((transaction) => transaction.categoryMajor))];
+
   fetchTransactionsData.mockResolvedValue({
     ok: true,
     truncated,
     data: {
       transactions,
-      categories: [...new Set(transactions.map((transaction) => transaction.categoryMajor))],
+      categories,
+      categoryMinorsByMajor: Object.fromEntries(
+        categories.map((major) => [
+          major,
+          [
+            ...new Set(
+              transactions
+                .filter((transaction) => transaction.categoryMajor === major)
+                .map((transaction) => transaction.categoryMinor)
+                .filter((minor) => minor),
+            ),
+          ],
+        ]),
+      ),
       accounts: [...new Set(transactions.map((transaction) => transaction.account))],
     },
   });
@@ -115,6 +130,67 @@ describe("TransactionsScreen", () => {
     renderScreen({ category: "住居費" });
 
     expect(await screen.findByRole("cell", { name: "家賃引き落とし" })).toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "スーパー〇〇" })).not.toBeInTheDocument();
+  });
+
+  it("URLの中項目でも絞り込む", async () => {
+    resolveData([
+      buildTransaction({ id: "aaaa1111", content: "スーパー〇〇", categoryMinor: "食料品" }),
+      buildTransaction({ id: "bbbb2222", content: "定食屋〇〇", categoryMinor: "外食" }),
+    ]);
+    renderScreen({ subcategory: "外食" });
+
+    expect(await screen.findByRole("cell", { name: "定食屋〇〇" })).toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "スーパー〇〇" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 印が無いと、一覧の金額を足してもB1の収支サマリと合わない理由が分からない。
+   * 振替と計算対象外は意味が違うので別の印にする(同書5章)
+   */
+  it("振替・計算対象外の行にそれぞれ別の印を付ける", async () => {
+    resolveData([
+      buildTransaction({ id: "aaaa1111", content: "証券口座へ入金", isTransfer: true }),
+      buildTransaction({ id: "bbbb2222", content: "立替分", isCalculationTarget: false }),
+      buildTransaction({ id: "cccc3333", content: "スーパー〇〇" }),
+    ]);
+    renderScreen();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("振替")).toBeInTheDocument();
+    expect(table.getByText("計算対象外")).toBeInTheDocument();
+    // 集計に入る行には印を付けない
+    expect(table.getAllByText(/振替|計算対象外/u)).toHaveLength(2);
+  });
+
+  it("振替かつ計算対象外の行には両方の印を出す", async () => {
+    resolveData([
+      buildTransaction({
+        id: "aaaa1111",
+        content: "証券口座へ入金",
+        isTransfer: true,
+        isCalculationTarget: false,
+      }),
+    ]);
+    renderScreen();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByText("振替")).toBeInTheDocument();
+    expect(table.getByText("計算対象外")).toBeInTheDocument();
+  });
+
+  /**
+   * 期間を切り替えると選択肢の集合が変わる。黙って外すと、0件なのは「本当に無い」からなのか
+   * 「選択が外れた」からなのかを画面から区別できない(B3)
+   */
+  it("選択中の費目がその期間に無くても選択肢に残し、該当が無いことを添える", async () => {
+    resolveData([buildTransaction({ id: "aaaa1111", categoryMajor: "食費" })]);
+    renderScreen({ category: "交通費" });
+
+    expect(await screen.findByLabelText("費目(大項目)")).toHaveTextContent(
+      "交通費(この期間に該当なし)",
+    );
+    // 絞り込みは効いたままなので一覧は0件になる
     expect(screen.queryByRole("cell", { name: "スーパー〇〇" })).not.toBeInTheDocument();
   });
 

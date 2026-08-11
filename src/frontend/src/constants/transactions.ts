@@ -73,12 +73,23 @@ export const DEFAULT_TRANSACTION_SORT_KEY: TransactionSortKey = "date";
 export const DEFAULT_TRANSACTION_SORT_DIRECTION: TransactionSortDirection = "desc";
 
 /**
- * 「すべて」を表す費目・口座セレクタの選択値。
- * 未選択は内部的に空文字(`TransactionFilters.category`/`account`)で表すが、Radix
+ * 「すべて」を表す費目・中項目・口座セレクタの選択値。
+ * 未選択は内部的に空文字(`TransactionFilters.category`等)で表すが、Radix
  * `Select`のitem valueには空文字を使えないため、UI表示専用のダミー値を割り当てる。
  */
 export const ALL_TRANSACTION_CATEGORIES_VALUE = "__all-categories__";
+export const ALL_TRANSACTION_CATEGORY_MINORS_VALUE = "__all-category-minors__";
 export const ALL_TRANSACTION_ACCOUNTS_VALUE = "__all-accounts__";
+
+/**
+ * 選択中の値が、読み込んだ期間に1件も無いときにラベルへ添える但し書き
+ * (docs/screen-requirements-dashboard.md B3)。
+ *
+ * 選択肢から黙って外すと、結果が0件なのは「本当に無い」からなのか「選択が外れた」からなのかを
+ * 画面から区別できない。打ち切りを黙って欠けさせないのと同じ理由で、消さずに理由を添える。
+ */
+export const buildUnavailableOptionLabel = (value: string): string =>
+  `${value}(この期間に該当なし)`;
 
 /** 1ページあたりの表示件数 */
 export const TRANSACTIONS_PAGE_SIZE = 20;
@@ -90,6 +101,7 @@ export const TRANSACTIONS_PAGE_SIZE = 20;
  */
 export const TRANSACTION_PERIOD_PARAM = "period";
 export const TRANSACTION_CATEGORY_PARAM = "category";
+export const TRANSACTION_CATEGORY_MINOR_PARAM = "subcategory";
 export const TRANSACTION_ACCOUNT_PARAM = "account";
 export const TRANSACTION_KEYWORD_PARAM = "q";
 export const TRANSACTION_SORT_PARAM = "sort";
@@ -125,3 +137,18 @@ export const NO_TRANSACTIONS_IN_PERIOD_EMPTY_STATE = {
 
 /** 絞り込み条件に一致する取引が無いときの表示 */
 export const NO_MATCHING_TRANSACTIONS_LABEL = "条件に一致する取引がありません。";
+
+/**
+ * 収支の集計から外れる行に付ける印(docs/screen-requirements-dashboard.md B3)。
+ *
+ * **振替と計算対象外は別の印にする。** 前者はマネーフォワードが自動で付ける分類、後者は
+ * ユーザーが下した判断で、意味が違う。印が無いと、一覧の金額を足してもB1の収支サマリと
+ * 合わない理由が分からない(docs/transaction-import-requirements.md 5章)。
+ */
+export const TRANSFER_BADGE_LABEL = "振替";
+export const NON_CALCULATION_TARGET_BADGE_LABEL = "計算対象外";
+
+/** 印の意味を補う説明。バッジだけでは「なぜ外れるのか」までは伝わらない */
+export const TRANSFER_BADGE_DESCRIPTION = "自口座間の移動のため収支の集計に含みません";
+export const NON_CALCULATION_TARGET_BADGE_DESCRIPTION =
+  "マネーフォワードで計算対象外に設定されているため収支の集計に含みません";

@@ -6,7 +6,9 @@
  * 片方だけを直したときに、読めているのに表示から落ちる取引が出る
  * (docs/transaction-import-requirements.md 8章)。
  *
- * 費目は**大項目**で突き合わせる。キーワードは内容(摘要)に対する部分一致で、大小文字は
+ * 費目は**大項目と中項目の2段**で突き合わせる。両方が選ばれていればAND条件になり、中項目だけが
+ * 選ばれていれば大項目をまたいで一致させる(セレクタの選択肢は大項目に連動して絞られるが、
+ * 絞り込みそのものは独立している)。キーワードは内容(摘要)に対する部分一致で、大小文字は
  * 区別しない。Firestoreの複合条件に載せられない絞り込みなので、読み込んだ範囲に対して
  * クライアント側で行う。
  */
@@ -18,6 +20,10 @@ export const filterTransactions = (
 
   return transactions.filter((transaction) => {
     if (filters.category && transaction.categoryMajor !== filters.category) {
+      return false;
+    }
+
+    if (filters.categoryMinor && transaction.categoryMinor !== filters.categoryMinor) {
       return false;
     }
 

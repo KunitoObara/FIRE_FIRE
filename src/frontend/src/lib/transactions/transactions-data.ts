@@ -25,6 +25,24 @@ const collectOptions = (values: string[]): string[] =>
     left.localeCompare(right, "ja"),
   );
 
+/**
+ * 大項目ごとの中項目を集める。
+ *
+ * 大項目を選ぶと中項目セレクタの選択肢がその配下に絞られるため、対応関係を保ったまま渡す
+ * (docs/transaction-import-requirements.md 6章)。中項目が空の取引はどちらにも数えない。
+ */
+const collectCategoryMinorsByMajor = (transactions: Transaction[]): Record<string, string[]> =>
+  Object.fromEntries(
+    collectOptions(transactions.map((transaction) => transaction.categoryMajor)).map((major) => [
+      major,
+      collectOptions(
+        transactions
+          .filter((transaction) => transaction.categoryMajor === major)
+          .map((transaction) => transaction.categoryMinor),
+      ),
+    ]),
+  );
+
 export const fetchTransactionsData = async (
   periodId: TransactionPeriodId,
   now: Date,
@@ -42,8 +60,8 @@ export const fetchTransactionsData = async (
     truncated: result.truncated,
     data: {
       transactions,
-      // 費目の選択肢は大項目で作る。中項目での絞り込みは別途足す
       categories: collectOptions(transactions.map((transaction) => transaction.categoryMajor)),
+      categoryMinorsByMajor: collectCategoryMinorsByMajor(transactions),
       accounts: collectOptions(transactions.map((transaction) => transaction.account)),
     },
   };
