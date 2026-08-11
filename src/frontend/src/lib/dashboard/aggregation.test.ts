@@ -254,12 +254,30 @@ describe("resolveDebtBalanceAt(発生年月あり)", () => {
   });
 
   /** B11は入力時にこの前後関係をエラーにしないので、集計側が一意に決まる規則を持つ */
-  it("発生年月が最初の記録より後なら、それより前の記録は無視する", () => {
+  it("発生年月が最初の記録より後でも、発生年月より前の点は差し引かない", () => {
     const originAfterRecord: Debt = { ...mortgage, originatedOn: "2026-08" };
 
-    // 7月末の記録(400万)は発生年月より前なので使わない
     expect(resolveDebtBalanceAt(originAfterRecord, "2026-07-31")).toBe(0);
     expect(resolveDebtBalanceAt(originAfterRecord, "2026-08-05")).toBe(3_000_000);
+  });
+
+  /**
+   * **発生年月より前の記録しか無い負債。** 既存の負債に発生年月だけを後から入力すると、
+   * 残債が変わっていない保存では履歴が増えない(`buildNextBalanceHistory`)ため、この形になる。
+   * 記録を選ぶ範囲まで発生年月で狭めると、起点以降に採れる記録が1件も無くなり、過去の全期間が
+   * 残債0円になる(PR #143 のレビュー指摘)。
+   */
+  it("発生年月より前の記録しか無くても、その残債を起点以降に当てる", () => {
+    const originOnly: Debt = {
+      ...mortgage,
+      originatedOn: "2026-08",
+      balanceHistory: { "2024-01-15": 5_000_000 },
+    };
+
+    // 起点より前は差し引かない
+    expect(resolveDebtBalanceAt(originOnly, "2026-07-31")).toBe(0);
+    // 起点以降は、唯一の記録の残債を当てる(0にしない)
+    expect(resolveDebtBalanceAt(originOnly, "2026-08-05")).toBe(5_000_000);
   });
 
   /** 履歴が1件も無ければ、発生年月を入れても遡って当てる値が無い */

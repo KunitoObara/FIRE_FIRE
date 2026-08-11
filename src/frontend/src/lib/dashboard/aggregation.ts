@@ -86,8 +86,13 @@ const resolveDebtOriginDate = (debt: Debt): string | null => {
  * 置く — 返済前の残債は今より多いのが普通なので実態より少なく出るが、起点が
  * 「アプリに登録した月」のままである読み違いのほうが大きい([B11-7](https://trello.com/c/zNKoKCOn))。
  *
- * 発生年月が最初の記録より後にある場合は、**発生年月を優先し、それより前の記録は無視する**。
- * B11が入力時にこの前後関係をエラーにしない以上、集計側が一意に決まる規則を持つ必要がある。
+ * **発生年月より前の記録も、残債の値としては使う。** 発生年月が効くのは「いつから差し引くか」
+ * だけで、記録を選ぶ範囲は狭めない。狭めると、**発生年月より前の記録しか持たない負債**
+ * (発生年月だけを後から入力し、残債が変わっていないので履歴が増えていない場合)で
+ * 起点以降に採れる記録が1件も無くなり、過去の全期間が残債0円になる。実際にはずっとあった
+ * 負債が消えて純資産が過大に出るうえ、最後の点だけ現在の残債に戻るので、このカードが
+ * 解消しようとした「右端の崖」が残る([PR #143](https://github.com/KunitoObara/FIRE_FIRE/pull/143) のレビュー指摘)。
+ * 発生年月より前の点を差し引かないことは、入口の`date < originDate`だけで担保できている。
  *
  * 履歴のキーは`yyyy-MM-dd`固定なので、日付の比較は文字列のままで辞書順=時系列になる
  * (`Date`へ直すとタイムゾーンの解釈が入る)。
@@ -105,11 +110,6 @@ export const resolveDebtBalanceAt = (debt: Debt, date: string): number => {
   let earliestBalance = 0;
 
   for (const [recordedDate, balance] of Object.entries(debt.balanceHistory)) {
-    // 発生年月より前の記録は、起点より前の期間を差し引かないのと同じ理由で無視する
-    if (recordedDate < originDate) {
-      continue;
-    }
-
     if (recordedDate <= date && (latestDate === null || recordedDate > latestDate)) {
       latestDate = recordedDate;
       latestBalance = balance;
