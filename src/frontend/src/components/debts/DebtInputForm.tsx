@@ -245,10 +245,24 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
                         className="tabular-nums"
                         disabled={saving}
                         aria-invalid={errors.debts?.[index]?.originatedOn !== undefined}
-                        aria-describedby={`debt-originated-on-hint-${field.rowKey}`}
+                        aria-describedby={
+                          /*
+                            エラーが出ているあいだはエラー文、それ以外はヒント文を指す。
+                            `FieldError`は`role="alert"`を持つので発生時には読み上げられるが、
+                            あとからこの欄へフォーカスしたときに理由を辿れるのは
+                            `aria-describedby`で結び付けている側だけ。ヒント文を持つ欄は
+                            この欄だけなので、この分岐もここにしか要らない
+                          */
+                          errors.debts?.[index]?.originatedOn === undefined
+                            ? `debt-originated-on-hint-${field.rowKey}`
+                            : `debt-originated-on-error-${field.rowKey}`
+                        }
                         {...register(`debts.${index}.originatedOn`)}
                       />
-                      <FieldError errors={[errors.debts?.[index]?.originatedOn]} />
+                      <FieldError
+                        id={`debt-originated-on-error-${field.rowKey}`}
+                        errors={[errors.debts?.[index]?.originatedOn]}
+                      />
                       {/*
                         入れても負債サマリ・円グラフ・ゲージの数字は変わらないので、
                         何のための欄かを添えないと入力されないまま残る(同要件B11)

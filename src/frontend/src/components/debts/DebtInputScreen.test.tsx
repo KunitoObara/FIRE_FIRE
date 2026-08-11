@@ -190,6 +190,14 @@ describe("DebtInputScreen", () => {
 
     expect(await screen.findByText("発生年月に未来の年月は入力できません。")).toBeInTheDocument();
     expect(saveDebts).not.toHaveBeenCalled();
+
+    /*
+      エラー中はヒント文ではなくエラー文を指す。`role="alert"`は発生した瞬間しか読み上げず、
+      あとからこの欄へフォーカスしたときに理由を辿れるのは`aria-describedby`側だけ
+    */
+    expect(screen.getByLabelText(/発生年月/u)).toHaveAccessibleDescription(
+      "発生年月に未来の年月は入力できません。",
+    );
   });
 
   it("項目名・残債の不正はインラインエラーを出し、保存しない", async () => {
