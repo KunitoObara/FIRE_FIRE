@@ -148,7 +148,7 @@ OS側で視差効果を減らす設定(`prefers-reduced-motion: reduce`)にな�
 
 | チャート | 動かしているもの |
 |---|---|
-| `NetWorthTrendChart.tsx` | Rechartsの登場アニメーション(`isAnimationActive={!prefersReducedMotion}`)。線と面を同じクリップで広げてくれるため |
+| `NetWorthStackedChart.tsx` | Rechartsの登場アニメーション(`isAnimationActive={!prefersReducedMotion}`)。積み上げた帯を同じクリップでまとめて広げてくれるため(0より下に積む負債の帯も同じクリップに入る) |
 | `CategoryBreakdownChart.tsx` | CSSマスク(`CategoryBreakdownChart.module.css`)。`paddingAngle`との併用ができないためRecharts側は`false`のまま |
 | `FireProgressGauge.tsx` | 自前の進捗値。リングと中央の%を同じ値から描くためRecharts側は`false`のまま |
 
