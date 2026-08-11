@@ -97,7 +97,7 @@ export const TransactionsFilterBar = ({
               費目
             </Label>
             <Select
-              value={category === "" ? ALL_TRANSACTION_CATEGORIES_VALUE : category}
+              value={category || ALL_TRANSACTION_CATEGORIES_VALUE}
               onValueChange={(value) =>
                 setCategory(value === ALL_TRANSACTION_CATEGORIES_VALUE ? "" : value)
               }
@@ -121,7 +121,7 @@ export const TransactionsFilterBar = ({
               口座
             </Label>
             <Select
-              value={account === "" ? ALL_TRANSACTION_ACCOUNTS_VALUE : account}
+              value={account || ALL_TRANSACTION_ACCOUNTS_VALUE}
               onValueChange={(value) =>
                 setAccount(value === ALL_TRANSACTION_ACCOUNTS_VALUE ? "" : value)
               }

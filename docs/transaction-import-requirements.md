@@ -226,7 +226,16 @@ CSVの `大項目` と `中項目` を両方保存する。
 | [B2 CSV取込](./screen-requirements-dashboard.md#b2-csv取込画面) | 入出金明細タブのCSV形式(2章)・冪等性(4章)・プレビュー(7章) |
 | [B3 収支明細一覧](./screen-requirements-dashboard.md#b3-収支明細一覧画面) | 表示する行(5章)、絞り込みの軸(6章)、読み取り範囲と打ち切り(8章) |
 
-なお **B3 は [B3-1] で Firestore に接続済み**で、サンプルデータ(`USE_SAMPLE_TRANSACTIONS_DATA` と `sample-data.ts`)は撤去した。取得は `src/frontend/src/lib/transactions/transactions-data.ts` の `fetchTransactionsData` が担い、B1が `fetchDashboardData` で行ったのと同じ形になっている。**B1の収支サマリ(5章・6章の集計)はまだ実データを見ておらず、[B1-8] の範囲**である。
+なお **B3 は [B3-1] で Firestore に接続済み**で、サンプルデータ(`USE_SAMPLE_TRANSACTIONS_DATA` と `sample-data.ts`)は撤去した。取得は `src/frontend/src/lib/transactions/transactions-data.ts` の `fetchTransactionsData` が担い、B1が `fetchDashboardData` で行ったのと同じ形になっている。
+
+**ただし接続済み = 要件を満たしている、ではない。** 実装が追いついていない箇所が次のとおり残っている。
+
+| 未実装 | 本書の該当 | 範囲 |
+|---|---|---|
+| 費目の絞り込みが大項目の1段のみ(中項目で絞れない) | 6章 | [B3-1] の3本目 |
+| 振替・計算対象外の行に印(バッジ)が付かない | 5章 | 同上 |
+| 選択中の費目・口座がその期間に無いと選択肢から黙って外れる | 8章 | 同上 |
+| B1の収支サマリが実データを集計していない(`fetchDashboardData` の `cashflow` が `null`) | 5章・6章 | [B1-8] |
 
 ## 10. 今後の検討事項
 

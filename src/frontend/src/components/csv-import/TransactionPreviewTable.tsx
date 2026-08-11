@@ -60,9 +60,9 @@ export const TransactionPreviewTable = ({ rows }: TransactionPreviewTableProps):
               (docs/transaction-import-requirements.md 6章)
             */}
             <td className="px-3 py-2 whitespace-nowrap">
-              {row.categoryMinor === ""
-                ? row.categoryMajor
-                : `${row.categoryMajor} / ${row.categoryMinor}`}
+              {row.categoryMinor
+                ? `${row.categoryMajor} / ${row.categoryMinor}`
+                : row.categoryMajor}
             </td>
           </tr>
         ))}

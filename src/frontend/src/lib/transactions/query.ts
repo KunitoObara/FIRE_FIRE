@@ -17,15 +17,15 @@ export const filterTransactions = (
   const keyword = filters.keyword.toLowerCase();
 
   return transactions.filter((transaction) => {
-    if (filters.category !== "" && transaction.categoryMajor !== filters.category) {
+    if (filters.category && transaction.categoryMajor !== filters.category) {
       return false;
     }
 
-    if (filters.account !== "" && transaction.account !== filters.account) {
+    if (filters.account && transaction.account !== filters.account) {
       return false;
     }
 
-    return keyword === "" || transaction.content.toLowerCase().includes(keyword);
+    return !keyword || transaction.content.toLowerCase().includes(keyword);
   });
 };
 
