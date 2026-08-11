@@ -29,7 +29,7 @@ docs/fire-asset-management-requirements.md の4.2と、docs/screen-requirements-
 
 **入出金明細CSVの取込は実装済み(B2-1〜B2-3)。** タブごとにパーサー・リポジトリ・失敗時の文言・プレビュー表が別々にあり、共有しているのは文字コードの判定とファイルサイズの歯止めだけになる。「未実装だから探さない」と書いてあった時期のメモを見つけたら、それは B2-3 より前の記述で古い。
 
-**ただしB3 収支明細一覧はまだFirestoreに繋がっていない。** `src/frontend/src/lib/transactions/transactions-data.ts` が `USE_SAMPLE_TRANSACTIONS_DATA` 越しに `sample-data.ts` を返しており、取り込んだ取引は画面に出ない。差し替えは [B3-1]、B1の収支サマリの集計は [B1-8] の範囲で、**B2側の退行ではない**。
+**B3 収支明細一覧も [B3-1] でFirestoreに接続済み。** `src/frontend/src/lib/transactions/transactions-data.ts` の `fetchTransactionsData` が選択中の期間だけを読み、サンプルデータは撤去した。**まだ実データを見ていないのはB1の収支サマリだけ**で(`fetchDashboardData` の `cashflow` が `null`)、これは [B1-8] の範囲であり**B2・B3側の退行ではない**。
 
 ## 検証手順
 

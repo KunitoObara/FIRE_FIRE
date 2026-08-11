@@ -1,4 +1,4 @@
-import { format, parseISO, startOfDay, startOfYear, subMonths } from "date-fns";
+import { format, startOfDay, startOfYear, subMonths } from "date-fns";
 
 import { STORED_DATE_FORMAT } from "@/constants/csv-import";
 
@@ -6,9 +6,6 @@ import { STORED_DATE_FORMAT } from "@/constants/csv-import";
  * 期間の始まりを決める。「直近Nヶ月」は現在からNヶ月前の同日を境界にし、その日ちょうどの
  * 取引は含める(`src/lib/dashboard/period.ts`の`filterSeriesByPeriod`と同じ考え方)。
  * 「今年」は当年1/1以降。
- *
- * **Firestoreの範囲クエリとクライアント側の絞り込みで同じ関数を使う。** 境界の決め方が
- * 2箇所に分かれると、読む範囲と絞り込む範囲がずれても気づけない。
  */
 const resolvePeriodStart = (periodId: Exclude<TransactionPeriodId, "all">, now: Date): Date =>
   periodId === "this-year"
@@ -39,26 +36,3 @@ export const resolveTransactionDateRange = (
         from: format(resolvePeriodStart(periodId, now), STORED_DATE_FORMAT),
         to: format(now, STORED_DATE_FORMAT),
       };
-
-/**
- * 取引一覧を表示期間で絞り込む(B3の期間絞り込み)。
- *
- * サンプルデータを表示している間の絞り込みで、Firestoreから読むようになれば範囲クエリ
- * (`resolveTransactionDateRange`)が同じ役目を担う。境界の決め方は`resolvePeriodStart`に
- * 一本化してあるので、両者の結果は一致する。
- */
-export const filterTransactionsByPeriod = (
-  transactions: Transaction[],
-  periodId: TransactionPeriodId,
-  now: Date,
-): Transaction[] => {
-  if (periodId === "all") {
-    return transactions;
-  }
-
-  const since = resolvePeriodStart(periodId, now);
-
-  return transactions.filter(
-    (transaction) => parseISO(transaction.date).getTime() >= since.getTime(),
-  );
-};
