@@ -27,6 +27,16 @@ export const DEFAULT_DASHBOARD_PERIOD_ID: DashboardPeriodId = "1y";
 export const DASHBOARD_AXIS_PARAM = "axis";
 export const DASHBOARD_PERIOD_PARAM = "period";
 export const DASHBOARD_DEBT_PARAM = "debt";
+export const DASHBOARD_MONTH_PARAM = "month";
+
+/**
+ * 年月を表す文字列の形(`date-fns`の書式)。
+ *
+ * 収支サマリの対象月(`CashflowSummary.month`・URLの`month`)と、資産残高を月へ丸めるときに
+ * 共有する。B11の発生年月(`DEBT_ORIGINATED_ON_PATTERN`)と同じ`yyyy-MM`だが、あちらは
+ * 入力値の検査用の正規表現で、これは整形・パースの書式なので別に持つ。
+ */
+export const MONTH_KEY_FORMAT = "yyyy-MM";
 
 /**
  * 資産推移グラフの負債反映切替の選択肢(docs/screen-requirements-dashboard.md B1)。
@@ -171,11 +181,43 @@ export const DASHBOARD_EMPTY_STATES = {
     message: "FIRE目標が未設定です。目標を設定すると達成度と到達予測日が表示されます。",
     action: { label: "目標を設定する", href: FIRE_GOAL_PATH },
   },
-  cashflow: {
-    message: "入出金明細のデータがまだありません。CSVを取り込むと当月の収支が表示されます。",
-    action: { label: "CSVを取り込む", href: CSV_IMPORT_PATH },
-  },
 } as const;
+
+/**
+ * 選択した年月に取引が1件も無いときの案内(docs/screen-requirements-dashboard.md B1
+ * 「選択した年月にデータが無いとき」)。
+ *
+ * **「まだ取り込んでいない」と言い切らない。** 読むのは選択中の1ヶ月だけなので
+ * (docs/transaction-import-requirements.md 8章)、他の月に取引があるかどうかをこの画面は
+ * 知らない。月初や取り込んでいない過去の月を選んだときに正常に起こる状態であり、
+ * 断定するとその月しか取り込んでいないユーザーに「無い」と伝えることになる
+ * (B3の`NO_TRANSACTIONS_IN_PERIOD_EMPTY_STATE`と同じ理由)。
+ *
+ * 別の月を選ぶ手はカードの中の年月ピッカーそのものなので、文言で示してCSV取込を導線に置く。
+ */
+export const buildCashflowEmptyState = (
+  monthLabel: string,
+): { message: string; action: { label: string; href: string } } => ({
+  message: `${monthLabel}の取引がありません。別の月を選ぶか、入出金明細CSVを取り込んでください。`,
+  action: { label: "CSVを取り込む", href: CSV_IMPORT_PATH },
+});
+
+/**
+ * 取引はあるが支出が1件も無い月に、費目別支出の場所へ出す文言(同節)。
+ *
+ * この月を空状態にはしない。収入・支出・収支の3つの数字は出したうえで費目別支出だけを
+ * 出さないので、**空欄のまま詰めると「支出が無い」のか「表示が壊れている」のかが
+ * 画面から区別できない**。全額が振替・計算対象外だった月に普通に起こる状態であり、
+ * 取引は取り込めているので導線は添えない。
+ */
+export const NO_EXPENSE_IN_MONTH_LABEL = "この月の支出はありません。";
+
+/** 年月ピッカーのアクセシブルな名前(見えている月の表示に添える) */
+export const CASHFLOW_MONTH_PICKER_LABEL = "対象の年月";
+
+/** 年月ピッカーの年送りのラベル。上限は当月なので、当年を表示中は「次の年」を押せない */
+export const CASHFLOW_MONTH_PICKER_PREVIOUS_YEAR_LABEL = "前の年";
+export const CASHFLOW_MONTH_PICKER_NEXT_YEAR_LABEL = "次の年";
 
 /**
  * 負債サマリに並べる項目の件数。超過分は「ほかN件」にまとめてB11へ渡す
@@ -306,6 +348,36 @@ export const buildBreakdownKey = (axisName: string, slices: AssetBreakdownSlice[
 
 /** ダッシュボードの表示データのキャッシュキー(TanStack Query) */
 export const DASHBOARD_DATA_QUERY_KEY = ["dashboard-data"] as const;
+
+/**
+ * 収支サマリのキャッシュキー。**`DASHBOARD_DATA_QUERY_KEY`とは別に持つ**。
+ *
+ * **キーには対象の年月を足して使う**(`[...CASHFLOW_DATA_QUERY_KEY, month]`)。読む範囲が
+ * 年月で変わるためで、月ごとに別のキャッシュに載ることで一度見た月へ戻ったときに
+ * 読み直さない(B3が期間ごとに分けているのと同じ形)。
+ *
+ * ダッシュボードの一括取得と分けてあるのは、**年月を切り替えたときに読み直すのを
+ * その月の取引だけにする**ため(docs/screen-requirements-dashboard.md B1「年月の選択」)。
+ * 混ぜると資産残高・分類軸・負債・FIRE目標まで毎回引き直すことになる。
+ *
+ * B2で入出金明細を取り込んだあとの無効化は、このキーの前方一致で全ての月に効かせる。
+ */
+export const CASHFLOW_DATA_QUERY_KEY = ["cashflow-data"] as const;
+
+/**
+ * 収支サマリのキャッシュを新鮮とみなす時間。**一度見た月へ戻ったときに読み直さない**ための設定
+ * (docs/screen-requirements-dashboard.md B1「年月の選択」)。
+ *
+ * TanStack Queryの既定(`staleTime: 0`)ではキャッシュを即座に出したうえで裏で取り直すため、
+ * 月を行き来するたびにFirestoreを読むことになる。月ごとにキャッシュを分けた目的が
+ * 「読み取りを増やさない」ことなので、その裏の再取得も止める。
+ *
+ * **古い数字が残り続けることにはならない。** 取引を書き換えるのはB2の取込だけで、そのとき
+ * `CASHFLOW_DATA_QUERY_KEY`の前方一致で全ての月が無効化される(無効化は`staleTime`より優先され、
+ * 表示中のクエリはその場で取り直される)。別のタブで取り込んだ場合だけはリロードまで反映されないが、
+ * これはダッシュボードの一括取得(`DASHBOARD_DATA_QUERY_KEY`)も同じ性質で、本カードだけの制約ではない。
+ */
+export const CASHFLOW_DATA_STALE_TIME_MS = Number.POSITIVE_INFINITY;
 
 /**
  * 表示データを取得できなかったときの文言。

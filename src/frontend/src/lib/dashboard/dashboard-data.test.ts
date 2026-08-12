@@ -7,7 +7,6 @@ const fetchAssetSnapshots = vi.fn();
 const fetchLastImportedAt = vi.fn();
 const fetchFireGoal = vi.fn();
 const fetchDebts = vi.fn();
-const fetchMonthlyTransactions = vi.fn();
 
 vi.mock("@/lib/asset-categories/category-axis-repository", () => ({
   fetchCategoryAxes: () => fetchCategoryAxes(),
@@ -25,24 +24,6 @@ vi.mock("@/lib/fire-goal/fire-goal-repository", () => ({
 vi.mock("@/lib/debts/debt-repository", () => ({
   fetchDebts: () => fetchDebts(),
 }));
-
-vi.mock("@/lib/csv-import/transaction-repository", () => ({
-  fetchMonthlyTransactions: (...args: unknown[]) => fetchMonthlyTransactions(...args),
-}));
-
-/** 当月の取引(B2で取り込んだもの)。既定は0件にして、収支サマリを扱わない既存のケースの期待値を変えない */
-const buildTransaction = (transaction: Partial<Transaction> & { id: string }): Transaction => ({
-  date: "2026-08-05",
-  content: "スーパー〇〇",
-  amount: -3_280,
-  account: "〇〇カード",
-  categoryMajor: "食費",
-  categoryMinor: "食料品",
-  memo: "",
-  isTransfer: false,
-  isCalculationTarget: true,
-  ...transaction,
-});
 
 const axes: AssetCategoryAxisDocument[] = [
   {
@@ -83,8 +64,6 @@ describe("fetchDashboardData", () => {
     // 負債(B11)。既定は取得成功・0件にして、負債を扱わない既存のケースの期待値を変えない
     fetchDebts.mockReset();
     fetchDebts.mockResolvedValue({ ok: true, debts: [] });
-    fetchMonthlyTransactions.mockReset();
-    fetchMonthlyTransactions.mockResolvedValue({ ok: true, transactions: [], truncated: false });
 
     fetchCategoryAxes.mockResolvedValue({ ok: true, axes });
     fetchAssetSnapshots.mockResolvedValue({ ok: true, snapshots });
@@ -263,47 +242,16 @@ describe("fetchDashboardData", () => {
     expect(result.data.fireProgress?.currentAmount).toBe(11_400_000 - 3_000_000);
   });
 
-  /** 月初は正常にこの状態になる。エラーとしても、取込前の状態としても扱わない */
-  it("当月の取引が1件も無ければ収支サマリはnullのまま返す", async () => {
+  /**
+   * 収支サマリは対象の月ごとに別で取得する(docs/screen-requirements-dashboard.md B1
+   * 「年月の選択」)。ここに混ざったままだと、年月を切り替えるたびに資産残高・分類軸・負債・
+   * FIRE目標まで読み直すことになる
+   */
+  it("取引は読まない(収支サマリは`fetchCashflowData`が月ごとに取得する)", async () => {
     const result = await fetchDashboardData();
 
-    expect(result).toMatchObject({ ok: true, data: { cashflow: null } });
-  });
-
-  it("当月の取引から収支サマリを組み立てる", async () => {
-    fetchMonthlyTransactions.mockResolvedValue({
-      ok: true,
-      truncated: false,
-      transactions: [
-        buildTransaction({ id: "a", amount: 420_000, categoryMajor: "収入" }),
-        buildTransaction({ id: "b", amount: -98_000, categoryMajor: "住居費" }),
-        buildTransaction({ id: "c", amount: -3_280, categoryMajor: "食費" }),
-      ],
-    });
-
-    const result = await fetchDashboardData();
-
-    expect(result).toMatchObject({
-      ok: true,
-      data: {
-        cashflow: {
-          income: 420_000,
-          // 支出は絶対値で持つ(負のまま渡すと収支が`income + |支出|`になる)
-          expense: 101_280,
-          expenseByCategory: [
-            { name: "住居費", amount: 98_000 },
-            { name: "食費", amount: 3_280 },
-          ],
-        },
-      },
-    });
-  });
-
-  /** 読むのは当月分だけ(docs/transaction-import-requirements.md 8章) */
-  it("収支サマリの集計と対象月の判定に同じ時刻を使う", async () => {
-    await fetchDashboardData();
-
-    expect(fetchMonthlyTransactions).toHaveBeenCalledWith(expect.any(Date));
+    expect(result).toMatchObject({ ok: true });
+    expect(result.ok === true && "cashflow" in result.data).toBe(false);
   });
 
   it("CSVも分類軸も無いアカウントでは空のデータを返す(失敗にはしない)", async () => {
@@ -321,7 +269,6 @@ describe("fetchDashboardData", () => {
         byAxis: {},
         debts: [],
         fireProgress: null,
-        cashflow: null,
       },
     });
   });

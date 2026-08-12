@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
 import { CashflowSummaryCard } from "@/components/dashboard/CashflowSummaryCard";
@@ -16,61 +17,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DASHBOARD_DATA_QUERY_KEY,
-  DASHBOARD_FAILURE_MESSAGES,
   DASHBOARD_RETRY_LABEL,
   DASHBOARD_RETRYING_LABEL,
-  DASHBOARD_UNEXPECTED_ERROR_MESSAGE,
   NO_ASSET_AXIS_EMPTY_STATE,
   NO_CSV_IMPORT_LABEL,
 } from "@/constants/dashboard";
 import { resolveAxisNetAmount } from "@/lib/dashboard/aggregation";
 import { buildBreakdownSlices } from "@/lib/dashboard/category-color";
 import { fetchDashboardData } from "@/lib/dashboard/dashboard-data";
+import { resolveFailureView } from "@/lib/dashboard/failure-view";
 import {
   buildDashboardHref,
   resolveAxisId,
+  resolveMonthId,
   resolvePeriodId,
   resolveTrendModeId,
 } from "@/lib/dashboard/filters";
+import { toMonthKey } from "@/lib/dashboard/month";
 import { filterSeriesByPeriod } from "@/lib/dashboard/period";
 
 import type { JSX } from "react";
-
-/**
- * 表示できないときの扱いを決める。取得の失敗(理由つき)と、集計まで含めた例外の両方をここに集める。
- * 表示できているあいだは`null`。
- *
- * 文言と再試行の可否を**同じ場所で**決める。別々に判断すると、失敗理由を足したときに
- * 片方だけ直して、文言は「ログインし直してください」なのに再試行ボタンが出る、といった
- * 食い違いが起きる。
- *
- * **例外を先に見る。** rejectしたときTanStack Queryは`data`を更新しないので、`ok: false`で
- * 失敗したあとに再試行が例外で落ちると、`failureReason`には1つ前の理由が残ったままになる。
- * 理由を先に見ると、その古い文言を出し続けてしまう。
- */
-const resolveFailureView = (
-  failureReason: FirestoreAccessFailureReason | null,
-  unexpectedError: unknown,
-): DashboardFailureView | null => {
-  if (unexpectedError) {
-    return { message: DASHBOARD_UNEXPECTED_ERROR_MESSAGE, retryable: true };
-  }
-
-  if (failureReason === null) {
-    return null;
-  }
-
-  return {
-    message: DASHBOARD_FAILURE_MESSAGES[failureReason],
-    /*
-      ログイン切れ・設定不備は再取得しても同じ結果にしかならず、文言で案内している
-      「ログインし直す」より先にボタンを押させてしまう。押せる導線は残さない。
-      `permission-denied`は文言で再ログインを促してはいるが、IDトークンが更新されれば
-      その場で通ることがあるので残す(`unknown`と同じ扱い)。
-    */
-    retryable: failureReason !== "signed-out" && failureReason !== "configuration-error",
-  };
-};
 
 /** 直近CSV取込日時の表示。未取込のときは日時の代わりにその旨を出す */
 const formatLastImportedAt = (isoDateTime: string | null): string =>
@@ -90,7 +56,10 @@ export const DashboardScreen = ({
   axisParam,
   periodParam,
   debtParam,
+  monthParam,
 }: DashboardScreenProps): JSX.Element => {
+  const router = useRouter();
+
   const dashboardQuery = useQuery({
     queryKey: DASHBOARD_DATA_QUERY_KEY,
     queryFn: fetchDashboardData,
@@ -131,6 +100,14 @@ export const DashboardScreen = ({
   const selectedAxisId = resolveAxisId(axisParam, axes);
   const selectedPeriodId = resolvePeriodId(periodParam);
   const selectedTrendMode = resolveTrendModeId(debtParam);
+  /*
+    収支サマリの対象月。既定は当月で、未指定・不正な値・当月より後は当月に落とす
+    (同要件B1「年月の選択」)。上限の判定にも期間の絞り込みと同じ`now`を使う。
+    別々に`new Date()`を呼ぶと、月をまたぐ瞬間に「上限は先月なのに既定は今月」のような
+    食い違いが起きうる
+  */
+  const selectedMonth = resolveMonthId(monthParam, now);
+  const currentMonth = toMonthKey(now);
   const selectedAxis = axes.find((axis) => axis.id === selectedAxisId);
   const axisData = selectedAxisId ? data?.byAxis[selectedAxisId] : undefined;
 
@@ -154,6 +131,7 @@ export const DashboardScreen = ({
         selectedAxisId={selectedAxisId ?? ""}
         selectedPeriodId={selectedPeriodId}
         selectedTrendMode={selectedTrendMode}
+        selectedMonth={selectedMonth}
       />
 
       {dashboardQuery.isPending ? (
@@ -211,7 +189,14 @@ export const DashboardScreen = ({
                 資産種別が違う色になると見比べられない(同要件B1「積み上げ表示」)
               */
               categories={data.categories}
-              buildHref={(mode) => buildDashboardHref(selectedAxisId, selectedPeriodId, mode)}
+              buildHref={(mode) =>
+                buildDashboardHref({
+                  axisId: selectedAxisId,
+                  periodId: selectedPeriodId,
+                  trendMode: mode,
+                  month: selectedMonth,
+                })
+              }
             />
           ) : (
             <Card>
@@ -246,7 +231,24 @@ export const DashboardScreen = ({
           */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <DebtSummaryCard debts={data.debts} />
-            <CashflowSummaryCard cashflow={data.cashflow} />
+            {/*
+              収支サマリは対象の月を自分で取得する(同要件B1「年月の選択」)。ここから渡すのは
+              表示中の月と、選べる上限(当月)と、切り替えたときの遷移だけ
+            */}
+            <CashflowSummaryCard
+              month={selectedMonth}
+              maxMonth={currentMonth}
+              onMonthChange={(month) => {
+                router.replace(
+                  buildDashboardHref({
+                    axisId: selectedAxisId,
+                    periodId: selectedPeriodId,
+                    trendMode: selectedTrendMode,
+                    month,
+                  }),
+                );
+              }}
+            />
           </div>
         </>
       ) : null}

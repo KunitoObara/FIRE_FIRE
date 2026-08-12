@@ -1,6 +1,7 @@
 import { endOfMonth, format, startOfDay, startOfMonth, startOfYear, subMonths } from "date-fns";
 
 import { STORED_DATE_FORMAT } from "@/constants/csv-import";
+import { fromMonthKey } from "@/lib/dashboard/month";
 
 /**
  * 期間の始まりを決める。「直近Nヶ月」は現在からNヶ月前の同日を境界にし、その日ちょうどの
@@ -38,14 +39,22 @@ export const resolveTransactionDateRange = (
       };
 
 /**
- * 当月の範囲を出す(docs/transaction-import-requirements.md 8章
- * 「B1の収支サマリは当月だけを読む」)。
+ * 指定した年月(`yyyy-MM`)の範囲を出す(docs/transaction-import-requirements.md 8章
+ * 「B1の収支サマリは選択中の年月の1ヶ月だけを読む」)。
  *
- * **月末まで含める。** 当月の収支を出すカードなので、今日より後の日付が付いた取引もその月の
- * ものとして数える。B3の「直近1ヶ月」等が今日で閉じるのは「直近」が今を終点とする言葉だから
- * で、こちらは月そのものを指している。
+ * **月初から月末までを丸ごと含める。** その月の収支を出すカードなので、当月を選んでいる場合は
+ * 今日より後の日付が付いた取引もその月のものとして数える。B3の「直近1ヶ月」等が今日で閉じるのは
+ * 「直近」が今を終点とする言葉だからで、こちらは月そのものを指している。
+ *
+ * **受け取るのは`Date`ではなく年月。** 対象の月は画面上で選べる(既定は当月)ので、`Date`で
+ * 受けると呼び出し側が「当月」しか渡せない形が残る。当月を指す値は`toMonthKey(new Date())`で作る
+ * (docs/screen-requirements-dashboard.md B1「年月の選択」)。
  */
-export const resolveTransactionMonthRange = (now: Date): TransactionDateRange => ({
-  from: format(startOfMonth(now), STORED_DATE_FORMAT),
-  to: format(endOfMonth(now), STORED_DATE_FORMAT),
-});
+export const resolveTransactionMonthRange = (month: string): TransactionDateRange => {
+  const firstDay = fromMonthKey(month);
+
+  return {
+    from: format(startOfMonth(firstDay), STORED_DATE_FORMAT),
+    to: format(endOfMonth(firstDay), STORED_DATE_FORMAT),
+  };
+};

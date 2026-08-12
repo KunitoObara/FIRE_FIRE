@@ -467,9 +467,7 @@ describe("resolveAxisNetAmount", () => {
   });
 });
 
-/** 収支サマリの検証用。当月(2026-08)の取引を作る */
-const NOW = new Date("2026-08-05T12:00:00+09:00");
-
+/** 収支サマリの検証用。対象月(2026-08)に含まれる取引を作る */
 const buildTransaction = (transaction: Partial<Transaction> & { id: string }): Transaction => ({
   date: "2026-08-05",
   content: "スーパー〇〇",
@@ -490,7 +488,7 @@ describe("buildCashflowSummary", () => {
         buildTransaction({ id: "a", amount: 420_000, categoryMajor: "収入" }),
         buildTransaction({ id: "b", amount: -98_000, categoryMajor: "住居費" }),
       ],
-      NOW,
+      "2026-08",
     );
 
     expect(summary).toMatchObject({ month: "2026-08", income: 420_000, expense: 98_000 });
@@ -501,7 +499,10 @@ describe("buildCashflowSummary", () => {
    * `income + |支出|`になり、赤字が黒字として出る(同書5章「集計した値の符号」)
    */
   it("支出は絶対値で持つ(0以上)", () => {
-    const summary = buildCashflowSummary([buildTransaction({ id: "a", amount: -84_200 })], NOW);
+    const summary = buildCashflowSummary(
+      [buildTransaction({ id: "a", amount: -84_200 })],
+      "2026-08",
+    );
 
     expect(summary?.expense).toBe(84_200);
     expect(summary?.expenseByCategory[0]?.amount).toBe(84_200);
@@ -515,7 +516,7 @@ describe("buildCashflowSummary", () => {
         buildTransaction({ id: "b", amount: -1_000_000, isTransfer: true, categoryMajor: "振替" }),
         buildTransaction({ id: "c", amount: -3_280 }),
       ],
-      NOW,
+      "2026-08",
     );
 
     expect(summary).toMatchObject({ income: 0, expense: 3_280 });
@@ -529,7 +530,7 @@ describe("buildCashflowSummary", () => {
         buildTransaction({ id: "a", amount: -50_000, isCalculationTarget: false }),
         buildTransaction({ id: "b", amount: -3_280 }),
       ],
-      NOW,
+      "2026-08",
     );
 
     expect(summary?.expense).toBe(3_280);
@@ -548,7 +549,7 @@ describe("buildCashflowSummary", () => {
         buildTransaction({ id: "b", amount: -2_720, categoryMajor: "食費", categoryMinor: "外食" }),
         buildTransaction({ id: "c", amount: -98_000, categoryMajor: "住居費" }),
       ],
-      NOW,
+      "2026-08",
     );
 
     expect(summary?.expenseByCategory).toEqual([
@@ -560,15 +561,29 @@ describe("buildCashflowSummary", () => {
   it("収入は費目別支出に混ぜない", () => {
     const summary = buildCashflowSummary(
       [buildTransaction({ id: "a", amount: 420_000, categoryMajor: "収入" })],
-      NOW,
+      "2026-08",
     );
 
     expect(summary?.expenseByCategory).toEqual([]);
   });
 
+  /**
+   * 対象の月は画面上で選べる(docs/screen-requirements-dashboard.md B1「年月の選択」)。
+   * `now`から当月を導く実装が残っていると、過去の月を集計しても`month`が当月になり、
+   * 読んだ範囲と表示している月が食い違う
+   */
+  it("対象月は渡された年月をそのまま持つ(当月に寄らない)", () => {
+    const summary = buildCashflowSummary(
+      [buildTransaction({ id: "a", date: "2025-03-04", amount: -3_280 })],
+      "2025-03",
+    );
+
+    expect(summary).toMatchObject({ month: "2025-03", expense: 3_280 });
+  });
+
   /** 月初は正常にこの状態になるので、エラーとしては扱わない */
   it("取引が1件も無ければnullを返す(空状態のまま)", () => {
-    expect(buildCashflowSummary([], NOW)).toBeNull();
+    expect(buildCashflowSummary([], "2026-08")).toBeNull();
   });
 
   /**
@@ -578,7 +593,7 @@ describe("buildCashflowSummary", () => {
   it("取引はあるが全て集計対象外なら、nullではなく0円で返す", () => {
     const summary = buildCashflowSummary(
       [buildTransaction({ id: "a", amount: -1_000_000, isTransfer: true })],
-      NOW,
+      "2026-08",
     );
 
     expect(summary).toMatchObject({ income: 0, expense: 0, expenseByCategory: [] });
