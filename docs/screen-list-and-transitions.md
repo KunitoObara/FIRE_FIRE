@@ -170,10 +170,15 @@ flowchart TD
     RealEstateList -->|物件を選択| RealEstateDetail[B6 不動産詳細画面]
     RealEstateDetail -->|編集| RealEstateEdit[B7 不動産登録・編集画面]
     RealEstateList -->|新規登録| RealEstateEdit
-    RealEstateEdit -->|保存| RealEstateList
+    RealEstateEdit -->|保存| RealEstateDetail
+    RealEstateDetail -->|削除| RealEstateList
 ```
 
 > **ログアウトはB1〜B11のどの画面からも実行できる**唯一の外向きの遷移で、共通ヘッダーのユーザーメニューに置く(2.6)。図では起点をまとめて共通ヘッダーからの1本にしているが、実際には各画面のヘッダーから到達できる。ユーザーメニューにはアカウント設定(B10)への導線も並べる。
+
+> **B7の保存後はB6 不動産詳細画面へ戻る**(新規登録・編集のどちらも)。登録・更新した内容と利ざやをその場で確認できるようにするため。[不動産管理系画面の要件](./screen-requirements-real-estate.md) B7が正で、この図は以前B5と書いていた。
+>
+> **B6からの「削除」は未実装。** 要件は [同書「物件の削除」](./screen-requirements-real-estate.md#物件の削除未実装)にあり、実装は別カードで行う。
 
 ## 4. 今後の検討事項
 
