@@ -193,7 +193,7 @@ FIRE達成度ゲージの現在資産額は、[B8 FIRE目標設定画面](./scre
 - **既定は当月。** 開いた直後に出るものはこれまでと同じにする
 - 選択した年月は**URLのクエリに載せる**(`month=yyyy-MM`)。分類軸・表示期間・負債反映と同じ扱いで、リロードやリンク共有で同じ表示を再現できる([CODING_STANDARDS.md](../src/frontend/docs/CODING_STANDARDS.md) 2章)
   - 未指定・`yyyy-MM` として読めない値・**当月より後の月**は当月として解釈する(分類軸・表示期間の解決と同じ「不正な値は既定へ落とす」)
-- **選べる上限は当月。** マネーフォワードの入出金明細は発生済みの取引を書き出すものなので、未来の月は選べても「データなし」しか出ない
+- **選べる上限は当月。** マネーフォワードの入出金明細は発生済みの取引を書き出すもので、未来の月には数える取引が無い。URLで未来月を直接指定されても前項のとおり当月に丸めるので、**ピッカー側でも選ばせる意味がない**(押した先で当月に戻る操作を残すことになる)
 - **下限は設けない。** 取り込んである最も古い月をこの画面は知らない(読むのは選択中の1ヶ月だけ)。範囲を出すために全期間を読むのは、当月だけを読むと決めた理由([同書](./transaction-import-requirements.md) 8章)と正面から衝突する
 - UIは shadcn の Date Picker と同じ構成(ボタン+ポップオーバー)とし、**中身は月のグリッド**(年の前後ナビ + 1〜12月)を自前で組む(PO判断)
   - shadcn(react-day-picker)の `Calendar` は**日単位の選択しか持たない**。`captionLayout="dropdown"` の月・年のドロップダウンは表示月を移動するためのもので、確定には日をクリックさせることになる。選んだ日が結果に一切効かない操作を画面に置かないため、日のグリッドは使わない
@@ -232,6 +232,7 @@ FIRE達成度ゲージの現在資産額は、[B8 FIRE目標設定画面](./scre
 - `resolveTransactionMonthRange(now)`(`src/frontend/src/lib/transactions/period.ts`)と `fetchMonthlyTransactions(now)`(`src/frontend/src/lib/csv-import/transaction-repository.ts`)も選択中の年月から範囲を出す形に変える。**当月だけを前提にしたdocstringも直す** — 「今日より後の日付が付いた取引もその月のものとして数える」は当月の話で、過去の月では月末が今日より前になる
 - 収支サマリのキャッシュキーに**年月を足す**(B3が `[...TRANSACTIONS_DATA_QUERY_KEY, periodId]` としているのと同じ形)。B2の入出金明細取込後の無効化は前方一致で全ての月に効かせる(B2「取込完了後は…B1・B3のキャッシュを無効化する」)
 - `CashflowSummaryCard` の見出し「収支サマリ(今月)」を、見出し+年月ピッカーに置き換える。カードは `cashflow === null` を「未取込」として扱っているが、これからは「**選択月にデータなし**」の意味になるので、`DASHBOARD_EMPTY_STATES.cashflow` の文言(「入出金明細のデータがまだありません」)も直す
+- **カードに読み込み中・失敗(再試行)・空の3状態を持たせる。** 今の `CashflowSummaryCard` は `cashflow === null` の1状態しか持たず、取得の成否は画面全体の失敗表示(`resolveFailureView` と `DASHBOARD_FAILURE_MESSAGES`)が引き受けている。取得を切り出すと収支サマリだけが失敗しうるので、この3つを区別しないと**取得失敗が「未取込」として出る**(前掲「選択した年月にデータが無いとき」)。文言と再試行の可否を1組で決める形は `resolveFailureView` に既にあるので、そこを使い回せるかを含めて検討する
 - 費目別支出の色割り当てに `buildBreakdownSlices`(`src/frontend/src/lib/dashboard/category-color.ts`)をそのまま使えない。あちらは資産の内訳向けに `AssetCategory[]` の登録順と負債スライスを前提にしている。費目には登録順も負債も無いので、共有するなら引数の形から見直す(名前順の一覧を渡す・負債の引数を持たない形)
 - 円グラフの再生の引き金(`buildBreakdownKey` 相当)には**選択中の年月を含める**。費目と金額だけでは、同じ内訳の月へ切り替えたときに再生が漏れる([DESIGN.md](../DESIGN.md) 9章)
 - shadcn の `popover` を導入する。`radix-ui` は既に依存にあるため**新しいnpmパッケージは増えない**([DESIGN.md](../DESIGN.md) 7章の表に足す)
