@@ -227,6 +227,7 @@ B11の `categoryAxes.debtIds` はこの形にできた(実際、既存ドキュ�
 | CSV取込・パース(B2) | `mf-csv-parser-check` |
 | FIRE目標・達成率・到達予測(B8) | `fire-calc-verify` |
 | 資産分類軸(B4、ダッシュボードの内訳) | `category-master-extensibility-check` |
+| 不動産(B5〜B7)・負債(B11、残債履歴、資産推移への控除) | `real-estate-debt-check` |
 
 ### セルフレビュー
 

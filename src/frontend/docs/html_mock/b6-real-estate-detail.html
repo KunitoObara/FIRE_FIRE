@@ -98,7 +98,14 @@
           <h2 class="text-lg font-bold">〇〇マンション101号室</h2>
           <p class="text-sm text-slate-400">東京都渋谷区・収益物件</p>
         </div>
-        <a href="b7-real-estate-edit.html" class="btn btn-outline btn-sm">編集</a>
+        <!-- 「削除」は未実装(docs/screen-requirements-real-estate.md「物件の削除」)。
+             B5 一覧ではなくここに置く。一覧の行は全体がこの画面へのリンクで、行の中に
+             破壊的な操作を混ぜると誤操作で消えるため。削除の前に時価・ローン残高・利ざやを
+             確かめられる場所もここである。 -->
+        <div class="flex items-center gap-2">
+          <a href="b7-real-estate-edit.html" class="btn btn-outline btn-sm">編集</a>
+          <button class="btn btn-ghost btn-sm" type="button" style="color: hsl(var(--destructive));" onclick="document.getElementById('delete-property-dialog').classList.remove('hidden')">削除</button>
+        </div>
       </div>
 
       <!-- 利ざや(時価-ローン残高)自動計算 -->
@@ -151,6 +158,20 @@
         </dl>
       </section>
     </main>
+  </div>
+</div>
+
+<!-- 物件の削除確認ダイアログ(docs/screen-requirements-real-estate.md「物件の削除」)。**未実装**。
+     どの物件を消すのか分かるよう物件名を示す。負債(B11)と違い、削除しても他の画面の集計は
+     変わらない(物件はダッシュボードにも資産分類軸にも入らない)ので、影響の予告は要らない。 -->
+<div id="delete-property-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4); z-index: 50;">
+  <div class="card p-6 max-w-sm w-full">
+    <h3 class="text-base font-bold mb-2">「〇〇マンション101号室」を削除しますか?</h3>
+    <p class="text-sm text-slate-500 mb-5">この操作は取り消せません。削除すると一覧に戻ります。</p>
+    <div class="flex gap-3">
+      <a href="b5-real-estate-list.html?deleted=1" class="btn btn-destructive flex-1">削除する</a>
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('delete-property-dialog').classList.add('hidden')">キャンセル</button>
+    </div>
   </div>
 </div>
 

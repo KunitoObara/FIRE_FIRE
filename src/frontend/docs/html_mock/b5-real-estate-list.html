@@ -88,6 +88,20 @@
     </header>
 
     <main class="flex-1 overflow-y-auto p-6 max-w-4xl">
+      <!-- 物件を削除した直後の表示(docs/screen-requirements-real-estate.md「物件の削除」)。**未実装**。
+           削除はB6で行い、成功するとこの一覧へ戻ってトーストで知らせる。
+
+           下の ?deleted=1 は静的ファイル間で状態を渡せないモック都合の代用であり、実装では
+           踏襲しない(A4のログアウト直後の表示と同じ理由)。実装ではsonnerのトーストを出す。 -->
+      <div id="deleted-notice" class="alert alert-success mb-5 hidden">
+        <span>物件を削除しました。</span>
+      </div>
+      <script>
+        if (new URLSearchParams(location.search).get("deleted") === "1") {
+          document.getElementById("deleted-notice").classList.remove("hidden");
+        }
+      </script>
+
       <section class="card">
         <ul class="divide-y" style="border-color: hsl(var(--border));">
           <li>
