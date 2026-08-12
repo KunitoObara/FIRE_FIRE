@@ -151,21 +151,22 @@ export const fetchTransactions = async (
   fetchTransactionsInRange(resolveTransactionDateRange(periodId, now));
 
 /**
- * B1の収支サマリが集計する当月の取引を取得する(8章「B1の収支サマリは当月だけを読む」)。
+ * B1の収支サマリが集計する取引を、**選択中の年月(`yyyy-MM`)の1ヶ月分だけ**取得する
+ * (8章「B1の収支サマリは選択中の年月の1ヶ月だけを読む」)。
  *
- * B3の期間IDを流用せず専用の入口にしてあるのは、`TransactionPeriodId`に「当月」を足すと
- * B3の期間セレクタにもその選択肢が並んでしまうため。B1が当月固定なのは表示するものが
- * 当月の収入・支出・費目別支出だからで、B3の期間絞り込みとは別の都合になる。
+ * B3の期間IDを流用せず専用の入口にしてあるのは、`TransactionPeriodId`に「特定の月」を足すと
+ * B3の期間セレクタにもその選択肢が並んでしまうため。B1が1ヶ月ずつなのは表示するものが
+ * その月の収入・支出・費目別支出だからで、B3の期間絞り込みとは別の都合になる。
  *
- * **月末まで読む。** 当月の収支なので、今日より後の日付が付いた取引もその月のものとして
- * 数える(B3の「直近1ヶ月」等が今日で閉じるのとは扱いが違う)。
+ * **月初から月末までを読む。** 当月を選んでいる場合は今日より後の日付が付いた取引もその月の
+ * ものとして数える(B3の「直近1ヶ月」等が今日で閉じるのとは扱いが違う)。
  *
  * 打ち切り(`truncated`)は呼び出し側で使っていない。月に数百件のペースで積み上がるデータに
  * 対して上限は9,999件で、1ヶ月で超えるには2桁足りない。超えた場合は古い側が落ちて収支が
  * 過少に出るが、その状況では収支サマリより先に取込側が破綻している。
  */
-export const fetchMonthlyTransactions = async (now: Date): Promise<TransactionsFetchResult> =>
-  fetchTransactionsInRange(resolveTransactionMonthRange(now));
+export const fetchMonthlyTransactions = async (month: string): Promise<TransactionsFetchResult> =>
+  fetchTransactionsInRange(resolveTransactionMonthRange(month));
 
 /**
  * 取り込もうとしている取引のうち、既にFirestoreにあるものを数える

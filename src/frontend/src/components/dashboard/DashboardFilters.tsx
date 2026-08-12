@@ -32,16 +32,29 @@ export const DashboardFilters = ({
   selectedAxisId,
   selectedPeriodId,
   selectedTrendMode,
+  selectedMonth,
 }: DashboardFiltersProps): JSX.Element => {
   const router = useRouter();
 
   const handleAxisChange = (axisId: string): void => {
-    router.replace(buildDashboardHref(axisId, selectedPeriodId, selectedTrendMode));
+    router.replace(
+      buildDashboardHref({
+        axisId,
+        periodId: selectedPeriodId,
+        trendMode: selectedTrendMode,
+        month: selectedMonth,
+      }),
+    );
   };
 
   const handlePeriodChange = (periodId: string): void => {
     router.replace(
-      buildDashboardHref(selectedAxisId, periodId as DashboardPeriodId, selectedTrendMode),
+      buildDashboardHref({
+        axisId: selectedAxisId,
+        periodId: periodId as DashboardPeriodId,
+        trendMode: selectedTrendMode,
+        month: selectedMonth,
+      }),
     );
   };
 

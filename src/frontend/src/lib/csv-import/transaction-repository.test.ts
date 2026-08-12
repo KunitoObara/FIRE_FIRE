@@ -400,9 +400,12 @@ describe("fetchTransactions", () => {
 });
 
 describe("fetchMonthlyTransactions", () => {
-  /** B1の収支サマリは当月だけを読む(docs/transaction-import-requirements.md 8章) */
-  it("当月の1日から月末までを範囲にして読む", async () => {
-    await fetchMonthlyTransactions(new Date("2026-08-05T12:00:00+09:00"));
+  /**
+   * B1の収支サマリは選択中の年月の1ヶ月だけを読む
+   * (docs/transaction-import-requirements.md 8章)
+   */
+  it("指定した年月の1日から月末までを範囲にして読む", async () => {
+    await fetchMonthlyTransactions("2026-08");
 
     expect(getDocs).toHaveBeenCalledWith({
       ref: { path: "users/uid-1/transactions" },
@@ -415,10 +418,25 @@ describe("fetchMonthlyTransactions", () => {
     });
   });
 
+  /** 当月を前提にした実装が残っていると、過去の月を選んでも当月の範囲を読んでしまう */
+  it("過去の月を渡してもその月の範囲を読む", async () => {
+    await fetchMonthlyTransactions("2025-03");
+
+    expect(getDocs).toHaveBeenCalledWith({
+      ref: { path: "users/uid-1/transactions" },
+      constraints: [
+        { field: "date", operator: ">=", value: "2025-03-01" },
+        { field: "date", operator: "<=", value: "2025-03-31" },
+        { orderBy: "date", direction: "desc" },
+        { limit: TRANSACTION_SCAN_LIMIT + 1 },
+      ],
+    });
+  });
+
   it("B3の一覧と同じ形で取引を返す", async () => {
     getDocs.mockResolvedValue({ docs: [buildDocument("aaaa1111")] });
 
-    const result = await fetchMonthlyTransactions(NOW);
+    const result = await fetchMonthlyTransactions("2026-08");
 
     expect(result).toMatchObject({
       ok: true,
@@ -430,7 +448,7 @@ describe("fetchMonthlyTransactions", () => {
   it("未ログインなら読みに行かない", async () => {
     resolveFirestoreUserContext.mockReturnValue({ ok: false, reason: "signed-out" });
 
-    expect(await fetchMonthlyTransactions(NOW)).toEqual({ ok: false, reason: "signed-out" });
+    expect(await fetchMonthlyTransactions("2026-08")).toEqual({ ok: false, reason: "signed-out" });
     expect(getDocs).not.toHaveBeenCalled();
   });
 });

@@ -164,7 +164,7 @@ declare global {
   };
 
   /**
-   * 収支サマリ(当月)。
+   * 収支サマリ(選択中の年月)。
    *
    * **`expense` と `expenseByCategory[].amount` は0以上の値で組み立てる**
    * (docs/transaction-import-requirements.md 5章「集計した値の符号」)。収入は `amount > 0`
@@ -179,7 +179,7 @@ declare global {
    * 生CSVの符号(支出がマイナス)を保つのは`Transaction.amount`とB3の一覧だけ。
    */
   type CashflowSummary = {
-    /** 対象月(`yyyy-MM`) */
+    /** 対象月(`yyyy-MM`)。呼び出し側が選んだ月そのもので、集計の中でも導かない */
     month: string;
     /** 0以上 */
     income: number;
@@ -205,7 +205,6 @@ declare global {
      */
     debts: Debt[];
     fireProgress: FireProgress | null;
-    cashflow: CashflowSummary | null;
   };
 
   /**
@@ -216,6 +215,21 @@ declare global {
    */
   type DashboardDataResult =
     { ok: true; data: DashboardData } | { ok: false; reason: FirestoreAccessFailureReason };
+
+  /**
+   * 収支サマリの取得結果(`fetchCashflowData`)。
+   *
+   * ダッシュボードの一括取得とは別に持つ。対象の月は画面上で選べるので、混ぜると年月を
+   * 切り替えるたびに資産残高・分類軸・負債・FIRE目標まで読み直すことになる
+   * (docs/screen-requirements-dashboard.md B1「年月の選択」)。
+   *
+   * **「その月に取引が無い」は失敗ではない**ので、`cashflow: null`を`ok: true`で返す。
+   * 月初や取り込んでいない過去の月では正常に起こる状態で、失敗は取得そのものが
+   * できなかった場合だけを指す。
+   */
+  type CashflowDataResult =
+    | { ok: true; cashflow: CashflowSummary | null }
+    | { ok: false; reason: FirestoreAccessFailureReason };
 
   /**
    * B1本体のProps。
@@ -229,6 +243,23 @@ declare global {
     axisParam: string | string[] | undefined;
     periodParam: string | string[] | undefined;
     debtParam: string | string[] | undefined;
+    /** 収支サマリの対象月(`yyyy-MM`)。未指定・不正な値・当月より後は当月に落とす */
+    monthParam: string | string[] | undefined;
+  };
+
+  /**
+   * B1のURLに載せる選択の一式(`buildDashboardHref`)。
+   *
+   * **4つとも必ず載せる。** 1つだけを変えたときに他の選択が落ちないようにするため。
+   * 位置引数ではなくオブジェクトで受けるのは、`string`が隣り合う引数の順番を取り違えても
+   * 型で気付けないため。
+   */
+  type DashboardHrefParams = {
+    axisId: string | undefined;
+    periodId: DashboardPeriodId;
+    trendMode: NetWorthTrendModeId;
+    /** 収支サマリの対象月(`yyyy-MM`) */
+    month: string;
   };
 
   /**
@@ -247,6 +278,12 @@ declare global {
     axes: AssetCategoryAxis[];
     selectedAxisId: string;
     selectedPeriodId: DashboardPeriodId;
+    /**
+     * 選択中の収支サマリの対象月。この切替UI自体は出さない(年月ピッカーは収支サマリの
+     * カードの中にある)が、分類軸・表示期間を変えたときに載せ直さないとURLから落ちる。
+     * `selectedTrendMode`と同じ理由で受け取る。
+     */
+    selectedMonth: string;
     /**
      * 選択中の資産推移の表示。この切替UI自体は出さない(切替は資産推移カードの中にある)が、
      * 分類軸・表示期間を変えたときに載せ直さないとURLから落ちてしまうため受け取る。
@@ -312,10 +349,28 @@ declare global {
     fireProgress: FireProgress | null;
   };
 
-  /** 収支サマリカードのProps */
+  /**
+   * 収支サマリカードのProps。
+   *
+   * **集計済みのデータは受け取らない。** 対象の月ごとに取得するのはカード自身で、
+   * ダッシュボードの一括取得から切り離してある(docs/screen-requirements-dashboard.md B1
+   * 「年月の選択」)。
+   */
   type CashflowSummaryCardProps = {
-    /** 入出金明細が未取込なら`null` */
-    cashflow: CashflowSummary | null;
+    /** 表示中の対象月(`yyyy-MM`) */
+    month: string;
+    /** 選べる上限(`yyyy-MM`。当月)。呼び出し側と同じ時刻から導いた値を渡す */
+    maxMonth: string;
+    onMonthChange: (month: string) => void;
+  };
+
+  /** 年月ピッカーのProps */
+  type MonthPickerProps = {
+    /** 選択中の年月(`yyyy-MM`) */
+    month: string;
+    /** これより後の月は選べない(`yyyy-MM`) */
+    maxMonth: string;
+    onSelect: (month: string) => void;
   };
 
   /** 各ウィジェットのカードに共通する、データが無いときの表示のProps */

@@ -11,7 +11,7 @@ import {
   DEFAULT_CSV_IMPORT_TYPE_ID,
   IMPORT_HISTORY_QUERY_KEY,
 } from "@/constants/csv-import";
-import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
+import { CASHFLOW_DATA_QUERY_KEY, DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 import { TRANSACTIONS_DATA_QUERY_KEY } from "@/constants/transactions";
 import { fetchImportHistory } from "@/lib/csv-import/asset-balance-repository";
 
@@ -43,12 +43,16 @@ export const CsvImportScreen = (): JSX.Element => {
    *
    * - 資産残高推移 → B1(資産推移グラフ・分類別内訳)
    * - 入出金明細 → B1(収支サマリ)とB3(収支明細一覧)
+   *
+   * 収支サマリとB3は**月・期間ごとにキャッシュを分けている**ので、前方一致で落として
+   * どの月・どの期間で見ていた分も一度に無効化する。
    */
   const handleImported = (typeId: CsvImportTypeId): void => {
     void history.refetch();
     void queryClient.invalidateQueries({ queryKey: DASHBOARD_DATA_QUERY_KEY });
 
     if (typeId === "transaction") {
+      void queryClient.invalidateQueries({ queryKey: CASHFLOW_DATA_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: TRANSACTIONS_DATA_QUERY_KEY });
     }
   };

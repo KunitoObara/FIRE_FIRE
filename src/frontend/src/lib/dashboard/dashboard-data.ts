@@ -3,11 +3,9 @@ import {
   fetchAssetSnapshots,
   fetchLastImportedAt,
 } from "@/lib/csv-import/asset-balance-repository";
-import { fetchMonthlyTransactions } from "@/lib/csv-import/transaction-repository";
 import {
   buildAxisBreakdown,
   buildAxisNetWorthSeries,
-  buildCashflowSummary,
   collectAssetCategories,
   resolveAxisDebts,
   sumDebtBalance,
@@ -25,36 +23,25 @@ import { fetchFireGoal } from "@/lib/fire-goal/fire-goal-repository";
  * users/{uid}/csvImports        B2 CSV取込          直近CSV取込日時
  * users/{uid}/settings/fireGoal B8 FIRE目標設定     FIRE達成度ゲージ
  * users/{uid}/debts             B11 負債入力        負債サマリ・負債を含む分類軸の集計
- * users/{uid}/transactions      B2 CSV取込          収支サマリ(当月分のみ)
  * ```
  *
- * 取引だけは**当月分しか読まない**(docs/transaction-import-requirements.md 8章)。
- * 収支サマリが出すのが当月の収入・支出・費目別支出であり、取引は月に数百件のペースで
- * 積み上がるため、全件を読むと表示のたびに読み取りが増え続ける。
+ * **収支サマリ(`users/{uid}/transactions`)はここでは読まない。** 対象の月は画面上で選べるので、
+ * 一括取得に混ぜると年月を切り替えるたびに資産残高・分類軸・負債・FIRE目標まで読み直すことに
+ * なる。取引の取得は`fetchCashflowData`が月ごとに持つ
+ * (docs/screen-requirements-dashboard.md B1「年月の選択」)。
  *
- * 6つの取得は互いに独立しているので並列に投げる。順に待つと、いちばん遅いものだけでなく
+ * 5つの取得は互いに独立しているので並列に投げる。順に待つと、いちばん遅いものだけでなく
  * 合計の待ち時間がログイン直後の最初の画面に乗る。
  */
 export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
-  // 収支サマリの集計と対象月の判定は同じ時刻から出す。別々に`new Date()`を呼ぶと、
-  // 月をまたぐ瞬間に「先月の取引を今月として集計する」ずれが起きうる
-  const now = new Date();
-
-  const [
-    axesResult,
-    snapshotsResult,
-    lastImportedAtResult,
-    fireGoalResult,
-    debtsResult,
-    monthlyTransactionsResult,
-  ] = await Promise.all([
-    fetchCategoryAxes(),
-    fetchAssetSnapshots(),
-    fetchLastImportedAt(),
-    fetchFireGoal(),
-    fetchDebts(),
-    fetchMonthlyTransactions(now),
-  ]);
+  const [axesResult, snapshotsResult, lastImportedAtResult, fireGoalResult, debtsResult] =
+    await Promise.all([
+      fetchCategoryAxes(),
+      fetchAssetSnapshots(),
+      fetchLastImportedAt(),
+      fetchFireGoal(),
+      fetchDebts(),
+    ]);
 
   // どれか1つでも失敗したら画面全体を失敗として返す。失敗の原因(未ログイン・権限・設定)は
   // どの取得にも共通するものばかりで、部分的に欠けた数字を実データとして見せる方が危うい
@@ -76,10 +63,6 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
 
   if (!debtsResult.ok) {
     return debtsResult;
-  }
-
-  if (!monthlyTransactionsResult.ok) {
-    return monthlyTransactionsResult;
   }
 
   const { snapshots } = snapshotsResult;
@@ -121,11 +104,6 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
       // 渡すのは、設定された軸がB4で削除されていたときに既定へフォールバックさせるため。
       // 負債は対象分類が負債を含む軸のときだけ差し引かれる
       fireProgress: buildFireProgress(fireGoalResult.goal, latest, axesResult.axes, debts),
-      /*
-        収支サマリは当月固定で、分類軸切替セレクタにも表示期間切替にも従わない(同要件B1)。
-        入出金明細の集計であって資産の分類軸とは別の軸のため、`byAxis`の中には入れない
-      */
-      cashflow: buildCashflowSummary(monthlyTransactionsResult.transactions, now),
     },
   };
 };

@@ -2,6 +2,7 @@ import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
 import { GoogleLinkFailureNotice } from "@/components/dashboard/GoogleLinkFailureNotice";
 import {
   DASHBOARD_AXIS_PARAM,
+  DASHBOARD_MONTH_PARAM,
   DASHBOARD_PERIOD_PARAM,
   DASHBOARD_DEBT_PARAM,
 } from "@/constants/dashboard";
@@ -17,7 +18,8 @@ export const metadata: Metadata = {
  * B1 ダッシュボード画面(docs/screen-requirements-dashboard.md B1)。
  *
  * 表示データはFirestoreから読むためClient Component(`DashboardScreen`)側で取得する。
- * この画面が受け持つのは、分類軸・表示期間のクエリパラメータの受け取りだけ。
+ * この画面が受け持つのは、分類軸・表示期間・負債反映・収支サマリの対象月のクエリパラメータの
+ * 受け取りだけ。
  * `useSearchParams`を使うとSuspense境界が要る(Next.jsのuseSearchParamsドキュメント)ため、
  * A7と同じくServer Component側でクエリを取り出して渡す。
  *
@@ -34,6 +36,7 @@ const DashboardPage = async (props: PageProps<"/dashboard">): Promise<JSX.Elemen
         axisParam={searchParams[DASHBOARD_AXIS_PARAM]}
         periodParam={searchParams[DASHBOARD_PERIOD_PARAM]}
         debtParam={searchParams[DASHBOARD_DEBT_PARAM]}
+        monthParam={searchParams[DASHBOARD_MONTH_PARAM]}
       />
     </>
   );

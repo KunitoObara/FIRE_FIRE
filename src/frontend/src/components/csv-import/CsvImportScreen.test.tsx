@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CsvImportScreen } from "@/components/csv-import/CsvImportScreen";
-import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
+import { CASHFLOW_DATA_QUERY_KEY, DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 import { TRANSACTIONS_DATA_QUERY_KEY } from "@/constants/transactions";
 
 import type { RenderResult } from "@testing-library/react";
@@ -63,6 +63,7 @@ describe("CsvImportScreen", () => {
 
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
     expect(invalidateQueries).not.toHaveBeenCalledWith({ queryKey: TRANSACTIONS_DATA_QUERY_KEY });
+    expect(invalidateQueries).not.toHaveBeenCalledWith({ queryKey: CASHFLOW_DATA_QUERY_KEY });
     expect(fetchImportHistory).toHaveBeenCalledTimes(2);
   });
 
@@ -79,6 +80,11 @@ describe("CsvImportScreen", () => {
 
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: DASHBOARD_DATA_QUERY_KEY });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: TRANSACTIONS_DATA_QUERY_KEY });
+    /*
+      収支サマリは月ごとにキャッシュを分けているので、前方一致で落としてどの月で見ていた分も
+      一度に無効化する(docs/screen-requirements-dashboard.md B1「年月の選択」)
+    */
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: CASHFLOW_DATA_QUERY_KEY });
     expect(fetchImportHistory).toHaveBeenCalledTimes(2);
   });
 
