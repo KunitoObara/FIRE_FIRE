@@ -57,7 +57,10 @@ Phase 3([要件定義書](../../../docs/fire-asset-management-requirements.md) 4
 
 7. **同時更新**。読んでから書くまでの間に他方のタブが書いた内容を上書きしないか。上書きするなら、それが要件として決まっているか([不動産の今後の検討事項](../../../docs/screen-requirements-real-estate.md#今後の検討事項)は後勝ちを許容と明記している)
 8. **二重実行**。同じ保存を連続で2回実行したときに、複製や履歴の消失が起きないか
-9. **確かめたケースをユニットテストとして残す。** vitest は導入済み(`npm run test`)で、上記の各ファイルには `*.test.ts` がある。既存のテストと重複するケースは足さない
+9. **確かめたケースをユニットテストとして残す。** vitest は導入済み(`npm run test`)。ただし**上のファイルすべてにテストがあるわけではない**ので、「既存のテストと重複するケースは足さない」を鵜呑みにして未カバーの箇所を飛ばさないこと
+   - `calculation.ts` / `form-values.ts` と負債側の3ファイル(`debt-repository.ts` / `summary.ts` / `aggregation.ts`)には `*.test.ts` がある。ここは既存のケースと重複させない
+   - **`property-repository.ts` と `src/frontend/src/schemas/real-estate.ts` には専用のテストが無い。** スキーマの検証(半角数字のみ・12桁)は `RealEstateForm.test.tsx` が画面越しに通しているだけなので、ここで確かめたことは**新しいテストとして書く**
+   - `firestore.rules` は vitest の対象外。確認は `firebase emulators:exec --only firestore` で行う
 
 ## 出力
 
