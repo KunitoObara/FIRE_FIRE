@@ -111,6 +111,21 @@ export const OTHER_CATEGORY_NAME = "その他";
 export const OTHER_CATEGORY_ID = "__other__";
 
 /**
+ * 収支サマリの費目別支出で、色のスロットに収まらなかった費目をまとめるスライス
+ * (docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」)。
+ *
+ * **表示名を資産側の「その他」と別にする**(PO判断)。費目名はマネーフォワードのCSVの値そのもので
+ * (docs/transaction-import-requirements.md 6章)、大項目には**「その他」が実在する**。同じ名前を
+ * 受け皿に使うと、費目が9件以上ある月に凡例へ「その他」が2行並び、どちらが何を指すのかが
+ * 画面から読めなくなる。避けられるのはアプリ側が付ける名前だけなので、そちらを変える。
+ *
+ * IDが擬似的なのは資産側と同じ理由 — 判定は`OTHER_EXPENSE_CATEGORY_ID`で行い、表示名との
+ * 一致では見ない。
+ */
+export const OTHER_EXPENSE_CATEGORY_ID = "__other-expense__";
+export const OTHER_EXPENSE_CATEGORY_NAME = "ほかの費目";
+
+/**
  * 分類別内訳の負債スライスを表す擬似的な分類ID(`OTHER_CATEGORY_ID`と同じ考え方)。
  *
  * **表示名「負債」との一致で判定しない。** 資産種別の名前はCSVの列名そのもの
@@ -345,6 +360,17 @@ export const FIRE_GAUGE_ANIMATION_KEY = "fire-progress-gauge";
 /** 分類別内訳の再生の引き金にする署名(`buildNetWorthSeriesKey`と同じ考え方) */
 export const buildBreakdownKey = (axisName: string, slices: AssetBreakdownSlice[]): string =>
   JSON.stringify([axisName, slices.map((slice) => [slice.categoryId, slice.amount])]);
+
+/**
+ * 費目別支出の円グラフの再生の引き金にする署名。
+ *
+ * **選択中の年月を含める。** 費目と金額だけでは、内訳がたまたま同じ月へ切り替えたときに
+ * 署名が変わらず、再生が漏れる(DESIGN.md 9章。年月切替は「切り替えた結果が変わったことを
+ * 見せる」再生の対象)。分類軸切替・表示期間切替では再生しない — このカードはどちらにも
+ * 追従しないので、そもそも中身が変わらない。
+ */
+export const buildExpenseBreakdownKey = (month: string, slices: ExpenseBreakdownSlice[]): string =>
+  JSON.stringify([month, slices.map((slice) => [slice.categoryId, slice.amount])]);
 
 /** ダッシュボードの表示データのキャッシュキー(TanStack Query) */
 export const DASHBOARD_DATA_QUERY_KEY = ["dashboard-data"] as const;

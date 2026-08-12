@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -11,6 +12,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   buildCashflowEmptyState,
+  buildExpenseBreakdownKey,
   CASHFLOW_DATA_QUERY_KEY,
   CASHFLOW_DATA_STALE_TIME_MS,
   CASHFLOW_DETAIL_LINK,
@@ -19,11 +21,21 @@ import {
   NO_EXPENSE_IN_MONTH_LABEL,
 } from "@/constants/dashboard";
 import { fetchCashflowData } from "@/lib/dashboard/cashflow-data";
+import { buildExpenseSlices } from "@/lib/dashboard/expense-color";
 import { resolveFailureView } from "@/lib/dashboard/failure-view";
 import { formatMonthLabel } from "@/lib/dashboard/month";
-import { formatJpy, formatSignedJpy } from "@/lib/format/currency";
+import { formatJpy, formatPercent, formatSignedJpy } from "@/lib/format/currency";
 
 import type { JSX } from "react";
+
+/**
+ * Rechartsは描画にブラウザのAPIを使うため、サーバー側では読み込まない
+ * (src/frontend/docs/CODING_STANDARDS.md 2章。分類別内訳の円グラフと同じ扱い)。
+ */
+const ExpenseBreakdownChart = dynamic(
+  async () => (await import("@/components/dashboard/ExpenseBreakdownChart")).ExpenseBreakdownChart,
+  { ssr: false, loading: () => <Skeleton className="size-36 rounded-full" /> },
+);
 
 /**
  * 収支サマリのカード(B1)。
@@ -82,6 +94,11 @@ export const CashflowSummaryCard = ({
   }, [unexpectedError]);
 
   const balance = cashflow === null ? 0 : cashflow.income - cashflow.expense;
+  /*
+    費目別支出の色は**費目名の順**に割り当てる(同要件B1「費目別支出の円グラフ」)。
+    費目マスタを持たない方針のため、資産分類のような登録順がそもそも無い
+  */
+  const expenseSlices = buildExpenseSlices(cashflow?.expenseByCategory ?? []);
 
   return (
     <Card>
@@ -164,24 +181,54 @@ export const CashflowSummaryCard = ({
         ) : null}
 
         {/*
-          費目別支出は大項目で集計する(docs/transaction-import-requirements.md 6章)。
-          円グラフ+凡例に差し替えるのはこのカードの次のPRで、ここでは金額の一覧のまま。
+          費目別支出は大項目で集計し(docs/transaction-import-requirements.md 6章)、円グラフと
+          凡例で出す。凡例の色見本・費目名・構成比・金額という並びは分類別内訳カードと同じで、
+          同じ画面に並ぶ2枚のカードで読み方を覚え直さずに済むようにしている(同要件B1)。
+
           **支出が1件も無い月は空状態にしない** — 全額が振替・計算対象外だった月に普通に
-          起こる状態で、上の3つの数字は出したまま費目別支出の場所にその旨を出す。空欄のまま
+          起こる状態で、上の3つの数字は出したまま円グラフの場所にその旨を出す。空欄のまま
           詰めると、支出が無いのか表示が壊れているのかを画面から区別できない(同要件B1)
         */}
         {cashflow !== null && failureView === null ? (
-          <ul className="flex flex-col gap-2 text-sm">
-            {cashflow.expenseByCategory.map((item) => (
-              <li key={item.name} className="flex items-center justify-between">
-                <span>{item.name}</span>
-                <span className="text-muted-foreground tabular-nums">{formatJpy(item.amount)}</span>
-              </li>
-            ))}
-            {cashflow.expenseByCategory.length === 0 ? (
-              <li className="text-muted-foreground">{NO_EXPENSE_IN_MONTH_LABEL}</li>
-            ) : null}
-          </ul>
+          <div className="flex flex-wrap items-center gap-6">
+            {expenseSlices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{NO_EXPENSE_IN_MONTH_LABEL}</p>
+            ) : (
+              <>
+                {/*
+                  `key`にデータの署名を渡し、対象月やデータが差し替わったときだけ作り直して
+                  スイープを最初から再生する(分類別内訳と同じ扱い。DESIGN.md 9章)。
+                  凡例の構成比・金額はアニメーションさせないので、作り直しの対象に含めない
+                */}
+                <ExpenseBreakdownChart
+                  key={buildExpenseBreakdownKey(month, expenseSlices)}
+                  slices={expenseSlices}
+                />
+                <ul className="flex min-w-48 flex-1 flex-col gap-2 text-sm">
+                  {expenseSlices.map((slice) => (
+                    <li key={slice.categoryId} className="flex items-center gap-2">
+                      {/*
+                        色は費目ごとに実行時に決まる値なので、Tailwindのクラス名では表現できない
+                        (ビルド時にクラス名を静的に列挙できないため)。ここだけstyle属性を使う
+                      */}
+                      <span
+                        aria-hidden
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: slice.color }}
+                      />
+                      <span>{slice.name}</span>
+                      <span className="ml-auto text-muted-foreground tabular-nums">
+                        {formatPercent(slice.ratio)}
+                      </span>
+                      <span className="w-28 text-right text-muted-foreground tabular-nums">
+                        {formatJpy(slice.amount)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         ) : null}
       </CardContent>
     </Card>
