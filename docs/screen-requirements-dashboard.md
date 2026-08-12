@@ -159,12 +159,16 @@ FIRE達成度ゲージの現在資産額は、[B8 FIRE目標設定画面](./scre
 - 積み上げ表示の負債の帯([B1-15](https://trello.com/c/9PoKqOdR))も同じ規則に従う。帯が0でなくなる左端が発生年月になる
 - 表示期間(1年/3年/5年/全期間)を切り替えても規則は変わらない。発生年月が表示期間より前にある負債は、**期間の最初の点から差し引かれた状態**で描かれる(段差は画面の外にある)
 
-**実装時に直すもの**(発生年月の分):
+**実装時に直すもの**(発生年月の分。[PR #143](https://github.com/KunitoObara/FIRE_FIRE/pull/143) で実装済み):
 
-- 残債を求める関数(`src/frontend/src/lib/dashboard/aggregation.ts` の `resolveDebtBalanceAt`)に発生年月を効かせる。「その時点以前で最も新しい記録、無ければ0」から、**「発生年月より前なら0。発生年月以降で記録がまだ無ければ最も古い記録」**へ広げる。呼び出し側(`sumDebtBalanceAt`)の形は変えなくて済む
-- 発生年月は `yyyy-MM`、履歴のキーと点の日付は `yyyy-MM-dd` なので、**比較する前に桁を揃える**。`date.slice(0, 7) >= originatedOn` のように月で比べるか、発生年月に `-01` を足して日付として比べるかを決め、片方に寄せる(混在させると月初の1日だけ判定が食い違う)
-- `Debt` 型・`src/frontend/src/schemas/debts.ts`・`src/frontend/src/lib/debts/form-values.ts`・`DebtInputScreen` に発生年月を足す。**既存ドキュメントには無いキーなので、パース時は`null`を既定にする**(`categoryAxes.debtIds` に `.default([])` を入れたのと同じ扱い)
-- `firestore.rules` の `isValidDebt` は許可キーと必須キーを両方 `hasAll` / `hasOnly` で見ているため、**どちらにも足す**。保存側が常にキーを書く(未入力は`null`)ことと揃える
+- 残債を求める関数(`src/frontend/src/lib/dashboard/aggregation.ts` の `resolveDebtBalanceAt`)に**起点**の概念を入れた。起点は発生年月があればその月、無ければ最も古い記録の日で、起点より前は0を返す。呼び出し側(`sumDebtBalanceAt`)の形は変えていない
+- **比較は `yyyy-MM-dd` の桁に揃えた**(発生年月に `-01` を足して日付として比べる)。月へ切り詰める向き(`date.slice(0, 7) >= originatedOn`)は**採れない** — 発生年月が未入力の負債では起点が最も古い記録の日になるため、月に揃えると「最初の記録と**同じ月の、記録より前の日**」まで起点に含まれ、「最初に残債を記録した日から反映する」という約束が崩れる
+- **発生年月より前の記録も、残債の値としては使う。** 起点より前の点を差し引かないことは入口の判定だけで担保できており、記録を選ぶ範囲まで狭めると、発生年月より前の記録しか持たない負債で過去の全期間が0円になる(前掲「発生年月が最初の記録より後にある場合」)
+- `Debt` 型・`src/frontend/src/schemas/debts.ts`・`src/frontend/src/lib/debts/form-values.ts`・`DebtInputForm` に発生年月を足した。**既存ドキュメントには無いキーなので、パース時は`null`を既定にしてある**(`categoryAxes.debtIds` に `.default([])` を入れたのと同じ扱い)
+- `firestore.rules` の `isValidDebt` は許可キーと必須キーを両方 `hasAll` / `hasOnly` で見ているため、**どちらにも足した**。保存側が常にキーを書く(未入力は`null`)ことと揃えてある
+- 形の検査は**月を01〜12に絞る**(`^\d{4}-(0[1-9]|1[0-2])$`)。桁だけを見る形だと `2020-13` が通り、当月との比較も文字列の辞書順なので保存まで素通りする。クライアント側(`DEBT_ORIGINATED_ON_PATTERN`)とルールで同じ形にしてある
+
+**収支サマリ**
 
 入出金明細CSV(B2)から取り込んだ取引を当月分だけ集計するカード。集計に数える行・費目の粒度・読み取り範囲は [入出金明細CSV取込 要件定義書](./transaction-import-requirements.md) を正とし、本節には画面側の扱いだけを置く。
 
