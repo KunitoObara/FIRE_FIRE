@@ -14,10 +14,17 @@ vi.mock("@/lib/dashboard/cashflow-data", () => ({
   fetchCashflowData: (...args: unknown[]) => fetchCashflowData(...args),
 }));
 
+/** 円グラフはブラウザ専用(next/dynamic)なので、ここでは描画対象にしない */
+vi.mock("@/components/dashboard/ExpenseBreakdownChart", () => ({
+  ExpenseBreakdownChart: ({ slices }: ExpenseBreakdownChartProps) => (
+    <div data-testid="expense-breakdown-chart" data-slices={slices.length} />
+  ),
+}));
+
 const cashflow: CashflowSummary = {
   month: "2026-08",
   income: 420_000,
-  expense: 234_300,
+  expense: 159_400,
   expenseByCategory: [
     { name: "住居費", amount: 97_000 },
     { name: "食費", amount: 62_400 },
@@ -60,10 +67,29 @@ describe("CashflowSummaryCard", () => {
 
     expect(await screen.findByText("¥ 420,000")).toBeInTheDocument();
     // 支出は絶対値、符号を持つのは収支だけ(同書5章)
-    expect(screen.getByText("¥ 234,300")).toBeInTheDocument();
-    expect(screen.getByText("+ ¥ 185,700")).toBeInTheDocument();
-    expect(screen.getByText("住居費")).toBeInTheDocument();
+    expect(screen.getByText("¥ 159,400")).toBeInTheDocument();
+    expect(screen.getByText("+ ¥ 260,600")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /対象の年月/ })).toHaveTextContent("2026年8月");
+  });
+
+  /**
+   * 費目別支出は円グラフ+凡例で出し、凡例の並び(色見本・費目名・構成比・金額)は
+   * 分類別内訳カードと同じにする(docs/screen-requirements-dashboard.md B1)
+   */
+  it("費目別支出を円グラフと凡例(費目名・構成比・金額)で出す", async () => {
+    renderCard();
+
+    expect(await screen.findByTestId("expense-breakdown-chart")).toHaveAttribute(
+      "data-slices",
+      "2",
+    );
+    expect(screen.getByText("住居費")).toBeInTheDocument();
+    expect(screen.getByText("食費")).toBeInTheDocument();
+    // 構成比の分母はその月の支出合計(97,000 + 62,400 = 159,400)
+    expect(screen.getByText("61%")).toBeInTheDocument();
+    expect(screen.getByText("39%")).toBeInTheDocument();
+    expect(screen.getByText("¥ 97,000")).toBeInTheDocument();
+    expect(screen.getByText("¥ 62,400")).toBeInTheDocument();
   });
 
   it("選択中の年月の取引だけを読む", async () => {
@@ -172,8 +198,9 @@ describe("CashflowSummaryCard", () => {
     renderCard();
 
     expect(await screen.findByText("この月の支出はありません。")).toBeInTheDocument();
-    // 空状態ではないので、3つの数字は出したまま
+    // 空状態ではないので、3つの数字は出したまま。円グラフだけを出さない
     expect(screen.getByText("+ ¥ 0")).toBeInTheDocument();
+    expect(screen.queryByTestId("expense-breakdown-chart")).not.toBeInTheDocument();
     expect(screen.queryByText(/取引がありません/)).not.toBeInTheDocument();
   });
 

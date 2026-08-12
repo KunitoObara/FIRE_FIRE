@@ -1,0 +1,66 @@
+/*
+  費目別支出(円グラフ)の登場アニメーション(DESIGN.md 9章)。
+  12時の位置から時計回りに1周かけて円を出す。分類別内訳と同じ見え方に揃える
+  (同じ画面に2つの円グラフが並ぶので、スイープの動きを別々にしない)。
+
+  **Rechartsの登場アニメーション(`isAnimationActive`)は使えない。** `paddingAngle`と
+  併用するとRechartsが角度を広げきれず、開始フレーム(ほぼ0度の扇形)のまま止まって円が
+  出ない。`paddingAngle`は隣り合う色の境界を見せるためのもの(DESIGN.md 3章)で外せない
+  ため、描画済みの円を**マスクで隠して開けていく**形にする
+  (`CategoryBreakdownChart.module.css`と同じ理由・同じ手口)。
+
+  Tailwindのユーティリティでは`@property`も`@keyframes`も書けないため、
+  コンポーネント単位のCSS Moduleに置く(CODING_STANDARDS.md 6章)。
+*/
+
+/*
+  カスタムプロパティを角度としてアニメーションさせるために型を宣言する。
+  宣言が無いと文字列として扱われ、0deg→360degが補間されずに一足飛びで切り替わる。
+
+  **`@property`はCSS Moduleの中で書いてもスコープを持たず、グローバルに登録される。**
+  そのため名前にコンポーネント名を含める(CODING_STANDARDS.md 6章)。分類別内訳の
+  `--category-breakdown-sweep`と**同じ名前にしない** — 後から読み込まれた方の
+  `syntax` / `initial-value`で上書きされ、視差効果を減らす設定のときに「全面が見えた状態」に
+  ならず、アニメーションが出ないのではなく**円グラフが欠けて見える**形で壊れる。
+  lint・型検査・テストのいずれでも検出できない衝突になる。
+*/
+@property --expense-breakdown-sweep {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 360deg;
+}
+
+@keyframes expenseChartSweep {
+  from {
+    --expense-breakdown-sweep: 0deg;
+  }
+}
+
+/*
+  マスクは`ChartContainer`の外側の`<div>`ではなく、**Rechartsが描くSVGだけ**に掛ける。
+  ツールチップは同じ`<div>`の中に絶対配置のHTMLとして描かれる(ポータルに出ていない)ため、
+  外側に掛けるとスイープ再生中に開いたツールチップまで一緒に隠れてしまう。
+  ツールチップ・凡例はアニメーションの対象外(DESIGN.md 9章)。
+*/
+.chartSweep :global(.recharts-surface) {
+  /* 再生後は1周(360deg)=全面が見える状態で止まるので、マスクは残っても見え方を変えない */
+  mask-image: conic-gradient(from 0deg, #000 var(--expense-breakdown-sweep), transparent 0);
+  /*
+    再生時間とイージングは`src/constants/dashboard.ts`の`CHART_ANIMATION_DURATION_MS` /
+    `CHART_ANIMATION_EASING`と同じ値にする。片方だけ変えると、同じ画面の中でこの円グラフだけ
+    別の速さで動く。CSSからTypeScriptの定数は読めないため、値が一致していること自体を
+    `src/constants/dashboard.test.ts`がこのファイルを読んで確かめている。
+  */
+  animation: expenseChartSweep 600ms ease-out backwards;
+}
+
+/*
+  視差効果を減らす設定では最終状態を即座に描く(DESIGN.md 9章)。短くするのではなく行わない。
+  `--expense-breakdown-sweep`の初期値が360degなので、アニメーションを外すだけで
+  全面が見えた状態になる。
+*/
+@media (prefers-reduced-motion: reduce) {
+  .chartSweep :global(.recharts-surface) {
+    animation: none;
+  }
+}

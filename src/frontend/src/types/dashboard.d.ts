@@ -156,6 +156,35 @@ declare global {
     projectedAchievementDate: string | null;
   };
 
+  /**
+   * 費目別支出の円グラフの1スライス(B1の収支サマリ)。
+   *
+   * `AssetBreakdownSlice`と形は同じだが別の型にする。あちらは資産分類マスタ(B4)の登録順に
+   * 紐づく色を持ち、負債の擬似スライスも入りうる。費目はマスタを持たず(同書6章)、色は
+   * **選択中の月に現れる費目の名前順**で決まるので、同じ型として扱うと取り違えても
+   * 気付けない(docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」)。
+   */
+  type ExpenseBreakdownSlice = {
+    /**
+     * 費目名そのもの。溢れた分をまとめるスライスだけ擬似的なID
+     * (`OTHER_EXPENSE_CATEGORY_ID`)で、表示名との一致では判定しない —
+     * マネーフォワードの大項目には「その他」が実在する
+     */
+    categoryId: string;
+    name: string;
+    /** 0以上(`ExpenseByCategory`の取り決めをそのまま引き継ぐ) */
+    amount: number;
+    /** その月の支出合計に対する割合(0〜1) */
+    ratio: number;
+    color: string;
+  };
+
+  /** 費目別支出の円グラフのProps */
+  type ExpenseBreakdownChartProps = {
+    /** 描く順(=色スロット順=費目名順)に並んだスライス */
+    slices: ExpenseBreakdownSlice[];
+  };
+
   /** 収支サマリの費目別支出の1行(費目は大項目。粒度は同書6章) */
   type ExpenseByCategory = {
     name: string;

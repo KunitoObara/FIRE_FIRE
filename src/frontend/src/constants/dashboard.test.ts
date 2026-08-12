@@ -64,10 +64,13 @@ const slices: AssetBreakdownSlice[] = [
  * 片方だけ変えると、同じ画面の中で円グラフだけ別の速さで動く。lintも型検査も気付けないので、
  * CSSを文字列として読んで値が一致していることをここで確かめる。
  */
-describe("グラフの再生時間・イージング", () => {
+describe.each([
+  ["分類別内訳", "CategoryBreakdownChart", "category-breakdown"],
+  ["費目別支出", "ExpenseBreakdownChart", "expense-breakdown"],
+])("グラフの再生時間・イージング(%s)", (_label, componentName, propertyNamePart) => {
   // vitestの実行時のカレントディレクトリは`src/frontend`(vitest.config.ts の root)
   const moduleCss = readFileSync(
-    resolve(process.cwd(), "src/components/dashboard/CategoryBreakdownChart.module.css"),
+    resolve(process.cwd(), `src/components/dashboard/${componentName}.module.css`),
     "utf8",
   );
 
@@ -104,8 +107,30 @@ describe("グラフの再生時間・イージング", () => {
   it("@propertyの名前にコンポーネント名が含まれている", () => {
     const declared = /@property\s+(--[\w-]+)/u.exec(moduleCss)?.[1];
 
-    expect(declared).toContain("category-breakdown");
+    expect(declared).toContain(propertyNamePart);
   });
+});
+
+/**
+ * 2つの円グラフのCSS Moduleが**別々の`@property`名**を使っていること。
+ *
+ * `@property`はCSS Moduleの中で書いてもスコープを持たずグローバルに登録されるため、
+ * 同じ名前を2つのコンポーネントが宣言すると、後から読み込まれた方の`initial-value`で
+ * 上書きされる。`initial-value: 360deg`が別の値に変わると、視差効果を減らす設定のときに
+ * 「全面が見えた状態」にならず、**円グラフが欠けて見える**形で壊れる。lint・型検査・
+ * 各モジュール単体のテストのいずれでも検出できない衝突なので、名前が違うことを直接見る。
+ */
+it("2つの円グラフが同じ@property名を宣言していない", () => {
+  const declaredName = (componentName: string): string | undefined => {
+    const css = readFileSync(
+      resolve(process.cwd(), `src/components/dashboard/${componentName}.module.css`),
+      "utf8",
+    );
+
+    return /@property\s+(--[\w-]+)/u.exec(css)?.[1];
+  };
+
+  expect(declaredName("CategoryBreakdownChart")).not.toBe(declaredName("ExpenseBreakdownChart"));
 });
 
 describe("buildNetWorthSeriesKey", () => {
