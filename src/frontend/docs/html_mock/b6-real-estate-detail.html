@@ -153,6 +153,11 @@
           <dd>〇〇マンション101号室</dd>
           <dt class="text-slate-400">所在地</dt>
           <dd>東京都渋谷区〇〇1-2-3</dd>
+          <!-- 取得年月(docs/screen-requirements-real-estate.md B6)。**未実装**。
+               資産推移グラフが物件を積み始める起点なので、入力欄のあるB7だけでなく
+               参照側でも値が入っているか確かめられるようにする。未入力の物件は「未登録」と出す -->
+          <dt class="text-slate-400">取得年月</dt>
+          <dd class="tabular-nums">2019年4月</dd>
           <dt class="text-slate-400">最終更新日</dt>
           <dd class="tabular-nums">2026/06/01</dd>
         </dl>
@@ -167,7 +172,11 @@
 <div id="delete-property-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4); z-index: 50;">
   <div class="card p-6 max-w-sm w-full">
     <h3 class="text-base font-bold mb-2">「〇〇マンション101号室」を削除しますか?</h3>
-    <p class="text-sm text-slate-500 mb-5">この操作は取り消せません。削除すると一覧に戻ります。</p>
+    <!-- B4-8で物件が分類軸の集計対象になったため、ダッシュボードへの波及もダイアログに書く
+         (docs/screen-requirements-real-estate.md「物件の削除」)。時価・ローン残高の履歴も
+         消えるので、資産推移グラフからは過去に遡ってこの物件の額が消える。
+         集計対象にしている分類軸は件数ではなく名前をすべて挙げる(B11の負債削除と同じ) -->
+    <p class="text-sm text-slate-500 mb-5">この操作は取り消せません。時価・ローン残高の履歴も削除され、資産推移グラフからは過去に遡ってこの物件の額が消えます。この物件を集計対象にしている分類軸「総資産」の集計も変わります。削除すると一覧に戻ります。</p>
     <div class="flex gap-3">
       <a href="b5-real-estate-list.html?deleted=1" class="btn btn-destructive flex-1">削除する</a>
       <button class="btn btn-ghost" type="button" onclick="document.getElementById('delete-property-dialog').classList.add('hidden')">キャンセル</button>
