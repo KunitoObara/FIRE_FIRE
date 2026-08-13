@@ -53,7 +53,16 @@ export const REAL_ESTATE_RENTAL_BALANCE_LABEL = "収支";
 export const REAL_ESTATE_BASIC_INFO_SECTION_TITLE = "物件基本情報";
 export const REAL_ESTATE_NAME_LABEL = "物件名";
 export const REAL_ESTATE_LOCATION_LABEL = "所在地";
+export const REAL_ESTATE_ACQUIRED_ON_LABEL = "取得年月";
 export const REAL_ESTATE_UPDATED_AT_LABEL = "最終更新日";
+
+/**
+ * 取得年月が未入力のときにB6が出す文言。
+ *
+ * 行ごと消さないのは、項目名と値が対になる基本情報のリストでは、行が無いと項目そのものが
+ * 存在しないように見えるため(B1の負債サマリが未入力の欄を空にするのとは事情が違う)。
+ */
+export const REAL_ESTATE_ACQUIRED_ON_EMPTY_LABEL = "未登録";
 
 /** 収益物件であることを物件名の下に示すラベル。非収益物件には何も出さない */
 export const REAL_ESTATE_RENTAL_PROPERTY_LABEL = "収益物件";
@@ -98,6 +107,7 @@ export const REAL_ESTATE_FORM_TITLES = {
 export const REAL_ESTATE_FORM_INITIAL_VALUES: RealEstateFormValues = {
   name: "",
   location: "",
+  acquiredOn: "",
   marketValue: "",
   loanBalance: "",
   isRentalProperty: false,
@@ -129,6 +139,43 @@ export const REAL_ESTATE_FORM_RENTAL_TOGGLE_LABEL = "収益物件として登録
 
 /** 所在地が任意入力であることを入力欄に明示する。未入力でも保存できる */
 export const REAL_ESTATE_FORM_OPTIONAL_SUFFIX = "(任意)";
+
+/**
+ * 取得年月の入力欄に添えるヒント。
+ *
+ * **入れると推移グラフのどこから物件が積まれるようになるのか**を書く
+ * (docs/screen-requirements-real-estate.md B7)。入れてもB6の利ざや・B1の円グラフ・
+ * FIRE達成度ゲージの数字は変わらない(いずれも「いま」の額なので)ため、何のための欄かが
+ * 画面から読めないと入力されないまま残る。B11の発生年月のヒントと同じ考え方。
+ */
+export const REAL_ESTATE_ACQUIRED_ON_HINT =
+  "入力すると、資産推移グラフがこの月から物件を反映します。未入力の場合は最初に記録した日からになります。";
+
+/**
+ * 取得年月の形式(`yyyy-MM`)。B11の発生年月と同じ値を持つ。
+ *
+ * **月を01〜12に絞る。** 桁だけを見る形にすると`2020-13`が通り、当月との比較も文字列の
+ * 辞書順なので保存まで素通りする。`firestore.rules`側にも同じ形を置く。
+ */
+export const REAL_ESTATE_ACQUIRED_ON_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/u;
+
+/** 取得年月の書式(date-fns)。当月との比較に使う */
+export const REAL_ESTATE_ACQUIRED_ON_FORMAT = "yyyy-MM";
+
+/**
+ * 取得年月の下限。桁を打ち間違えた年(`0202`)を止める歯止めで、
+ * 実在しうる取得年を締め出さない値に置く(B11の発生年月と同じ)。
+ */
+export const REAL_ESTATE_ACQUIRED_ON_MIN = "1900-01";
+
+/**
+ * 時価・ローン残高の履歴の件数上限(月1回の更新で50年分)。
+ *
+ * 値はB11の残債の履歴(`DEBT_BALANCE_HISTORY_MAX`)と揃える。この履歴は削除以外で減らず
+ * 運用年数に応じて単調に増えるため、`byType`のように「種別の数で自然に頭打ちになる」
+ * 性質に頼れない。`firestore.rules`側にも同じ値を置く。
+ */
+export const REAL_ESTATE_VALUE_HISTORY_MAX = 600;
 
 /** 物件名の最大文字数。firestore.rulesの`properties`の検証と一致させる */
 export const REAL_ESTATE_NAME_MAX_LENGTH = 60;
@@ -166,18 +213,34 @@ export const REAL_ESTATE_AMOUNT_FORMAT_MESSAGE = "半角数字のみ入力して
 /** 金額が上限を超えたときのエラー */
 export const REAL_ESTATE_AMOUNT_TOO_LARGE_MESSAGE = "金額は12桁以内で入力してください。";
 
+/** 取得年月が`yyyy-MM`として読めないときのエラー */
+export const REAL_ESTATE_ACQUIRED_ON_FORMAT_MESSAGE = `${REAL_ESTATE_ACQUIRED_ON_LABEL}は年月で入力してください。`;
+
+/** 取得年月に未来の年月が入っているときのエラー(まだ取得していない物件を過去のグラフに積まないため) */
+export const REAL_ESTATE_ACQUIRED_ON_FUTURE_MESSAGE = `${REAL_ESTATE_ACQUIRED_ON_LABEL}に未来の年月は入力できません。`;
+
+/** 取得年月が下限より前のときのエラー */
+export const REAL_ESTATE_ACQUIRED_ON_TOO_OLD_MESSAGE = `${REAL_ESTATE_ACQUIRED_ON_LABEL}は${REAL_ESTATE_ACQUIRED_ON_MIN.replace("-", "年")}月以降で入力してください。`;
+
 /** 保存完了のトースト(DESIGN.md 3章のsonner) */
 export const REAL_ESTATE_SAVED_MESSAGES = {
   create: "物件を登録しました",
   edit: "物件情報を更新しました",
 } as const;
 
-/** 物件の取得・保存が失敗したときの文言(B4の`CATEGORY_AXIS_FAILURE_MESSAGES`と同じ考え方) */
-export const REAL_ESTATE_FAILURE_MESSAGES: Record<FirestoreAccessFailureReason, string> = {
+/**
+ * 物件の取得・保存が失敗したときの文言(B4の`CATEGORY_AXIS_FAILURE_MESSAGES`と同じ考え方)。
+ *
+ * 保存側だけが起こしうる`history-limit-exceeded`も同じ表に置く。取得側は
+ * `FirestoreAccessFailureReason`しか返さないが、その部分集合をこの表で引ける
+ * (B11が`DEBT_FAILURE_MESSAGES`1つで両方を賄っているのと同じ)。
+ */
+export const REAL_ESTATE_FAILURE_MESSAGES: Record<RealEstateSaveFailureReason, string> = {
   "signed-out": "ログイン状態が切れています。ログインし直してから操作してください。",
   "configuration-error": "Firebaseの設定が読み込めないため操作できません。",
   "permission-denied": "この操作は許可されていません。ログインし直すか、画面を更新してください。",
   unknown: "操作に失敗しました。時間をおいて再度お試しください。",
+  "history-limit-exceeded": `時価・ローン残高の履歴が上限(${REAL_ESTATE_VALUE_HISTORY_MAX}件)に達しているため保存できません。履歴の持ち方を見直す必要があります。`,
 };
 
 /** 物件一覧のキャッシュキー(TanStack Query) */

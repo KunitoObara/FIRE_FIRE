@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  REAL_ESTATE_ACQUIRED_ON_EMPTY_LABEL,
+  REAL_ESTATE_ACQUIRED_ON_LABEL,
   REAL_ESTATE_BACK_TO_LIST_LINK,
   REAL_ESTATE_BASIC_INFO_SECTION_TITLE,
   REAL_ESTATE_EDIT_LABEL,
@@ -144,6 +146,18 @@ const RealEstateBasicInfoCard = ({ property }: RealEstateDetailProps): JSX.Eleme
         <dd>{property.name}</dd>
         <dt className="text-muted-foreground">{REAL_ESTATE_LOCATION_LABEL}</dt>
         <dd>{property.location}</dd>
+        {/*
+          取得年月は資産推移グラフが物件を積み始める起点(B1「不動産を含む分類軸の集計」)。
+          入力欄はB7にしか無いので、値が入っているかを参照側でも確かめられるようにする。
+          未入力でも行ごと消さない — 項目名と値が対になるリストでは、行が無いと項目そのものが
+          存在しないように見えるため。
+        */}
+        <dt className="text-muted-foreground">{REAL_ESTATE_ACQUIRED_ON_LABEL}</dt>
+        <dd className="tabular-nums">
+          {property.acquiredOn === null
+            ? REAL_ESTATE_ACQUIRED_ON_EMPTY_LABEL
+            : format(parseISO(`${property.acquiredOn}-01`), "yyyy年M月")}
+        </dd>
         <dt className="text-muted-foreground">{REAL_ESTATE_UPDATED_AT_LABEL}</dt>
         <dd className="tabular-nums">{format(parseISO(property.updatedAt), "yyyy/MM/dd")}</dd>
       </dl>

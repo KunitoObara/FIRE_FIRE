@@ -18,6 +18,9 @@ export const toRealEstatePropertyInput = (
 ): RealEstatePropertyInput => ({
   name: values.name,
   location: values.location,
+  // 空文字は「未登録」。`null`で保存し、`firestore.rules`の必須キーを満たすためキー自体は必ず書く
+  // (B11の発生年月と同じ扱い)
+  acquiredOn: values.acquiredOn.length === 0 ? null : values.acquiredOn,
   marketValue: Number(values.marketValue),
   loanBalance: Number(values.loanBalance),
   rental: values.isRentalProperty
@@ -36,6 +39,7 @@ export const toRealEstatePropertyInput = (
 export const toRealEstateFormValues = (property: RealEstateProperty): RealEstateFormValues => ({
   name: property.name,
   location: property.location,
+  acquiredOn: property.acquiredOn ?? "",
   marketValue: String(property.marketValue),
   loanBalance: String(property.loanBalance),
   isRentalProperty: property.rental !== undefined,
