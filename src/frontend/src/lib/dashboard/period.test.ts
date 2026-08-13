@@ -10,6 +10,7 @@ const point = (date: string, amount: number): NetWorthPoint => ({
   amount,
   byType: {},
   debtBalance: 0,
+  propertyAmount: 0,
 });
 
 const series: NetWorthPoint[] = [

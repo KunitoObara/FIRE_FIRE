@@ -7,6 +7,7 @@ const fetchAssetSnapshots = vi.fn();
 const fetchLastImportedAt = vi.fn();
 const fetchFireGoal = vi.fn();
 const fetchDebts = vi.fn();
+const fetchRealEstateProperties = vi.fn();
 
 vi.mock("@/lib/asset-categories/category-axis-repository", () => ({
   fetchCategoryAxes: () => fetchCategoryAxes(),
@@ -23,6 +24,11 @@ vi.mock("@/lib/fire-goal/fire-goal-repository", () => ({
 
 vi.mock("@/lib/debts/debt-repository", () => ({
   fetchDebts: () => fetchDebts(),
+}));
+
+// 不動産を含む分類軸の集計に使う(B4-8)。既定は取得成功・0件で、他のケースを止めない
+vi.mock("@/lib/real-estate/property-repository", () => ({
+  fetchRealEstateProperties: () => fetchRealEstateProperties(),
 }));
 
 const axes: AssetCategoryAxisDocument[] = [
@@ -83,6 +89,8 @@ describe("fetchDashboardData", () => {
         achievementAxisId: null,
       },
     });
+    fetchRealEstateProperties.mockReset();
+    fetchRealEstateProperties.mockResolvedValue({ ok: true, properties: [] });
   });
 
   it("B4で登録した分類軸をそのままセレクタの選択肢にする", async () => {

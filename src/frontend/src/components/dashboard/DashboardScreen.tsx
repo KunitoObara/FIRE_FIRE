@@ -113,11 +113,17 @@ export const DashboardScreen = ({
 
   const series = filterSeriesByPeriod(axisData?.netWorthSeries ?? [], selectedPeriodId, now);
   const debtTotal = axisData?.debtTotal ?? 0;
-  const slices = buildBreakdownSlices(axisData?.breakdown ?? [], data?.categories ?? [], debtTotal);
+  const propertyTotal = axisData?.propertyTotal ?? 0;
+  const slices = buildBreakdownSlices(
+    axisData?.breakdown ?? [],
+    data?.categories ?? [],
+    debtTotal,
+    propertyTotal,
+  );
   /*
-    差引後の純額は負債を含む分類軸でだけ併記する(同要件B1)。含まない軸では構成比の分母が
-    資産合計そのものなので、断り書きを添える意味が無い。0円の負債はスライスも出ないため
-    `debtTotal`が0のときは`null`になり、断り書きだけが残る状態にはならない。
+    純額は擬似分類(不動産・負債)を含む分類軸でだけ併記する(同要件B1)。含まない軸では
+    構成比の分母が資産合計そのものなので、断り書きを添える意味が無い。どちらも0のときは
+    スライスも出ないため`null`になり、断り書きだけが残る状態にはならない。
 
     絞り込み後の`series`ではなく`axisData`を渡す。純額は「いま何をどれだけ持っているか」を
     表す内訳の相手なので、表示期間ではなく直近の資産残高で出す(`resolveAxisNetAmount`)
@@ -184,6 +190,7 @@ export const DashboardScreen = ({
               axisName={selectedAxis.name}
               series={series}
               mode={selectedTrendMode}
+              hasSpreadProperty={axisData?.hasSpreadProperty ?? false}
               /*
                 色スロットの割り当ては分類別内訳と共有する。同じ画面の2つのグラフで同じ
                 資産種別が違う色になると見比べられない(同要件B1「積み上げ表示」)

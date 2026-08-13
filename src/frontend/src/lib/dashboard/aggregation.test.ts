@@ -7,10 +7,14 @@ import {
   collectAssetCategories,
   resolveAxisDebts,
   resolveAxisNetAmount,
+  resolveAxisProperties,
   resolveDebtBalanceAt,
+  resolvePropertyAmount,
   sumAxisAmount,
   sumDebtBalance,
   sumDebtBalanceAt,
+  sumPropertyAmount,
+  sumPropertyAmountAt,
 } from "@/lib/dashboard/aggregation";
 
 /**
@@ -43,20 +47,20 @@ const snapshots: AssetSnapshot[] = [
 
 describe("sumAxisAmount", () => {
   it("集計対象の資産種別だけを合計する", () => {
-    expect(sumAxisAmount(latestSnapshot, ["株式(現物)", "投資信託"], 0)).toBe(7_000_000);
+    expect(sumAxisAmount(latestSnapshot, ["株式(現物)", "投資信託"], 0, 0)).toBe(7_000_000);
   });
 
   /** 空配列は「すべての資産種別が対象」を意味する(B4) */
   it("集計対象が空配列なら全種別を合計する", () => {
-    expect(sumAxisAmount(latestSnapshot, [], 0)).toBe(11_400_000);
+    expect(sumAxisAmount(latestSnapshot, [], 0, 0)).toBe(11_400_000);
   });
 
   it("その日に存在しない資産種別が指定されていても無視する", () => {
-    expect(sumAxisAmount(latestSnapshot, ["株式(現物)", "暗号資産"], 0)).toBe(5_400_000);
+    expect(sumAxisAmount(latestSnapshot, ["株式(現物)", "暗号資産"], 0, 0)).toBe(5_400_000);
   });
 
   it("対象が1件も残らなければ0を返す", () => {
-    expect(sumAxisAmount(latestSnapshot, ["暗号資産"], 0)).toBe(0);
+    expect(sumAxisAmount(latestSnapshot, ["暗号資産"], 0, 0)).toBe(0);
   });
 });
 
@@ -70,7 +74,7 @@ const netAmountsOf = (series: NetWorthPoint[]): { date: string; amount: number }
 describe("buildAxisNetWorthSeries", () => {
   /** 当月の日次が並ぶと、月次の目盛り・ツールチップと1対1で対応しなくなる */
   it("月ごとに、その月でいちばん新しい集計日の残高を1点にする", () => {
-    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], []))).toEqual([
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [], [], {}))).toEqual([
       { date: "2026-06-30", amount: 10_000_000 },
       { date: "2026-07-31", amount: 11_000_000 },
       { date: "2026-08-05", amount: 11_400_000 },
@@ -78,7 +82,7 @@ describe("buildAxisNetWorthSeries", () => {
   });
 
   it("集計対象の資産種別だけで各月の金額を出す", () => {
-    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, ["投資信託"], []))).toEqual([
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, ["投資信託"], [], [], {}))).toEqual([
       { date: "2026-06-30", amount: 1_000_000 },
       { date: "2026-07-31", amount: 1_500_000 },
       { date: "2026-08-05", amount: 1_600_000 },
@@ -90,13 +94,13 @@ describe("buildAxisNetWorthSeries", () => {
    * (docs/screen-requirements-dashboard.md B1「積み上げ表示」)。
    */
   it("各点に集計対象の資産種別ごとの額を持たせる", () => {
-    expect(buildAxisNetWorthSeries(snapshots, ["投資信託"], []).at(-1)?.byType).toEqual({
+    expect(buildAxisNetWorthSeries(snapshots, ["投資信託"], [], [], {}).at(-1)?.byType).toEqual({
       投資信託: 1_600_000,
     });
   });
 
   it("集計対象が空配列なら全種別を内訳に持つ", () => {
-    expect(buildAxisNetWorthSeries(snapshots, [], []).at(-1)?.byType).toEqual({
+    expect(buildAxisNetWorthSeries(snapshots, [], [], [], {}).at(-1)?.byType).toEqual({
       "預金・現金": 4_400_000,
       "株式(現物)": 5_400_000,
       投資信託: 1_600_000,
@@ -105,12 +109,12 @@ describe("buildAxisNetWorthSeries", () => {
 
   it("入力の並び順によらず日付の昇順で返す", () => {
     expect(
-      buildAxisNetWorthSeries([...snapshots].reverse(), [], []).map((point) => point.date),
+      buildAxisNetWorthSeries([...snapshots].reverse(), [], [], [], {}).map((point) => point.date),
     ).toEqual(["2026-06-30", "2026-07-31", "2026-08-05"]);
   });
 
   it("資産残高が1件も無ければ空配列を返す", () => {
-    expect(buildAxisNetWorthSeries([], [], [])).toEqual([]);
+    expect(buildAxisNetWorthSeries([], [], [], [], {})).toEqual([]);
   });
 });
 
@@ -328,22 +332,22 @@ describe("sumDebtBalance", () => {
   });
 });
 
-describe("sumAxisAmount(負債を含む分類軸)", () => {
+describe("sumAxisAmount(負債を含む分類軸, 0)", () => {
   it("対象の資産種別の合計から、渡された残債を差し引く", () => {
-    expect(sumAxisAmount(latestSnapshot, [], sumDebtBalance([mortgage]))).toBe(
+    expect(sumAxisAmount(latestSnapshot, [], sumDebtBalance([mortgage]), 0)).toBe(
       11_400_000 - 3_000_000,
     );
   });
 
   /** 負債が資産を上回る状態そのものなので0で止めない(丸めるのは表示側の達成率だけ) */
   it("負債が資産を上回れば負の値になる", () => {
-    expect(sumAxisAmount(latestSnapshot, [], 20_000_000)).toBe(11_400_000 - 20_000_000);
+    expect(sumAxisAmount(latestSnapshot, [], 20_000_000, 0)).toBe(11_400_000 - 20_000_000);
   });
 });
 
 describe("buildAxisNetWorthSeries(負債を含む分類軸)", () => {
   it("過去の点は、その時点以前の最も新しい残債を差し引く", () => {
-    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [mortgage]))).toEqual([
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [mortgage], [], {}))).toEqual([
       // 6月末は負債の登録前なので差し引かない
       { date: "2026-06-30", amount: 10_000_000 },
       { date: "2026-07-31", amount: 11_000_000 - 4_000_000 },
@@ -367,7 +371,7 @@ describe("buildAxisNetWorthSeries(負債を含む分類軸)", () => {
       balanceHistory: { "2026-08-10": 2_500_000 },
     };
 
-    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [justRegistered]))).toEqual([
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [justRegistered], [], {}))).toEqual([
       // 過去は履歴に無いので差し引かない(遡って負債を作らない)
       { date: "2026-06-30", amount: 10_000_000 },
       { date: "2026-07-31", amount: 11_000_000 },
@@ -384,7 +388,7 @@ describe("buildAxisNetWorthSeries(負債を含む分類軸)", () => {
     // 2026-06に借りたことにする。記録は7月末が最初なので、6月末は遡って当てる
     const withOrigin: Debt = { ...mortgage, originatedOn: "2026-06" };
 
-    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [withOrigin]))).toEqual([
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [withOrigin], [], {}))).toEqual([
       { date: "2026-06-30", amount: 10_000_000 - 4_000_000 },
       { date: "2026-07-31", amount: 11_000_000 - 4_000_000 },
       { date: "2026-08-05", amount: 11_400_000 - 3_000_000 },
@@ -395,7 +399,7 @@ describe("buildAxisNetWorthSeries(負債を含む分類軸)", () => {
   it("最新点は履歴の最後の記録ではなく現在の残債を引く", () => {
     const repaid: Debt = { ...mortgage, balance: 1_000_000 };
 
-    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [repaid])).at(-1)).toEqual({
+    expect(netAmountsOf(buildAxisNetWorthSeries(snapshots, [], [repaid], [], {})).at(-1)).toEqual({
       date: "2026-08-05",
       amount: 11_400_000 - 1_000_000,
     });
@@ -406,7 +410,7 @@ describe("buildAxisNetWorthSeries(負債を含む分類軸)", () => {
    * 差し引いた推移は純資産表示が描くので、内訳側で引くと二重に引くことになる。
    */
   it("負債を差し引くのは純額だけで、資産種別ごとの額からは引かない", () => {
-    const latest = buildAxisNetWorthSeries(snapshots, [], [mortgage]).at(-1);
+    const latest = buildAxisNetWorthSeries(snapshots, [], [mortgage], [], {}).at(-1);
 
     expect(latest?.amount).toBe(11_400_000 - 3_000_000);
     expect(latest?.byType).toEqual({
@@ -430,10 +434,12 @@ describe("resolveAxisNetAmount", () => {
   };
 
   const axisDataWithNegative: AssetAxisData = {
-    netWorthSeries: buildAxisNetWorthSeries([snapshotWithNegative], [], [mortgage]),
+    netWorthSeries: buildAxisNetWorthSeries([snapshotWithNegative], [], [mortgage], [], {}),
     breakdown: buildAxisBreakdown(snapshotWithNegative, []),
     // 円グラフも推移グラフの最新点も「いま」なので、どちらも現在の残債を引く
     debtTotal: sumDebtBalance([mortgage]),
+    propertyTotal: 0,
+    hasSpreadProperty: false,
   };
 
   it("マイナス残高の資産種別があっても、推移グラフの最新点と一致する", () => {
@@ -454,15 +460,31 @@ describe("resolveAxisNetAmount", () => {
     expect(fromSlices).not.toBe(resolveAxisNetAmount(axisDataWithNegative));
   });
 
-  /** 負債を含まない分類軸では併記そのものを出さない */
-  it("負債を差し引かない分類軸はnullを返す", () => {
+  /** 負債も不動産も含まない分類軸では併記そのものを出さない */
+  it("負債も不動産も含まない分類軸はnullを返す", () => {
     expect(resolveAxisNetAmount({ ...axisDataWithNegative, debtTotal: 0 })).toBeNull();
+  });
+
+  /**
+   * 不動産を含む軸でも分母が各スライスの絶対値の合計になるので、%が純資産に対する割合では
+   * なくなる。負債が無くても併記する(B4-8)
+   */
+  it("負債が無くても不動産を含む分類軸なら併記する", () => {
+    expect(
+      resolveAxisNetAmount({ ...axisDataWithNegative, debtTotal: 0, propertyTotal: 5_000_000 }),
+    ).toBe(axisDataWithNegative.netWorthSeries.at(-1)?.amount);
   });
 
   it("資産残高が未取込ならnullを返す", () => {
     expect(resolveAxisNetAmount(undefined)).toBeNull();
     expect(
-      resolveAxisNetAmount({ netWorthSeries: [], breakdown: [], debtTotal: 3_000_000 }),
+      resolveAxisNetAmount({
+        netWorthSeries: [],
+        breakdown: [],
+        debtTotal: 3_000_000,
+        propertyTotal: 0,
+        hasSpreadProperty: false,
+      }),
     ).toBeNull();
   });
 });
@@ -597,5 +619,184 @@ describe("buildCashflowSummary", () => {
     );
 
     expect(summary).toMatchObject({ income: 0, expense: 0, expenseByCategory: [] });
+  });
+});
+
+/**
+ * 不動産を含む分類軸の集計(docs/screen-requirements-dashboard.md B1)。
+ *
+ * 規則は負債の残債と同じ — 過去の点は履歴、最新点は「いま」の値、起点(取得年月)より前は
+ * 積まない。違うのは**符号**(加える)と、**反映方法が物件ごとに決まる**ことの2つ。
+ */
+describe("不動産を含む分類軸の集計", () => {
+  const property = (overrides: Partial<RealEstateProperty> = {}): RealEstateProperty => ({
+    id: "shibuya-101",
+    name: "〇〇マンション101号室",
+    location: "",
+    acquiredOn: null,
+    marketValue: 32_000_000,
+    loanBalance: 18_400_000,
+    updatedAt: "2026-08-01",
+    valueHistory: { "2026-08-01": { marketValue: 32_000_000, loanBalance: 18_400_000 } },
+    ...overrides,
+  });
+
+  describe("resolvePropertyAmount", () => {
+    it("利ざやは時価からローン残高を引いた額になる", () => {
+      expect(
+        resolvePropertyAmount({ marketValue: 32_000_000, loanBalance: 18_400_000 }, "spread"),
+      ).toBe(13_600_000);
+    });
+
+    it("時価で反映する物件はローン残高を引かない", () => {
+      expect(
+        resolvePropertyAmount({ marketValue: 32_000_000, loanBalance: 18_400_000 }, "marketValue"),
+      ).toBe(32_000_000);
+    });
+
+    /** オーバーローンを0で止めると、資産を上回るローンがダッシュボードから消える(B1) */
+    it("オーバーローンの物件は負のまま返す", () => {
+      expect(
+        resolvePropertyAmount({ marketValue: 12_800_000, loanBalance: 14_100_000 }, "spread"),
+      ).toBe(-1_300_000);
+    });
+  });
+
+  describe("resolveAxisProperties", () => {
+    it("選ばれていない物件は落とす", () => {
+      const selected = property();
+      const other = property({ id: "yokohama-202" });
+
+      expect(resolveAxisProperties([selected, other], { "shibuya-101": "spread" })).toEqual([
+        selected,
+      ]);
+    });
+
+    /** 削除された物件への参照はそのまま落ちる(削除済みの負債と同じ扱い。B4) */
+    it("削除済みの物件への参照は何も足さない", () => {
+      expect(resolveAxisProperties([], { "sold-out": "spread" })).toEqual([]);
+    });
+  });
+
+  describe("sumPropertyAmountAt(過去の点)", () => {
+    it("その時点以前で最も新しい記録を使う", () => {
+      const withHistory = property({
+        valueHistory: {
+          "2026-06-01": { marketValue: 30_000_000, loanBalance: 19_000_000 },
+          "2026-08-01": { marketValue: 32_000_000, loanBalance: 18_400_000 },
+        },
+      });
+
+      expect(sumPropertyAmountAt([withHistory], { "shibuya-101": "spread" }, "2026-07-31")).toBe(
+        11_000_000,
+      );
+    });
+
+    /**
+     * 時価とローン残高を別々に最新で探すと、実在しない日の組み合わせから利ざやを作ることに
+     * なる(docs/screen-requirements-real-estate.md B7)。組で読むことをここで固定する
+     */
+    it("時価とローン残高は同じ日の記録から組で読む", () => {
+      const withHistory = property({
+        valueHistory: {
+          "2026-06-01": { marketValue: 30_000_000, loanBalance: 19_000_000 },
+          "2026-08-01": { marketValue: 32_000_000, loanBalance: 18_400_000 },
+        },
+      });
+
+      // 6月の組(30,000,000 - 19,000,000)であって、時価だけ8月を混ぜた額ではない
+      expect(sumPropertyAmountAt([withHistory], { "shibuya-101": "spread" }, "2026-06-15")).toBe(
+        11_000_000,
+      );
+    });
+
+    /** 起点(取得年月)より前の点には積まない。段差はそこから保有し始めた事実の表示 */
+    it("取得年月より前の点には積まない", () => {
+      const acquired = property({ acquiredOn: "2026-07" });
+
+      expect(sumPropertyAmountAt([acquired], { "shibuya-101": "spread" }, "2026-06-30")).toBe(0);
+      expect(sumPropertyAmountAt([acquired], { "shibuya-101": "spread" }, "2026-07-01")).toBe(
+        13_600_000,
+      );
+    });
+
+    /**
+     * 取得年月から最初の記録までは、知っている中でいちばん古い記録を遡って当てる
+     * (負債の「発生年月からの反映」と同じ)。当時の実際の額はアプリが知りえない
+     */
+    it("取得年月から最初の記録までは最も古い記録を当てる", () => {
+      const acquired = property({
+        acquiredOn: "2026-07",
+        valueHistory: { "2026-08-01": { marketValue: 32_000_000, loanBalance: 18_400_000 } },
+      });
+
+      expect(sumPropertyAmountAt([acquired], { "shibuya-101": "spread" }, "2026-07-15")).toBe(
+        13_600_000,
+      );
+    });
+
+    /** 取得年月も履歴も無い物件は起点が決まらないので、過去の点には現れない */
+    it("履歴も取得年月も無い物件は積まない", () => {
+      const fresh = property({ valueHistory: {} });
+
+      expect(sumPropertyAmountAt([fresh], { "shibuya-101": "spread" }, "2026-08-01")).toBe(0);
+    });
+  });
+
+  /**
+   * 「いま」は履歴ではなくB7で最後に保存した値を使う(負債と同じ理由)。履歴の日付は保存日、
+   * 資産残高の最新日はCSVを最後に取り込んだ日で、後者が古いのが普通のため
+   */
+  describe("sumPropertyAmount(いま)", () => {
+    it("履歴ではなく現在の時価・ローン残高を使う", () => {
+      const updated = property({
+        marketValue: 33_000_000,
+        loanBalance: 18_000_000,
+        // 履歴には古い値しか無い(保存のたびに積むので、最新の保存で足された分がここに来る前の状態)
+        valueHistory: { "2026-06-01": { marketValue: 30_000_000, loanBalance: 19_000_000 } },
+      });
+
+      expect(sumPropertyAmount([updated], { "shibuya-101": "spread" })).toBe(15_000_000);
+    });
+
+    it("反映方法は物件ごとに効く", () => {
+      const spread = property();
+      const market = property({
+        id: "yokohama-202",
+        marketValue: 21_500_000,
+        loanBalance: 15_200_000,
+      });
+
+      expect(
+        sumPropertyAmount([spread, market], {
+          "shibuya-101": "spread",
+          "yokohama-202": "marketValue",
+        }),
+      ).toBe(13_600_000 + 21_500_000);
+    });
+  });
+
+  describe("buildAxisNetWorthSeries(不動産を含む分類軸)", () => {
+    it("純額に不動産を加え、帯の値も点ごとに持つ", () => {
+      const acquired = property({
+        acquiredOn: "2026-07",
+        valueHistory: { "2026-07-01": { marketValue: 30_000_000, loanBalance: 20_000_000 } },
+      });
+      const series = buildAxisNetWorthSeries(snapshots, [], [], [acquired], {
+        "shibuya-101": "spread",
+      });
+
+      // 最新点だけ「いま」の値(32,000,000 - 18,400,000)、それ以前は履歴(10,000,000)
+      expect(series.at(-1)?.propertyAmount).toBe(13_600_000);
+      expect(series.at(-1)?.amount).toBe(series.at(-1)?.amount ?? 0);
+      expect(series.map((point) => point.propertyAmount)).toEqual([0, 10_000_000, 13_600_000]);
+    });
+
+    /** 不動産を1件も選んでいない分類軸の集計は、これまでと変わらない */
+    it("物件を選んでいない分類軸では0のまま", () => {
+      const series = buildAxisNetWorthSeries(snapshots, [], [], [], {});
+
+      expect(series.every((point) => point.propertyAmount === 0)).toBe(true);
+    });
   });
 });

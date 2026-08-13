@@ -19,6 +19,7 @@ import {
   FIRE_GOAL_SAVED_MESSAGE,
   LATEST_ASSET_SNAPSHOT_QUERY_KEY,
 } from "@/constants/fire-goal";
+import { REAL_ESTATE_PROPERTIES_QUERY_KEY } from "@/constants/real-estate";
 import { DASHBOARD_PATH } from "@/constants/routes";
 import { fetchCategoryAxes } from "@/lib/asset-categories/category-axis-repository";
 import { fetchLatestAssetSnapshot } from "@/lib/csv-import/asset-balance-repository";
@@ -26,6 +27,7 @@ import { resolveAchievementAmount, resolveAchievementAxis } from "@/lib/dashboar
 import { fetchDebts } from "@/lib/debts/debt-repository";
 import { fetchFireGoal, saveFireGoal } from "@/lib/fire-goal/fire-goal-repository";
 import { toFireGoalFormValues } from "@/lib/fire-goal/form-values";
+import { fetchRealEstateProperties } from "@/lib/real-estate/property-repository";
 
 import type { JSX } from "react";
 
@@ -64,6 +66,15 @@ export const FireGoalScreen = (): JSX.Element => {
   */
   const debtsQuery = useQuery({ queryKey: DEBTS_QUERY_KEY, queryFn: fetchDebts });
 
+  /*
+    物件も同じ理由で読む。対象分類が不動産を含む軸なら現在資産額に加わるため
+    (B4-8)、これが無いとB8の参考表示だけがB1のゲージと違う額になる
+  */
+  const propertiesQuery = useQuery({
+    queryKey: REAL_ESTATE_PROPERTIES_QUERY_KEY,
+    queryFn: fetchRealEstateProperties,
+  });
+
   /**
    * 選択中の対象分類。`undefined`は「まだ触っていない」で、保存済みの設定に追従する。
    *
@@ -94,10 +105,12 @@ export const FireGoalScreen = (): JSX.Element => {
   // 失敗を重ねて表示しても増える情報が無く、「—」で分からないことは伝わる
   const latestSnapshot = snapshotQuery.data?.ok === true ? snapshotQuery.data.snapshot : null;
   const debts = debtsQuery.data?.ok === true ? debtsQuery.data.debts : [];
+  const properties = propertiesQuery.data?.ok === true ? propertiesQuery.data.properties : [];
   const currentAssetTotal = resolveAchievementAmount(
     achievementAxis,
     latestSnapshot ?? undefined,
     debts,
+    properties,
   );
 
   const handleSubmit = async (goal: FireGoal): Promise<SaveFireGoalResult> => {

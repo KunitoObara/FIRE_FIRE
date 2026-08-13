@@ -36,6 +36,7 @@ const point = (
   amount,
   byType,
   debtBalance,
+  propertyAmount: 0,
 });
 
 const series: NetWorthPoint[] = [point("2026-07-31", 11_000_000), point("2026-08-05", 11_400_000)];
@@ -221,6 +222,22 @@ describe("buildNetWorthSeriesKey", () => {
     );
 
     expect(seriesKey("総資産", repaid)).not.toBe(seriesKey("総資産", series));
+  });
+
+  /**
+   * 不動産の帯は`propertyAmount`から描く。純額(`amount`)は不動産と負債の増減が相殺すると
+   * 変わらないので、これを署名に含めないと帯の形が変わったのに再生が漏れる(残債と同じ性質)。
+   */
+  it("純額が同じでも不動産と残債の内訳が変わると署名が変わる", () => {
+    const shifted = series.map((point, index) =>
+      index === series.length - 1
+        ? { ...point, propertyAmount: 5_000_000, debtBalance: point.debtBalance + 5_000_000 }
+        : point,
+    );
+
+    // 純額は据え置き(不動産 +5,000,000 と残債 +5,000,000 が相殺する)
+    expect(shifted.at(-1)?.amount).toBe(series.at(-1)?.amount);
+    expect(seriesKey("総資産", shifted)).not.toBe(seriesKey("総資産", series));
   });
 });
 

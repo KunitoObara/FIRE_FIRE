@@ -5,6 +5,7 @@ import {
   DEBT_CATEGORY_ID,
   DEBT_CATEGORY_NAME,
   OTHER_CATEGORY_ID,
+  PROPERTY_CATEGORY_ID,
 } from "@/constants/dashboard";
 import { buildBreakdownSlices, buildStackedTrend } from "@/lib/dashboard/category-color";
 
@@ -188,6 +189,7 @@ describe("buildStackedTrend", () => {
     amount: 0,
     byType,
     debtBalance,
+    propertyAmount: 0,
   });
 
   /**
@@ -295,6 +297,7 @@ describe("buildStackedTrend", () => {
       amount: 100,
       byType: { fund: 300, deposit: 200 },
       debtBalance: 400,
+      propertyAmount: 0,
     };
 
     expect(buildStackedTrend([withDebt], categories, false).points[0]?.total).toBe(500);
@@ -351,5 +354,129 @@ describe("buildStackedTrend", () => {
 
       expect(bands.some((band) => band.categoryId === DEBT_CATEGORY_ID)).toBe(false);
     });
+  });
+});
+
+/**
+ * 不動産の帯・スライス(docs/screen-requirements-dashboard.md B1「グラフでの見せ方」)。
+ *
+ * 擬似的な分類IDで表し、表示名「不動産」との一致では判定しない — CSVの資産種別に
+ * 「不動産」が現れうるため。並びは資産種別の後ろ・負債の前で固定する。
+ */
+describe("不動産の帯・スライス", () => {
+  const categories: AssetCategory[] = [
+    { id: "現金・預金", name: "現金・預金" },
+    { id: "投資信託", name: "投資信託" },
+  ];
+
+  it("帯は資産種別の後ろ・負債の前に並ぶ", () => {
+    const { bands } = buildStackedTrend(
+      [
+        {
+          date: "2026-08-01",
+          amount: 0,
+          byType: { "現金・預金": 5_000_000 },
+          debtBalance: 3_000_000,
+          propertyAmount: 13_600_000,
+        },
+      ],
+      categories,
+      true,
+    );
+
+    expect(bands.map((band) => band.categoryId)).toEqual([
+      "現金・預金",
+      PROPERTY_CATEGORY_ID,
+      DEBT_CATEGORY_ID,
+    ]);
+  });
+
+  /**
+   * 切替が動かすのはB11の負債だけ(同要件「負債反映の切替との関係」)。「資産のみ」でも
+   * 不動産は分類軸の設定どおりに積まれ続ける
+   */
+  it("「資産のみ」でも不動産の帯は残る", () => {
+    const { bands, points } = buildStackedTrend(
+      [
+        {
+          date: "2026-08-01",
+          amount: 0,
+          byType: { "現金・預金": 5_000_000 },
+          debtBalance: 3_000_000,
+          propertyAmount: 13_600_000,
+        },
+      ],
+      categories,
+      false,
+    );
+
+    expect(bands.map((band) => band.categoryId)).toEqual(["現金・預金", PROPERTY_CATEGORY_ID]);
+    expect(points[0]?.amounts[PROPERTY_CATEGORY_ID]).toBe(13_600_000);
+  });
+
+  /** オーバーローンの物件は負のまま積む(`stackOffset="sign"`で0より下に来る) */
+  it("利ざやが負なら負の値のまま帯に載る", () => {
+    const { points } = buildStackedTrend(
+      [
+        {
+          date: "2026-08-01",
+          amount: 0,
+          byType: {},
+          debtBalance: 0,
+          propertyAmount: -1_300_000,
+        },
+      ],
+      categories,
+      true,
+    );
+
+    expect(points[0]?.amounts[PROPERTY_CATEGORY_ID]).toBe(-1_300_000);
+  });
+
+  it("スライスは資産種別の後ろ・負債の前で、色スロットを消費しない", () => {
+    const slices = buildBreakdownSlices(
+      [{ categoryId: "現金・預金", amount: 5_000_000 }],
+      categories,
+      3_000_000,
+      13_600_000,
+    );
+
+    expect(slices.map((slice) => slice.categoryId)).toEqual([
+      "現金・預金",
+      PROPERTY_CATEGORY_ID,
+      DEBT_CATEGORY_ID,
+    ]);
+    // 資産種別は先頭のスロットのまま(不動産に奪われない)
+    expect(slices[0]?.color).toBe("var(--chart-1)");
+  });
+
+  /**
+   * 分母は各スライスの絶対値の合計。オーバーローンでもスライスを落とさず、面積は絶対値、
+   * 額は符号付きで持つ(凡例が符号付きで出せるように)
+   */
+  it("合計が負でもスライスを出し、額は符号付き・比は絶対値で持つ", () => {
+    const slices = buildBreakdownSlices(
+      [{ categoryId: "現金・預金", amount: 5_000_000 }],
+      categories,
+      0,
+      -5_000_000,
+    );
+    const property = slices.find((slice) => slice.categoryId === PROPERTY_CATEGORY_ID);
+
+    expect(property?.amount).toBe(-5_000_000);
+    // 分母 = 5,000,000 + |-5,000,000| = 10,000,000
+    expect(property?.ratio).toBe(0.5);
+  });
+
+  /** 出さないのはちょうど0円のときだけ(0円のスライスは凡例を埋めるだけ) */
+  it("合計がちょうど0円ならスライスを出さない", () => {
+    const slices = buildBreakdownSlices(
+      [{ categoryId: "現金・預金", amount: 5_000_000 }],
+      categories,
+      0,
+      0,
+    );
+
+    expect(slices.some((slice) => slice.categoryId === PROPERTY_CATEGORY_ID)).toBe(false);
   });
 });

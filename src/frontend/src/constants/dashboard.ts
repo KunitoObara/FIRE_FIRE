@@ -171,6 +171,39 @@ export const DEBT_LEGEND_SWATCH_BACKGROUND =
   "repeating-linear-gradient(45deg, var(--destructive) 0 2px, color-mix(in oklab, var(--destructive) 55%, white) 2px 4px)";
 
 /**
+ * 分類別内訳・積み上げ推移グラフの不動産を表す擬似的な分類ID(`DEBT_CATEGORY_ID`と同じ考え方)。
+ *
+ * **表示名「不動産」との一致で判定しない。** 資産種別の名前はCSVの列名そのものなので
+ * 「不動産」という名前の資産種別が現れうる — マネーフォワードに不動産を登録していれば
+ * むしろ現れる(docs/screen-requirements-dashboard.md B1「CSV取込データとの重複」)。
+ */
+export const PROPERTY_CATEGORY_ID = "__property__";
+
+/** 不動産のスライス・帯の表示名。物件ごとに分けず1つにまとめる(物件別はB5・B6で見る) */
+export const PROPERTY_CATEGORY_NAME = "不動産";
+
+/**
+ * 不動産の色。**資産分類カラーのスロットを使わない**(DESIGN.md 3章)。
+ *
+ * 物件の数だけスロットを占めると、実際に保有している資産種別が「その他」へ押し出される
+ * (負債と同じ理由)。`--real-estate`は`--chart-*`とも`--destructive`とも別のトークン。
+ */
+export const PROPERTY_CATEGORY_COLOR = "var(--real-estate)";
+
+/**
+ * 不動産のスライス・帯に重ねる模様(点)。**負債のハッチング(斜線)とは変える**
+ * (DESIGN.md 3章)。
+ *
+ * 利ざやがマイナスの物件では帯が0の線より下に積まれ、負債の帯と並ぶ。そこで模様まで
+ * 同じだと、色相の違いだけで「不動産」と「負債」を見分けることになる。
+ */
+export const PROPERTY_SLICE_DOT_PATTERN_ID = "category-breakdown-property-dot";
+
+/** 凡例の色見本に重ねる点。円グラフのスライスと同じ見た目にする(負債の色見本と同じ考え方) */
+export const PROPERTY_LEGEND_SWATCH_BACKGROUND =
+  "radial-gradient(color-mix(in oklab, var(--real-estate) 45%, white) 30%, transparent 32%) 0 0 / 4px 4px, var(--real-estate)";
+
+/**
  * 差引後の純額に添える見出し(分類別内訳のカード)。
  *
  * 円グラフは正の面積でしか比を表せず、負債のスライスを置いた時点で**構成比の分母は
@@ -178,6 +211,24 @@ export const DEBT_LEGEND_SWATCH_BACKGROUND =
  * 分かるよう、差引後の純額を数字で併記する(docs/screen-requirements-dashboard.md B1)。
  */
 export const BREAKDOWN_NET_AMOUNT_LABEL = "資産 - 負債";
+
+/**
+ * 不動産を含む分類軸での純額の見出し。
+ *
+ * 加える側(不動産)と引く側(負債)が並ぶので、式の順どおりに出す
+ * (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
+ */
+export const BREAKDOWN_NET_AMOUNT_WITH_PROPERTY_LABEL = "資産 + 不動産 - 負債";
+
+/**
+ * 「資産のみ」に切り替えても不動産はローン控除後のままである旨の注記(B1)。
+ *
+ * 負債反映の切替が動かすのはB11の負債だけで、不動産は分類軸の設定どおりに積まれ続ける。
+ * 0の線より上だけを見て「借入を一切引いていない状態」と読まれないようにする。
+ * **利ざやで反映している物件がある分類軸にだけ**出す。
+ */
+export const PROPERTY_SPREAD_NOT_TOGGLED_NOTICE =
+  "「利ざやのみ反映」にしている物件は、「資産のみ」でもローンを差し引いた額で積まれています。切替はこの分類軸が対象にしている負債だけに効きます。";
 
 /** 直近CSV取込日時が無いときの表示 */
 export const NO_CSV_IMPORT_LABEL = "CSV未取込";
@@ -344,6 +395,12 @@ export const buildNetWorthSeriesKey = (
         切替(`mode`)自体は上で署名に入っており、帯の出入りはそちらで再生される
       */
       point.debtBalance,
+      /*
+        **不動産の額も同じ理由で含める。** 帯は`propertyAmount`から描くので、これを
+        含めないと「時価を更新したが、同額の負債の増減と相殺されて純額は同じ」保存の
+        あとに帯の形が変わったことを検出できない(残債と同じ性質の漏れ)
+      */
+      point.propertyAmount,
     ]),
   ]);
 

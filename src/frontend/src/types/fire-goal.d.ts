@@ -105,6 +105,8 @@ declare global {
      * 黙って純資産の軸へ変わるのを避けるため。
      */
     debtIds: string[];
+    /** 集計に加える物件と反映方法。空のマップは「不動産を反映しない」(B4)。`debtIds`と同じ非対称 */
+    propertyValuations: CategoryAxisPropertyValuations;
   };
 
   /**
@@ -126,6 +128,14 @@ declare global {
      * 選ぶ必要がある(docs/screen-requirements-fire-goal.md B8)。
      */
     debtIds: string[];
+    /**
+     * 集計に加える物件と反映方法。
+     *
+     * 既定(総資産)は空のマップになる。マネーフォワードの合計に手動で登録した物件は
+     * 含まれないため、不動産を達成度に効かせるには物件を含む分類軸を作って選ぶ必要がある
+     * (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
+     */
+    propertyValuations: CategoryAxisPropertyValuations;
     /** 設定されていた分類軸が見つからず既定へフォールバックした場合に`true` */
     missing: boolean;
   };
