@@ -178,7 +178,7 @@ flowchart TD
 
 > **B7の保存後はB6 不動産詳細画面へ戻る**(新規登録・編集のどちらも)。登録・更新した内容と利ざやをその場で確認できるようにするため。[不動産管理系画面の要件](./screen-requirements-real-estate.md) B7が正で、この図は以前B5と書いていた。
 >
-> **B6からの「削除」は未実装。** 要件は [同書「物件の削除」](./screen-requirements-real-estate.md#物件の削除未実装)にあり、実装は別カードで行う。
+> **B6からの「削除」は [B6-1](https://trello.com/c/0Frlp1Q1) で実装済み。** 要件は [同書「物件の削除」](./screen-requirements-real-estate.md#物件の削除)にある。削除に成功するとB5 不動産一覧へ戻る。
 
 ## 4. 今後の検討事項
 

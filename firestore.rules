@@ -569,9 +569,12 @@ service cloud.firestore {
             resource.data.get('valueHistory', {}),
             request.resource.data.updatedAt
           );
-        // 物件を削除する画面はまだ無い(B5〜B7の要件に削除は含まれない)。
-        // 必要になった時点でここに許可を書く
-        allow delete: if false;
+        // 削除はB6の「削除」から行う(B6-1)。分類軸から参照されているだけの物件も消せる —
+        // 参照が残った分類軸は、その物件を集計対象から外して計算する
+        // (B4「集計対象に不動産を含める」)。売却した物件を整理できなくなるほうが困るため、
+        // 負債(debts)と同じく参照を理由に削除を止めない。
+        // 時価・ローン残高の履歴は同じドキュメント内のマップなので一緒に消える
+        allow delete: if canAccessOwnData(userId);
       }
     }
 

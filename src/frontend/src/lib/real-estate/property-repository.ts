@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -275,6 +276,38 @@ export const updateRealEstateProperty = async (
     return { ok: true, id };
   } catch (error) {
     console.error("物件を更新できませんでした", id, error);
+    return { ok: false, reason: toFirestoreFailureReason(error) };
+  }
+};
+
+/**
+ * 物件を削除する(B6の「削除」)。
+ *
+ * **論理削除は設けない**(docs/screen-requirements-real-estate.md「物件の削除」)。
+ * 時価・ローン残高の履歴は同じドキュメント内のマップなので、物件と一緒に消える —
+ * 資産推移グラフからはこの物件の額が過去に遡って消えることになるため、確認ダイアログで
+ * その旨を明示してから呼ぶ。
+ *
+ * **分類軸からの参照は消さない。** 参照だけが残った状態は正常に起こりうるもので、B4側が
+ * 集計対象から外れたものとして扱う(B4「集計対象に不動産を含める」)。ここで分類軸まで
+ * 書き換えると、物件1件の削除が複数ドキュメントの更新になり、途中で失敗したときに
+ * 中途半端な状態が残る。
+ */
+export const deleteRealEstateProperty = async (
+  id: string,
+): Promise<DeleteRealEstatePropertyResult> => {
+  const context = resolveFirestoreUserContext();
+
+  if (!context.ok) {
+    return context;
+  }
+
+  try {
+    await deleteDoc(doc(propertiesRef(context.firestore, context.uid), id));
+
+    return { ok: true };
+  } catch (error) {
+    console.error("物件を削除できませんでした", id, error);
     return { ok: false, reason: toFirestoreFailureReason(error) };
   }
 };

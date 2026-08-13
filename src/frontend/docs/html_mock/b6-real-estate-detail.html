@@ -98,8 +98,8 @@
           <h2 class="text-lg font-bold">〇〇マンション101号室</h2>
           <p class="text-sm text-slate-400">東京都渋谷区・収益物件</p>
         </div>
-        <!-- 「削除」は未実装(docs/screen-requirements-real-estate.md「物件の削除」)。
-             B5 一覧ではなくここに置く。一覧の行は全体がこの画面へのリンクで、行の中に
+        <!-- 「削除」はここに置く(docs/screen-requirements-real-estate.md「物件の削除」)。
+             B5 一覧ではなくここに置く理由は2つ。一覧の行は全体がこの画面へのリンクで、行の中に
              破壊的な操作を混ぜると誤操作で消えるため。削除の前に時価・ローン残高・利ざやを
              確かめられる場所もここである。 -->
         <div class="flex items-center gap-2">
@@ -153,7 +153,7 @@
           <dd>〇〇マンション101号室</dd>
           <dt class="text-slate-400">所在地</dt>
           <dd>東京都渋谷区〇〇1-2-3</dd>
-          <!-- 取得年月(docs/screen-requirements-real-estate.md B6)。**未実装**。
+          <!-- 取得年月(docs/screen-requirements-real-estate.md B6)。
                資産推移グラフが物件を積み始める起点なので、入力欄のあるB7だけでなく
                参照側でも値が入っているか確かめられるようにする。未入力の物件は「未登録」と出す -->
           <dt class="text-slate-400">取得年月</dt>
@@ -166,7 +166,7 @@
   </div>
 </div>
 
-<!-- 物件の削除確認ダイアログ(docs/screen-requirements-real-estate.md「物件の削除」)。**未実装**。
+<!-- 物件の削除確認ダイアログ(docs/screen-requirements-real-estate.md「物件の削除」)。
      どの物件を消すのか分かるよう物件名を示す。負債(B11)と違い、削除しても他の画面の集計は
      変わらない(物件はダッシュボードにも資産分類軸にも入らない)ので、影響の予告は要らない。 -->
 <div id="delete-property-dialog" class="hidden fixed inset-0 flex items-center justify-center p-4" style="background-color: rgb(0 0 0 / 0.4); z-index: 50;">

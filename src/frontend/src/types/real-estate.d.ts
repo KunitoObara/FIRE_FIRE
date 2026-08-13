@@ -167,9 +167,50 @@ declare global {
     params: Promise<{ id: string }>;
   };
 
+  /** 物件の削除結果(B6)。成功後はB5へ遷移するため、返すのは可否だけでよい */
+  type DeleteRealEstatePropertyResult =
+    { ok: true } | { ok: false; reason: FirestoreAccessFailureReason };
+
+  /**
+   * 削除する物件を集計対象にしている分類軸の状態(B6の確認ダイアログ)。
+   *
+   * 「該当が無い」と「取得できていない」を型で分ける。空配列に倒すと、影響する軸が無いのか
+   * 確かめられなかっただけなのかがダイアログから区別できない
+   * (`AssetTypeOptionsState`などと同じ考え方)。削除自体はどちらの状態でも止めない。
+   */
+  type AffectedAxisNamesState = { status: "unknown" } | { status: "ready"; axisNames: string[] };
+
+  /**
+   * B6の内部カード(時価・ローン残高・利ざや / 物件基本情報)のProps。
+   *
+   * `RealEstateDetailProps`と分けるのは、カード側が削除の導線を持たないため。
+   * 画面本体のPropsをそのまま渡すと、カードが使わない`onDelete`まで受けることになる。
+   */
+  type RealEstateValuationCardProps = {
+    property: RealEstateProperty;
+  };
+
   /** B6 不動産詳細画面の本体(RealEstateDetail)のProps */
   type RealEstateDetailProps = {
     property: RealEstateProperty;
+    /**
+     * 削除の確認ダイアログに出す、この物件を集計対象にしている分類軸。
+     *
+     * 取得は画面側(`RealEstateDetailScreen`)が行う。B6の表示そのものには要らないが、
+     * 削除の影響を伝えるために要る(docs/screen-requirements-real-estate.md「物件の削除」)。
+     */
+    affectedAxisNames: AffectedAxisNamesState;
+    /** 削除の実行。成功後の遷移とトーストは呼び出し側が持つ */
+    onDelete: () => Promise<DeleteRealEstatePropertyResult>;
+  };
+
+  /** 削除確認ダイアログ(DeleteRealEstateDialog)のProps */
+  type DeleteRealEstateDialogProps = {
+    /** 削除対象。`null`は非表示 */
+    property: RealEstateProperty | null;
+    affectedAxisNames: AffectedAxisNamesState;
+    onOpenChange: (open: boolean) => void;
+    onConfirm: () => Promise<DeleteRealEstatePropertyResult>;
   };
 
   /**
