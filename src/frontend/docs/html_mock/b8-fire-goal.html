@@ -112,6 +112,19 @@
           </p>
         </div>
 
+        <!--
+          毎月の積立額(docs/screen-requirements-fire-goal.md「毎月の積立額」)。
+          到達予測日の算出に使う。対象分類と同じ理由でタブの外に置き、両方式で共通の設定にする。
+          初期値として前月の月次収支を提示するが、以後は手入力の値がそのまま予測に使われる。
+        -->
+        <div class="field mb-6 pb-6 border-b" style="border-color: hsl(var(--border));">
+          <label class="label">毎月の積立額(円)</label>
+          <input class="input tabular-nums" value="180000" />
+          <p class="field-hint">
+            到達予測日の算出に使います。初期値は前月の収支(収入 - 支出)です。取り崩しを見込む場合はマイナスも入力できます。
+          </p>
+        </div>
+
         <!-- タブ切替(非表示タブの入力値も保持する) -->
         <div class="tab-row mb-6">
           <span id="tab-direct" class="tab tab-active" onclick="selectTab('direct')">直接入力</span>
