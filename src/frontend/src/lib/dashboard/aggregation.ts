@@ -149,6 +149,125 @@ export const sumDebtBalance = (axisDebts: Debt[]): number =>
   axisDebts.reduce((sum, debt) => sum + debt.balance, 0);
 
 /**
+ * 分類軸が集計に加える物件を選び出す。
+ *
+ * 空のマップは「不動産を反映しない」を意味するので、`resolveAxisDebts`と同じく
+ * 「未選択=すべて」の読み替えをしない(B4)。**参照している物件が削除されていた場合は
+ * そのまま落ちる**(削除済みの負債と同じ扱い。B4側が一覧と編集フォームで外れたことを出す)。
+ */
+export const resolveAxisProperties = (
+  properties: RealEstateProperty[],
+  propertyValuations: CategoryAxisPropertyValuations,
+): RealEstateProperty[] => properties.filter((property) => property.id in propertyValuations);
+
+/**
+ * 反映方法に従って、時価とローン残高の組から集計に加える額を求める。
+ *
+ * `spread`(利ざや)は**0で止めない**。オーバーローンの物件では負になり、そのまま積む
+ * (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。0に丸めると、
+ * 資産を上回るローンを負っていることがダッシュボードから消える。
+ */
+export const resolvePropertyAmount = (
+  record: RealEstateValueRecord,
+  mode: RealEstateValuationMode,
+): number => (mode === "spread" ? record.marketValue - record.loanBalance : record.marketValue);
+
+/**
+ * その物件が資産推移グラフに現れ始める起点(`yyyy-MM-dd`)。記録も取得年月も無い物件は`null`。
+ *
+ * 負債の`resolveDebtOriginDate`と同じ規則。B7の**取得年月**が入っていればその月の1日、
+ * 入っていなければ最も古い記録の日(履歴を積む前と同じ振る舞い)。
+ */
+const resolvePropertyOriginDate = (property: RealEstateProperty): string | null => {
+  if (property.acquiredOn !== null) {
+    return `${property.acquiredOn}-01`;
+  }
+
+  const recordedDates = Object.keys(property.valueHistory);
+
+  return recordedDates.length === 0
+    ? null
+    : recordedDates.reduce((left, right) => (left < right ? left : right));
+};
+
+/**
+ * ある時点の時価・ローン残高を履歴から求める。起点より前は`null`(その点には積まない)。
+ *
+ * 規則は負債の`resolveDebtBalanceAt`と同じ — **その時点以前で最も新しい記録**を採り、
+ * 起点以降でまだ記録が無い期間には**最も古い記録**を遡って当てる。取得年月より前の記録も
+ * 値としては使う(起点が決めるのは「いつから積むか」だけ)。
+ *
+ * **時価とローン残高は同じ記録から組で返す。** 別々に最新を探すと「時価は3月・ローン残高は
+ * 7月」という実在しない日の組み合わせから利ざやを作ることになる
+ * (docs/screen-requirements-real-estate.md B7「時価・ローン残高の履歴」)。
+ */
+export const resolvePropertyValueAt = (
+  property: RealEstateProperty,
+  date: string,
+): RealEstateValueRecord | null => {
+  const originDate = resolvePropertyOriginDate(property);
+
+  if (originDate === null || date < originDate) {
+    return null;
+  }
+
+  let latestDate: string | null = null;
+  let latestRecord: RealEstateValueRecord | null = null;
+  let earliestDate: string | null = null;
+  let earliestRecord: RealEstateValueRecord | null = null;
+
+  for (const [recordedDate, record] of Object.entries(property.valueHistory)) {
+    if (recordedDate <= date && (latestDate === null || recordedDate > latestDate)) {
+      latestDate = recordedDate;
+      latestRecord = record;
+    }
+
+    if (earliestDate === null || recordedDate < earliestDate) {
+      earliestDate = recordedDate;
+      earliestRecord = record;
+    }
+  }
+
+  return latestRecord ?? earliestRecord;
+};
+
+/**
+ * ある時点で分類軸が加える不動産の合計(**過去の点に使う**。「いま」は`sumPropertyAmount`)。
+ *
+ * 起点より前の物件は加えない。積み始める月に段差が出るが、これは「そこから保有し始めた」
+ * という事実の表示であって隠す対象ではない(負債の起点と同じ扱い)。
+ */
+export const sumPropertyAmountAt = (
+  axisProperties: RealEstateProperty[],
+  propertyValuations: CategoryAxisPropertyValuations,
+  date: string,
+): number =>
+  axisProperties.reduce((sum, property) => {
+    const record = resolvePropertyValueAt(property, date);
+    const mode = propertyValuations[property.id];
+
+    return record === null || mode === undefined ? sum : sum + resolvePropertyAmount(record, mode);
+  }, 0);
+
+/**
+ * 分類軸が加える**現在の**不動産の合計(B7で最後に保存した時価・ローン残高)。
+ *
+ * **「いま」を表す表示はこちらを使う**(推移グラフの最新点・分類別内訳・FIRE達成度ゲージ)。
+ * 理由は負債の`sumDebtBalance`と同じで、履歴に付く日付は保存した日、資産残高の最新日は
+ * CSVを最後に取り込んだ日であり、後者が古いのが普通のため。履歴を「いま」にも当てると、
+ * **物件を登録した直後に不動産がどこにも現れない**。
+ */
+export const sumPropertyAmount = (
+  axisProperties: RealEstateProperty[],
+  propertyValuations: CategoryAxisPropertyValuations,
+): number =>
+  axisProperties.reduce((sum, property) => {
+    const mode = propertyValuations[property.id];
+
+    return mode === undefined ? sum : sum + resolvePropertyAmount(property, mode);
+  }, 0);
+
+/**
  * 1日分の資産残高を、分類軸の集計対象に絞って合計し、渡された残債を差し引く。
  *
  * CSVの「合計（円）」列(`total`)は使わない。分類軸が資産種別の部分集合を指す以上、
@@ -170,12 +289,15 @@ export const sumAxisAmount = (
   snapshot: AssetSnapshot,
   assetTypeNames: string[],
   debtTotal: number,
+  propertyTotal: number,
 ): number =>
   Object.entries(snapshot.byType).reduce(
     (sum, [assetTypeName, amount]) =>
       isAxisTarget(assetTypeNames, assetTypeName) ? sum + amount : sum,
     0,
-  ) - debtTotal;
+  ) +
+  propertyTotal -
+  debtTotal;
 
 /**
  * 1日分の資産残高から、分類軸の集計対象になる資産種別だけを取り出す。
@@ -218,6 +340,8 @@ export const buildAxisNetWorthSeries = (
   snapshots: AssetSnapshot[],
   assetTypeNames: string[],
   axisDebts: Debt[],
+  axisProperties: RealEstateProperty[],
+  propertyValuations: CategoryAxisPropertyValuations,
 ): NetWorthPoint[] => {
   const byMonth = new Map<string, AssetSnapshot>();
 
@@ -231,18 +355,25 @@ export const buildAxisNetWorthSeries = (
   // 昇順に畳み込んでいるので、`Map`の挿入順の末尾が直近の資産残高になる
   const monthly = [...byMonth.values()];
   const currentDebtTotal = sumDebtBalance(axisDebts);
+  const currentPropertyTotal = sumPropertyAmount(axisProperties, propertyValuations);
 
   return monthly.map((snapshot, index) => {
-    const debtBalance =
-      index === monthly.length - 1 ? currentDebtTotal : sumDebtBalanceAt(axisDebts, snapshot.date);
+    // 最後の点だけ「いま」の値にするのは負債・不動産で同じ扱い(同要件)
+    const isLatest = index === monthly.length - 1;
+    const debtBalance = isLatest ? currentDebtTotal : sumDebtBalanceAt(axisDebts, snapshot.date);
+    const propertyAmount = isLatest
+      ? currentPropertyTotal
+      : sumPropertyAmountAt(axisProperties, propertyValuations, snapshot.date);
 
     return {
       date: snapshot.date,
-      amount: sumAxisAmount(snapshot, assetTypeNames, debtBalance),
+      amount: sumAxisAmount(snapshot, assetTypeNames, debtBalance, propertyAmount),
       // 積み上げ表示が描く値。純額(`amount`)とは別に持つ(型の取り決め)
       byType: pickAxisAmountsByType(snapshot, assetTypeNames),
       // 負債の帯が描く値。`byType`の総和と`amount`の差から逆算させない(型の取り決め)
       debtBalance,
+      // 不動産の帯が描く値。負債と同じ理由で、差から逆算させず明示的に持つ
+      propertyAmount,
     };
   });
 };
@@ -289,10 +420,22 @@ export const buildAxisBreakdown = (
  * **表示期間で絞り込む前の推移を渡すこと。** 絞り込んだ後の末尾は期間内で最も新しい点に
  * すぎず、「いま何をどれだけ持っているか」を表す内訳の相手ではなくなる。
  */
-export const resolveAxisNetAmount = (axisData: AssetAxisData | undefined): number | null =>
-  axisData === undefined || axisData.debtTotal <= 0
-    ? null
-    : (axisData.netWorthSeries.at(-1)?.amount ?? null);
+export const resolveAxisNetAmount = (axisData: AssetAxisData | undefined): number | null => {
+  if (axisData === undefined) {
+    return null;
+  }
+
+  /*
+    不動産を含む分類軸でも併記する。円グラフの分母は各スライスの絶対値の合計になっており、
+    負債と同じく%が純資産に対する割合ではなくなるため(B4-8)。0円のときに併記しないのは
+    負債と同じ — スライスが出ないので、差し引く前と後で数字が変わらない
+  */
+  if (axisData.debtTotal <= 0 && axisData.propertyTotal === 0) {
+    return null;
+  }
+
+  return axisData.netWorthSeries.at(-1)?.amount ?? null;
+};
 
 /**
  * 内訳の色割り当ての元になる分類の一覧を、直近の資産残高から組み立てる。

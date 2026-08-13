@@ -27,6 +27,7 @@ const series: NetWorthPoint[] = [
     amount: 5_000_000,
     byType: { 投資信託: 3_000_000, "預金・現金": 2_000_000 },
     debtBalance: 0,
+    propertyAmount: 0,
   },
 ];
 
@@ -37,6 +38,7 @@ const seriesWithDebt: NetWorthPoint[] = [
     amount: 3_000_000,
     byType: { 投資信託: 3_000_000, "預金・現金": 2_000_000 },
     debtBalance: 2_000_000,
+    propertyAmount: 0,
   },
 ];
 
@@ -46,6 +48,7 @@ const renderCard = (props: Partial<NetWorthTrendCardProps> = {}): void => {
       axisName="総資産"
       series={series}
       mode="with-debt"
+      hasSpreadProperty={false}
       categories={categories}
       buildHref={(mode) => `/dashboard?debt=${mode}`}
       {...props}
@@ -144,5 +147,30 @@ describe("NetWorthTrendCard", () => {
     expect(
       screen.getByText("資産残高のデータがまだありません。CSVを取り込むと推移が表示されます。"),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * 「資産のみ」でも利ざやの物件はローン控除後のまま積まれる
+ * (docs/screen-requirements-dashboard.md B1「負債反映の切替との関係」)。
+ */
+describe("NetWorthTrendCard(不動産の注記)", () => {
+  it("「資産のみ」で利ざやの物件があるときだけ注記を出す", () => {
+    renderCard({ mode: "assets-only", hasSpreadProperty: true });
+
+    expect(screen.getByText(/ローンを差し引いた額で積まれています/u)).toBeInTheDocument();
+  });
+
+  /** 負債反映のままなら引いている額が帯として見えており、読み違えは起きない */
+  it("負債反映のときは出さない", () => {
+    renderCard({ mode: "with-debt", hasSpreadProperty: true });
+
+    expect(screen.queryByText(/ローンを差し引いた額で積まれています/u)).not.toBeInTheDocument();
+  });
+
+  it("時価だけで反映している分類軸では出さない", () => {
+    renderCard({ mode: "assets-only", hasSpreadProperty: false });
+
+    expect(screen.queryByText(/ローンを差し引いた額で積まれています/u)).not.toBeInTheDocument();
   });
 });

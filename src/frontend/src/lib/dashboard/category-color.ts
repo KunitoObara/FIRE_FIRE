@@ -5,6 +5,9 @@ import {
   DEBT_CATEGORY_NAME,
   OTHER_CATEGORY_ID,
   OTHER_CATEGORY_NAME,
+  PROPERTY_CATEGORY_COLOR,
+  PROPERTY_CATEGORY_ID,
+  PROPERTY_CATEGORY_NAME,
 } from "@/constants/dashboard";
 
 /**
@@ -110,6 +113,17 @@ export const buildStackedTrend = (
       usedSlotIds.add(DEBT_CATEGORY_ID);
     }
 
+    /*
+      不動産は**負債反映の切替に関わらず**積む(docs/screen-requirements-dashboard.md B1
+      「負債反映の切替との関係」)。切替が動かすのはB11の負債だけで、不動産は分類軸の
+      設定どおりの額になる。利ざやが負の物件では額そのものが負になり、`stackOffset="sign"`
+      によって0より下へ積まれる — 負債と同じ位置に来るので、色と模様の両方で区別する
+    */
+    if (point.propertyAmount !== 0) {
+      amounts[PROPERTY_CATEGORY_ID] = point.propertyAmount;
+      usedSlotIds.add(PROPERTY_CATEGORY_ID);
+    }
+
     return {
       date: point.date,
       /*
@@ -147,6 +161,19 @@ export const buildStackedTrend = (
     色スロット(--chart-1〜8)は消費せず、円グラフの負債スライスと同じ固定色を使う
     (DESIGN.md 3章)。実際に保有している資産の分類が「その他」へ押し出されないため
   */
+  /*
+    不動産の帯は**資産種別の後ろ・負債の前**に固定する(B4-8)。「資産種別 → 不動産 → 負債」の
+    順は集計の式と同じで、凡例を上から読む順が集計の順になる。負債と同じく色スロットは
+    消費せず、円グラフの不動産スライスと同じ固定色を使う
+  */
+  if (usedSlotIds.has(PROPERTY_CATEGORY_ID)) {
+    bands.push({
+      categoryId: PROPERTY_CATEGORY_ID,
+      name: PROPERTY_CATEGORY_NAME,
+      color: PROPERTY_CATEGORY_COLOR,
+    });
+  }
+
   if (usedSlotIds.has(DEBT_CATEGORY_ID)) {
     bands.push({
       categoryId: DEBT_CATEGORY_ID,
@@ -187,8 +214,15 @@ export const buildBreakdownSlices = (
   entries: AssetBreakdownEntry[],
   categories: AssetCategory[],
   debtTotal = 0,
+  propertyTotal = 0,
 ): AssetBreakdownSlice[] => {
-  const total = entries.reduce((sum, entry) => sum + entry.amount, 0) + debtTotal;
+  /*
+    分母は**各スライスの絶対値の合計**(資産種別 + 不動産 + 負債)。円グラフは正の面積でしか
+    比を表せず、不動産はオーバーローンで負になりうるため絶対値で足す
+    (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)
+  */
+  const total =
+    entries.reduce((sum, entry) => sum + entry.amount, 0) + Math.abs(propertyTotal) + debtTotal;
   const toRatio = (amount: number): number => (total === 0 ? 0 : amount / total);
 
   const individualSlotCount = resolveIndividualSlotCount(categories);
@@ -233,15 +267,33 @@ export const buildBreakdownSlices = (
   }
 
   /*
+    不動産は資産種別の後ろ・負債の前に置く。「資産種別 → 不動産 → 負債」の順は集計の式
+    (資産 + 不動産 - 負債)と同じで、凡例を上から読む順が集計の順になる(B4-8)。
+
+    **面積は絶対値で取り、凡例には符号付きの額を出す**(`amount`は符号のまま持つ)。
+    オーバーローンの物件だけを含む軸では合計が負になるが、そこでスライスを落とすと、
+    その分類軸が不動産を対象にしていること自体が円グラフから消える。
+    出さないのは**ちょうど0円のとき**だけ
+  */
+  if (propertyTotal !== 0) {
+    slices.push({
+      categoryId: PROPERTY_CATEGORY_ID,
+      name: PROPERTY_CATEGORY_NAME,
+      amount: propertyTotal,
+      ratio: toRatio(Math.abs(propertyTotal)),
+      color: PROPERTY_CATEGORY_COLOR,
+    });
+  }
+
+  /*
     負債は最後に置く。資産のスライスの並び(分類マスタの登録順)を崩さないためと、
     符号の違うものを資産の間に挟まないため。残債の合計が0円のときはスライスを出さない
     (0円のスライスは凡例を埋めるだけになるため)。
 
     出さないのは**ちょうど0円のとき**であって、資産種別に掛けている「0円以下を除く」
     フィルタ(`buildAxisBreakdown`)とは別のものである。残債は0以上なので負債では差が
-    出ないが、同じ擬似分類の不動産(B4-8、未実装)は利ざやが負になりうるため、そちらは
-    絶対値で面積を取って描く(docs/screen-requirements-dashboard.md B1「不動産を含む
-    分類軸の集計」の「グラフでの見せ方」で2つまとめて決めてある)
+    出ないが、同じ擬似分類の不動産(上記)は利ざやが負になりうるため、そちらは絶対値で
+    面積を取って描く(同要件の「グラフでの見せ方」で2つまとめて決めてある)
   */
   if (debtTotal > 0) {
     slices.push({

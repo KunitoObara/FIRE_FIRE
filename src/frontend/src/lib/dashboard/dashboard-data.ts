@@ -8,11 +8,14 @@ import {
   buildAxisNetWorthSeries,
   collectAssetCategories,
   resolveAxisDebts,
+  resolveAxisProperties,
   sumDebtBalance,
+  sumPropertyAmount,
 } from "@/lib/dashboard/aggregation";
 import { buildFireProgress } from "@/lib/dashboard/fire-progress";
 import { fetchDebts } from "@/lib/debts/debt-repository";
 import { fetchFireGoal } from "@/lib/fire-goal/fire-goal-repository";
+import { fetchRealEstateProperties } from "@/lib/real-estate/property-repository";
 
 /**
  * B1が表示するデータを、各画面が書き込んだFirestoreのデータから組み立てる。
@@ -23,6 +26,7 @@ import { fetchFireGoal } from "@/lib/fire-goal/fire-goal-repository";
  * users/{uid}/csvImports        B2 CSV取込          直近CSV取込日時
  * users/{uid}/settings/fireGoal B8 FIRE目標設定     FIRE達成度ゲージ
  * users/{uid}/debts             B11 負債入力        負債サマリ・負債を含む分類軸の集計
+ * users/{uid}/properties        B5〜B7 不動産       不動産を含む分類軸の集計
  * ```
  *
  * **収支サマリ(`users/{uid}/transactions`)はここでは読まない。** 対象の月は画面上で選べるので、
@@ -30,18 +34,25 @@ import { fetchFireGoal } from "@/lib/fire-goal/fire-goal-repository";
  * なる。取引の取得は`fetchCashflowData`が月ごとに持つ
  * (docs/screen-requirements-dashboard.md B1「年月の選択」)。
  *
- * 5つの取得は互いに独立しているので並列に投げる。順に待つと、いちばん遅いものだけでなく
+ * 6つの取得は互いに独立しているので並列に投げる。順に待つと、いちばん遅いものだけでなく
  * 合計の待ち時間がログイン直後の最初の画面に乗る。
  */
 export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
-  const [axesResult, snapshotsResult, lastImportedAtResult, fireGoalResult, debtsResult] =
-    await Promise.all([
-      fetchCategoryAxes(),
-      fetchAssetSnapshots(),
-      fetchLastImportedAt(),
-      fetchFireGoal(),
-      fetchDebts(),
-    ]);
+  const [
+    axesResult,
+    snapshotsResult,
+    lastImportedAtResult,
+    fireGoalResult,
+    debtsResult,
+    propertiesResult,
+  ] = await Promise.all([
+    fetchCategoryAxes(),
+    fetchAssetSnapshots(),
+    fetchLastImportedAt(),
+    fetchFireGoal(),
+    fetchDebts(),
+    fetchRealEstateProperties(),
+  ]);
 
   // どれか1つでも失敗したら画面全体を失敗として返す。失敗の原因(未ログイン・権限・設定)は
   // どの取得にも共通するものばかりで、部分的に欠けた数字を実データとして見せる方が危うい
@@ -65,8 +76,13 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
     return debtsResult;
   }
 
+  if (!propertiesResult.ok) {
+    return propertiesResult;
+  }
+
   const { snapshots } = snapshotsResult;
   const { debts } = debtsResult;
+  const { properties } = propertiesResult;
   // 日付の昇順で返るので、末尾が直近の資産残高になる
   const latest = snapshots.at(-1);
 
@@ -80,11 +96,19 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
         axesResult.axes.map((axis) => {
           // 分類軸が参照している負債がB11で削除されていた場合は、ここで落ちる
           const axisDebts = resolveAxisDebts(debts, axis.debtIds);
+          // 削除された物件への参照も同じく落ちる(B4「集計対象に不動産を含める」)
+          const axisProperties = resolveAxisProperties(properties, axis.propertyValuations);
 
           return [
             axis.id,
             {
-              netWorthSeries: buildAxisNetWorthSeries(snapshots, axis.assetTypeNames, axisDebts),
+              netWorthSeries: buildAxisNetWorthSeries(
+                snapshots,
+                axis.assetTypeNames,
+                axisDebts,
+                axisProperties,
+                axis.propertyValuations,
+              ),
               breakdown: latest ? buildAxisBreakdown(latest, axis.assetTypeNames) : [],
               /*
                 円グラフは「いま何をどれだけ持っているか」なので、履歴ではなく現在の残債を
@@ -94,6 +118,20 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
                 同じ画面の3か所が揃って「負債なし」と同じ表示になる
               */
               debtTotal: latest ? sumDebtBalance(axisDebts) : 0,
+              /*
+                不動産も「いま」の額を使う(負債と同じ理由)。円グラフのスライスと純額の
+                併記、推移グラフの最新点が同じ値を指す
+              */
+              propertyTotal: latest
+                ? sumPropertyAmount(axisProperties, axis.propertyValuations)
+                : 0,
+              /*
+                「資産のみ」でも利ざやの物件はローン控除後のまま積まれる旨の注記を出すか
+                (同要件「負債反映の切替との関係」)。削除済みの物件への参照は数えない
+              */
+              hasSpreadProperty: axisProperties.some(
+                (property) => axis.propertyValuations[property.id] === "spread",
+              ),
             },
           ];
         }),
@@ -103,7 +141,13 @@ export const fetchDashboardData = async (): Promise<DashboardDataResult> => {
       // ゲージの現在資産額はB1のセレクタではなくB8の対象分類で集計する。分類軸の一覧を
       // 渡すのは、設定された軸がB4で削除されていたときに既定へフォールバックさせるため。
       // 負債は対象分類が負債を含む軸のときだけ差し引かれる
-      fireProgress: buildFireProgress(fireGoalResult.goal, latest, axesResult.axes, debts),
+      fireProgress: buildFireProgress(
+        fireGoalResult.goal,
+        latest,
+        axesResult.axes,
+        debts,
+        properties,
+      ),
     },
   };
 };

@@ -59,6 +59,7 @@ const data: DashboardData = {
           amount: 11_400_000,
           byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000, "預金・現金": 4_400_000 },
           debtBalance: 0,
+          propertyAmount: 0,
         },
       ],
       breakdown: [
@@ -67,6 +68,8 @@ const data: DashboardData = {
         { categoryId: "預金・現金", amount: 4_400_000 },
       ],
       debtTotal: 0,
+      propertyTotal: 0,
+      hasSpreadProperty: false,
     },
     investment: {
       netWorthSeries: [
@@ -75,6 +78,7 @@ const data: DashboardData = {
           amount: 7_000_000,
           byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000 },
           debtBalance: 0,
+          propertyAmount: 0,
         },
       ],
       breakdown: [
@@ -82,6 +86,8 @@ const data: DashboardData = {
         { categoryId: "投資信託", amount: 1_600_000 },
       ],
       debtTotal: 0,
+      propertyTotal: 0,
+      hasSpreadProperty: false,
     },
   },
   debts: [],
@@ -171,6 +177,8 @@ describe("DashboardScreen", () => {
             ],
             breakdown: data.byAxis.total?.breakdown ?? [],
             debtTotal: 0,
+            propertyTotal: 0,
+            hasSpreadProperty: false,
           },
         },
       },

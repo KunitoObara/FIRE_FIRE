@@ -62,6 +62,15 @@ declare global {
      * 最新点だけは履歴ではなく現在の残債(同要件「いま」の扱い)。
      */
     debtBalance: number;
+    /**
+     * その時点で分類軸が加える不動産の額(物件ごとに利ざや または 時価の合計)。
+     * **不動産の帯が描く値**(docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
+     *
+     * 負債と同じ理由で明示的に持つ — `byType`の総和と`amount`の差からは、負債と不動産の
+     * どちらの分なのかを分けられない。オーバーローンの物件では**負になりうる**(0で止めない)。
+     * 最新点だけは履歴ではなく現在の時価・ローン残高(同要件「いま」の扱い)。
+     */
+    propertyAmount: number;
   };
 
   /** 資産推移グラフの負債反映切替(docs/screen-requirements-dashboard.md B1「資産推移グラフの負債反映切替」) */
@@ -132,6 +141,25 @@ declare global {
      * (docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」)。
      */
     debtTotal: number;
+    /**
+     * この分類軸が加える不動産の額の合計(現在の時価・ローン残高から)。
+     *
+     * 不動産を含まない分類軸は0。円グラフの不動産スライスと、純額の併記に使う
+     * (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
+     * オーバーローンの物件だけを含む軸では負になりうる。
+     */
+    propertyTotal: number;
+    /**
+     * この分類軸が**利ざやで反映している物件を持つか**。
+     *
+     * 資産推移グラフの「資産のみ」に切り替えても、利ざやの物件はローン控除後の額のまま
+     * 積まれる(切替が動かすのはB11の負債だけ)。0の線より上だけを見て「借入を一切引いて
+     * いない状態」と読まれないよう、注記を出すかどうかの判定に使う
+     * (docs/screen-requirements-dashboard.md B1「負債反映の切替との関係」)。
+     *
+     * 反映方法は分類軸が持つ設定なので、推移の点(`propertyAmount`)からは判定できない。
+     */
+    hasSpreadProperty: boolean;
   };
 
   /** FIRE達成度ゲージの表示値。目標未設定なら`null`が渡る */
@@ -346,6 +374,8 @@ declare global {
     series: NetWorthPoint[];
     /** 選択中の切替(負債反映 / 資産のみ) */
     mode: NetWorthTrendModeId;
+    /** 利ざやで反映している物件があるか。「資産のみ」の注記を出すかの判定に使う */
+    hasSpreadProperty: boolean;
     /** 色スロットの割り当ての元になる分類の一覧(円グラフと共有する) */
     categories: AssetCategory[];
     /**

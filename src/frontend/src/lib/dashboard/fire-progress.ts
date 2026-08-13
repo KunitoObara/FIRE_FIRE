@@ -2,7 +2,13 @@ import { format, parseISO } from "date-fns";
 
 import { NO_PROJECTED_DATE_LABEL } from "@/constants/dashboard";
 import { DEFAULT_ACHIEVEMENT_AXIS_NAME } from "@/constants/fire-goal";
-import { resolveAxisDebts, sumAxisAmount, sumDebtBalance } from "@/lib/dashboard/aggregation";
+import {
+  resolveAxisDebts,
+  resolveAxisProperties,
+  sumAxisAmount,
+  sumDebtBalance,
+  sumPropertyAmount,
+} from "@/lib/dashboard/aggregation";
 import { resolveFireGoalTargetAmount } from "@/lib/fire-goal/calculation";
 
 /**
@@ -25,6 +31,7 @@ export const resolveAchievementAxis = (
       name: DEFAULT_ACHIEVEMENT_AXIS_NAME,
       assetTypeNames: null,
       debtIds: [],
+      propertyValuations: {},
       missing: false,
     };
   }
@@ -36,6 +43,7 @@ export const resolveAchievementAxis = (
       name: DEFAULT_ACHIEVEMENT_AXIS_NAME,
       assetTypeNames: null,
       debtIds: [],
+      propertyValuations: {},
       missing: true,
     };
   }
@@ -44,6 +52,7 @@ export const resolveAchievementAxis = (
     name: axis.name,
     assetTypeNames: axis.assetTypeNames,
     debtIds: axis.debtIds,
+    propertyValuations: axis.propertyValuations,
     missing: false,
   };
 };
@@ -76,17 +85,27 @@ export const resolveAchievementAmount = (
   resolution: AchievementAxisResolution,
   latest: AssetSnapshot | undefined,
   debts: Debt[],
+  properties: RealEstateProperty[],
 ): number | null => {
   if (latest === undefined) {
     return null;
   }
 
+  /*
+    既定(総資産)はCSVの「合計(円)」列をそのまま採るため、**手動で登録した不動産は
+    入らない**(docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
+    含めたい場合はB4で物件を選んだ分類軸を作り、B8の対象分類に指定する
+  */
   return resolution.assetTypeNames === null
     ? latest.total
     : sumAxisAmount(
         latest,
         resolution.assetTypeNames,
         sumDebtBalance(resolveAxisDebts(debts, resolution.debtIds)),
+        sumPropertyAmount(
+          resolveAxisProperties(properties, resolution.propertyValuations),
+          resolution.propertyValuations,
+        ),
       );
 };
 
@@ -111,6 +130,7 @@ export const buildFireProgress = (
   latest: AssetSnapshot | undefined,
   axes: AchievementAxisOption[],
   debts: Debt[],
+  properties: RealEstateProperty[],
 ): FireProgress | null => {
   if (!goal) {
     return null;
@@ -127,7 +147,7 @@ export const buildFireProgress = (
 
   return {
     targetAmount,
-    currentAmount: resolveAchievementAmount(resolution, latest, debts) ?? 0,
+    currentAmount: resolveAchievementAmount(resolution, latest, debts, properties) ?? 0,
     achievementAxisName: resolution.name,
     achievementAxisMissing: resolution.missing,
     // 到達予測日は想定利回り(B9)を前提とする別の計算なので、ここでは算出しない

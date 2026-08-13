@@ -14,11 +14,14 @@ import {
   DEBT_LEGEND_SWATCH_BACKGROUND,
   NET_WORTH_TREND_MODES,
   NET_WORTH_TREND_MODE_LABEL,
+  PROPERTY_CATEGORY_ID,
+  PROPERTY_LEGEND_SWATCH_BACKGROUND,
+  PROPERTY_SPREAD_NOT_TOGGLED_NOTICE,
   STACKED_DEBT_NOT_DEDUCTED_NOTICE,
 } from "@/constants/dashboard";
 import { buildStackedTrend } from "@/lib/dashboard/category-color";
 
-import type { JSX } from "react";
+import type { CSSProperties, JSX } from "react";
 
 /**
  * Rechartsは描画にブラウザのAPIを使うため、サーバー側では読み込まない
@@ -43,10 +46,22 @@ const NetWorthStackedChart = dynamic(
  * 切替の状態はURLのクエリに載せる。ローカルstateに閉じ込めると、リンク共有やブラウザの
  * 戻る/進むで同じ表示を再現できない(CODING_STANDARDS.md 2章)。分類軸・表示期間と同じ扱い。
  */
+/** 帯の色見本。擬似分類(不動産・負債)は帯と同じ模様にする(DESIGN.md 3章) */
+const resolveBandSwatchStyle = (band: NetWorthTrendBand): CSSProperties => {
+  if (band.categoryId === DEBT_CATEGORY_ID) {
+    return { background: DEBT_LEGEND_SWATCH_BACKGROUND };
+  }
+
+  return band.categoryId === PROPERTY_CATEGORY_ID
+    ? { background: PROPERTY_LEGEND_SWATCH_BACKGROUND }
+    : { backgroundColor: band.color };
+};
+
 export const NetWorthTrendCard = ({
   axisName,
   series,
   mode,
+  hasSpreadProperty,
   categories,
   buildHref,
 }: NetWorthTrendCardProps): JSX.Element => {
@@ -124,11 +139,7 @@ export const NetWorthTrendCard = ({
                   <span
                     aria-hidden
                     className="size-2.5 shrink-0 rounded-full"
-                    style={
-                      band.categoryId === DEBT_CATEGORY_ID
-                        ? { background: DEBT_LEGEND_SWATCH_BACKGROUND }
-                        : { backgroundColor: band.color }
-                    }
+                    style={resolveBandSwatchStyle(band)}
                   />
                   <span>{band.name}</span>
                 </li>
@@ -143,6 +154,17 @@ export const NetWorthTrendCard = ({
             */}
             {mode === "assets-only" && hasDebtBand ? (
               <p className="text-xs text-muted-foreground">{STACKED_DEBT_NOT_DEDUCTED_NOTICE}</p>
+            ) : null}
+
+            {/*
+              「資産のみ」でも、利ざやで反映している物件はローン控除後の額のまま積まれる
+              (切替が動かすのはB11の負債だけ。同要件B1「負債反映の切替との関係」)。
+              0の線より上だけを見て「借入を一切引いていない状態」と読まれないよう注記する。
+              出すのは切替を実際に「資産のみ」にしているときだけ — 負債反映のままなら
+              引いている額が帯として見えており、読み違えは起きない
+            */}
+            {mode === "assets-only" && hasSpreadProperty ? (
+              <p className="text-xs text-muted-foreground">{PROPERTY_SPREAD_NOT_TOGGLED_NOTICE}</p>
             ) : null}
           </div>
         )}
