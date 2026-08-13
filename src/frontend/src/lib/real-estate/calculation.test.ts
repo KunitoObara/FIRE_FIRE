@@ -6,9 +6,11 @@ const property = (marketValue: number, loanBalance: number): RealEstateProperty 
   id: "shibuya-101",
   name: "〇〇マンション101号室",
   location: "東京都渋谷区神南1-2-3",
+  acquiredOn: null,
   marketValue,
   loanBalance,
   updatedAt: "2026-06-01",
+  valueHistory: {},
 });
 
 describe("calculateRealEstateSpread", () => {

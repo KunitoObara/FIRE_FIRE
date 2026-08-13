@@ -11,6 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
+  REAL_ESTATE_ACQUIRED_ON_HINT,
+  REAL_ESTATE_ACQUIRED_ON_LABEL,
   REAL_ESTATE_FAILURE_MESSAGES,
   REAL_ESTATE_FORM_CANCEL_LABEL,
   REAL_ESTATE_FORM_LOAN_BALANCE_LABEL,
@@ -141,6 +143,42 @@ export const RealEstateForm = ({
                 {...register("location")}
               />
               <FieldError errors={[errors.location]} />
+            </Field>
+
+            {/*
+              取得年月。資産推移グラフがこの月から物件を積み始める
+              (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
+              時価・ローン残高の履歴はB7で保存したときにしか積まれないので、これが無いと
+              段差が「取得した月」ではなく「アプリに登録した月」に出る(B11の発生年月と同じ)。
+              金額欄と違い`type="month"`にするのは、`yyyy-MM`の形をブラウザに揃えさせるため。
+            */}
+            <Field>
+              <FieldLabel htmlFor="acquiredOn">
+                {REAL_ESTATE_ACQUIRED_ON_LABEL}
+                {REAL_ESTATE_FORM_OPTIONAL_SUFFIX}
+              </FieldLabel>
+              <Input
+                id="acquiredOn"
+                type="month"
+                autoComplete="off"
+                className="tabular-nums"
+                disabled={saving}
+                aria-invalid={errors.acquiredOn !== undefined}
+                /*
+                  エラーが出ているあいだはエラー文、それ以外はヒント文を指す。
+                  `FieldError`は`role="alert"`を持つので発生時には読み上げられるが、
+                  あとからこの欄へフォーカスしたときに理由を辿れるのは`aria-describedby`で
+                  結び付けている側だけ(B11の発生年月と同じ組み方)。
+                */
+                aria-describedby={errors.acquiredOn === undefined ? "acquiredOn-hint" : undefined}
+                {...register("acquiredOn")}
+              />
+              <FieldError errors={[errors.acquiredOn]} />
+              {errors.acquiredOn === undefined ? (
+                <p id="acquiredOn-hint" className="text-xs text-muted-foreground">
+                  {REAL_ESTATE_ACQUIRED_ON_HINT}
+                </p>
+              ) : null}
             </Field>
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">

@@ -45,11 +45,25 @@ service cloud.firestore {
     // 物件1件の中身(B7で保存する形)。作成・更新のどちらでも同じ形を要求する
     function isValidProperty(property) {
       return property.keys().hasAll(
-          ['name', 'location', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'createdAt']
+          ['name', 'location', 'acquiredOn', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'valueHistory', 'createdAt']
         )
         && property.keys().hasOnly(
-          ['name', 'location', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'createdAt']
+          ['name', 'location', 'acquiredOn', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'valueHistory', 'createdAt']
         )
+        // 取得年月(yyyy-MM)は任意入力で、未登録はnull。資産推移グラフがこの月から物件を
+        // 積み始める(B1「不動産を含む分類軸の集計」)ので、形は崩させない。
+        // **当月より後でないことはここでは見ない**(debts.originatedOnと同じ制約。要件8.1)。
+        // 月は01〜12だけを通す(REAL_ESTATE_ACQUIRED_ON_PATTERNと同じ形)
+        && (
+          property.acquiredOn == null
+          || (property.acquiredOn is string && property.acquiredOn.matches('^[0-9]{4}-(0[1-9]|1[0-2])$'))
+        )
+        // 時価・ローン残高の履歴は「日付→{時価, ローン残高}」のマップ。キーも値もルールでは
+        // 検査しきれないため(debts.balanceHistoryと同じ制約)、形はパース側
+        // (src/schemas/real-estate.ts)で担保し、ここでは件数の上限だけを見る。
+        // 上限は REAL_ESTATE_VALUE_HISTORY_MAX と揃える
+        && property.valueHistory is map
+        && property.valueHistory.size() <= 600
         // 文字数の上限は src/frontend/src/constants/real-estate.ts と揃える
         && property.name is string
         && property.name.size() > 0
@@ -532,7 +546,20 @@ service cloud.firestore {
         // なお`updatedAt`が保存した日そのものであることは見ていない(debtsと同じ。要件8.1)
         allow update: if canAccessOwnData(userId)
           && isValidProperty(request.resource.data)
-          && request.resource.data.createdAt == resource.data.createdAt;
+          && request.resource.data.createdAt == resource.data.createdAt
+          // 時価・ローン残高の履歴は消させず、触れるのを**その保存が最終更新日として刻む日の
+          // 記録だけ**に限る(debtsの残債の履歴と同じ関数・同じ理由)。B7は履歴のうち
+          // その日のキーだけを書くので、この条件がそのまま通る。
+          //
+          // **保存済み側は`get()`で既定値を与えて読む。** B4-8より前に登録された物件は
+          // `valueHistory`を持たず、素で参照するとエラーになって更新が一切通らなくなる
+          // (既存の物件を編集できなくなる)。既定の空マップと比べれば、初回の保存は
+          // 「その日の記録を1件追加した」形になって条件を満たす
+          && isAppendOnlyBalanceHistory(
+            request.resource.data.valueHistory,
+            resource.data.get('valueHistory', {}),
+            request.resource.data.updatedAt
+          );
         // 物件を削除する画面はまだ無い(B5〜B7の要件に削除は含まれない)。
         // 必要になった時点でここに許可を書く
         allow delete: if false;

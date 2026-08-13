@@ -8,10 +8,12 @@ const rentalProperty: RealEstateProperty = {
   id: "shibuya-101",
   name: "〇〇マンション101号室",
   location: "東京都渋谷区神南1-2-3",
+  acquiredOn: null,
   marketValue: 32_000_000,
   loanBalance: 18_400_000,
   rental: { monthlyIncome: 128_000, monthlyExpense: 22_000 },
   updatedAt: "2026-06-01",
+  valueHistory: {},
 };
 
 /** 非収益物件。ローン完済済み */
@@ -19,9 +21,11 @@ const ownHomeProperty: RealEstateProperty = {
   id: "chiba-house",
   name: "□□戸建て",
   location: "千葉県市川市八幡7-8-9",
+  acquiredOn: null,
   marketValue: 18_000_000,
   loanBalance: 0,
   updatedAt: "2026-04-02",
+  valueHistory: {},
 };
 
 describe("RealEstateDetail", () => {
@@ -68,6 +72,27 @@ describe("RealEstateDetail", () => {
     expect(screen.getByText("東京都渋谷区・収益物件")).toBeInTheDocument();
     expect(screen.getByText("東京都渋谷区神南1-2-3")).toBeInTheDocument();
     expect(screen.getByText("2026/06/01")).toBeInTheDocument();
+  });
+
+  /**
+   * 取得年月は資産推移グラフが物件を積み始める起点(B1「不動産を含む分類軸の集計」)。
+   * 入力欄はB7にしか無いので、値が入っているかを参照側でも確かめられるようにする。
+   */
+  it("取得年月を年月の表記で表示する", () => {
+    render(<RealEstateDetail property={{ ...rentalProperty, acquiredOn: "2019-04" }} />);
+
+    expect(screen.getByText("2019年4月")).toBeInTheDocument();
+  });
+
+  /**
+   * 未入力でも行ごと消さない。項目名と値が対になるリストでは、行が無いと項目そのものが
+   * 存在しないように見えるため。
+   */
+  it("取得年月が未登録の物件では「未登録」と表示する", () => {
+    render(<RealEstateDetail property={rentalProperty} />);
+
+    expect(screen.getByText("取得年月")).toBeInTheDocument();
+    expect(screen.getByText("未登録")).toBeInTheDocument();
   });
 
   /** 所在地はB7で任意入力(未入力可)なので、空でも区切りの「・」だけが残らないようにする */

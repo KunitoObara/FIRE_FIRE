@@ -56,6 +56,7 @@ describe("RealEstateNewScreen", () => {
       expect(createRealEstateProperty).toHaveBeenCalledWith({
         name: "□□戸建て",
         location: "",
+        acquiredOn: null,
         marketValue: 18_000_000,
         loanBalance: 0,
         rental: null,
