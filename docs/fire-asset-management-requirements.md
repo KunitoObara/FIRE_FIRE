@@ -193,5 +193,5 @@
 | `importedAt` / `createdAt` / `updatedAt`(timestamp)がサーバー時刻であること | `isServerTime()`(`== request.time`)。`createdAt` は**作成時だけ**要求する — 更新では既存の値が `request.resource.data` に現れるため |
 | `csvImports` の `periodFrom <= periodTo` | `yyyy-MM-dd` は辞書順が日付順なので文字列比較 |
 | `settings/fireGoal` の方式ごとの必須 | `mode` ごとに必要な欄が `null` でないことを要求 |
-| `debts.balanceHistory` の改ざん防止(過去へ遡って書き換えさせない・過去の日付を後から差し込ませない) | `isAppendOnlyBalanceHistory()`(B4-8で足す `properties.valueHistory` も同じ形で検査する。**そちらは未実装**)。`diff()` の `removedKeys()` が0件、かつ `affectedKeys()`(追加・削除・変更のすべて)が `updatedAt` の日だけ。B11は同じ日に2回保存するとその日の記録を上書きするので、その日だけは触れるようにしないと通常の保存し直しが落ちる |
+| `debts.balanceHistory` の改ざん防止(過去へ遡って書き換えさせない・過去の日付を後から差し込ませない) | `isAppendOnlyBalanceHistory()`(B4-8で足した `properties.valueHistory` も同じ形で検査する)。`diff()` の `removedKeys()` が0件、かつ `affectedKeys()`(追加・削除・変更のすべて)が `updatedAt` の日だけ。B11は同じ日に2回保存するとその日の記録を上書きするので、その日だけは触れるようにしないと通常の保存し直しが落ちる |
 | `transactions.amount` が整数であること | `is int`。JS SDKは安全な整数を `integerValue`、小数を `doubleValue` で送る |
