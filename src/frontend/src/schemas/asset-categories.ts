@@ -1,7 +1,10 @@
 import { Timestamp } from "firebase/firestore";
 import { z } from "zod";
 
-import { CATEGORY_AXIS_NAME_MAX_LENGTH } from "@/constants/asset-categories";
+import {
+  CATEGORY_AXIS_NAME_MAX_LENGTH,
+  CATEGORY_AXIS_PROPERTY_MAX_COUNT,
+} from "@/constants/asset-categories";
 import { DEBT_MAX_COUNT } from "@/constants/debts";
 
 /**
@@ -22,6 +25,16 @@ export const categoryAxisFormSchema = z.object({
   name: z.string().trim().min(1).max(CATEGORY_AXIS_NAME_MAX_LENGTH),
   assetTypeNames: z.array(z.string()),
   debtIds: z.array(z.string()).max(DEBT_MAX_COUNT),
+  /**
+   * 集計に加える物件と反映方法(B4「集計対象に不動産を含める」)。
+   *
+   * 件数の上限は**1つの軸で選べる数**で、物件の登録件数そのものは縛らない。
+   * `firestore.rules`が同じ値で拒否するので、保存を試みる前に画面側でも止める
+   * (`debtIds`と同じ扱い)。
+   */
+  propertyValuations: z
+    .record(z.string(), z.enum(["spread", "marketValue"]))
+    .refine((valuations) => Object.keys(valuations).length <= CATEGORY_AXIS_PROPERTY_MAX_COUNT),
 });
 
 /**
@@ -39,6 +52,15 @@ export const categoryAxisDocumentSchema = z.object({
    * 既存の分類軸の集計は負債の登録前と変わらない。
    */
   debtIds: z.array(z.string()).default([]),
+  /**
+   * 集計に加える物件と反映方法(B4)。**B4-8より前に登録された分類軸はこのフィールドを
+   * 持たない**ため、欠損を空のマップに倒す(`debtIds`の`.default([])`と同じ理由)。
+   * 空は「不動産を反映しない」を意味するので、既存の分類軸の集計は物件の登録前と変わらない。
+   *
+   * 値が`spread` / `marketValue`のどちらかであることはここで見る。`firestore.rules`は
+   * マップの値を1件ずつ検査できないため(要件定義書 8.1)、形の担保はこちらに置く。
+   */
+  propertyValuations: z.record(z.string(), z.enum(["spread", "marketValue"])).default({}),
   createdAt: z.instanceof(Timestamp).nullable(),
 });
 

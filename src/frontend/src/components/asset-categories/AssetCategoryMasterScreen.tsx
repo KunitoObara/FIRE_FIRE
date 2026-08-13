@@ -18,6 +18,10 @@ import {
 import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
 import { DEBT_LOAD_FAILURE_MESSAGES, DEBTS_QUERY_KEY } from "@/constants/debts";
 import {
+  REAL_ESTATE_FAILURE_MESSAGES,
+  REAL_ESTATE_PROPERTIES_QUERY_KEY,
+} from "@/constants/real-estate";
+import {
   createCategoryAxis,
   deleteCategoryAxis,
   fetchAssetTypeOptions,
@@ -25,7 +29,9 @@ import {
   updateCategoryAxis,
 } from "@/lib/asset-categories/category-axis-repository";
 import { resolveCategoryAxisDebtReferences } from "@/lib/asset-categories/debt-references";
+import { resolveCategoryAxisPropertyReferences } from "@/lib/asset-categories/property-references";
 import { fetchDebts } from "@/lib/debts/debt-repository";
+import { fetchRealEstateProperties } from "@/lib/real-estate/property-repository";
 
 import type { JSX } from "react";
 
@@ -33,6 +39,7 @@ const EMPTY_FORM_VALUES: AssetCategoryAxisFormValues = {
   name: "",
   assetTypeNames: [],
   debtIds: [],
+  propertyValuations: {},
 };
 
 /**
@@ -55,6 +62,25 @@ const resolveDebtOptionsState = (result: DebtsResult | undefined): DebtOptionsSt
 };
 
 /**
+ * 物件の選択肢の状態を1つの値にまとめる(負債と同じ理由・同じ形)。
+ *
+ * 選択肢が出ないまま保存できると、選択済みの物件が黙って外れた分類軸で上書きされる。
+ */
+const resolvePropertyOptionsState = (
+  result: RealEstatePropertiesResult | undefined,
+): PropertyOptionsState => {
+  if (result === undefined) {
+    return { status: "loading" };
+  }
+
+  if (!result.ok) {
+    return { status: "error", message: REAL_ESTATE_FAILURE_MESSAGES[result.reason] };
+  }
+
+  return { status: "ready", properties: result.properties };
+};
+
+/**
  * 編集フォームに渡す初期値を組み立てる。
  *
  * **B11で削除された負債への参照は落とす。** 存在しない負債を選択中として出すことはできず、
@@ -68,10 +94,14 @@ const resolveDebtOptionsState = (result: DebtsResult | undefined): DebtOptionsSt
 const toEditingFormValues = (
   axis: AssetCategoryAxisDocument,
   references: CategoryAxisDebtReferences | null,
+  propertyReferences: CategoryAxisPropertyReferences | null,
 ): AssetCategoryAxisFormValues => ({
   name: axis.name,
   assetTypeNames: axis.assetTypeNames,
   debtIds: references === null ? axis.debtIds : references.activeIds,
+  // 削除された物件への参照も同じ理由で落とす(B4は「物件の扱いは負債とすべて同じ」)
+  propertyValuations:
+    propertyReferences === null ? axis.propertyValuations : propertyReferences.activeValuations,
 });
 
 /**
@@ -120,6 +150,11 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
   });
   // 集計対象に含める負債の選択肢(B4「集計対象に負債を含める」)。B11の登録済みの負債そのもの
   const debtsQuery = useQuery({ queryKey: DEBTS_QUERY_KEY, queryFn: fetchDebts });
+  // 集計に加える物件の選択肢(B4「集計対象に不動産を含める」)。B5〜B7の登録済みの物件そのもの
+  const propertiesQuery = useQuery({
+    queryKey: REAL_ESTATE_PROPERTIES_QUERY_KEY,
+    queryFn: fetchRealEstateProperties,
+  });
 
   const [formMode, setFormMode] = useState<"closed" | "create" | "edit">("closed");
   const [editingAxis, setEditingAxis] = useState<AssetCategoryAxisDocument | null>(null);
@@ -135,6 +170,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
 
   const assetTypeOptions = resolveAssetTypeOptionsState(assetTypeOptionsQuery.data);
   const debtOptions = resolveDebtOptionsState(debtsQuery.data);
+  const propertyOptions = resolvePropertyOptionsState(propertiesQuery.data);
 
   /*
     編集中の分類軸が参照している負債の内訳。フォームの初期値(残っている参照)と、案内に
@@ -145,6 +181,11 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
     editingAxis === null
       ? null
       : resolveCategoryAxisDebtReferences(editingAxis.debtIds, debtOptions);
+
+  const editingPropertyReferences =
+    editingAxis === null
+      ? null
+      : resolveCategoryAxisPropertyReferences(editingAxis.propertyValuations, propertyOptions);
 
   const closeForm = (): void => {
     setFormMode("closed");
@@ -172,8 +213,18 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
       落ちるのは選択肢に出ていない負債だけなので、ユーザーが選んだものには影響しない
     */
     const references = resolveCategoryAxisDebtReferences(values.debtIds, debtOptions);
-    const saving: AssetCategoryAxisFormValues =
-      references === null ? values : { ...values, debtIds: references.activeIds };
+    const propertyReferences = resolveCategoryAxisPropertyReferences(
+      values.propertyValuations,
+      propertyOptions,
+    );
+    const saving: AssetCategoryAxisFormValues = {
+      ...values,
+      ...(references === null ? {} : { debtIds: references.activeIds }),
+      // 物件も同じ理由で保存の直前に絞り直す(編集を開いたあとに一覧が読み終わった場合)
+      ...(propertyReferences === null
+        ? {}
+        : { propertyValuations: propertyReferences.activeValuations }),
+    };
 
     const result =
       formMode === "edit" && editingAxis !== null
@@ -230,6 +281,8 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
               debtOptions={debtOptions}
               // 新規追加は参照を1つも持たないので、落とす参照も常に無い
               missingDebtCount={0}
+              propertyOptions={propertyOptions}
+              missingPropertyCount={0}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
@@ -244,10 +297,16 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
             <h2 className="mb-4 text-sm font-semibold">分類を編集</h2>
             <AssetCategoryAxisForm
               key={editingAxis.id}
-              initialValues={toEditingFormValues(editingAxis, editingDebtReferences)}
+              initialValues={toEditingFormValues(
+                editingAxis,
+                editingDebtReferences,
+                editingPropertyReferences,
+              )}
               assetTypeOptions={assetTypeOptions}
               debtOptions={debtOptions}
               missingDebtCount={editingDebtReferences?.missingCount ?? 0}
+              propertyOptions={propertyOptions}
+              missingPropertyCount={editingPropertyReferences?.missingCount ?? 0}
               submitLabel="保存"
               onSubmit={handleSubmit}
               onCancel={closeForm}
@@ -273,6 +332,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
         <AssetCategoryAxisList
           axes={axes}
           debtOptions={debtOptions}
+          propertyOptions={propertyOptions}
           onEdit={handleEdit}
           onDelete={setDeletingAxis}
         />
@@ -281,6 +341,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
       <DeleteCategoryAxisDialog
         axis={deletingAxis}
         debtOptions={debtOptions}
+        propertyOptions={propertyOptions}
         onOpenChange={(open) => {
           if (!open) {
             setDeletingAxis(null);

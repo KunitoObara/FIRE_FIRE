@@ -31,6 +31,7 @@ const axes: AssetCategoryAxisDocument[] = [
     name: "総資産",
     assetTypeNames: [],
     debtIds: [],
+    propertyValuations: {},
     createdAt: "2026-01-01T00:00:00.000Z",
   },
   {
@@ -38,6 +39,7 @@ const axes: AssetCategoryAxisDocument[] = [
     name: "投資性資産",
     assetTypeNames: ["株式(現物)", "投資信託"],
     debtIds: [],
+    propertyValuations: {},
     createdAt: "2026-01-02T00:00:00.000Z",
   },
 ];
@@ -191,6 +193,7 @@ describe("fetchDashboardData", () => {
           name: "純資産",
           assetTypeNames: [],
           debtIds: ["debt-1"],
+          propertyValuations: {},
           createdAt: "2026-01-03T00:00:00.000Z",
         },
       ],

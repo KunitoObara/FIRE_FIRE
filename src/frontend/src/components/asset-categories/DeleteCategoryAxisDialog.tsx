@@ -19,6 +19,7 @@ import {
   DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES,
 } from "@/constants/asset-categories";
 import { resolveCategoryAxisDebtReferences } from "@/lib/asset-categories/debt-references";
+import { resolveCategoryAxisPropertyReferences } from "@/lib/asset-categories/property-references";
 
 import type { JSX, MouseEvent } from "react";
 
@@ -29,22 +30,24 @@ import type { JSX, MouseEvent } from "react";
  * 集計対象が1件以上ある分類は、この画面から辿れるダイアログの時点で禁止する
  * (先に編集で割り当てを解除すれば削除できるようになる)。
  *
- * **負債(`debtIds`)だけが紐づいている分類も同じく禁止する。** 集計対象が割り当てられた
- * 分類軸を消させないという制約を資産・負債で分ける理由が無いため(B4の遷移条件)。
+ * **負債(`debtIds`)だけ・物件(`propertyValuations`)だけが紐づいている分類も同じく禁止する。**
+ * 集計対象が割り当てられた分類軸を消させないという制約を資産・負債・不動産で分ける理由が
+ * 無いため(B4の遷移条件)。
  *
  * ただし**数えるのは実際に集計対象になっている負債だけ**で、参照の件数ではない(B4-3)。
  * B11で削除済みの負債しか参照していない分類軸は何も集計していないため、削除を止める
  * 理由が無い。`resolveCategoryAxisDebtReferences`が返す`activeIds`を使うので、一覧の
  * 件数表示・編集フォームの初期値と同じ判定になる。
  *
- * `firestore.rules`側は`assetTypeNames`しか見ない。負債の生死は別コレクションを引かないと
- * 分からず、ルールには繰り返しが無いため可変長の`debtIds`を1件ずつ確かめられないため
- * (firestore.rulesの`categoryAxes`のコメント)。したがって負債側についてはここが唯一の
- * 判定箇所になるが、これは表示制御であって保護ではない。
+ * `firestore.rules`側は`assetTypeNames`しか見ない。負債・物件の生死は別コレクションを引かないと
+ * 分からず、ルールには繰り返しが無いため可変長の`debtIds` / `propertyValuations`を1件ずつ
+ * 確かめられないため(firestore.rulesの`categoryAxes`のコメント)。したがって負債・不動産側に
+ * ついてはここが唯一の判定箇所になるが、これは表示制御であって保護ではない。
  */
 export const DeleteCategoryAxisDialog = ({
   axis,
   debtOptions,
+  propertyOptions,
   onOpenChange,
   onConfirm,
 }: DeleteCategoryAxisDialogProps): JSX.Element => {
@@ -54,9 +57,16 @@ export const DeleteCategoryAxisDialog = ({
   const references =
     axis === null ? null : resolveCategoryAxisDebtReferences(axis.debtIds, debtOptions);
 
+  const propertyReferences =
+    axis === null
+      ? null
+      : resolveCategoryAxisPropertyReferences(axis.propertyValuations, propertyOptions);
+
   const blocked =
     axis !== null &&
-    (axis.assetTypeNames.length > 0 || (references !== null && references.activeIds.length > 0));
+    (axis.assetTypeNames.length > 0 ||
+      (references !== null && references.activeIds.length > 0) ||
+      (propertyReferences !== null && Object.keys(propertyReferences.activeValuations).length > 0));
 
   /**
    * 負債の情報が揃っていないと削除してよいか決められない状態。安全側に倒して止めるが、
@@ -66,14 +76,16 @@ export const DeleteCategoryAxisDialog = ({
    * ままなので、「時間をおいてもう一度」と促す文言を出すと、永久に叶わない再試行を勧める
    * ことになる。確定してブロックされる軸は`blocked`側の文言で扱う。
    *
-   * この条件により`blocked`とは排他になる(資産種別が0件で`references`が`null`なら、
-   * `blocked`の2つの条件はどちらも成立しない)。
+   * **`blocked`を条件に入れて排他にしてある。** 負債と不動産で状態が揃わないことがあり
+   * (負債は取得済みで集計対象あり、物件は読み込み中、など)、片方だけを見ると「削除できない」と
+   * 「判定できない」が同時に成立しうるため。確定してブロックされるならそちらを優先する。
    */
   const undetermined =
     axis !== null &&
     axis.assetTypeNames.length === 0 &&
-    axis.debtIds.length > 0 &&
-    references === null;
+    !blocked &&
+    ((axis.debtIds.length > 0 && references === null) ||
+      (Object.keys(axis.propertyValuations).length > 0 && propertyReferences === null));
 
   /**
    * 見出しと本文をここで決める。3状態あるので式の中で分岐させると三項が入れ子になり、
@@ -83,9 +95,13 @@ export const DeleteCategoryAxisDialog = ({
     if (undetermined) {
       return {
         title: "この分類を削除できるか判定できません",
-        // `undetermined`が真なら`references`は`null`、すなわち`status`は`ready`ではない
+        /*
+          `undetermined`が真なら、負債か物件の少なくとも一方が`ready`ではない。
+          どちらかが取得失敗なら再試行を促す側の文言を採る — 片方が読み込み中でも、
+          失敗している側が揃わない限り判定できないため
+        */
         description:
-          debtOptions.status === "error"
+          debtOptions.status === "error" || propertyOptions.status === "error"
             ? DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES.error
             : DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES.loading,
       };

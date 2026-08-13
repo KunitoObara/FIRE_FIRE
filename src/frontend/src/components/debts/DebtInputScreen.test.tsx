@@ -53,6 +53,7 @@ const netAxis: AssetCategoryAxisDocument = {
   name: "純金融資産",
   assetTypeNames: [],
   debtIds: ["debt-mortgage"],
+  propertyValuations: {},
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
