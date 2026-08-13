@@ -88,7 +88,10 @@
 
     <main class="flex-1 overflow-y-auto p-6 max-w-4xl flex flex-col gap-5">
       <p class="text-sm text-slate-500">
-        資産・口座ごとの想定利回り・リスクレベルはシミュレーション(将来予測)とダッシュボードの可視化の両方に反映されます。一覧内で直接編集できます。
+        資産種別ごとの想定利回り・リスクレベルを設定します。設定値はFIRE到達予測の入力パラメータと、ダッシュボードでのリスク可視化の両方に使われます。一覧に並ぶのは取り込んだ資産残高の資産種別で、どちらの欄も未設定のままにできます。
+      </p>
+      <p class="text-xs text-slate-400">
+        手入力の不動産(B5〜B7)・負債(B11)はここでは設定できません。到達予測では現在の値のまま据え置かれます。
       </p>
 
       <section class="card">
@@ -96,7 +99,7 @@
           <table class="w-full text-sm">
             <thead>
               <tr style="background-color: hsl(var(--muted));">
-                <th class="text-left font-medium px-4 py-3">資産・口座</th>
+                <th class="text-left font-medium px-4 py-3">資産種別</th>
                 <th class="text-right font-medium px-4 py-3">現在残高</th>
                 <th class="text-left font-medium px-4 py-3">想定利回り(年率%)</th>
                 <th class="text-left font-medium px-4 py-3">リスクレベル</th>
@@ -104,7 +107,7 @@
             </thead>
             <tbody>
               <tr class="border-t" style="border-color: hsl(var(--border));">
-                <td class="px-4 py-3">普通預金(三井住友)</td>
+                <td class="px-4 py-3">預金・現金</td>
                 <td class="px-4 py-3 text-right tabular-nums">2,140,000円</td>
                 <td class="px-4 py-3"><input class="input tabular-nums" style="width:6rem; height:2.25rem;" value="0.01" /></td>
                 <td class="px-4 py-3">
@@ -115,7 +118,7 @@
                 </td>
               </tr>
               <tr class="border-t" style="border-color: hsl(var(--border));">
-                <td class="px-4 py-3">SBI証券(特定口座)</td>
+                <td class="px-4 py-3">株式(現物)</td>
                 <td class="px-4 py-3 text-right tabular-nums">18,320,500円</td>
                 <td class="px-4 py-3"><input class="input input-error tabular-nums" style="width:6rem; height:2.25rem;" value="5%" /><p class="field-error mt-1">数値のみ入力してください</p></td>
                 <td class="px-4 py-3">
@@ -126,7 +129,7 @@
                 </td>
               </tr>
               <tr class="border-t" style="border-color: hsl(var(--border));">
-                <td class="px-4 py-3">米国株式(NISA成長投資枠)</td>
+                <td class="px-4 py-3">投資信託</td>
                 <td class="px-4 py-3 text-right tabular-nums">9,850,000円</td>
                 <td class="px-4 py-3"><input class="input tabular-nums" style="width:6rem; height:2.25rem;" value="6.0" /></td>
                 <td class="px-4 py-3">
@@ -137,14 +140,11 @@
                 </td>
               </tr>
               <tr class="border-t" style="border-color: hsl(var(--border));">
-                <td class="px-4 py-3">不動産(利ざや合算)</td>
-                <td class="px-4 py-3 text-right tabular-nums">28,800,000円</td>
-                <td class="px-4 py-3"><input class="input tabular-nums" style="width:6rem; height:2.25rem;" value="2.5" /></td>
+                <td class="px-4 py-3">年金</td>
+                <td class="px-4 py-3 text-right tabular-nums">4,300,000円</td>
+                <td class="px-4 py-3"><input class="input tabular-nums" style="width:6rem; height:2.25rem;" value="" /></td>
                 <td class="px-4 py-3">
-                  <span class="badge" style="background-color: hsl(38 90% 92%); color: hsl(30 70% 35%);">
-                    <svg width="10" height="10" viewBox="0 0 10 10"><polygon points="5,0 10,9 0,9" fill="currentColor"/></svg>
-                    中
-                  </span>
+                  <span class="text-xs text-slate-400">未設定</span>
                 </td>
               </tr>
             </tbody>
