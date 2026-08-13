@@ -92,6 +92,67 @@ export const REAL_ESTATE_BACK_TO_LIST_LINK = {
 export const REAL_ESTATE_EDIT_LABEL = "編集";
 
 /**
+ * 「削除」ボタンのラベル(B6)。
+ *
+ * B5の一覧ではなくB6に置く。一覧の行は全体がB6へのリンクで、行の中に破壊的な操作を混ぜると
+ * 誤操作で消えるため。削除の前に時価・ローン残高・利ざやを確かめられる場所もB6である
+ * (docs/screen-requirements-real-estate.md「物件の削除」)。
+ */
+export const REAL_ESTATE_DELETE_LABEL = "削除";
+
+/** 削除確認ダイアログの見出し。どの物件を消すのか分かるよう物件名を示す */
+export const buildDeleteRealEstateConfirmTitle = (name: string): string =>
+  `「${name}」を削除しますか?`;
+
+/**
+ * 削除確認ダイアログの本文(取り消せないこと)。
+ *
+ * 論理削除(ゴミ箱)は設けないので、押した時点で元に戻せない(B11の負債削除と同じ)。
+ */
+export const DELETE_REAL_ESTATE_IRREVERSIBLE_WARNING =
+  "この操作は取り消せません。削除すると一覧に戻ります。";
+
+/**
+ * 履歴が消えることの影響(B4-8以降)。
+ *
+ * 時価・ローン残高の履歴は物件のドキュメント内に持つので、削除すれば一緒に消える。
+ * 資産推移グラフはその履歴から過去の点を描いているため、**過去に遡って額が消える**。
+ * B11の負債削除が残債の履歴について同じ警告を出しているのと揃える。
+ */
+export const DELETE_REAL_ESTATE_HISTORY_WARNING =
+  "時価・ローン残高の履歴も削除され、資産推移グラフからこの物件の額が過去に遡って消えます。";
+
+/**
+ * 削除する物件を集計対象にしている分類軸の案内。
+ *
+ * 物件はチェックボックスで複数の分類軸から独立に選べるため、該当する軸は**すべて列挙する**
+ * (B11の負債削除と同じ)。件数だけを示すと、どの軸の集計が変わるかを確かめるために
+ * B4を開き直させることになる。
+ */
+export const buildDeleteRealEstateAxisWarning = (axisNames: string[]): string =>
+  `この物件を集計対象にしている分類軸「${axisNames.join("」「")}」の集計も変わります。`;
+
+/**
+ * 分類軸を取得できていないときにダイアログへ出す一文。
+ *
+ * **削除は止めない**(分類軸の情報は影響の説明であって、削除の可否を決めるものではない。
+ * 無関係な取得失敗で物件の整理ができなくなるほうが困る)。ただし黙って省くと、
+ * 影響する軸が無いのか確かめられなかっただけなのかを画面から区別できないため、
+ * 取れていないことをそのまま出す(PO判断)。
+ */
+export const DELETE_REAL_ESTATE_AXES_UNKNOWN_WARNING =
+  "分類軸の情報を取得できなかったため、この物件を集計対象にしている分類軸があるかどうかは確認できていません。";
+
+/** 削除確認ダイアログの実行ボタン */
+export const DELETE_REAL_ESTATE_CONFIRM_LABEL = "削除する";
+
+/** 削除中の実行ボタン。二重に押させない */
+export const DELETE_REAL_ESTATE_SUBMITTING_LABEL = "削除中...";
+
+/** 削除完了のトースト(B5へ遷移してから出す) */
+export const REAL_ESTATE_DELETED_MESSAGE = "物件を削除しました";
+
+/**
  * 指定された物件が見つからないときの案内(B6・B7 編集モード)。
  *
  * 削除済みの物件をブックマークや履歴から開いた場合に出る。行き止まりにしないよう
