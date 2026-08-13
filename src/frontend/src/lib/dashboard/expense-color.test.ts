@@ -11,7 +11,7 @@ const expense = (name: string, amount: number): ExpenseByCategory => ({ name, am
  * 「登録順」が無い。並びは費目名の順で決める。
  */
 describe("buildExpenseSlices", () => {
-  it("費目名の順に色スロットを割り当てる", () => {
+  it("費目名の順に、末尾のスロットから降順で色を割り当てる", () => {
     const slices = buildExpenseSlices([
       expense("食費", 62_400),
       expense("交通費", 21_000),
@@ -19,9 +19,29 @@ describe("buildExpenseSlices", () => {
     ]);
 
     expect(slices.map((slice) => [slice.name, slice.color])).toEqual([
-      ["交通費", "var(--chart-1)"],
-      ["住居費", "var(--chart-2)"],
-      ["食費", "var(--chart-3)"],
+      ["交通費", "var(--chart-8)"],
+      ["住居費", "var(--chart-7)"],
+      ["食費", "var(--chart-6)"],
+    ]);
+  });
+
+  /**
+   * 資産分類カラー(`category-color.ts`)は`--chart-1`から昇順に配る。両方を先頭から埋めると
+   * 同じ画面に並ぶ2つの円グラフで無関係な資産種別と費目が同じ色になるため、費目は末尾から
+   * 配る([B11-9-2](https://trello.com/c/zh3egdfo))。
+   *
+   * 結果として、資産種別と費目が合わせて8件までなら重ならない。ここで固定するのは
+   * **このモジュールの側の約束**(末尾から詰めて配ること)だけにする。資産側のスロットを
+   * リテラルで書き写すと、あちらの配り方が変わってもこのテストは通ったままになる。
+   */
+  it("費目が4件なら末尾4つのスロットに収まり、先頭側を空けたままにする", () => {
+    const slices = buildExpenseSlices(["A", "B", "C", "D"].map((name) => expense(name, 1_000)));
+
+    expect(slices.map((slice) => slice.color)).toEqual([
+      "var(--chart-8)",
+      "var(--chart-7)",
+      "var(--chart-6)",
+      "var(--chart-5)",
     ]);
   });
 
@@ -55,7 +75,9 @@ describe("buildExpenseSlices", () => {
     );
 
     expect(slices).toHaveLength(8);
-    expect(slices.at(-1)).toMatchObject({ name: "H", color: "var(--chart-8)" });
+    // 名前順の先頭が --chart-8 なので、8件目は --chart-1 になる
+    expect(slices[0]).toMatchObject({ name: "A", color: "var(--chart-8)" });
+    expect(slices.at(-1)).toMatchObject({ name: "H", color: "var(--chart-1)" });
   });
 
   /**
@@ -82,7 +104,8 @@ describe("buildExpenseSlices", () => {
       name: "ほかの費目",
       // H と I の合計
       amount: 2_000,
-      color: "var(--chart-8)",
+      // 個別色が --chart-8〜2 の7件になり、受け皿はその続きの --chart-1
+      color: "var(--chart-1)",
     });
   });
 
