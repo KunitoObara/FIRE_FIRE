@@ -8,8 +8,15 @@ import { CSV_IMPORT_PATH } from "@/constants/routes";
 export const ASSUMPTIONS_DESCRIPTION =
   "資産種別ごとの想定利回り・リスクレベルを設定します。設定値はFIRE到達予測の入力パラメータと、ダッシュボードでのリスク可視化の両方に使われます。";
 
-/** 一覧の列見出し(HTMLモック b9-assumption-settings.html の表に合わせる) */
-export const ASSUMPTIONS_ASSET_COLUMN_LABEL = "資産・口座";
+/**
+ * 一覧の列見出し(HTMLモック b9-assumption-settings.html の表に合わせる)。
+ *
+ * 「資産・口座」ではなく「資産種別」。この画面が設定するのはCSVの資産種別ごとの想定値で、
+ * 口座単位の残高はマネーフォワードのCSVに含まれないため(docs/screen-requirements-fire-goal.md
+ * B9「設定の単位は資産種別」)。旧称は要件・モックが口座単位を想定していた頃の名残で、
+ * 要求定義 Ph4 で3者を資産種別へ揃えた。
+ */
+export const ASSUMPTIONS_ASSET_COLUMN_LABEL = "資産種別";
 export const ASSUMPTIONS_BALANCE_COLUMN_LABEL = "現在残高";
 export const ASSUMPTIONS_EXPECTED_RETURN_COLUMN_LABEL = "想定利回り(年率%)";
 export const ASSUMPTIONS_RISK_LEVEL_COLUMN_LABEL = "リスクレベル";
