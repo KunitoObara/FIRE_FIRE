@@ -110,6 +110,14 @@ export const AssetCategoryAxisForm = ({
   };
 
   const handleSubmit = async (): Promise<void> => {
+    /*
+      検証の入口で両方のエラーを消す。片方だけを設定して戻ると、直したはずのエラーが
+      残り続ける — 名前を空で保存(nameError)→ 名前を直して物件を選びすぎて保存
+      (submitError)で、名前欄が`aria-invalid`のまま赤く残る([PR #154](https://github.com/KunitoObara/FIRE_FIRE/pull/154) のレビュー指摘)
+    */
+    setNameError(null);
+    setSubmitError(null);
+
     const parsed = categoryAxisFormSchema.safeParse({
       name,
       assetTypeNames,
@@ -143,8 +151,7 @@ export const AssetCategoryAxisForm = ({
       return;
     }
 
-    setNameError(null);
-    setSubmitError(null);
+    // 入口で両方消してあるので、ここで消し直す必要は無い
     setSubmitting(true);
 
     const result = await onSubmit(parsed.data);
