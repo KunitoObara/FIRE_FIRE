@@ -372,7 +372,7 @@ service cloud.firestore {
       match /categoryAxes/{axisId} {
         allow read: if canAccessOwnData(userId);
         allow create: if canAccessOwnData(userId)
-          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'propertyValuations', 'createdAt'])
           && request.resource.data.name is string
           // 文字数の上限はsrc/constants/asset-categories.tsのCATEGORY_AXIS_NAME_MAX_LENGTHと揃える
           && request.resource.data.name.size() > 0
@@ -385,10 +385,17 @@ service cloud.firestore {
           // 負債IDの上限は登録できる負債の件数(src/constants/debts.tsのDEBT_MAX_COUNT)と揃える
           && request.resource.data.debtIds is list
           && request.resource.data.debtIds.size() <= 50
+          // 物件は「物件ID→反映方法」のマップ。値がspread/marketValueのどちらかであることは
+          // ルールでは検査しきれないため(byType・balanceHistoryと同じ制約)、パース側
+          // (src/schemas/asset-categories.ts)で担保し、ここでは件数の上限だけを見る。
+          // 上限は CATEGORY_AXIS_PROPERTY_MAX_COUNT と揃える(選択数の上限であって、
+          // 物件の登録件数そのものは縛らない)
+          && request.resource.data.propertyValuations is map
+          && request.resource.data.propertyValuations.size() <= 50
           && request.resource.data.createdAt is timestamp
           && isServerTime(request.resource.data.createdAt);
         allow update: if canAccessOwnData(userId)
-          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'propertyValuations', 'createdAt'])
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.name.size() <= 40
@@ -396,15 +403,17 @@ service cloud.firestore {
           && request.resource.data.assetTypeNames.size() <= 50
           && request.resource.data.debtIds is list
           && request.resource.data.debtIds.size() <= 50
+          && request.resource.data.propertyValuations is map
+          && request.resource.data.propertyValuations.size() <= 50
           // 登録順が分類別内訳の色スロットに対応するため、登録日時は編集で変えさせない(DESIGN.md 3章)
           && request.resource.data.createdAt == resource.data.createdAt;
         // 集計対象が1件以上割り当てられた分類の削除は禁止する(画面の要件そのものを
         // ルール側でも担保する。クライアント側の判定はscreen-requirements-dashboard.md B4参照)。
         // 先に編集で割り当てを解除すれば削除できるようになる。
         //
-        // **見るのは`assetTypeNames`だけで、`debtIds`は見ない。** 負債だけが割り当てられた
-        // 分類軸を削除させない方針(B4の遷移条件)は変わっていないが、その判定をここでは
-        // 正しく行えないため、意図的に外してある(B4-3)。
+        // **見るのは`assetTypeNames`だけで、`debtIds`と`propertyValuations`は見ない。**
+        // 負債だけ・物件だけが割り当てられた分類軸を削除させない方針(B4の遷移条件)は
+        // 変わっていないが、その判定をここでは正しく行えないため、意図的に外してある(B4-3)。
         //
         // 理由は、負債の参照が「実際に集計対象になっているか」が別コレクション
         // (`debts`)の存在に依存すること。B11は負債の削除を許しているので、削除済みの負債を

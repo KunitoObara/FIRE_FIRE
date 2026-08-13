@@ -1,6 +1,6 @@
 /** B5 不動産一覧画面・B6 不動産詳細画面・B7 不動産登録・編集画面で使う定数 */
 
-import { REAL_ESTATE_NEW_PATH, REAL_ESTATE_PATH } from "@/constants/routes";
+import { ASSET_CATEGORIES_PATH, REAL_ESTATE_NEW_PATH, REAL_ESTATE_PATH } from "@/constants/routes";
 
 /**
  * 画面上部の説明文。
@@ -10,6 +10,21 @@ import { REAL_ESTATE_NEW_PATH, REAL_ESTATE_PATH } from "@/constants/routes";
  */
 export const REAL_ESTATE_LIST_DESCRIPTION =
   "登録済みの物件の時価とローン残高を一覧します。利ざやは物件を選ぶと詳細画面で確認できます。";
+
+/**
+ * ダッシュボードへの反映はB4で分類軸の集計対象に選ぶ、という導線
+ * (docs/screen-requirements-real-estate.md B5)。
+ *
+ * 登録しただけではB1に現れないため、この画面で触れないと「登録したのにダッシュボードが
+ * 変わらない」の答えがどこにも無い。**行ごとにどの分類軸へ選ばれているかは出さない** —
+ * 分類軸が物件を参照する向きなので、出すには一覧を開くたびに全分類軸を読むことになる。
+ */
+export const REAL_ESTATE_DASHBOARD_LINK = {
+  prefix: "ダッシュボードに反映するには、",
+  label: "資産分類マスタ",
+  href: ASSET_CATEGORIES_PATH,
+  suffix: "で分類軸の集計対象に選んでください。",
+} as const;
 
 /** 「新規登録」ボタン(B7の新規登録モードへの導線) */
 export const REAL_ESTATE_NEW_LINK = {

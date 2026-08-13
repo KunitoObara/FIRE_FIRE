@@ -10,6 +10,7 @@ import type { RenderResult } from "@testing-library/react";
 
 const fetchCategoryAxes = vi.fn();
 const fetchDebts = vi.fn();
+const fetchRealEstateProperties = vi.fn();
 const fetchAssetTypeOptions = vi.fn();
 const createCategoryAxis = vi.fn();
 const updateCategoryAxis = vi.fn();
@@ -28,6 +29,10 @@ vi.mock("@/lib/debts/debt-repository", () => ({
   fetchDebts: (...args: unknown[]) => fetchDebts(...args),
 }));
 
+vi.mock("@/lib/real-estate/property-repository", () => ({
+  fetchRealEstateProperties: (...args: unknown[]) => fetchRealEstateProperties(...args),
+}));
+
 vi.mock("sonner", () => ({
   toast: { success: (...args: unknown[]) => toastSuccess(...args) },
 }));
@@ -37,6 +42,7 @@ const TOTAL_ASSETS_AXIS: AssetCategoryAxisDocument = {
   name: "総資産",
   assetTypeNames: [],
   debtIds: [],
+  propertyValuations: {},
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
@@ -45,6 +51,7 @@ const NET_FINANCIAL_AXIS: AssetCategoryAxisDocument = {
   name: "純金融資産",
   assetTypeNames: ["預金・現金", "投資信託"],
   debtIds: [],
+  propertyValuations: {},
   createdAt: "2026-01-02T00:00:00.000Z",
 };
 
@@ -69,6 +76,9 @@ describe("AssetCategoryMasterScreen", () => {
     // 負債を扱わない既存のケースが読み込み中で止まらないようにする
     fetchDebts.mockReset();
     fetchDebts.mockResolvedValue({ ok: true, debts: [] });
+    // 物件の選択肢(B4「集計対象に不動産を含める」)。負債と同じ理由で、既定は取得成功・0件
+    fetchRealEstateProperties.mockReset();
+    fetchRealEstateProperties.mockResolvedValue({ ok: true, properties: [] });
     fetchAssetTypeOptions.mockReset();
     createCategoryAxis.mockReset();
     updateCategoryAxis.mockReset();
@@ -190,6 +200,7 @@ describe("AssetCategoryMasterScreen", () => {
         name: "生活防衛資金",
         assetTypeNames: ["預金・現金"],
         debtIds: [],
+        propertyValuations: {},
       });
     });
     expect(toastSuccess).toHaveBeenCalledWith("分類を追加しました");
@@ -256,6 +267,7 @@ describe("AssetCategoryMasterScreen", () => {
         name: "純金融資産",
         assetTypeNames: ["預金・現金", "投資信託"],
         debtIds: [],
+        propertyValuations: {},
       });
     });
     // 新規追加と同じくB1の表示データも無効化する(片方の分岐だけ外れても気づけるように)
@@ -294,6 +306,7 @@ describe("AssetCategoryMasterScreen", () => {
         name: "総資産",
         assetTypeNames: [],
         debtIds: [],
+        propertyValuations: {},
       });
     });
   });
@@ -398,6 +411,7 @@ describe("AssetCategoryMasterScreen(負債)", () => {
         name: "純金融資産",
         assetTypeNames: [],
         debtIds: ["debt-mortgage"],
+        propertyValuations: {},
       });
     });
   });
@@ -615,7 +629,7 @@ describe("AssetCategoryMasterScreen(負債)", () => {
     await user.click(await screen.findByRole("button", { name: "削除" }));
 
     expect(await screen.findByText("この分類を削除できるか判定できません")).toBeInTheDocument();
-    expect(screen.getByText(/負債の情報を取得できなかったため/u)).toBeInTheDocument();
+    expect(screen.getByText(/負債・不動産の情報を取得できなかったため/u)).toBeInTheDocument();
     expect(screen.queryByText(/先に編集で割り当てを解除してください/u)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
     expect(deleteCategoryAxis).not.toHaveBeenCalled();
@@ -748,5 +762,283 @@ describe("AssetCategoryMasterScreen(負債)", () => {
     await waitFor(() => {
       expect(deleteCategoryAxis).toHaveBeenCalledWith("total-assets");
     });
+  });
+});
+
+describe("AssetCategoryMasterScreen(不動産)", () => {
+  /** B5〜B7で登録済みの物件。物件名は重複を許すので、簡略表記の所在地で見分ける(B4) */
+  const SHIBUYA: RealEstateProperty = {
+    id: "shibuya-101",
+    name: "〇〇マンション101号室",
+    location: "東京都渋谷区神南1-2-3",
+    acquiredOn: "2019-04",
+    marketValue: 32_000_000,
+    loanBalance: 18_400_000,
+    updatedAt: "2026-06-01",
+    valueHistory: {},
+  };
+
+  const YOKOHAMA: RealEstateProperty = {
+    id: "yokohama-202",
+    name: "△△アパート202号室",
+    location: "",
+    acquiredOn: null,
+    marketValue: 21_500_000,
+    loanBalance: 15_200_000,
+    updatedAt: "2026-05-02",
+    valueHistory: {},
+  };
+
+  /*
+    describeごとにモックを組み直す(このファイルの他のブロックと同じ作り)。
+    前のブロックが残した戻り値を引き継ぐと、保存できない状態から始まるテストが混ざる
+  */
+  beforeEach(() => {
+    fetchCategoryAxes.mockReset();
+    fetchAssetTypeOptions.mockReset();
+    createCategoryAxis.mockReset();
+    updateCategoryAxis.mockReset();
+    deleteCategoryAxis.mockReset();
+    fetchDebts.mockReset();
+    fetchRealEstateProperties.mockReset();
+    toastSuccess.mockReset();
+
+    fetchCategoryAxes.mockResolvedValue({ ok: true, axes: [TOTAL_ASSETS_AXIS] });
+    fetchAssetTypeOptions.mockResolvedValue({ ok: true, assetTypeNames: ["預金・現金"] });
+    fetchDebts.mockResolvedValue({ ok: true, debts: [] });
+    fetchRealEstateProperties.mockResolvedValue({ ok: true, properties: [SHIBUYA, YOKOHAMA] });
+    createCategoryAxis.mockResolvedValue({ ok: true });
+    updateCategoryAxis.mockResolvedValue({ ok: true });
+  });
+
+  /**
+   * 選んだ物件は既定で「利ざやのみ反映」になる(B4)。時価を既定にすると、ローンが
+   * 残っている物件を選んだ瞬間に控除前の額がダッシュボードへ載る。
+   */
+  it("選んだ物件を既定の利ざやで保存する", async () => {
+    const user = userEvent.setup();
+    createCategoryAxis.mockResolvedValue({ ok: true });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "新規分類を追加" }));
+    await user.type(screen.getByLabelText("分類名"), "総資産(不動産込み)");
+    await user.click(await screen.findByLabelText(/〇〇マンション101号室/u));
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(createCategoryAxis).toHaveBeenCalledWith(
+        expect.objectContaining({ propertyValuations: { "shibuya-101": "spread" } }),
+      );
+    });
+  });
+
+  it("「利ざやのみ反映」を外すと時価で保存する", async () => {
+    const user = userEvent.setup();
+    createCategoryAxis.mockResolvedValue({ ok: true });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "新規分類を追加" }));
+    await user.type(screen.getByLabelText("分類名"), "総資産(不動産込み)");
+    await user.click(await screen.findByLabelText(/〇〇マンション101号室/u));
+    await user.click(screen.getByLabelText(/利ざやのみ反映/u));
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(createCategoryAxis).toHaveBeenCalledWith(
+        expect.objectContaining({ propertyValuations: { "shibuya-101": "marketValue" } }),
+      );
+    });
+  });
+
+  /**
+   * 反映方法は選んだ物件の行にだけ出す。選んでいない物件に残っていると、何が集計されるのかが
+   * 行から読めない(B4)。外した物件の反映方法も保存しない — 画面に出ていない設定が
+   * 保存され続けることになるため。
+   */
+  it("選択を外すと反映方法の選択肢も消え、保存にも残らない", async () => {
+    const user = userEvent.setup();
+    createCategoryAxis.mockResolvedValue({ ok: true });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "新規分類を追加" }));
+    await user.type(screen.getByLabelText("分類名"), "総資産");
+    expect(screen.queryByLabelText(/利ざやのみ反映/u)).not.toBeInTheDocument();
+
+    const propertyCheckbox = await screen.findByLabelText(/〇〇マンション101号室/u);
+    await user.click(propertyCheckbox);
+    expect(screen.getByLabelText(/利ざやのみ反映/u)).toBeInTheDocument();
+
+    await user.click(propertyCheckbox);
+    expect(screen.queryByLabelText(/利ざやのみ反映/u)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(createCategoryAxis).toHaveBeenCalledWith(
+        expect.objectContaining({ propertyValuations: {} }),
+      );
+    });
+  });
+
+  /**
+   * 上限は**選択数**で、登録件数は縛らない(B4)。分類名以外の失敗を分類名のエラーへ
+   * 丸めると、物件を選びすぎただけの保存に「分類名を入力してください」と出て、
+   * 直す場所が画面から分からなくなる。
+   */
+  it("選べる物件の上限を超えると、分類名ではなく件数のエラーを出す", async () => {
+    const user = userEvent.setup();
+    // 51件をクリックで選ぶと遅いので、上限を超えた軸を編集で開いて保存だけを試す
+    const many = Array.from({ length: 51 }, (_, index) => ({
+      ...SHIBUYA,
+      id: `property-${String(index).padStart(2, "0")}`,
+      name: `物件${String(index).padStart(2, "0")}`,
+    }));
+    fetchRealEstateProperties.mockResolvedValue({ ok: true, properties: many });
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [
+        {
+          ...TOTAL_ASSETS_AXIS,
+          propertyValuations: Object.fromEntries(
+            many.map((property) => [property.id, "spread" as const]),
+          ),
+        },
+      ],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "編集" }));
+    await user.click(await screen.findByRole("button", { name: "保存" }));
+
+    expect(await screen.findByText(/選べる物件は50件までです/u)).toBeInTheDocument();
+    expect(screen.queryByText("分類名を入力してください。")).not.toBeInTheDocument();
+    expect(updateCategoryAxis).not.toHaveBeenCalled();
+  });
+
+  /** カードで指定された赤字の注意(B1「CSV取込データとの重複」) */
+  it("CSV取込データとの重複の注意を出す", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "新規分類を追加" }));
+
+    expect(await screen.findByText(/CSV取込データとの重複に注意してください/u)).toBeInTheDocument();
+    expect(screen.getByText(/二重に差し引きます/u)).toBeInTheDocument();
+  });
+
+  /** 選択肢が出ないまま保存すると、選択済みの物件が黙って外れた分類軸で上書きされる(B4) */
+  it("物件の選択肢を取得できないあいだは保存させない", async () => {
+    const user = userEvent.setup();
+    fetchRealEstateProperties.mockResolvedValue({ ok: false, reason: "unknown" });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "新規分類を追加" }));
+
+    expect(await screen.findByText(/選択肢を読み込めるまで保存できません/u)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  });
+
+  it("一覧には集計へ加わる物件の件数を出す", async () => {
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [
+        {
+          ...TOTAL_ASSETS_AXIS,
+          propertyValuations: { "shibuya-101": "spread", "yokohama-202": "marketValue" },
+        },
+      ],
+    });
+    renderScreen();
+
+    expect(await screen.findByText(/不動産 2件/u)).toBeInTheDocument();
+  });
+
+  /**
+   * 削除された物件への参照は集計対象から外れたものとして扱い、外したことを一覧にも出す
+   * (負債とすべて同じ扱い。B4)。件数は実際に集計へ加わる数で出す。
+   */
+  it("削除済みの物件への参照は件数から除き、削除済みである旨を添える", async () => {
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [
+        {
+          ...TOTAL_ASSETS_AXIS,
+          propertyValuations: { "shibuya-101": "spread", "sold-out": "spread" },
+        },
+      ],
+    });
+    renderScreen();
+
+    expect(await screen.findByText(/不動産 1件/u)).toBeInTheDocument();
+    expect(screen.getByText(/1件は削除済み/u)).toBeInTheDocument();
+  });
+
+  /** 集計対象が割り当てられた軸を消させない制約を、資産・負債・不動産で分ける理由が無い(B4) */
+  it("物件だけが紐づいている分類の削除もブロックする", async () => {
+    const user = userEvent.setup();
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, propertyValuations: { "shibuya-101": "spread" } }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+
+    expect(await screen.findByText("この分類は削除できません")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
+  });
+
+  /** 参照が残っているだけの軸は何も集計していない(負債と同じ判定。B4-3) */
+  it("参照している物件がすべて削除済みなら削除できる", async () => {
+    const user = userEvent.setup();
+    deleteCategoryAxis.mockResolvedValue({ ok: true });
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, propertyValuations: { "sold-out": "spread" } }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+    await user.click(await screen.findByRole("button", { name: "削除する" }));
+
+    await waitFor(() => {
+      expect(deleteCategoryAxis).toHaveBeenCalledWith("total-assets");
+    });
+  });
+
+  /**
+   * 負債と物件で状態が揃わないことがある(負債は取得済みで集計対象あり、物件は読み込み中)。
+   * 片方だけを見ると「削除できない」と「判定できない」が同時に成立するので、確定して
+   * ブロックされるほうを優先する。
+   */
+  it("負債で確定してブロックされる軸は、物件が読み込み中でも削除禁止と伝える", async () => {
+    const user = userEvent.setup();
+    fetchDebts.mockResolvedValue({
+      ok: true,
+      debts: [
+        {
+          id: "debt-mortgage",
+          name: "住宅ローン",
+          balance: 18_400_000,
+          originatedOn: null,
+          interestRate: null,
+          repaymentMonths: null,
+          updatedAt: "2026-07-12",
+          balanceHistory: {},
+        },
+      ],
+    });
+    // 解決しないPromiseで物件だけを読み込み中のまま留める
+    fetchRealEstateProperties.mockReturnValue(new Promise(() => {}));
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+
+    expect(await screen.findByText("この分類は削除できません")).toBeInTheDocument();
+    expect(screen.queryByText("この分類を削除できるか判定できません")).not.toBeInTheDocument();
   });
 });

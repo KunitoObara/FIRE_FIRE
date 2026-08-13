@@ -3,12 +3,15 @@ import { Card } from "@/components/ui/card";
 import {
   buildCategoryAxisDebtCountLabel,
   buildCategoryAxisMissingDebtLabel,
+  buildCategoryAxisMissingPropertyLabel,
+  buildCategoryAxisPropertyCountLabel,
   CATEGORY_AXIS_ALL_TYPES_LABEL,
   CATEGORY_AXIS_MEMBER_DISPLAY_LIMIT,
   NO_CATEGORY_AXES_LABEL,
 } from "@/constants/asset-categories";
 import { CATEGORY_COLOR_SLOT_COUNT } from "@/constants/dashboard";
 import { resolveCategoryAxisDebtReferences } from "@/lib/asset-categories/debt-references";
+import { resolveCategoryAxisPropertyReferences } from "@/lib/asset-categories/property-references";
 
 import type { JSX } from "react";
 
@@ -47,21 +50,42 @@ const buildAssetTypeSummary = (assetTypeNames: string[]): string => {
 const buildMemberSummary = (
   axis: AssetCategoryAxisDocument,
   references: CategoryAxisDebtReferences | null,
+  propertyReferences: CategoryAxisPropertyReferences | null,
 ): string => {
-  const assetTypes = buildAssetTypeSummary(axis.assetTypeNames);
-
-  if (axis.debtIds.length === 0) {
-    return assetTypes;
-  }
+  const parts = [buildAssetTypeSummary(axis.assetTypeNames)];
+  const propertyIds = Object.keys(axis.propertyValuations);
 
   /*
-    件数は**実際に差し引かれる負債**の数で出す(B4)。参照の数をそのまま出すと、一覧の
-    「負債 2件」とB1で差し引かれている額が食い違い、一覧に件数を出した目的そのものを外す。
-    負債の選択肢がまだ読めていない間は絞り込めないので、参照の数をそのまま出す
+    並びは集計の式と同じ「資産種別 → 不動産 → 負債」にする(B4)。読む順が
+    足すもの・引くものの順になる
   */
-  const debtCount = references === null ? axis.debtIds.length : references.activeIds.length;
+  if (propertyIds.length > 0) {
+    /*
+      件数は**実際に集計へ加わる物件**の数で出す(負債と同じ理由)。利ざや / 時価の内訳は
+      出さない — 反映方法は物件ごとに変わるので、内訳まで並べると1行に収まらない
+    */
+    const propertyCount =
+      propertyReferences === null
+        ? propertyIds.length
+        : Object.keys(propertyReferences.activeValuations).length;
 
-  return `${assetTypes} / ${buildCategoryAxisDebtCountLabel(debtCount)}`;
+    parts.push(buildCategoryAxisPropertyCountLabel(propertyCount));
+  }
+
+  if (axis.debtIds.length > 0) {
+    /*
+      件数は**実際に差し引かれる負債**の数で出す(B4)。参照の数をそのまま出すと、一覧の
+      「負債 2件」とB1で差し引かれている額が食い違い、一覧に件数を出した目的そのものを外す。
+      負債の選択肢がまだ読めていない間は絞り込めないので、参照の数をそのまま出す
+    */
+    parts.push(
+      buildCategoryAxisDebtCountLabel(
+        references === null ? axis.debtIds.length : references.activeIds.length,
+      ),
+    );
+  }
+
+  return parts.join(" / ");
 };
 
 /**
@@ -73,6 +97,7 @@ const buildMemberSummary = (
 export const AssetCategoryAxisList = ({
   axes,
   debtOptions,
+  propertyOptions,
   onEdit,
   onDelete,
 }: AssetCategoryAxisListProps): JSX.Element => {
@@ -89,6 +114,10 @@ export const AssetCategoryAxisList = ({
       <ul className="divide-y divide-border">
         {axes.map((axis, index) => {
           const references = resolveCategoryAxisDebtReferences(axis.debtIds, debtOptions);
+          const propertyReferences = resolveCategoryAxisPropertyReferences(
+            axis.propertyValuations,
+            propertyOptions,
+          );
 
           return (
             <li key={axis.id} className="flex items-center gap-3 px-5 py-4">
@@ -100,13 +129,18 @@ export const AssetCategoryAxisList = ({
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{axis.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {buildMemberSummary(axis, references)}
+                  {buildMemberSummary(axis, references, propertyReferences)}
                   {/*
                     B11で削除された負債を参照している軸にだけ注記を添える(B4)。行の一部
                     として最初から出ている文字なので`role="status"`は付けない — 軸の数だけ
                     ライブリージョンが並び、再描画のたびに読み上げが走ることになるため。
                     動的に現れる編集フォーム側の案内にだけ付ける
                   */}
+                  {propertyReferences !== null && propertyReferences.missingCount > 0 ? (
+                    <span className="ml-1 text-destructive">
+                      {buildCategoryAxisMissingPropertyLabel(propertyReferences.missingCount)}
+                    </span>
+                  ) : null}
                   {references !== null && references.missingCount > 0 ? (
                     <span className="ml-1 text-destructive">
                       {buildCategoryAxisMissingDebtLabel(references.missingCount)}
