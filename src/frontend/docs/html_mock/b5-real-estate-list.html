@@ -102,6 +102,16 @@
         }
       </script>
 
+      <!-- 画面上部の説明文(docs/screen-requirements-real-estate.md B5)。
+           一覧に出さない利ざやがどこで見られるかを示す。あわせて、登録しただけでは
+           ダッシュボードに現れないこと(反映はB4で分類軸の集計対象に選ぶ)を添える。
+           行ごとに「どの分類軸に選ばれているか」は出さない — 分類軸が物件を参照する向きなので、
+           出すには一覧を開くたびに全分類軸を読むことになる -->
+      <p class="text-sm text-slate-500 mb-5">
+        登録済みの物件の時価とローン残高を一覧します。利ざやは物件を選ぶと詳細画面で確認できます。
+        ダッシュボードに反映するには、<a class="link" href="b4-category-master.html">資産分類マスタ</a>で分類軸の集計対象に選んでください。
+      </p>
+
       <section class="card">
         <ul class="divide-y" style="border-color: hsl(var(--border));">
           <li>

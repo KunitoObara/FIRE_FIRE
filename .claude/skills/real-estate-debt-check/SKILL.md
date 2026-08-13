@@ -1,6 +1,6 @@
 ---
 name: real-estate-debt-check
-description: Verifies the Phase 3 money rules — real-estate spread (時価 - ローン残高, must stay signed so over-leveraged properties show negative), monthly rental balance, and the debt side's "no automatic calculation" rule (no repayment schedule derived from interest rate or term, no balance decaying over time), plus the append-only balance history and how it is back-filled from 発生年月. Use this skill whenever code touching real estate (B5/B6/B7, users/{uid}/properties) or debts (B11, users/{uid}/debts, 残債履歴, the debt deduction in the asset-trend graph) is written or changed — even when the user frames it as "just adding a field" or "fixing the display", since these values feed the dashboard and a sign or unit slip is invisible until the numbers are wrong.
+description: Verifies the Phase 3 money rules — real-estate spread (時価 - ローン残高, must stay signed so over-leveraged properties show negative), monthly rental balance, and the debt side's "no automatic calculation" rule (no repayment schedule derived from interest rate or term, no balance decaying over time), plus the append-only value/balance histories on both sides and how they are back-filled from 取得年月 / 発生年月. Also covers how a property reaches the dashboard — only via a B4 category axis, as 利ざや or 時価 per property (B4-8). Use this skill whenever code touching real estate (B5/B6/B7, users/{uid}/properties, the 不動産 band in the asset-trend graph) or debts (B11, users/{uid}/debts, 残債履歴, the debt deduction in the asset-trend graph) is written or changed — even when the user frames it as "just adding a field" or "fixing the display", since these values feed the dashboard and a sign or unit slip is invisible until the numbers are wrong.
 ---
 
 # 不動産・負債の計算とデータ整合の検証
@@ -25,7 +25,7 @@ Phase 3([要件定義書](../../../docs/fire-asset-management-requirements.md) 4
 | 物件の入力値↔保存値 | `src/frontend/src/lib/real-estate/form-values.ts`、`src/frontend/src/schemas/real-estate.ts` |
 | 負債の読み書き・残債履歴 | `src/frontend/src/lib/debts/debt-repository.ts` |
 | 負債の集計(負債サマリ) | `src/frontend/src/lib/debts/summary.ts` |
-| 負債の資産推移への反映 | `src/frontend/src/lib/dashboard/aggregation.ts` |
+| 負債・不動産の資産推移への反映 | `src/frontend/src/lib/dashboard/aggregation.ts` |
 | 書ける形の担保 | `firestore.rules`(`isValidProperty()`、`isAppendOnlyBalanceHistory()`) |
 
 要件の正本は [4.5・4.8](../../../docs/fire-asset-management-requirements.md)、画面側は [不動産 B5〜B7](../../../docs/screen-requirements-real-estate.md) と [B11](../../../docs/screen-requirements-dashboard.md#b11-負債入力画面)。
@@ -41,8 +41,9 @@ Phase 3([要件定義書](../../../docs/fire-asset-management-requirements.md) 4
 2. **保存していないか**。利ざや・賃貸収支がFirestoreのドキュメントに書かれていないこと。`isValidProperty()` の `hasOnly` に増えていないことでも確かめられる
 3. **賃貸収支の単位**。月額のまま計算しているか(12を掛けた値が混ざっていないか)。支出が収入を上回る場合に負になるか
 4. **収益物件の判定が1つに保たれているか**。区分のフラグと金額を別々に持っていないこと。収益物件から外して保存したとき、以前の賃貸収入/支出が残らないこと
-5. **ローン残高を集計に入れていないか**。B7のローン残高はダッシュボードの負債控除に入らない(そちらはB11の負債)。同じ住宅ローンが二重に差し引かれないこと
+5. **ローン残高が効く経路が1つだけか**([B4-8](https://trello.com/c/8U3xoGJj) で変わった項目)。B7のローン残高がダッシュボードに効くのは、**B4の分類軸がその物件を「利ざやのみ反映」で選んだときだけ**である。時価で反映する物件からローンを引いていないこと、B11の負債による控除と混ざっていないこと(同じローンを両方に入れた場合に二重に引かれるのは要件どおりで、画面は注記で知らせる。[B11「不動産のローン残高(B7)との関係」](../../../docs/screen-requirements-dashboard.md#b11-負債入力画面))
 6. **最終更新日**。保存のたびに更新されること、登録日時(`createdAt`)は編集で変わらないこと
+7. **時価・ローン残高の履歴と取得年月**([B4-8](https://trello.com/c/8U3xoGJj) で追加)。追記のみで、**時価かローン残高が変わった日だけ**記録が増えること。時価とローン残高を**同じ日の記録から組で**読むこと(別々の日の値で利ざやを組み立てない)。取得年月より前の点に物件を積まないこと、取得年月から最初の記録までは**最も古い記録**を当てること(購入価格や当初借入額からの補間はしない)。負債の残債履歴と同じ規則なので、判定に迷ったら負債側の実装に揃える
 
 ### 負債(B11)
 
