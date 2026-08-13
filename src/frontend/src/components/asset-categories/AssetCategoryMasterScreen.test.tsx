@@ -915,6 +915,47 @@ describe("AssetCategoryMasterScreen(不動産)", () => {
     expect(updateCategoryAxis).not.toHaveBeenCalled();
   });
 
+  /**
+   * 失敗した側だけを設定して戻ると、直したはずのエラーが残り続ける
+   * ([PR #154](https://github.com/KunitoObara/FIRE_FIRE/pull/154) のレビュー指摘)。
+   * 名前欄の `aria-invalid` も `nameError` を見ているので、有効な名前がエラー扱いのままになる。
+   */
+  it("分類名を直して物件の件数で失敗したとき、分類名のエラーを消す", async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 51 }, (_, index) => ({
+      ...SHIBUYA,
+      id: `property-${String(index).padStart(2, "0")}`,
+      name: `物件${String(index).padStart(2, "0")}`,
+    }));
+    fetchRealEstateProperties.mockResolvedValue({ ok: true, properties: many });
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [
+        {
+          ...TOTAL_ASSETS_AXIS,
+          name: "",
+          propertyValuations: Object.fromEntries(
+            many.map((property) => [property.id, "spread" as const]),
+          ),
+        },
+      ],
+    });
+    renderScreen();
+
+    // 1回目: 分類名が空のまま保存して名前のエラーを出す
+    await user.click(await screen.findByRole("button", { name: "編集" }));
+    await user.click(await screen.findByRole("button", { name: "保存" }));
+    expect(await screen.findByText("分類名を入力してください。")).toBeInTheDocument();
+
+    // 2回目: 名前を直すと、今度は物件の件数で失敗する
+    await user.type(screen.getByLabelText("分類名"), "総資産");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(await screen.findByText(/選べる物件は50件までです/u)).toBeInTheDocument();
+    expect(screen.queryByText("分類名を入力してください。")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("分類名")).not.toHaveAttribute("aria-invalid", "true");
+  });
+
   /** カードで指定された赤字の注意(B1「CSV取込データとの重複」) */
   it("CSV取込データとの重複の注意を出す", async () => {
     const user = userEvent.setup();
@@ -971,6 +1012,29 @@ describe("AssetCategoryMasterScreen(不動産)", () => {
 
     expect(await screen.findByText(/不動産 1件/u)).toBeInTheDocument();
     expect(screen.getByText(/1件は削除済み/u)).toBeInTheDocument();
+  });
+
+  /**
+   * 判定できない原因の文言は、**その軸が参照している側**の取得状態だけで決める
+   * ([PR #154](https://github.com/KunitoObara/FIRE_FIRE/pull/154) のレビュー指摘)。
+   * 無関係な側の失敗を拾うと、待てば解決する状態に再試行を促すことになる。
+   */
+  it("負債だけを参照する軸では、無関係な物件側の取得失敗で再試行を促さない", async () => {
+    const user = userEvent.setup();
+    // 負債は読み込み中のまま、物件(この軸には無関係)だけ取得失敗にする
+    fetchDebts.mockReturnValue(new Promise(() => {}));
+    fetchRealEstateProperties.mockResolvedValue({ ok: false, reason: "unknown" });
+    fetchCategoryAxes.mockResolvedValue({
+      ok: true,
+      axes: [{ ...TOTAL_ASSETS_AXIS, debtIds: ["debt-mortgage"] }],
+    });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "削除" }));
+
+    expect(await screen.findByText("この分類を削除できるか判定できません")).toBeInTheDocument();
+    expect(screen.getByText(/読み込みが終わるまでお待ちください/u)).toBeInTheDocument();
+    expect(screen.queryByText(/もう一度お試しください/u)).not.toBeInTheDocument();
   });
 
   /** 集計対象が割り当てられた軸を消させない制約を、資産・負債・不動産で分ける理由が無い(B4) */

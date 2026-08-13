@@ -88,6 +88,17 @@ export const DeleteCategoryAxisDialog = ({
       (Object.keys(axis.propertyValuations).length > 0 && propertyReferences === null));
 
   /**
+   * 判定できない原因が**取得失敗**かどうか。読み込み中なら待てば解決するので、文言を分ける。
+   *
+   * 見るのは**その分類軸が参照している側**だけ。負債しか参照していない軸で、無関係な物件側の
+   * 取得が失敗しているだけなら、待てば判定できる状態に変わりない。
+   */
+  const blockingFailure =
+    axis !== null &&
+    ((axis.debtIds.length > 0 && debtOptions.status === "error") ||
+      (Object.keys(axis.propertyValuations).length > 0 && propertyOptions.status === "error"));
+
+  /**
    * 見出しと本文をここで決める。3状態あるので式の中で分岐させると三項が入れ子になり、
    * どの状態がどの文言に対応するかが読み取りにくくなる。
    */
@@ -96,14 +107,17 @@ export const DeleteCategoryAxisDialog = ({
       return {
         title: "この分類を削除できるか判定できません",
         /*
-          `undetermined`が真なら、負債か物件の少なくとも一方が`ready`ではない。
-          どちらかが取得失敗なら再試行を促す側の文言を採る — 片方が読み込み中でも、
-          失敗している側が揃わない限り判定できないため
+          **その分類軸が参照している側の失敗だけを見る。** 画面全体で共有している取得状態を
+          そのまま見ると、負債しか参照していない軸で「負債は読み込み中・物件(無関係)は
+          取得失敗」のときに再試行を促すことになる。実際には待てば判定できる状態なので、
+          恒久的な失敗であるかのような案内になってしまう([PR #154](https://github.com/KunitoObara/FIRE_FIRE/pull/154) のレビュー指摘)。
+
+          「負債と不動産で文言を分けない」判断はそのまま — 分けていないのは文言であって、
+          どちらの取得状態を見るかではない
         */
-        description:
-          debtOptions.status === "error" || propertyOptions.status === "error"
-            ? DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES.error
-            : DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES.loading,
+        description: blockingFailure
+          ? DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES.error
+          : DELETE_CATEGORY_AXIS_UNDETERMINED_MESSAGES.loading,
       };
     }
 
