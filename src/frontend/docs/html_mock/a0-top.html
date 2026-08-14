@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- ベータ期間中は検索エンジンに出さない(screen-requirements-public.md 2章)。
+     実装ではA0だけでなくサイト全体に掛ける — A0にだけ掛けると、A1 サインアップ画面が
+     単独でインデックスされうるため。外すのは正式公開の判断とセット。 -->
+<meta name="robots" content="noindex" />
+<title>A0 サービストップページ | FIRE-FIRE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+<style>
+  /* A0だけで使う装飾。ヘッダー・フッターは common.css の .public-* を共有する。 */
+
+  .hero {
+    background:
+      radial-gradient(60rem 30rem at 50% -10rem, hsl(var(--primary) / 0.10), transparent 70%),
+      hsl(var(--background));
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .hero-inner {
+    max-width: 64rem;
+    margin: 0 auto;
+    padding: 4.5rem 1.5rem 3.5rem;
+    text-align: center;
+  }
+
+  .hero-title {
+    font-size: 2.25rem;
+    line-height: 1.35;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  @media (min-width: 768px) {
+    .hero-title { font-size: 2.75rem; }
+  }
+
+  /* ベータ版であることの表示その1。もう1つは「ベータ版について」セクション。
+     バッジだけだと読み飛ばされ、セクションだけだと下までスクロールした人にしか
+     届かないため2箇所に置く(screen-requirements-public.md A0)。 */
+  .beta-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background-color: hsl(var(--primary) / 0.10);
+    color: hsl(var(--primary));
+    border: 1px solid hsl(var(--primary) / 0.25);
+  }
+
+  .btn-lg {
+    height: 2.875rem;
+    padding: 0 1.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .feature-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .feature-card {
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+  }
+
+  .feature-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.625rem;
+    background-color: hsl(var(--primary) / 0.10);
+    color: hsl(var(--primary));
+    margin-bottom: 0.875rem;
+  }
+
+  .step-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
+  .section-heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: -0.01em;
+  }
+
+  /* ヒーローの画面イメージ。実データのスクリーンショットは置けない(公開リポジトリ)ため、
+     ダミー値で描いたB1の簡略版を置く。実装では画像でもHTMLでもよい
+     (screen-requirements-public.md A0「画面イメージの扱い」)。 */
+  .preview-frame {
+    margin: 2.5rem auto 0;
+    max-width: 52rem;
+    border-radius: calc(var(--radius) + 4px);
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    box-shadow: 0 20px 40px -24px rgb(0 0 0 / 0.35);
+    overflow: hidden;
+    text-align: left;
+  }
+
+  .preview-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid hsl(var(--border));
+    background-color: hsl(var(--muted));
+  }
+
+  .preview-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: hsl(var(--border));
+  }
+
+  .beta-note {
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    padding: 1.75rem;
+  }
+
+  .cta-band {
+    background-color: hsl(var(--secondary));
+    border-top: 1px solid hsl(var(--border));
+    border-bottom: 1px solid hsl(var(--border));
+  }
+</style>
+</head>
+<body>
+
+<div class="public-shell">
+
+  <!-- ヘッダー(screen-requirements-public.md A0 セクション構成 1)。
+       ログイン中は「ログイン」「サインアップ」を「ダッシュボードへ」1つに差し替える。
+       下の ?signedIn=1 は静的ファイルで認証状態を持てないモック都合の代用で、
+       実装では踏襲しない(A4モックの ?loggedOut=1 と同じ扱い)。
+       実装では認証状態が確定するまでどちらの導線も描かない — 先に未ログイン用を
+       描くと、ログイン中のユーザーに一瞬「ログイン」ボタンが見えるため。 -->
+  <header class="public-header">
+    <a class="public-logo" href="a0-top.html">
+      <span class="public-logo-mark">FF</span>
+      FIRE-FIRE
+    </a>
+
+    <nav class="public-nav" id="nav-signed-out">
+      <a class="btn btn-ghost btn-sm" href="a4-login.html">ログイン</a>
+      <a class="btn btn-primary btn-sm" href="a1-signup.html">サインアップ</a>
+    </nav>
+
+    <nav class="public-nav hidden" id="nav-signed-in">
+      <a class="btn btn-primary btn-sm" href="b1-dashboard.html">ダッシュボードへ</a>
+    </nav>
+  </header>
+
+  <main class="public-main">
+
+    <!-- 2. ヒーロー -->
+    <section class="hero">
+      <div class="hero-inner">
+        <span class="beta-badge">ベータ版</span>
+
+        <h1 class="hero-title mt-5">
+          自分の資産を、<br class="sm:hidden" />自分の分類で数える。
+        </h1>
+
+        <p class="mt-5 text-base text-slate-500 max-w-2xl mx-auto" style="line-height: 1.9;">
+          マネーフォワードからエクスポートしたCSVを取り込むだけ。資産の推移、不動産と負債を含めた純資産、
+          そしてFIREの到達予測日までを1枚のダッシュボードにまとめる、個人のためのFIRE資産管理ツールです。
+        </p>
+
+        <!-- ページ内のCTAもヘッダーと同じ規則で差し替える。ヘッダーだけを直すと、
+             ログイン中のユーザーに画面の真ん中で「サインアップ」を勧め続けることになる
+             (screen-requirements-public.md 2章)。 -->
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3 cta-signed-out">
+          <a class="btn btn-primary btn-lg" href="a1-signup.html">サインアップ</a>
+          <a class="btn btn-outline btn-lg" href="a4-login.html">ログイン</a>
+        </div>
+
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3 cta-signed-in hidden">
+          <a class="btn btn-primary btn-lg" href="b1-dashboard.html">ダッシュボードへ</a>
+        </div>
+
+        <!-- ベータ版であることの明記(その1)に添える招待制の注記。
+             ボタンは置いたうえで期待値だけ先に伝える(screen-requirements-public.md A0)。
+             登録の案内なのでログイン中は出さない。 -->
+        <p class="field-hint mt-3 cta-signed-out">現在はベータ版のため、登録は招待制で運用しています。</p>
+
+        <!-- 画面イメージ:B1ダッシュボードのダミー版。
+             **金額はすべて作り物の丸めた値**で、実データを載せない(CLAUDE.md)。 -->
+        <div class="preview-frame">
+          <div class="preview-bar">
+            <span class="preview-dot"></span>
+            <span class="preview-dot"></span>
+            <span class="preview-dot"></span>
+            <span class="text-xs text-slate-400 ml-2">B1 ダッシュボード(サンプル)</span>
+          </div>
+
+          <div class="p-5">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div class="card p-3">
+                <p class="text-xs text-slate-400">総資産</p>
+                <p class="text-lg font-bold tabular-nums mt-1">12,345,678円</p>
+              </div>
+              <div class="card p-3">
+                <p class="text-xs text-slate-400">純金融資産</p>
+                <p class="text-lg font-bold tabular-nums mt-1">8,900,000円</p>
+              </div>
+              <div class="card p-3">
+                <p class="text-xs text-slate-400">FIRE達成率</p>
+                <p class="text-lg font-bold tabular-nums mt-1" style="color: hsl(var(--primary));">24.7%</p>
+              </div>
+            </div>
+
+            <!-- 資産推移グラフの簡略版。色は分類スロット(--chart-*)をそのまま使い、
+                 実装のダッシュボードと見え方を揃える。 -->
+            <div class="card p-4">
+              <p class="text-xs text-slate-400 mb-3">資産推移(サンプルデータ)</p>
+              <svg viewBox="0 0 480 120" class="w-full" style="height: 7.5rem;" role="img" aria-label="資産推移グラフのサンプル">
+                <g>
+                  <rect x="10"  y="74" width="42" height="40" fill="var(--chart-1)" rx="2" />
+                  <rect x="10"  y="56" width="42" height="18" fill="var(--chart-3)" rx="2" />
+                  <rect x="68"  y="70" width="42" height="44" fill="var(--chart-1)" rx="2" />
+                  <rect x="68"  y="50" width="42" height="20" fill="var(--chart-3)" rx="2" />
+                  <rect x="126" y="66" width="42" height="48" fill="var(--chart-1)" rx="2" />
+                  <rect x="126" y="44" width="42" height="22" fill="var(--chart-3)" rx="2" />
+                  <rect x="184" y="60" width="42" height="54" fill="var(--chart-1)" rx="2" />
+                  <rect x="184" y="36" width="42" height="24" fill="var(--chart-3)" rx="2" />
+                  <rect x="242" y="56" width="42" height="58" fill="var(--chart-1)" rx="2" />
+                  <rect x="242" y="30" width="42" height="26" fill="var(--chart-3)" rx="2" />
+                  <rect x="300" y="50" width="42" height="64" fill="var(--chart-1)" rx="2" />
+                  <rect x="300" y="24" width="42" height="26" fill="var(--chart-3)" rx="2" />
+                  <rect x="358" y="46" width="42" height="68" fill="var(--chart-1)" rx="2" />
+                  <rect x="358" y="18" width="42" height="28" fill="var(--chart-3)" rx="2" />
+                  <rect x="416" y="40" width="42" height="74" fill="var(--chart-1)" rx="2" />
+                  <rect x="416" y="10" width="42" height="30" fill="var(--chart-3)" rx="2" />
+                </g>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. できること。載せるのは実装済みの機能だけで、Phase 5以降の予告は置かない
+         (screen-requirements-public.md A0)。CSV取込は手段なので「使い方」側で説明する。 -->
+    <section class="public-section">
+      <h2 class="section-heading">できること</h2>
+      <p class="text-sm text-slate-500 text-center mt-3 mb-10">
+        取り込んだデータを、資産を見るための形に組み直します。
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" />
+            </svg>
+          </div>
+          <h3 class="font-semibold mb-2">資産の推移を1枚で見る</h3>
+          <p class="text-sm text-slate-500" style="line-height: 1.8;">
+            資産種別ごとの積み上げグラフで、これまでの動きをまとめて確認できます。負債を差し引いた表示にも切り替えられます。
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-9-9v9z" /><path d="M15.5 3.5A9 9 0 0 1 20.5 8.5L12 12z" />
+            </svg>
+          </div>
+          <h3 class="font-semibold mb-2">分類の切り口を自分で決める</h3>
+          <p class="text-sm text-slate-500" style="line-height: 1.8;">
+            総資産・純金融資産・投資性資産といった集計の軸は、決め打ちではなく自分で作れます。見たい単位が人によって違うためです。
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" />
+            </svg>
+          </div>
+          <h3 class="font-semibold mb-2">不動産と負債まで含めて数える</h3>
+          <p class="text-sm text-slate-500" style="line-height: 1.8;">
+            物件の時価とローン残高から利ざやを自動計算し、住宅ローンなどの負債と合わせて、純資産としての姿を出します。
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+            </svg>
+          </div>
+          <h3 class="font-semibold mb-2">FIRE到達予測日が出る</h3>
+          <p class="text-sm text-slate-500" style="line-height: 1.8;">
+            目標額は直接の指定でも、年間支出からの逆算(4%ルール等)でも設定できます。毎月の積立額と想定利回りから到達予測日を算出します。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 使い方。1ステップ目でマネーフォワード前提であることを明示する
+         (伏せて登録させると、登録した人が最初に詰まるため)。 -->
+    <section class="public-section pt-0">
+      <h2 class="section-heading">使い方</h2>
+      <p class="text-sm text-slate-500 text-center mt-3 mb-10">
+        入力しなおす作業はありません。すでにある明細をそのまま使います。
+      </p>
+
+      <ol class="flex flex-col gap-5 max-w-2xl mx-auto">
+        <li class="flex gap-4">
+          <span class="step-num">1</span>
+          <div>
+            <p class="font-semibold mb-1">マネーフォワードからCSVをエクスポートする</p>
+            <p class="text-sm text-slate-500" style="line-height: 1.8;">
+              資産残高推移と、収入・支出詳細の2種類に対応しています。
+            </p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="step-num">2</span>
+          <div>
+            <p class="font-semibold mb-1">FIRE-FIREに取り込む</p>
+            <p class="text-sm text-slate-500" style="line-height: 1.8;">
+              取込前に件数と期間のプレビューを出します。CSVファイル自体はサーバーに保存しません。
+            </p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="step-num">3</span>
+          <div>
+            <p class="font-semibold mb-1">ダッシュボードで見る</p>
+            <p class="text-sm text-slate-500" style="line-height: 1.8;">
+              資産推移・分類別内訳・収支サマリ・FIRE達成度が、取り込んだ時点の数字で並びます。
+            </p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 5. ベータ版について(ベータ版であることの明記・その2)。
+         ヒーローのバッジと合わせて2箇所(screen-requirements-public.md A0)。 -->
+    <section class="public-section pt-0">
+      <div class="beta-note max-w-3xl mx-auto">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="beta-badge">ベータ版</span>
+          <h2 class="font-bold">ご利用にあたって</h2>
+        </div>
+
+        <ul class="flex flex-col gap-3">
+          <li class="text-sm text-slate-500" style="line-height: 1.8;">
+            <span class="font-semibold" style="color: hsl(var(--foreground));">開発中のサービスです。</span>
+            画面や仕様は予告なく変わることがあります。
+          </li>
+          <li class="text-sm text-slate-500" style="line-height: 1.8;">
+            <span class="font-semibold" style="color: hsl(var(--foreground));">データが失われる可能性があります。</span>
+            取り込み元のCSVはお手元で保管してください(取り込んだCSVファイル自体はサーバーに保存していません)。
+          </li>
+          <li class="text-sm text-slate-500" style="line-height: 1.8;">
+            <span class="font-semibold" style="color: hsl(var(--foreground));">現在は招待制です。</span>
+            お受けできる登録の数を限らせていただいています。
+          </li>
+          <li class="text-sm text-slate-500" style="line-height: 1.8;">
+            <span class="font-semibold" style="color: hsl(var(--foreground));">投資助言を行うものではありません。</span>
+            表示される金額・予測は、ご自身で入力・取り込んだデータをもとにした計算結果です。
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 6. 下部CTA -->
+    <section class="cta-band">
+      <div class="public-section text-center">
+        <h2 class="section-heading">まずは手元のCSVから。</h2>
+        <p class="text-sm text-slate-500 mt-3 mb-7">
+          取り込んだその日から、資産の全体像が1枚で見えるようになります。
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3 cta-signed-out">
+          <a class="btn btn-primary btn-lg" href="a1-signup.html">サインアップ</a>
+          <a class="btn btn-outline btn-lg" href="a4-login.html">ログイン</a>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-3 cta-signed-in hidden">
+          <a class="btn btn-primary btn-lg" href="b1-dashboard.html">ダッシュボードへ</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 7. フッター。コピーライトと規約2ページへのリンク(カードの要求)。
+       ヘルプ(X2)は未着手のため、枠だけ置くことはしない。 -->
+  <footer class="public-footer">
+    <div class="public-footer-inner">
+      <p>© 2026 FIRE-FIRE</p>
+      <div class="public-footer-links">
+        <a class="link" href="a9-terms.html">利用規約</a>
+        <a class="link" href="a10-privacy.html">プライバシーポリシー</a>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+  // モック都合の代用(上のヘッダーのコメントを参照)。実装では認証状態から判定する。
+  // ヘッダーとページ内CTAの3箇所をまとめて差し替える(screen-requirements-public.md 2章)。
+  if (new URLSearchParams(location.search).get("signedIn") === "1") {
+    document.getElementById("nav-signed-out").classList.add("hidden");
+    document.getElementById("nav-signed-in").classList.remove("hidden");
+    document.querySelectorAll(".cta-signed-out").forEach((el) => el.classList.add("hidden"));
+    document.querySelectorAll(".cta-signed-in").forEach((el) => el.classList.remove("hidden"));
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>A10 プライバシーポリシー | FIRE-FIRE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+
+<!--
+  A9と同じく**文面は雛形**で、公開前に本人が内容を確認する
+  (screen-requirements-public.md A10)。ただし「取得する情報」「取得しない情報」
+  「外部サービスへの提供」の3項は実装から来る事実であり、実装を変えたらこちらも直す。
+-->
+
+<div class="public-shell">
+
+  <header class="public-header">
+    <a class="public-logo" href="a0-top.html">
+      <span class="public-logo-mark">FF</span>
+      FIRE-FIRE
+    </a>
+    <nav class="public-nav">
+      <a class="btn btn-ghost btn-sm" href="a4-login.html">ログイン</a>
+      <a class="btn btn-primary btn-sm" href="a1-signup.html">サインアップ</a>
+    </nav>
+  </header>
+
+  <main class="public-main">
+    <div class="legal-body">
+
+      <h1 class="text-2xl font-bold mb-2">プライバシーポリシー</h1>
+      <p class="legal-meta mb-8">制定日:2026年1月1日 / 最終改定日:2026年1月1日</p>
+
+      <p>
+        FIRE-FIRE(以下「本サービス」)は、利用者の個人情報および本サービスに登録されたデータの取扱いについて、以下のとおり定めます。
+      </p>
+
+      <h2>1. 取得する情報</h2>
+      <ul>
+        <li><strong>メールアドレス</strong>(アカウント登録時)</li>
+        <li><strong>Googleアカウントの情報</strong>(Googleでログインする場合。メールアドレス・表示名等)</li>
+        <li><strong>ログインに関する情報</strong>(ログイン日時、接続元の情報等)</li>
+        <li><strong>利用者が入力・取り込んだデータ</strong>(資産残高、入出金明細、不動産、負債、FIRE目標、想定利回り等)</li>
+      </ul>
+
+      <h2>2. 取得しない情報</h2>
+      <p>
+        <strong>取り込んだCSVファイルそのものは保存していません。</strong>
+        CSVファイルは利用者のブラウザ内で解析され、集計に必要な数値のみがデータベースに保存されます。ファイル自体がサーバーへアップロードされることはありません。
+      </p>
+      <p>
+        また、本サービスは金融機関のIDやパスワードを預かりません。金融機関への接続は行わず、利用者がエクスポートしたファイルを受け取る形のみを採っています。
+      </p>
+
+      <h2>3. 利用目的</h2>
+      <ul>
+        <li>本サービスの提供、表示、集計のため</li>
+        <li>ログイン通知メールの送信など、アカウントの安全確保のため</li>
+        <li>不具合の調査および不正利用の防止のため</li>
+      </ul>
+      <p>本サービスは、取得した情報を広告配信および広告目的の分析には利用しません。</p>
+
+      <h2>4. 外部サービスの利用</h2>
+      <p>本サービスは、提供にあたり次の外部サービスを利用しています。</p>
+      <ul>
+        <li><strong>Google(Firebase / Google Cloud)</strong> — 認証、データの保管、アプリケーションの配信</li>
+        <li><strong>Resend</strong> — ログイン通知メールの送信</li>
+      </ul>
+      <p>
+        いずれも本サービスの提供に必要な範囲で利用するものであり、これら以外の第三者へ個人情報を提供することはありません。ただし、法令に基づく開示の求めがある場合を除きます。
+      </p>
+
+      <h2>5. データの保管と削除</h2>
+      <ol>
+        <li>登録データは、アカウントごとに分離して保管し、他の利用者から参照できないよう制御しています。</li>
+        <li>利用者は、本サービス上の操作により登録データを削除できます。</li>
+        <li>アカウントの削除を希望する場合は、8のお問い合わせ先までご連絡ください。</li>
+      </ol>
+
+      <h2>6. Cookie等の利用</h2>
+      <p>
+        本サービスは、ログイン状態の保持のためにCookieおよびブラウザのストレージを利用します。広告目的のトラッキングには利用していません。
+      </p>
+
+      <h2>7. 安全管理</h2>
+      <p>
+        本サービスは、認証および2要素認証を必須とし、データベース側のアクセス制御によって、利用者本人以外が登録データを参照できないようにしています。
+      </p>
+
+      <h2>8. お問い合わせ先</h2>
+      <p>
+        本ポリシーに関するお問い合わせは、<span class="font-medium">support@fire-fire.live</span> までご連絡ください。
+      </p>
+      <p class="field-hint">
+        ※ モック上のプレースホルダーです。実際に受信できるアドレスの用意は、ドメイン接続の作業と合わせて行います(screen-requirements-public.md 3章)。
+      </p>
+
+      <h2>9. 本ポリシーの変更</h2>
+      <p>
+        本サービスは、必要と判断した場合、本ポリシーを変更することができます。変更後のポリシーは、本サービス上に掲示した時点から効力を生じるものとします。
+      </p>
+
+      <p class="mt-10">以上</p>
+    </div>
+  </main>
+
+  <footer class="public-footer">
+    <div class="public-footer-inner">
+      <p>© 2026 FIRE-FIRE</p>
+      <div class="public-footer-links">
+        <a class="link" href="a9-terms.html">利用規約</a>
+        <a class="link" href="a10-privacy.html">プライバシーポリシー</a>
+      </div>
+    </div>
+  </footer>
+</div>
+
+</body>
+</html>
