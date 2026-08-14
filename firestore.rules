@@ -179,6 +179,16 @@ service cloud.firestore {
       return value == null || (value is number && value > 0 && value <= 100);
     }
 
+    // 毎月の積立額(円)。到達予測で1ヶ月ごとに足す額(B8 FIRE目標設定画面)。
+    // **マイナスを許す** — 取り崩しの局面を表せるようにするため
+    // (docs/screen-requirements-fire-goal.md B8「毎月の積立額」)。未入力はnull。
+    // 0を許すのが目標額(`isFireGoalAmount`)との違いで、「積立なし」は正当な設定。
+    // 幅は絶対値で金額の上限に揃える(桁の打ち間違いを弾く歯止め)
+    function isMonthlyContribution(value) {
+      return value == null
+        || (value is number && value >= -999999999999 && value <= 999999999999);
+    }
+
     // 分類軸(`users/{userId}/categoryAxes`)のドキュメントIDを指す参照。
     // 既定を表すnullを許し、空文字は許さない(どの軸も指さないなら既定のnullで表す)。
     // 上限はFirestoreのドキュメントIDの上限(1500バイト)より十分に小さい値で足りる
@@ -480,10 +490,10 @@ service cloud.firestore {
         // create/updateで同じ形を要求する
         allow create, update: if canAccessOwnData(userId)
           && request.resource.data.keys().hasOnly(
-            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'updatedAt']
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'monthlyContribution', 'updatedAt']
           )
           && request.resource.data.keys().hasAll(
-            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'updatedAt']
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'monthlyContribution', 'updatedAt']
           )
           // 有効な設定方式。src/frontend/src/types/fire-goal.d.ts の`FireGoalMode`と揃える
           && request.resource.data.mode in ['direct', 'reverse']
@@ -511,6 +521,8 @@ service cloud.firestore {
           // 引くと読み取りが増え、B4での削除と競合もする)。存在しない軸を指したままでも
           // 参照側が既定へフォールバックする作りなので、ここは形だけを見る
           && isCategoryAxisId(request.resource.data.achievementAxisId)
+          // 毎月の積立額(到達予測の入力)。未入力はnullで保存される
+          && isMonthlyContribution(request.resource.data.monthlyContribution)
           && request.resource.data.updatedAt is timestamp
           && isServerTime(request.resource.data.updatedAt);
         // FIRE目標を消す画面は無い。方式の切替も上書きで表せる
