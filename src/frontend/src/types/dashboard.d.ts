@@ -127,6 +127,15 @@ declare global {
     ratio: number;
     /** `var(--chart-N)`形式のCSS変数参照 */
     color: string;
+    /**
+     * B9で置いたリスクレベル。凡例に形状と文字で添える
+     * (docs/screen-requirements-dashboard.md B1「リスクの可視化」)。
+     *
+     * **`null`は「添えるものが無い」**で、未設定の資産種別・B9の取得に失敗した場合・
+     * 擬似分類(その他 / 不動産 / 負債)のすべてがここに入る。擬似分類に付かないことを
+     * スライスを組み立てる時点で決めておくと、凡例の側が分類の種類を判定せずに済む。
+     */
+    riskLevel: AssumptionRiskLevel | null;
   };
 
   /** 分類軸ごとの資産データ */
@@ -326,6 +335,15 @@ declare global {
      */
     debts: Debt[];
     fireProgress: FireProgress | null;
+    /**
+     * B9で置いた資産種別ごとの想定値。分類別内訳の凡例のリスクレベルに使う
+     * (docs/screen-requirements-dashboard.md B1「リスクの可視化」)。
+     *
+     * **取得に失敗した場合は空のレコードにする。** 到達予測は前提が無いことを
+     * 「算出できません」で示せるが、凡例には示す場所が無く、示す必要も無い
+     * (リスクを1件も設定していない状態と見た目が同じになるだけ)。
+     */
+    assumptions: AssetAssumptions;
   };
 
   /**

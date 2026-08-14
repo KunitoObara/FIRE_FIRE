@@ -48,6 +48,7 @@ const slices: AssetBreakdownSlice[] = [
     amount: 5_400_000,
     ratio: 0.77,
     color: "var(--chart-1)",
+    riskLevel: null,
   },
   {
     categoryId: "投資信託",
@@ -55,6 +56,7 @@ const slices: AssetBreakdownSlice[] = [
     amount: 1_600_000,
     ratio: 0.23,
     color: "var(--chart-2)",
+    riskLevel: null,
   },
 ];
 
@@ -260,6 +262,7 @@ describe("署名に使う名前が区切り文字を含む場合", () => {
       amount,
       ratio: 1,
       color: "var(--chart-1)",
+      riskLevel: null,
     });
 
     expect(buildBreakdownKey("総資産", [slice('株式","1', 2)])).not.toBe(

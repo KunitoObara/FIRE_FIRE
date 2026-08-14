@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 
+import { RiskLevelIndicator } from "@/components/assumptions/RiskLevelIndicator";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +15,7 @@ import {
   DEBT_LEGEND_SWATCH_BACKGROUND,
   PROPERTY_CATEGORY_ID,
   PROPERTY_LEGEND_SWATCH_BACKGROUND,
+  RISK_LEVEL_LEGEND_LABEL,
 } from "@/constants/dashboard";
 import { formatJpy, formatPercent } from "@/lib/format/currency";
 
@@ -102,6 +104,25 @@ export const CategoryBreakdownCard = ({
                     style={resolveLegendSwatchStyle(slice)}
                   />
                   <span>{slice.name}</span>
+                  {/*
+                    B9で置いたリスクレベル(同要件B1「リスクの可視化」)。形状と文字はB9と
+                    同じものを使い、**色だけは当てない** — この行には分類のスロット色が既に
+                    並んでおり、低リスクの`--chart-1`は分類側の色と同じ値になるため、
+                    同じ行で2種類の意味の色を読み分けられない。
+                    未設定の資産種別と擬似分類には`null`が入っていて何も出ない
+                  */}
+                  {slice.riskLevel !== null ? (
+                    /*
+                      `RiskLevelIndicator`のルートは`display: flex`なので、包む側も
+                      `inline-flex`にする。既定の`display: inline`のままだとインラインの中に
+                      ブロックレベルの箱を抱えることになり、凡例の行が折り返しうる
+                      (HTMLモック b1-dashboard.html のバッジと同じ組み方)
+                    */
+                    <span className="inline-flex items-center text-xs text-muted-foreground">
+                      <span className="sr-only">{RISK_LEVEL_LEGEND_LABEL}</span>
+                      <RiskLevelIndicator level={slice.riskLevel} colored={false} />
+                    </span>
+                  ) : null}
                   <span className="ml-auto text-muted-foreground tabular-nums">
                     {formatPercent(slice.ratio)}
                   </span>

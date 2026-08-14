@@ -289,6 +289,7 @@ describe("fetchDashboardData", () => {
         byAxis: {},
         debts: [],
         fireProgress: null,
+        assumptions: {},
       },
     });
   });

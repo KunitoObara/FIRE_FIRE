@@ -179,6 +179,93 @@ describe("buildBreakdownSlices(負債)", () => {
     expect(slices.at(-1)?.categoryId).toBe(DEBT_CATEGORY_ID);
     expect(slices.at(-1)?.name).toBe(DEBT_CATEGORY_NAME);
   });
+
+  /**
+   * B9のリスクレベルを凡例に添えるための受け渡し
+   * (docs/screen-requirements-dashboard.md B1「リスクの可視化」)。
+   */
+  describe("リスクレベル", () => {
+    /** B9の想定値は資産種別名をキーに持つ。分類のIDが資産種別名そのものなのでそのまま引ける */
+    const assumptions: AssetAssumptions = {
+      fund: { expectedReturn: 5, riskLevel: "high" },
+      deposit: { expectedReturn: null, riskLevel: "low" },
+    };
+
+    it("資産種別のスライスに、その資産種別のリスクレベルを付ける", () => {
+      const slices = buildBreakdownSlices(
+        [
+          { categoryId: "fund", amount: 300 },
+          { categoryId: "deposit", amount: 100 },
+        ],
+        categories,
+        0,
+        0,
+        assumptions,
+      );
+
+      expect(slices.map((slice) => [slice.name, slice.riskLevel])).toEqual([
+        ["投資信託", "high"],
+        ["現金・預金", "low"],
+      ]);
+    });
+
+    /** 「未設定」のバッジを並べると、まだ何も置いていない状態で凡例が最も混み合う(要件) */
+    it("リスクレベルを設定していない資産種別はnullのままにする", () => {
+      const slices = buildBreakdownSlices(
+        [{ categoryId: "stock", amount: 100 }],
+        categories,
+        0,
+        0,
+        assumptions,
+      );
+
+      expect(slices[0]?.riskLevel).toBeNull();
+    });
+
+    /** B9の取得に失敗した場合もここに来る(1件も設定していない状態と同じ見た目になる) */
+    it("想定値を渡さなければ、どのスライスにもリスクレベルは付かない", () => {
+      const slices = buildBreakdownSlices([{ categoryId: "fund", amount: 100 }], categories);
+
+      expect(slices[0]?.riskLevel).toBeNull();
+    });
+
+    /**
+     * 「その他」は複数の資産種別をまとめたもので単一のリスクレベルに対応せず、
+     * 「不動産」「負債」はB9に対応する行そのものが無い(要件)。
+     */
+    it("擬似分類(その他・不動産・負債)にはリスクレベルを付けない", () => {
+      /** 色スロットを超える数の分類。9件目以降が「その他」へ落ちる */
+      const manyCategories: AssetCategory[] = Array.from({ length: 9 }, (_, index) => ({
+        id: `type-${index}`,
+        name: `資産種別${index}`,
+      }));
+      const slices = buildBreakdownSlices(
+        manyCategories.map((category) => ({ categoryId: category.id, amount: 100 })),
+        manyCategories,
+        2_000_000,
+        3_000_000,
+        // 「その他」へ落ちる資産種別にもリスクを置いておく(まとめた先へ漏れないことの確認)
+        Object.fromEntries(
+          manyCategories.map((category) => [
+            category.id,
+            { expectedReturn: null, riskLevel: "high" as const },
+          ]),
+        ),
+      );
+
+      const pseudoIds = [OTHER_CATEGORY_ID, PROPERTY_CATEGORY_ID, DEBT_CATEGORY_ID];
+
+      expect(
+        slices
+          .filter((slice) => pseudoIds.includes(slice.categoryId))
+          .map((slice) => [slice.categoryId, slice.riskLevel]),
+      ).toEqual([
+        [OTHER_CATEGORY_ID, null],
+        [PROPERTY_CATEGORY_ID, null],
+        [DEBT_CATEGORY_ID, null],
+      ]);
+    });
+  });
 });
 
 /** 積み上げ表示の帯と各点(docs/screen-requirements-dashboard.md B1「積み上げ表示」) */
