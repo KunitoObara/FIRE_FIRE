@@ -96,7 +96,7 @@ const data: DashboardData = {
     currentAmount: 11_400_000,
     achievementAxisName: "投資性資産",
     achievementAxisMissing: false,
-    projectedAchievementDate: null,
+    projection: { status: "projected", achievementDate: "2033-04-01" },
   },
 };
 
