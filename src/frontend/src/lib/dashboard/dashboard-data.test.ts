@@ -8,6 +8,7 @@ const fetchLastImportedAt = vi.fn();
 const fetchFireGoal = vi.fn();
 const fetchDebts = vi.fn();
 const fetchRealEstateProperties = vi.fn();
+const fetchAssumptions = vi.fn();
 
 vi.mock("@/lib/asset-categories/category-axis-repository", () => ({
   fetchCategoryAxes: () => fetchCategoryAxes(),
@@ -29,6 +30,11 @@ vi.mock("@/lib/debts/debt-repository", () => ({
 // 不動産を含む分類軸の集計に使う(B4-8)。既定は取得成功・0件で、他のケースを止めない
 vi.mock("@/lib/real-estate/property-repository", () => ({
   fetchRealEstateProperties: () => fetchRealEstateProperties(),
+}));
+
+// 到達予測日の想定利回り(B9)。既定は取得成功・未設定(=どの資産種別も年率0%)
+vi.mock("@/lib/assumptions/assumption-repository", () => ({
+  fetchAssumptions: () => fetchAssumptions(),
 }));
 
 const axes: AssetCategoryAxisDocument[] = [
@@ -91,6 +97,8 @@ describe("fetchDashboardData", () => {
     });
     fetchRealEstateProperties.mockReset();
     fetchRealEstateProperties.mockResolvedValue({ ok: true, properties: [] });
+    fetchAssumptions.mockReset();
+    fetchAssumptions.mockResolvedValue({ ok: true, assumptions: {} });
   });
 
   it("B4で登録した分類軸をそのままセレクタの選択肢にする", async () => {
@@ -146,7 +154,8 @@ describe("fetchDashboardData", () => {
           currentAmount: 11_400_000,
           achievementAxisName: "総資産(マネーフォワードの合計)",
           achievementAxisMissing: false,
-          projectedAchievementDate: null,
+          // 利回りも積立額も無いので資産は増えず、打ち切りまで進めても届かない
+          projection: { status: "unreachable" },
         },
       },
     });
@@ -289,5 +298,53 @@ describe("fetchDashboardData", () => {
     fetchAssetSnapshots.mockResolvedValue({ ok: false, reason: "permission-denied" });
 
     expect(await fetchDashboardData()).toEqual({ ok: false, reason: "permission-denied" });
+  });
+
+  /**
+   * **想定利回り(B9)だけは例外。** 効くのは到達予測日の欄だけなので、読めないことを理由に
+   * 資産推移・内訳・収支まで消さない(docs/screen-requirements-fire-goal.md「到達予測日の算出」が
+   * 「算出できません」を前提の解決に失敗した場合の保険として残している)。
+   */
+  it("想定利回りの取得に失敗しても画面全体は失敗にせず、予測だけを算出できない扱いにする", async () => {
+    fetchAssumptions.mockResolvedValue({ ok: false, reason: "unknown" });
+
+    const result = await fetchDashboardData();
+
+    if (!result.ok) {
+      throw new Error("取得に失敗した");
+    }
+
+    expect(result.data.fireProgress?.projection).toBeNull();
+    // ゲージそのものは従来どおり出せる
+    expect(result.data.fireProgress?.currentAmount).toBe(11_400_000);
+    expect(result.data.byAxis.total?.netWorthSeries).toHaveLength(2);
+  });
+
+  /** 予測はゲージと同じ対象分類から出す(要件B1「到達予測日も同じ対象分類から算出する」) */
+  it("想定利回りと積立額から到達予測を算出する", async () => {
+    fetchFireGoal.mockResolvedValue({
+      ok: true,
+      goal: {
+        mode: "direct",
+        targetAmount: 12_000_000,
+        annualExpense: null,
+        withdrawalRate: null,
+        achievementAxisId: null,
+        monthlyContribution: 100_000,
+      },
+    });
+    fetchAssumptions.mockResolvedValue({
+      ok: true,
+      assumptions: { "株式(現物)": { expectedReturn: 5, riskLevel: "medium" } },
+    });
+
+    const result = await fetchDashboardData();
+
+    if (!result.ok) {
+      throw new Error("取得に失敗した");
+    }
+
+    // 現在1,140万・目標1,200万なので、積立と利回りで数ヶ月のうちに到達する
+    expect(result.data.fireProgress?.projection?.status).toBe("projected");
   });
 });

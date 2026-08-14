@@ -2,6 +2,7 @@
 
 import {
   ASSET_CATEGORIES_PATH,
+  ASSUMPTION_SETTINGS_PATH,
   CSV_IMPORT_PATH,
   DEBTS_PATH,
   FIRE_GOAL_PATH,
@@ -338,8 +339,51 @@ export const ACHIEVEMENT_AXIS_MISSING_NOTICE =
 export const NEGATIVE_CURRENT_AMOUNT_NOTICE =
   "対象分類の負債が資産を上回っているため、達成率は0%として表示しています。";
 
-/** 到達予測日が算出できていないときの表示 */
+/**
+ * 到達予測日が算出できていないときの表示。
+ *
+ * **通常の運用では出ない。** 目標未設定ならカードごと空状態になって欄が現れず、資産残高が
+ * 未取込でも0円から予測を始める(docs/screen-requirements-fire-goal.md「到達予測日の算出」)。
+ * 残るのは前提の解決そのものに失敗した場合(B9の想定値を取得できなかった)の保険としての用途。
+ */
 export const NO_PROJECTED_DATE_LABEL = "算出できません";
+
+/** 現在資産額が既に目標資産額以上のときの表示。過去日付や0ヶ月を出さずにこの文言へ倒す */
+export const ACHIEVED_PROJECTION_LABEL = "達成済み";
+
+/** 打ち切り月まで進めても目標に届かないときの表示 */
+export const UNREACHABLE_PROJECTION_LABEL = "到達見込みなし";
+
+/**
+ * 予測を打ち切る月数(50年)。
+ *
+ * 上限を置かないと、資産がまったく増えない設定で終わらない(同要件「結果の区別」)。
+ * **この月に到達した場合は到達側に倒す** — 打ち切りは「ここまで進めても届かない」ことを
+ * 見込みなしと呼ぶための線であって、届いた月を捨てるためのものではない。
+ */
+export const PROJECTION_MAX_MONTHS = 600;
+
+/**
+ * 「到達見込みなし」に添える注記。
+ *
+ * 原因は想定利回り(B9)側とは限らず、積立額(B8)がマイナスで資産が減り続ける場合もあるため、
+ * 片方に絞らず両方への導線を出す(docs/screen-requirements-dashboard.md B1「到達予測日」)。
+ */
+export const UNREACHABLE_PROJECTION_NOTICE = `現在の想定利回りと毎月の積立額では、${PROJECTION_MAX_MONTHS / 12}年以内に目標へ届きません。`;
+
+/** FIRE達成度ゲージから想定利回り・リスク設定(B9)への導線 */
+export const ASSUMPTION_SETTINGS_LINK = {
+  label: "想定利回りを設定する",
+  href: ASSUMPTION_SETTINGS_PATH,
+} as const;
+
+/**
+ * 「到達見込みなし」から積立額(B8)を直しに行く導線の文言。
+ *
+ * 行き先はカード見出しの`FIRE_GOAL_LINK`と同じB8だが、あちらの「目標を設定する」は
+ * 積立額を直す先には読めないため、ここでは何を直せるかが分かる文言にする。
+ */
+export const MONTHLY_CONTRIBUTION_LINK_LABEL = "積立額を見直す";
 
 /**
  * グラフの登場アニメーションの再生時間(ms)と、その進み方(DESIGN.md 9章)。

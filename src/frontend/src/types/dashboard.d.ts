@@ -178,10 +178,74 @@ declare global {
      */
     achievementAxisMissing: boolean;
     /**
-     * 到達予測日(`yyyy-MM-dd`)。想定利回り(B9)を前提に算出するため、
-     * B1では計算せず算出済みの値を表示するだけにする。未算出は`null`
+     * 到達予測(docs/screen-requirements-fire-goal.md「到達予測日の算出」)。
+     *
+     * `null`は**前提の解決そのものに失敗した**場合(B9の想定値を取得できなかった)だけで、
+     * 画面には「算出できません」が出る。目標未設定や資産残高の未取込はここに来ない
+     * (前者はカードごと空状態、後者は0円から予測する)。
      */
-    projectedAchievementDate: string | null;
+    projection: FireProjection | null;
+  };
+
+  /**
+   * 到達予測の結果(docs/screen-requirements-fire-goal.md「結果の区別」)。
+   *
+   * **状態は3つ。** 「目標に達する月」と「設定した結果として届かない」を同じ空欄で表すと
+   * 区別が付かず、ユーザーが次に取る行動を選べないため、届かないことも状態として持つ。
+   */
+  type FireProjection =
+    /** 目標に達する月が求まった。`achievementDate`は`yyyy-MM-dd`(表示は年月まで) */
+    | { status: "projected"; achievementDate: string }
+    /** 現在資産額が既に目標資産額以上 */
+    | { status: "achieved" }
+    /** 打ち切り月(`PROJECTION_MAX_MONTHS`)まで進めても目標に届かない */
+    | { status: "unreachable" };
+
+  /**
+   * 予測の出発点。**成長させる分と据え置く分に分けて持つ**
+   * (`resolveProjectionBase`)。
+   *
+   * 2つの合計は、その対象分類の現在資産額(`resolveAchievementAmount`)と一致する。
+   */
+  type FireProjectionBase = {
+    /** 資産種別名ごとの残高。B9の想定利回りで月次に成長させる */
+    balancesByType: Record<string, number>;
+    /** 全期間据え置く額(対象の物件の額 − 対象の負債の残債。既定では合計と内訳の差額) */
+    flatAmount: number;
+  };
+
+  /** 到達予測の算出に必要な入力一式 */
+  type FireProjectionInput = FireProjectionBase & {
+    /** 目標資産額(円)。0以下はここに来ない(呼び出し側がカードごと空状態にする) */
+    targetAmount: number;
+    /** 毎月の積立額(円)。マイナスは取り崩し。**利回りは掛けない**(B8) */
+    monthlyContribution: number;
+    /** 資産種別ごとの想定利回り・リスク(B9)。未設定の資産種別は年率0%として扱う */
+    assumptions: AssetAssumptions;
+    /** 起点(当月)。月をまたぐ瞬間のずれを避けるため、呼び出し側が1度だけ作って渡す */
+    now: Date;
+  };
+
+  /**
+   * FIRE達成度の組み立て(`buildFireProgress`)の入力。
+   *
+   * 引数が7つに増えたためオブジェクトで受ける。配列が3つ並ぶ位置引数は、渡す順を
+   * 取り違えても型が通ってしまう(`debts`と`properties`以外は要素の型が違うので気付けるが、
+   * 気付けない組み合わせを残す理由が無い)。
+   */
+  type BuildFireProgressInput = {
+    /** 保存済みのFIRE目標(B8)。未設定は`null` */
+    goal: FireGoal | null;
+    /** 直近の資産残高。CSV未取込は`undefined` */
+    latest: AssetSnapshot | undefined;
+    /** 分類軸の一覧。対象分類がB4で削除されていた場合の既定へのフォールバックに使う */
+    axes: AchievementAxisOption[];
+    debts: Debt[];
+    properties: RealEstateProperty[];
+    /** B9の想定値。**取得に失敗した場合は`null`**で、予測だけを「算出できません」に倒す */
+    assumptions: AssetAssumptions | null;
+    /** 予測の起点(当月) */
+    now: Date;
   };
 
   /**

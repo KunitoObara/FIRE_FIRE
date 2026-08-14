@@ -1,6 +1,10 @@
 import { format, parseISO } from "date-fns";
 
-import { NO_PROJECTED_DATE_LABEL } from "@/constants/dashboard";
+import {
+  ACHIEVED_PROJECTION_LABEL,
+  NO_PROJECTED_DATE_LABEL,
+  UNREACHABLE_PROJECTION_LABEL,
+} from "@/constants/dashboard";
 import { DEFAULT_ACHIEVEMENT_AXIS_NAME } from "@/constants/fire-goal";
 import {
   resolveAxisDebts,
@@ -9,6 +13,7 @@ import {
   sumDebtBalance,
   sumPropertyAmount,
 } from "@/lib/dashboard/aggregation";
+import { buildFireProjection, resolveProjectionBase } from "@/lib/dashboard/fire-projection";
 import { resolveFireGoalTargetAmount } from "@/lib/fire-goal/calculation";
 
 /**
@@ -125,13 +130,15 @@ export const resolveAchievementAmount = (
  * 倒すと、目標を設定済みのユーザーに「FIRE目標が未設定です」と出てしまうため。
  * 未取込であることは同じ画面の「直近CSV取込」が示す。
  */
-export const buildFireProgress = (
-  goal: FireGoal | null,
-  latest: AssetSnapshot | undefined,
-  axes: AchievementAxisOption[],
-  debts: Debt[],
-  properties: RealEstateProperty[],
-): FireProgress | null => {
+export const buildFireProgress = ({
+  goal,
+  latest,
+  axes,
+  debts,
+  properties,
+  assumptions,
+  now,
+}: BuildFireProgressInput): FireProgress | null => {
   if (!goal) {
     return null;
   }
@@ -150,8 +157,23 @@ export const buildFireProgress = (
     currentAmount: resolveAchievementAmount(resolution, latest, debts, properties) ?? 0,
     achievementAxisName: resolution.name,
     achievementAxisMissing: resolution.missing,
-    // 到達予測日は想定利回り(B9)を前提とする別の計算なので、ここでは算出しない
-    projectedAchievementDate: null,
+    /*
+      B9の想定値を取得できなかった場合だけ予測を出さない(「算出できません」)。
+      前提の解決そのものに失敗した場合の保険で、ダッシュボードの他のカードは巻き込まない
+      (docs/screen-requirements-fire-goal.md「到達予測日の算出」)。
+
+      積立額を持たない目標(この欄を導入する前に保存されたもの)は0として扱う。同要件。
+    */
+    projection:
+      assumptions === null
+        ? null
+        : buildFireProjection({
+            targetAmount,
+            ...resolveProjectionBase(resolution, latest, debts, properties),
+            monthlyContribution: goal.monthlyContribution ?? 0,
+            assumptions,
+            now,
+          }),
   };
 };
 
@@ -201,17 +223,29 @@ export const toDisplayAchievementRate = (achievementRate: number): number =>
   Math.max(achievementRate, 0);
 
 /**
- * 到達予測日を「2033年4月頃」の形に整形する。
+ * 到達予測を画面に出す文言へ整形する(docs/screen-requirements-dashboard.md B1「到達予測日」)。
  *
- * 予測値であって確定日ではないため「頃」を添え、日付までは出さない。
- * 予測の算出そのものは想定利回り(B9)を前提とするため、B1では行わない。
+ * 到達月は「2033年4月頃」の粒度にする。予測値であって確定日ではないため「頃」を添え、
+ * 日付までは出さない。「達成済み」「到達見込みなし」を同じ表示にまとめないのは、
+ * ユーザーが次に取る行動が変わるため(正本「結果の区別」)。
+ *
+ * 日付として読めない値も「算出できません」に倒す。`null`と同じく前提の解決に失敗した
+ * 場合の保険で、通常は起こらない。
  */
-export const formatProjectedAchievementDate = (isoDate: string | null): string => {
-  if (isoDate === null) {
+export const formatFireProjection = (projection: FireProjection | null): string => {
+  if (projection === null) {
     return NO_PROJECTED_DATE_LABEL;
   }
 
-  const parsed = parseISO(isoDate);
+  if (projection.status === "achieved") {
+    return ACHIEVED_PROJECTION_LABEL;
+  }
+
+  if (projection.status === "unreachable") {
+    return UNREACHABLE_PROJECTION_LABEL;
+  }
+
+  const parsed = parseISO(projection.achievementDate);
 
   if (Number.isNaN(parsed.getTime())) {
     return NO_PROJECTED_DATE_LABEL;
