@@ -119,6 +119,11 @@ export const DashboardScreen = ({
     data?.categories ?? [],
     debtTotal,
     propertyTotal,
+    /*
+      B9のリスクレベルは凡例に添えるためのもの(同要件B1「リスクの可視化」)。分類軸を
+      切り替えても効くのは、リスクが分類軸ではなく資産種別に紐づくため
+    */
+    data?.assumptions ?? {},
   );
   /*
     純額は擬似分類(不動産・負債)を含む分類軸でだけ併記する(同要件B1)。含まない軸では

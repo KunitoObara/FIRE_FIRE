@@ -91,6 +91,8 @@ const data: DashboardData = {
     },
   },
   debts: [],
+  // B9の想定値。凡例のリスクレベルに使う(B1-17)
+  assumptions: { "株式(現物)": { expectedReturn: 5, riskLevel: "high" } },
   fireProgress: {
     targetAmount: 80_000_000,
     currentAmount: 11_400_000,

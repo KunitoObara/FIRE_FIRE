@@ -92,5 +92,16 @@ declare global {
   type RiskLevelIndicatorProps = {
     /** 未選択のときは`ASSUMPTION_RISK_LEVELS`に無い値が来るため、文字列として受ける */
     level: string;
+    /**
+     * 段階ごとの色を当てるか。既定は当てる(B9の一覧)。
+     *
+     * **B1の分類別内訳の凡例では`false`にする。** あの凡例には資産分類のスロット色が
+     * 既に並んでおり、低リスクの`--chart-1`は分類側のスロット色と同じ値になるため、
+     * 同じ行の中で「分類の色」と「リスクの色」を読み分けられない
+     * (docs/screen-requirements-dashboard.md B1「リスクの可視化」)。意味を運ぶのは
+     * 形状と文字で色は補助という方針([DESIGN.md](../../DESIGN.md) 3章)なので、
+     * ここで色を落としても失うものが無い。
+     */
+    colored?: boolean;
   };
 }

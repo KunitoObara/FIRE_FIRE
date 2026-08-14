@@ -209,12 +209,18 @@ export const buildStackedTrend = (
  * 正の面積でしか比を表せないため、面積は残債の絶対値で取るしかない。%が純資産に対する
  * 割合ではないことは、カード側が差引後の純額を併記して示す
  * (docs/screen-requirements-dashboard.md B1)。
+ *
+ * **B9のリスクレベル(`assumptions`)は資産種別のスライスにだけ付ける。** 擬似分類
+ * (その他 / 不動産 / 負債)は`null`で固定する — 「その他」は複数の資産種別をまとめた
+ * もので単一のリスクレベルに対応せず、「不動産」「負債」はB9に対応する行そのものが無い
+ * (同要件B1「リスクの可視化」)。ここで決めておくと、凡例の側が分類の種類を判定せずに済む。
  */
 export const buildBreakdownSlices = (
   entries: AssetBreakdownEntry[],
   categories: AssetCategory[],
   debtTotal = 0,
   propertyTotal = 0,
+  assumptions: AssetAssumptions = {},
 ): AssetBreakdownSlice[] => {
   /*
     分母は**各スライスの絶対値の合計**(資産種別 + 不動産 + 負債)。円グラフは正の面積でしか
@@ -246,6 +252,11 @@ export const buildBreakdownSlices = (
       amount: entry.amount,
       ratio: toRatio(entry.amount),
       color: `var(--chart-${index + 1})`,
+      /*
+        分類のIDは資産種別名そのもの(`collectAssetCategories`)で、B9の想定値も
+        資産種別名をキーにしているため、そのまま引ける。未設定は`null`のまま
+      */
+      riskLevel: assumptions[category.id]?.riskLevel ?? null,
     });
   });
 
@@ -263,6 +274,8 @@ export const buildBreakdownSlices = (
       amount: otherAmount,
       ratio: toRatio(otherAmount),
       color: `var(--chart-${CATEGORY_COLOR_SLOT_COUNT})`,
+      // 複数の資産種別をまとめたものなので、単一のリスクレベルに対応しない(同要件)
+      riskLevel: null,
     });
   }
 
@@ -282,6 +295,8 @@ export const buildBreakdownSlices = (
       amount: propertyTotal,
       ratio: toRatio(Math.abs(propertyTotal)),
       color: PROPERTY_CATEGORY_COLOR,
+      // 不動産・負債はB9に対応する行そのものが無い(B9「不動産・負債の想定は置けない」)
+      riskLevel: null,
     });
   }
 
@@ -302,6 +317,7 @@ export const buildBreakdownSlices = (
       amount: debtTotal,
       ratio: toRatio(debtTotal),
       color: DEBT_CATEGORY_COLOR,
+      riskLevel: null,
     });
   }
 
