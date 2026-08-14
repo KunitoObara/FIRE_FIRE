@@ -206,7 +206,26 @@ Blocking Functionsの実行時間には上限がある(3.6でHTTP呼び出しを
 
 **エラーの伝わり方**
 
-Blocking Functionsで投げた例外は、クライアントのSDKにはカスタムメッセージそのままの形では届かない(`auth/internal-error` に包まれる)。**A1側で「招待されていないメールアドレスです」の主旨に翻訳して表示する。** 実際のレスポンスの形は実装時に `fire-fire-dev` で確かめてから確定させる。
+Blocking Functionsで投げた例外は、クライアントのSDKにはカスタムメッセージそのままの形では届かない。**`fire-fire-dev` へデプロイした実物で確かめた結果**は次のとおり。
+
+Identity Platformはサーバーのエラーメッセージを次の形に包む。
+
+```
+BLOCKING_FUNCTION_ERROR_RESPONSE : HTTP Cloud Function returned an error: {"error":{"message":"…","status":"PERMISSION_DENIED"}}
+```
+
+SDKは `' : '` で分解して `BLOCKING_FUNCTION_ERROR_RESPONSE` を `auth/internal-error` に写し、コロンより後ろをエラーメッセージとして残す(`@firebase/auth` の `errorMap` と `_errorWithCustomMessage`)。したがって:
+
+- **コードは常に `auth/internal-error`** で、他の内部エラーと区別が付かない
+- **理由はメッセージ側にしか無い。** ただし `HttpsError` の第1引数に対応する `status` は残るため、**「未承認(`PERMISSION_DENIED`)」と「確かめられなかった(`INTERNAL`)」は区別できる**
+
+**画面はこの2つを別の文言で扱う。** fail-closedで拒否された人に「招待されていません」と伝えると、**招待済みの人に「あなたは招待されていない」と言う**ことになるため。
+
+- 判定は**`status` で行い、メッセージ本文(日本語の文言)では行わない。** 文言はいつでも変わりうるうえ、変えたときに黙って判定が外れる
+- `PERMISSION_DENIED` を「未承認」と読んでよいのは、Identity Platformが `beforeCreate` のブロッキング関数を**プロジェクトに1つしか登録できない**ためである。アカウント作成の経路でこのエラーを出しうるのは `restrictSignUpToAllowlist` だけで、取り違える余地が無い。**2つ目の `beforeCreate` を足すときは、機械可読なマーカーでの判定に切り替える**
+- 包み方が変わって `status` を読めない場合は、無理に読まず既存の「不明なエラー」の文言に落とす。取り違えて「招待されていません」を出すより害が小さい
+
+判定は `src/frontend/src/lib/auth/signup-allowlist-error.ts` に1箇所だけ置き、A1のメール/パスワードとA1・A4の「Googleで続ける」の両方から呼ぶ。
 
 **ベータ期間が終わったら外す**
 

@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth/pending-google-link";
 import { clearPendingLogin, setPendingLogin } from "@/lib/auth/pending-login";
 import { persistenceFor } from "@/lib/auth/session-persistence";
+import { detectSignUpBlockedReason } from "@/lib/auth/signup-allowlist-error";
 import { FirebaseConfigurationError, getFirebaseAuth } from "@/lib/firebase/client";
 
 import type { MultiFactorError } from "firebase/auth";
@@ -44,6 +45,15 @@ const toFailureReason = (error: unknown): GoogleSignInFailureReason => {
 
   if (!(error instanceof FirebaseError)) {
     return "unknown";
+  }
+
+  // ベータ期間中のサインアップ制限による拒否(docs/auth-login-requirements.md 3.10)。
+  // `beforeUserCreated`はプロバイダを問わず発火するため、**A1・A4のどちらから押した場合も**
+  // ここに来る。Google側ではサインアップとログインを区別できないので、A4を
+  // 「ログイン専用だから起こらない」とは扱えない(docs/screen-requirements-auth.md 2章)
+  const blockedReason = detectSignUpBlockedReason(error);
+  if (blockedReason !== null) {
+    return blockedReason === "not-allowed" ? "signup-not-allowed" : "signup-check-unavailable";
   }
 
   switch (error.code) {

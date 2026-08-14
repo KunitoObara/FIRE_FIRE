@@ -1,6 +1,7 @@
 import { FirebaseError } from "firebase/app";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 
+import { detectSignUpBlockedReason } from "@/lib/auth/signup-allowlist-error";
 import { FirebaseConfigurationError, getFirebaseAuth } from "@/lib/firebase/client";
 
 const toFailureReason = (error: unknown): SignUpFailureReason => {
@@ -11,6 +12,14 @@ const toFailureReason = (error: unknown): SignUpFailureReason => {
 
   if (!(error instanceof FirebaseError)) {
     return "unknown";
+  }
+
+  // ベータ期間中のサインアップ制限による拒否(docs/auth-login-requirements.md 3.10)。
+  // `error.code`は`auth/internal-error`にしかならず他の内部エラーと区別が付かないため、
+  // コードでの分岐より先に判定する
+  const blockedReason = detectSignUpBlockedReason(error);
+  if (blockedReason !== null) {
+    return blockedReason === "not-allowed" ? "signup-not-allowed" : "signup-check-unavailable";
   }
 
   switch (error.code) {
