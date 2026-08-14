@@ -546,3 +546,146 @@ body {
   border-bottom-color: hsl(var(--primary));
   font-weight: 600;
 }
+
+/* ---- 公開画面シェル(A0・A9・A10) ----
+   認証系の中央寄せカード(.auth-shell)でもログイン後のアプリシェル(.app-shell)でもない
+   3つ目の系統(DESIGN.md 5章)。未ログインの訪問者が到達する画面で使う。
+   ヘッダーとフッターはA0・A9・A10で共通なので、ここに置いて3ファイルで共有する。 */
+
+.public-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: hsl(var(--background));
+}
+
+/* スクロールに追従させる。LPは縦に長く、下まで読んだところで
+   ログイン/サインアップへ入れる状態を保つため。 */
+.public-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: 3.75rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background) / 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.public-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground));
+  text-decoration: none;
+}
+
+.public-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+/* ヘッダー右側の導線。未ログインは「ログイン」「サインアップ」の2つ、
+   ログイン中は「ダッシュボードへ」1つに差し替える(screen-requirements-public.md 2章)。
+   畳む対象がボタン2つしか無いため、モバイル幅でもハンバーガーメニューにしない。 */
+.public-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.public-main {
+  flex: 1;
+}
+
+.public-section {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.public-footer {
+  border-top: 1px solid hsl(var(--border));
+  background-color: hsl(var(--muted));
+}
+
+.public-footer-inner {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.public-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+
+/* ---- 規約・ポリシーの本文(A9・A10) ----
+   読ませることだけが用途の画面。行長を本文向けに絞り、条見出しと本文の
+   間隔だけを決める。装飾は置かない。 */
+
+.legal-body {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 4rem;
+}
+
+.legal-body h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-top: 2rem;
+  margin-bottom: 0.625rem;
+}
+
+.legal-body p,
+.legal-body li {
+  font-size: 0.875rem;
+  line-height: 1.9;
+  color: hsl(var(--foreground));
+}
+
+.legal-body p {
+  margin-bottom: 0.75rem;
+}
+
+.legal-body ol,
+.legal-body ul {
+  margin: 0 0 0.75rem 1.25rem;
+}
+
+.legal-body ol {
+  list-style: decimal;
+}
+
+.legal-body ul {
+  list-style: disc;
+}
+
+.legal-meta {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}

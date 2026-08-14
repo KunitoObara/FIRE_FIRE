@@ -49,13 +49,43 @@
       <h1 class="text-2xl font-bold mb-2">HTMLモック一覧</h1>
       <p class="text-sm text-slate-500">
         docs/screen-list-and-transitions.md の画面一覧・遷移図に基づくHTMLモックです。各カードから各画面を確認できます。
-        認証系(A1〜A8)は中央寄せ1カラムレイアウト、ログイン後(B1〜B14)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
-        B12〜B14 は Phase 5 の未実装画面で、モックだけが先にあります。
+        公開画面(A0・A9・A10)はランディングページ型のシェル、認証系(A1〜A8)は中央寄せ1カラムレイアウト、
+        ログイン後(B1〜B14)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
+        A0・A9・A10 と B12〜B14 は未実装画面で、モックだけが先にあります。
       </p>
       <p class="text-sm text-slate-500 mt-2">
         ログアウトは画面IDを持たない共通操作です(screen-list-and-transitions.md 2.6)。B1〜B14 のどの画面でも、ヘッダー右上のアバターからユーザーメニューを開いて実行できます。
       </p>
     </header>
+
+    <!-- 公開画面(screen-list-and-transitions.md 2.0)。
+         未ログインの訪問者が到達する画面群で、認証フローには属さない。 -->
+    <section class="mb-10">
+      <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
+        公開画面(A0・A9・A10・未実装)
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <a class="screen-card" href="a0-top.html">
+          <span class="screen-id w-fit">A0</span>
+          <span class="text-sm font-medium">サービストップページ</span>
+          <span class="text-xs text-slate-400">LP。ベータ版の明記、ログイン/サインアップ導線</span>
+        </a>
+        <a class="screen-card" href="a9-terms.html">
+          <span class="screen-id w-fit">A9</span>
+          <span class="text-sm font-medium">利用規約画面</span>
+          <span class="text-xs text-slate-400">条文は構成確認用のドラフト</span>
+        </a>
+        <a class="screen-card" href="a10-privacy.html">
+          <span class="screen-id w-fit">A10</span>
+          <span class="text-sm font-medium">プライバシーポリシー画面</span>
+          <span class="text-xs text-slate-400">取得する情報・取得しない情報の掲示</span>
+        </a>
+      </div>
+      <p class="text-xs text-slate-400 mt-3">
+        A0のヘッダーはログイン状態で導線が変わります。ログイン中の表示は
+        <a class="link" href="a0-top.html?signedIn=1">a0-top.html?signedIn=1</a> で確認できます(クエリはモック都合の代用です)。
+      </p>
+    </section>
 
     <!-- 認証系画面 -->
     <section class="mb-10">
