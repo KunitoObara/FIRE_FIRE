@@ -670,13 +670,41 @@ Functions deploy had errors with the following functions:
 gcloud services list --enabled --project=fire-fire-dev | grep identitytoolkit
 ```
 
-## 14. 今後の検討事項（オープン課題）
+## 14. サインアップ許可リストの運用（ベータ期間中）
+
+ベータ期間中は、あらかじめ承認したメールアドレスだけがアカウントを作成できる（[auth-login-requirements.md](./auth-login-requirements.md) 3.10）。判定は Blocking Function `restrictSignUpToAllowlist` が行い、**承認の操作はコンソールでのドキュメント追加だけ**である。
+
+**この節の作業はコードのデプロイでは済まない。** 許可リストは Firestore のデータであり、リポジトリには入らない。
+
+### 承認する（招待する）
+
+Firebase コンソール → Firestore Database → コレクション `signupAllowlist` に、**ドキュメント ID を招待するメールアドレス**としてドキュメントを1件作る。
+
+- **ドキュメント ID は小文字・前後の空白なし**にする。判定側も同じ正規化をしてから照合するので大文字で登録しても通るが、リストを目で見たときに揃っていたほうが重複に気づける
+- **フィールドは判定に使わない。** ドキュメントが存在すること自体が承認の印である。誰をいつ招待したかを残したい場合は `note` / `invitedAt` のような任意のフィールドを足してよい
+- **プロジェクトごとに別のリストになる。** `fire-fire-dev`（STG）と `fire-fire-prod`（本番）の両方で有効なので、**開発用のテストアカウントを作るには dev 側のリストにもそのアドレスを入れる**
+
+### 承認を取り消す
+
+ドキュメントを削除する。**既に作成済みのアカウントには影響しない** — このリストが効くのはアカウント作成の瞬間だけである。作成済みのアカウントを止めたい場合は、コンソールでそのユーザーを無効化する。
+
+### 締め出されたときの逃げ道
+
+**Blocking Functions は Admin SDK・コンソールからのユーザー作成では発火しない。** リストの設定を誤っても、コンソールからユーザーを直接作る手段は残る。
+
+> **この挙動は初回のデプロイ後に `fire-fire-dev` で実際に確かめる。** 前提が外れていた場合、リストの誤設定から復旧できなくなるため（3.10 に同じ注記がある）。
+
+### ベータを終えるとき
+
+この制限は恒久的な仕様ではない。`noindex` の解除・A0 の「現在は招待制」の記述と同じタイミングで外す（[X4](https://trello.com/c/8wpkp9Gt)）。外し方は `src/backend/src/index.ts` から `restrictSignUpToAllowlist` の export を落として再デプロイする。**Firestore のコレクションを空にする形では外さない** — 空のリストは「誰も承認されていない」という意味になり、全員が拒否される。
+
+## 15. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
 - `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
-## 15. 参考リンク
+## 16. 参考リンク
 
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)

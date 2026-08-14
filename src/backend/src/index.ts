@@ -20,3 +20,5 @@ export {
 export { unlinkPasswordProvider } from "./linked-providers/functions";
 
 export { sendLoginNotification } from "./login-notification/functions";
+
+export { restrictSignUpToAllowlist } from "./signup-allowlist/functions";

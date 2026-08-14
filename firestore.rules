@@ -12,6 +12,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // サインアップ許可リスト(docs/auth-login-requirements.md 3.10)。
+    // ベータ期間中は、ここに載っているメールアドレスだけがアカウントを作成できる。
+    // ドキュメントIDが正規化済みのメールアドレスそのもので、存在すること自体が承認の印。
+    //
+    // Blocking Function(`beforeUserCreated`)がAdmin SDKで読み(セキュリティルールを
+    // 経由しない)、承認の追加は開発者がコンソールで行う。**クライアントには読ませない** —
+    // 読めると、どのメールアドレスが招待されているかを未認証の相手が列挙できてしまう。
+    // 書かせないのは言うまでもなく、自分を許可リストへ足せる状態にしないため。
+    match /signupAllowlist/{email} {
+      allow read, write: if false;
+    }
+
     // ユーザー自身の資産データ(docs/fire-asset-management-requirements.md 5章)。
     //
     // B2 CSV取込はクライアントSDKから直接書き込む。認証状態はブラウザ側のFirebase SDKが
