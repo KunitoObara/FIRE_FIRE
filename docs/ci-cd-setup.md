@@ -696,7 +696,25 @@ Firebase コンソール → Firestore Database → コレクション `signupAl
 
 ### ベータを終えるとき
 
-この制限は恒久的な仕様ではない。`noindex` の解除・A0 の「現在は招待制」の記述と同じタイミングで外す（[X4](https://trello.com/c/8wpkp9Gt)）。外し方は `src/backend/src/index.ts` から `restrictSignUpToAllowlist` の export を落として再デプロイする。**Firestore のコレクションを空にする形では外さない** — 空のリストは「誰も承認されていない」という意味になり、全員が拒否される。
+この制限は恒久的な仕様ではない。`noindex` の解除・A0 の「現在は招待制」の記述と同じタイミングで外す（[X4](https://trello.com/c/8wpkp9Gt)）。
+
+**順序を守る。先に手動で関数を削除し、そのあとで export を落とす。**
+
+```bash
+# 1. プロジェクトごとに手動で削除する（対話実行。dev と prod の両方）
+firebase functions:delete restrictSignUpToAllowlist \
+  --region asia-northeast1 --project fire-fire-dev
+
+# 2. src/backend/src/index.ts から export を落として、通常どおり develop → main へ流す
+```
+
+**逆の順序にするとデプロイが中断する。** export を先に落として push すると、ソースから消えた関数が本番に残っている状態になる。`deploy.yml` の `firebase deploy` は `--non-interactive` で、かつ **`--force` を意図的に付けていない**（8 章。`--force` はソースから消えた関数の削除確認までスキップするため）。この組み合わせでは firebase-tools が削除の確認を出せず、**`FirebaseError` を投げてデプロイを中断する**（`Aborting because deletion cannot proceed in non-interactive mode`）。
+
+デプロイのステップが落ちるとジョブが止まり、**後続の App Hosting ロールアウトごと飛ぶ**（8 章の Artifact Registry の件と同じ壊れ方で、フロントエンドだけ古いまま残る）。回復はできる — エラーが表示するとおり手動で削除してワークフローを再実行すればよい — が、本番のデプロイを一度赤にしてから気づくことになる。
+
+> この挙動は firebase-tools の `lib/deploy/functions/prompts.js`（`promptForFunctionDeletion`）で確かめられる。`options.force` が真なら確認を飛ばして削除し、偽かつ `options.nonInteractive` なら `firebase functions:delete` のコマンドを添えて `FirebaseError` を投げる。
+
+**Firestore のコレクションを空にする形では外さない。** 空のリストは「誰も承認されていない」という意味になり、全員が拒否される。関数を消したあとであれば、コレクションは残しても消してもよい。
 
 ## 15. 今後の検討事項（オープン課題）
 
