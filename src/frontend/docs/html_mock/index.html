@@ -49,10 +49,11 @@
       <h1 class="text-2xl font-bold mb-2">HTMLモック一覧</h1>
       <p class="text-sm text-slate-500">
         docs/screen-list-and-transitions.md の画面一覧・遷移図に基づくHTMLモックです。各カードから各画面を確認できます。
-        認証系(A1〜A8)は中央寄せ1カラムレイアウト、ログイン後(B1〜B11)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
+        認証系(A1〜A8)は中央寄せ1カラムレイアウト、ログイン後(B1〜B14)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
+        B12〜B14 は Phase 5 の未実装画面で、モックだけが先にあります。
       </p>
       <p class="text-sm text-slate-500 mt-2">
-        ログアウトは画面IDを持たない共通操作です(screen-list-and-transitions.md 2.6)。B1〜B11 のどの画面でも、ヘッダー右上のアバターからユーザーメニューを開いて実行できます。
+        ログアウトは画面IDを持たない共通操作です(screen-list-and-transitions.md 2.6)。B1〜B14 のどの画面でも、ヘッダー右上のアバターからユーザーメニューを開いて実行できます。
       </p>
     </header>
 
@@ -145,6 +146,38 @@
       </div>
       <p class="text-xs text-slate-400 mt-3">
         B11 は後から追加された画面のため画面IDが連番の末尾になっていますが、位置付けは B2〜B4 と同じ「ダッシュボードに供給するデータを管理する画面」です(screen-list-and-transitions.md 2.2)。
+      </p>
+    </section>
+
+    <!-- リスト管理系画面(Phase 5・未実装) -->
+    <section class="mb-10">
+      <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
+        リスト管理系画面(B12〜B14)<span class="ml-2 text-xs font-normal text-slate-400">Phase 5・未実装</span>
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <a class="screen-card" href="b12-subscriptions.html">
+          <span class="screen-id w-fit">B12</span>
+          <span class="text-sm font-medium">サブスク一覧画面</span>
+          <span class="text-xs text-slate-400">フォームの追加・削除、まとめて保存。月額換算・年額換算の合計</span>
+        </a>
+        <a class="screen-card" href="b13-financial-institutions.html">
+          <span class="screen-id w-fit">B13</span>
+          <span class="text-sm font-medium">金融機関一覧画面</span>
+          <span class="text-xs text-slate-400">CSV取込による自動登録+手動追加。行ごとに保存</span>
+        </a>
+        <a class="screen-card" href="b14-belongings.html">
+          <span class="screen-id w-fit">B14</span>
+          <span class="text-sm font-medium">持ち物一覧画面</span>
+          <span class="text-xs text-slate-400">資産として計上しない持ち物。減価償却なし</span>
+        </a>
+      </div>
+      <p class="text-xs text-slate-400 mt-3">
+        この3画面は<strong>まだ実装されていません</strong>(Phase 5)。要件は docs/screen-requirements-lists.md にあります。
+        いずれも<strong>ダッシュボードの数字には一切効きません</strong> — B2〜B4・B5〜B7・B11 が B1 へ数字を供給するのに対し、この3画面は自分の中で完結します。
+      </p>
+      <p class="text-xs text-slate-400 mt-2">
+        Phase 6・7 の B15(証券口座)・B16(積立・取り崩しシミュレーション)・B17(マイナポータル連携)はモックを作っていません。
+        外部の仕様(証券会社のCSV、マイナポータルAPI)を確かめないと表示項目が決まらないためです(screen-list-and-transitions.md 2.8)。
       </p>
     </section>
 
