@@ -6,7 +6,7 @@
 
 資産残高推移CSVの取込(Phase 1、実装済み)は本書の対象外である。両者は同じ [B2 CSV取込画面](./screen-requirements-dashboard.md#b2-csv取込画面) のタブに並ぶが、CSVの形・データモデル・冪等性の取り方がいずれも異なるため、共通するのは文字コードの判定とファイルサイズの歯止めだけになる。
 
-**画面をまたぐ仕様をここに集約する。** 入出金明細の取込は B2(取り込む)・B3(一覧する)・B1(集計して見せる)の3画面に効き、「どの行を集計に数えるか」「費目とは何か」を画面ごとの文書に書くと同じ内容が3箇所に散る。画面固有の表示項目・操作・遷移条件は [screen-requirements-dashboard.md](./screen-requirements-dashboard.md) 側に置き、本書を参照する形にする([auth-login-requirements.md](./auth-login-requirements.md) が4.1節に対して持っているのと同じ関係)。
+**画面をまたぐ仕様をここに集約する。** 入出金明細の取込は B2(取り込む)・B3(一覧する)・B1(集計して見せる)の3画面に効き(Phase 5で **B13 金融機関一覧** も加わる。9章)、「どの行を集計に数えるか」「費目とは何か」を画面ごとの文書に書くと同じ内容が3箇所に散る。画面固有の表示項目・操作・遷移条件は [screen-requirements-dashboard.md](./screen-requirements-dashboard.md) 側に置き、本書を参照する形にする([auth-login-requirements.md](./auth-login-requirements.md) が4.1節に対して持っているのと同じ関係)。
 
 ## 2. 対象CSVの形式
 
@@ -227,6 +227,7 @@ CSVの `大項目` と `中項目` を両方保存する。
 | [B1 ダッシュボード](./screen-requirements-dashboard.md#b1-ダッシュボード画面) | 収支サマリの集計対象(5章)、費目別支出の粒度(6章)、選択中の1ヶ月しか読まない制約(8章) |
 | [B2 CSV取込](./screen-requirements-dashboard.md#b2-csv取込画面) | 入出金明細タブのCSV形式(2章)・冪等性(4章)・プレビュー(7章) |
 | [B3 収支明細一覧](./screen-requirements-dashboard.md#b3-収支明細一覧画面) | 表示する行(5章)、絞り込みの軸(6章)、読み取り範囲と打ち切り(8章) |
+| [B13 金融機関一覧](./screen-requirements-lists.md#b13-金融機関一覧画面)(**Phase 5・未実装**) | 一覧の元になる `保有金融機関` 列(2.1)、遡って拾い直すときの読み取り範囲と打ち切り(8章) |
 
 なお **B3 は [B3-1] で Firestore に接続済み**で、サンプルデータ(`USE_SAMPLE_TRANSACTIONS_DATA` と `sample-data.ts`)は撤去した。取得は `src/frontend/src/lib/transactions/transactions-data.ts` の `fetchTransactionsData` が担い、B1が `fetchDashboardData` で行ったのと同じ形になっている。
 
@@ -235,6 +236,16 @@ B3側は本書の要件を満たしている(費目の2段絞り込み・振替/
 **B1 の収支サマリも [B1-8] で実データを集計するようになった。** `fetchDashboardData` が当月の取引を読み(`fetchMonthlyTransactions`)、`buildCashflowSummary` が5章・6章のとおりに集計する(振替・計算対象外を除く、費目別支出は大項目、収入・支出とも0以上)。**これで本書の範囲は一通り実装済みになる。** 残りは10章の「今後の検討事項」だけ。
 
 ただし **[B11-9] で収支サマリが「当月固定」から「画面上で選んだ年月」に変わる**([screen-requirements-dashboard.md](./screen-requirements-dashboard.md) B1「年月の選択」)。本書の側で変わるのは8章の読み取り範囲だけで、集計に数える行(5章)・費目の粒度(6章)・符号の扱い(5章)はそのままである。取得の入口(`fetchMonthlyTransactions` / `resolveTransactionMonthRange`)は当月を前提にした引数と説明を持っているため、選択中の年月を受け取る形へ直す。
+
+### B13が足す「取込の副作用」(Phase 5・未実装)
+
+**[B13 金融機関一覧](./screen-requirements-lists.md#b13-金融機関一覧画面) は本書の範囲に、取込の副作用を1つ足す。** [B2](./screen-requirements-dashboard.md#b2-csv取込画面) で入出金明細CSVを取り込むたびに、そのCSVに現れた `保有金融機関`(2.1)の値を重複排除して `users/{uid}/financialInstitutions` へ登録する。
+
+**B2を触るときはこの副作用があることを前提にすること。** 本書の1章のとおり画面をまたぐ仕様はここに集めており、B13側の文書だけを見て実装すると取込側で見落とす([リスト管理系画面の要件](./screen-requirements-lists.md#b13-金融機関一覧画面) B13「CSV取込による登録」が仕様の正本で、本項はB2から辿れるようにするための入口である)。
+
+- **登録の失敗は取込そのものを失敗させない。** 明細は取り込めているのに「取込に失敗しました」と出るほうが実態と合わない。2.3の「1件も取り込まない」はCSVのパースの話で、こちらには及ばない
+- 既に同じ名前で登録されている行は触らない(手で設定した種別・用途メモを取込のたびに上書きしない)
+- 取込済みの明細から遡って拾い直す操作もB13にあるが、**全件走査はしない**。8章の読み取りの制約に反するため、B3と同じ範囲クエリと `TRANSACTION_SCAN_LIMIT` で打ち切る
 
 ## 10. 今後の検討事項
 
