@@ -9,6 +9,10 @@ import {
   FIRE_GOAL_AMOUNT_TOO_LARGE_MESSAGE,
   FIRE_GOAL_AMOUNT_TOO_SMALL_MESSAGE,
   FIRE_GOAL_ANNUAL_EXPENSE_LABEL,
+  FIRE_GOAL_MONTHLY_CONTRIBUTION_FORMAT_MESSAGE,
+  FIRE_GOAL_MONTHLY_CONTRIBUTION_LABEL,
+  FIRE_GOAL_MONTHLY_CONTRIBUTION_PATTERN,
+  FIRE_GOAL_MONTHLY_CONTRIBUTION_TOO_LARGE_MESSAGE,
   FIRE_GOAL_TARGET_AMOUNT_LABEL,
   FIRE_GOAL_WITHDRAWAL_RATE_FORMAT_MESSAGE,
   FIRE_GOAL_WITHDRAWAL_RATE_LABEL,
@@ -41,6 +45,24 @@ const validateAmount = (value: string): string | null => {
 
   if (Number(value) > FIRE_GOAL_AMOUNT_MAX) {
     return FIRE_GOAL_AMOUNT_TOO_LARGE_MESSAGE;
+  }
+
+  return null;
+};
+
+/**
+ * 毎月の積立額の検証。空文字(未入力)はここに来ない(呼び出し元が先に通す)。
+ *
+ * 0を弾かないのが他の金額欄との違い。「積立なし」は正当な設定で、未入力もそれと同じ扱いに
+ * なる(要件B8)。上限は符号を除いた桁数で見る。
+ */
+const validateMonthlyContribution = (value: string): string | null => {
+  if (!FIRE_GOAL_MONTHLY_CONTRIBUTION_PATTERN.test(value)) {
+    return FIRE_GOAL_MONTHLY_CONTRIBUTION_FORMAT_MESSAGE;
+  }
+
+  if (Math.abs(Number(value)) > FIRE_GOAL_AMOUNT_MAX) {
+    return FIRE_GOAL_MONTHLY_CONTRIBUTION_TOO_LARGE_MESSAGE;
   }
 
   return null;
@@ -81,6 +103,11 @@ export const fireGoalFormSchema = z
     targetAmount: z.string().trim(),
     annualExpense: z.string().trim(),
     withdrawalRate: z.string().trim(),
+    /**
+     * 毎月の積立額。タブの外にある共通の設定なので、どちらの方式でも同じ欄を検証する。
+     * 未入力は0(積立なし)として扱うため必須にしない(要件B8)。
+     */
+    monthlyContribution: z.string().trim(),
   })
   .superRefine((values, ctx) => {
     const fields = [
@@ -101,6 +128,13 @@ export const fireGoalFormSchema = z
         label: FIRE_GOAL_WITHDRAWAL_RATE_LABEL,
         required: values.mode === "reverse",
         validate: validateWithdrawalRate,
+      },
+      {
+        name: "monthlyContribution",
+        label: FIRE_GOAL_MONTHLY_CONTRIBUTION_LABEL,
+        // 未入力は0(積立なし)。方式によらず必須にしない
+        required: false,
+        validate: validateMonthlyContribution,
       },
     ] as const;
 
@@ -150,5 +184,13 @@ export const fireGoalDocumentSchema = z.object({
    * 値のままになる」)。読み出し側が`null`(=既定)として扱う。
    */
   achievementAxisId: z.string().nullable().optional(),
+  /**
+   * 毎月の積立額(円)。未入力は`null`で、到達予測では0(積立なし)として扱う。
+   *
+   * **キーそのものが無い場合も通す。** 積立額を持たずに保存された既存の目標があり、
+   * 必須にするとそれらが「解釈できないドキュメント」として未設定に倒れ、設定済みの
+   * 目標額まで消えたように見えるため(`achievementAxisId`と同じ理由)。
+   */
+  monthlyContribution: z.number().nullable().optional(),
   updatedAt: z.instanceof(Timestamp).nullable(),
 });

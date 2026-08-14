@@ -17,6 +17,7 @@ const directGoal: FireGoal = {
   annualExpense: null,
   withdrawalRate: null,
   achievementAxisId: null,
+  monthlyContribution: null,
 };
 
 /**
@@ -137,6 +138,7 @@ describe("buildFireProgress", () => {
       annualExpense: 3_000_000,
       withdrawalRate: 4,
       achievementAxisId: null,
+      monthlyContribution: null,
     };
 
     expect(buildFireProgress(goal, latest, [], [], [])?.targetAmount).toBe(75_000_000);
@@ -155,6 +157,7 @@ describe("buildFireProgress", () => {
           annualExpense: null,
           withdrawalRate: 4,
           achievementAxisId: null,
+          monthlyContribution: null,
         },
         latest,
         [],

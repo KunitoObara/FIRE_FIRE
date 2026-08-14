@@ -26,6 +26,22 @@ const toOptionalNumber = (value: string): number | null => {
 };
 
 /**
+ * 毎月の積立額を保存する数値に変換する。**未入力は`null`ではなく0で保存する。**
+ *
+ * 要件が「未入力は0(積立なし)として扱う」としている(docs/screen-requirements-fire-goal.md
+ * B8「毎月の積立額」)ことに加えて、`null`で保存すると次にB8を開いたときに前月の収支が
+ * また初期値として提示される。意図して空にした設定が、次の保存で気付かないうちに前月の収支へ
+ * 化けることになるため、空欄のまま保存した時点で「積立なし」と決まったものとして0を書く。
+ *
+ * `null`が入るのは積立額を導入する前に保存された目標だけで、そこにだけ初期値の提示が働く。
+ */
+const toMonthlyContribution = (value: string): number => {
+  const parsed = toOptionalNumber(value);
+
+  return parsed ?? 0;
+};
+
+/**
  * 入力値を保存する形に変換する。**バリデーション通過後の値にのみ使う**
  * (形式は`fireGoalFormSchema`が保証している)。
  *
@@ -45,6 +61,7 @@ export const toFireGoal = (
   annualExpense: toOptionalNumber(values.annualExpense),
   withdrawalRate: toOptionalNumber(values.withdrawalRate),
   achievementAxisId,
+  monthlyContribution: toMonthlyContribution(values.monthlyContribution),
 });
 
 /**
@@ -53,14 +70,30 @@ export const toFireGoal = (
  * 逆算係数だけは未入力を空欄にせず既定値(4%)を入れる。要件が「デフォルト値ありで編集可能」と
  * している欄であり(docs/screen-requirements-fire-goal.md B8)、空欄から始めると
  * 4%ルールを使うだけのユーザーにも入力を求めることになるため。
+ *
+ * **毎月の積立額は保存済みの値を優先し、無い場合にだけ前月の収支(`prefilledMonthlyContribution`)を
+ * 入れる。** 保存した値がそのまま到達予測に使われる、という関係を崩さないため
+ * (要件B8「提示するのは画面を開いた時点の初期値だけで、保存後に追従して変わることはしない」)。
+ * 前月の収支は提示できないこともあるので`null`を受け付け、そのときは空欄にする。
  */
-export const toFireGoalFormValues = (goal: FireGoal | null): FireGoalFormValues => {
+export const toFireGoalFormValues = (
+  goal: FireGoal | null,
+  prefilledMonthlyContribution: number | null,
+): FireGoalFormValues => {
+  /*
+    `??`で受けるので、保存済みの0(「積立なし」と決めた設定)は前月の収支で上書きされない。
+    truthyかどうかで書くと0だけが提示に差し替わる(CODING_STANDARDS.md 2章)
+  */
+  const contribution = goal?.monthlyContribution ?? prefilledMonthlyContribution;
+  const monthlyContribution = contribution === null ? "" : String(contribution);
+
   if (goal === null) {
     return {
       mode: DEFAULT_FIRE_GOAL_MODE,
       targetAmount: "",
       annualExpense: "",
       withdrawalRate: String(DEFAULT_WITHDRAWAL_RATE),
+      monthlyContribution,
     };
   }
 
@@ -70,6 +103,7 @@ export const toFireGoalFormValues = (goal: FireGoal | null): FireGoalFormValues 
     annualExpense: goal.annualExpense === null ? "" : String(goal.annualExpense),
     withdrawalRate:
       goal.withdrawalRate === null ? String(DEFAULT_WITHDRAWAL_RATE) : String(goal.withdrawalRate),
+    monthlyContribution,
   };
 };
 
