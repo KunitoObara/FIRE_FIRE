@@ -20,14 +20,26 @@
 
 <div class="public-shell">
 
+  <!-- ヘッダーの導線はA0と同じ扱い(screen-requirements-public.md 2章「ログイン中でも
+       リダイレクトしない」)。ログイン中は「ログイン」「サインアップ」を「ダッシュボードへ」
+       1つに差し替える。規約を読みに来たログイン中のユーザーに「サインアップ」を出し続けない。
+       この画面はページ内にCTAを持たないので、差し替えるのはヘッダーだけである。
+
+       下の ?signedIn=1 は静的ファイルで認証状態を持てないモック都合の代用で、実装では
+       踏襲しない(a0-top.html と同じ扱い)。 -->
   <header class="public-header">
     <a class="public-logo" href="a0-top.html">
       <span class="public-logo-mark">FF</span>
       FIRE-FIRE
     </a>
-    <nav class="public-nav">
+
+    <nav class="public-nav" id="nav-signed-out">
       <a class="btn btn-ghost btn-sm" href="a4-login.html">ログイン</a>
       <a class="btn btn-primary btn-sm" href="a1-signup.html">サインアップ</a>
+    </nav>
+
+    <nav class="public-nav hidden" id="nav-signed-in">
+      <a class="btn btn-primary btn-sm" href="b1-dashboard.html">ダッシュボードへ</a>
     </nav>
   </header>
 
@@ -132,6 +144,15 @@
     </div>
   </footer>
 </div>
+
+<script>
+  // モック都合の代用(上のヘッダーのコメントを参照)。実装では認証状態から判定する。
+  // この画面が差し替えるのはヘッダーだけ(ページ内にCTAが無いため)。
+  if (new URLSearchParams(location.search).get("signedIn") === "1") {
+    document.getElementById("nav-signed-out").classList.add("hidden");
+    document.getElementById("nav-signed-in").classList.remove("hidden");
+  }
+</script>
 
 </body>
 </html>
