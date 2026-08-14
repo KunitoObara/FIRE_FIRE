@@ -41,8 +41,39 @@ export const FIREBASE_NETWORK_ERROR_MESSAGE =
 export const TOO_MANY_REQUESTS_MESSAGE =
   "試行回数が多いため、一時的に制限されています。しばらく待ってから再度お試しください。";
 
+/**
+ * 承認されていないメールアドレスで登録しようとしたときのメッセージ
+ * (docs/auth-login-requirements.md 3.10、docs/screen-requirements-auth.md A1・2章)。
+ *
+ * **A1とA4で同じ文言を使う。** 押した本人にとってはどちらも「このアカウントで入ろうとした」
+ * 操作で、画面の名前の違いは関係がない。A4側だけ「まだ登録されていません」の主旨にすると、
+ * そのアドレスが登録済みかどうかを外から判定でき、A4の認証失敗で状態を伝えない方針
+ * (`SIGN_IN_FAILURE_MESSAGE`)とも食い違う。
+ *
+ * **どのアドレスなら通るかは示さない。** 許可リストの内容を外から探れる状態にしないため。
+ * 入力されたアドレスも文言に含めない。
+ *
+ * **ベータ期間中の制限であることを伝える。** 恒久的に登録できないと読ませると、招待を
+ * 受けられる人まで諦めることになる。制限そのものは
+ * [X4](https://trello.com/c/8wpkp9Gt) の正式公開の判断とセットで外す。
+ */
+export const SIGN_UP_NOT_ALLOWED_MESSAGE =
+  "現在はベータ版のため、招待された方のみアカウントを作成できます。招待をお持ちの場合は、招待に使われたメールアドレスでお試しください。";
+
+/**
+ * 招待の確認そのものができずに登録を断ったときのメッセージ。
+ *
+ * バックエンドは許可リストを読めなかった場合も拒否する(fail-closed。同 3.10)。
+ * これを「招待されていません」と同じ文言にすると、**招待済みの人に「あなたは招待されて
+ * いない」と伝える**ことになる。待てば通りうる種類の失敗なので、そう読める文言にする。
+ */
+export const SIGN_UP_CHECK_UNAVAILABLE_MESSAGE =
+  "アカウントの作成を受け付けられませんでした。しばらく待ってから再度お試しください。";
+
 /** サインアップ失敗のうち、特定の入力項目に紐づかずフォーム全体に出すメッセージ */
 export const SIGN_UP_FORM_LEVEL_MESSAGES: Record<SignUpFormLevelFailureReason, string> = {
+  "signup-not-allowed": SIGN_UP_NOT_ALLOWED_MESSAGE,
+  "signup-check-unavailable": SIGN_UP_CHECK_UNAVAILABLE_MESSAGE,
   "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,
@@ -113,6 +144,10 @@ export const GOOGLE_SIGN_IN_MESSAGES: Record<GoogleSignInDisplayFailureReason, s
   "unauthorized-domain":
     "このドメインからのGoogleログインは許可されていません。Firebaseコンソールの承認済みドメインを確認してください。",
   "user-disabled": "このアカウントは利用できません。",
+  // A1とA4で同じ文言を使う(SIGN_UP_NOT_ALLOWED_MESSAGE の注記)。メール/パスワードでの
+  // サインアップと文言を分けないのも同じ理由で、経路の違いは押した本人に関係が無い
+  "signup-not-allowed": SIGN_UP_NOT_ALLOWED_MESSAGE,
+  "signup-check-unavailable": SIGN_UP_CHECK_UNAVAILABLE_MESSAGE,
   "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
   "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
   "network-error": FIREBASE_NETWORK_ERROR_MESSAGE,

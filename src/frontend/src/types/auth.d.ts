@@ -26,6 +26,14 @@ declare global {
     | "email-already-in-use"
     | "invalid-email"
     | "password-policy-violation"
+    /**
+     * 承認されていないメールアドレス(ベータ期間中の招待制。
+     * docs/auth-login-requirements.md 3.10)。恒久的な制限ではないため、
+     * 文言もベータ期間中のものだと伝わる形にする
+     */
+    | "signup-not-allowed"
+    /** 許可リストを確かめられずに拒否された(同 fail-closed)。時間をおけば通りうる */
+    | "signup-check-unavailable"
     | "too-many-requests"
     | "configuration-error"
     | "network-error"
@@ -36,7 +44,12 @@ declare global {
   /** 特定の入力項目に紐づかず、フォーム全体のエラーとして表示する失敗理由 */
   type SignUpFormLevelFailureReason = Extract<
     SignUpFailureReason,
-    "too-many-requests" | "configuration-error" | "network-error" | "unknown"
+    | "signup-not-allowed"
+    | "signup-check-unavailable"
+    | "too-many-requests"
+    | "configuration-error"
+    | "network-error"
+    | "unknown"
   >;
 
   /**
@@ -378,6 +391,14 @@ declare global {
     | "unauthorized-domain"
     /** 管理コンソール等でアカウントが無効化されている */
     | "user-disabled"
+    /**
+     * 承認されていないメールアドレスで**新規アカウントを作ろうとした**
+     * (ベータ期間中の招待制。docs/auth-login-requirements.md 3.10)。
+     * Google側ではサインアップとログインを区別できないため、A4から押した場合も起こる
+     */
+    | "signup-not-allowed"
+    /** 許可リストを確かめられずに拒否された(同 fail-closed)。時間をおけば通りうる */
+    | "signup-check-unavailable"
     | "too-many-requests"
     | "configuration-error"
     /** リクエストがFirebaseに届かない */
