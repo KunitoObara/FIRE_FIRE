@@ -307,6 +307,13 @@
     color: hsl(var(--muted-foreground));
   }
 
+  /* ゲージの現在資産額に添える対象分類名。B1では金額より一段小さく薄い扱いにしてある */
+  .preview-axis-note {
+    font-size: 0.5625rem;
+    color: hsl(var(--muted-foreground));
+    opacity: 0.8;
+  }
+
   .beta-note {
     border-radius: var(--radius);
     border: 1px solid hsl(var(--border));
@@ -503,15 +510,24 @@
                 <div class="card p-3">
                   <p class="preview-card-title">FIRE達成度</p>
                   <div class="flex items-center gap-3">
-                    <svg viewBox="0 0 120 120" class="shrink-0" style="width: 4.5rem; height: 4.5rem;" role="img" aria-label="FIRE達成度ゲージのサンプル。63%">
+                    <svg viewBox="0 0 120 120" class="shrink-0" style="width: 4.5rem; height: 4.5rem;" role="img" aria-label="FIRE達成度ゲージのサンプル。38%">
                       <circle cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--secondary))" stroke-width="14"/>
                       <circle cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--primary))" stroke-width="14"
-                              stroke-linecap="round" stroke-dasharray="178 283" transform="rotate(-90 60 60)"/>
-                      <text x="60" y="67" text-anchor="middle" font-size="24" font-weight="700" fill="hsl(var(--foreground))">63%</text>
+                              stroke-linecap="round" stroke-dasharray="106 283" transform="rotate(-90 60 60)"/>
+                      <text x="60" y="67" text-anchor="middle" font-size="24" font-weight="700" fill="hsl(var(--foreground))">38%</text>
                     </svg>
+                    <!-- 現在資産額には**対象分類名を併記する**(screen-requirements-dashboard.md
+                         「FIRE達成度の現在資産額(対象分類)」)。併記しないと、B1のセレクタが別の
+                         分類軸を指しているときにゲージの数字がどちらのものか判別できない。
+
+                         本物のB1モックは、セレクタ(純金融資産)とゲージの対象分類(投資性資産)が
+                         **違う**状態を示している。ここではあえて揃えてある — LPの訪問者に
+                         「2つの軸は別の設定」という区別を読ませる前提を置けないため。同じ軸に
+                         揃えたので、現在資産額は円グラフの差引後と同じ 30,000,000円、達成率は
+                         30,000,000 / 80,000,000 = 37.5% → 38% になる。 -->
                     <ul class="preview-goal tabular-nums">
                       <li>目標資産額 <strong>80,000,000円</strong></li>
-                      <li>現在資産額 <strong>50,000,000円</strong></li>
+                      <li>現在資産額 <strong>30,000,000円</strong><span class="preview-axis-note">(純金融資産)</span></li>
                       <li>到達予測日 <strong>2033年4月頃</strong></li>
                     </ul>
                   </div>
