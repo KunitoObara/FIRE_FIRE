@@ -28,7 +28,7 @@ export const contactSchema = z.object({
     .trim()
     .min(1, { message: "お問い合わせ内容を入力してください" })
     .max(CONTACT_BODY_MAX_LENGTH, {
-      message: `お問い合わせ内容は${CONTACT_BODY_MAX_LENGTH.toLocaleString()}文字以内で入力してください`,
+      message: `お問い合わせ内容は${CONTACT_BODY_MAX_LENGTH.toLocaleString("ja-JP")}文字以内で入力してください`,
     }),
   /**
    * ハニーポット。画面では隠してあり、**人が使う限り空のまま**になる。
