@@ -7,6 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css" />
 <link rel="stylesheet" href="common.css" />
 </head>
 <body>
@@ -209,7 +210,13 @@
     <p class="text-sm text-slate-500 mb-4">現在登録済みの認証アプリは無効になります。本人確認のため、パスワードを再入力してください。</p>
     <div class="field mb-5">
       <label class="label">パスワード</label>
-      <input class="input" type="password" />
+      <!-- 入力欄の右端に表示/非表示トグルを重ねる(DESIGN.md 6章) -->
+      <div class="relative">
+        <input class="input pr-10" type="password" id="mfa-reset-password" />
+        <button class="password-toggle" type="button" aria-label="パスワードを表示" aria-pressed="false" onclick="togglePassword(this, 'mfa-reset-password')">
+          <i class="fa-solid fa-eye" aria-hidden="true"></i>
+        </button>
+      </div>
     </div>
     <div class="flex gap-3">
       <a href="a3-mfa-setup.html" class="btn btn-primary flex-1">確認して再設定する</a>
@@ -231,6 +238,22 @@
     </div>
   </div>
 </div>
+
+<script>
+  // パスワード表示トグル(DESIGN.md 6章。A1・A4・A7・A8・B10で必須)。
+  // 欄ごとに独立して切り替えられるよう、対象の入力欄のidを引数で受ける。
+  function togglePassword(button, inputId) {
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector("i");
+    const willShow = input.type === "password";
+
+    input.type = willShow ? "text" : "password";
+    icon.classList.toggle("fa-eye", !willShow);
+    icon.classList.toggle("fa-eye-slash", willShow);
+    // 状態は aria-pressed だけで伝える(ラベルも切り替えると二重に読み上げられる)
+    button.setAttribute("aria-pressed", String(willShow));
+  }
+</script>
 
 </body>
 </html>

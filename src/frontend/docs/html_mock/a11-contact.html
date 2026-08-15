@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- ベータ期間中は検索エンジンに出さない(screen-requirements-public.md 2章)。
+     実装ではA0だけでなくサイト全体に掛ける。 -->
+<meta name="robots" content="noindex" />
+<title>A11 お問い合わせ | FIRE-FIRE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+</head>
+<body>
+
+<!--
+  A11 お問い合わせ画面(screen-requirements-public.md A11)。
+
+  **公開画面で唯一、入力項目を持つ画面である。** A0・A9・A10は「入力項目: 無し」で、
+  この画面だけが送信を伴う。
+
+  **問い合わせ先のメールアドレスは画面に出さない。** 宛先を知る必要がこの画面には無く、
+  出せば公開リポジトリにも載る。受信先はSecret Managerにだけ置く。
+-->
+
+<div class="public-shell">
+
+  <!-- ヘッダーの導線はA0・A9・A10と同じ扱い。ログイン中は2つを「ダッシュボードへ」1つに
+       差し替える。この画面はページ内にCTAを持たないので、差し替えるのはヘッダーだけ。
+
+       下の ?signedIn=1 は静的ファイルで認証状態を持てないモック都合の代用で、実装では
+       踏襲しない(a0-top.html と同じ扱い)。 -->
+  <header class="public-header">
+    <a class="public-logo" href="a0-top.html">
+      <span class="public-logo-mark">FF</span>
+      FIRE-FIRE
+    </a>
+
+    <nav class="public-nav" id="nav-signed-out">
+      <a class="btn btn-ghost btn-sm" href="a4-login.html">ログイン</a>
+      <a class="btn btn-primary btn-sm" href="a1-signup.html">サインアップ</a>
+    </nav>
+
+    <nav class="public-nav hidden" id="nav-signed-in">
+      <a class="btn btn-primary btn-sm" href="b1-dashboard.html">ダッシュボードへ</a>
+    </nav>
+  </header>
+
+  <main class="public-main">
+    <!-- 規約と同じ読み物向けの幅を使う。フォーム1つの画面で本文幅いっぱいに
+         入力欄を伸ばすと、1行が長くなりすぎて書きにくい。 -->
+    <div class="legal-body">
+
+      <h1 class="text-2xl font-bold mb-2">お問い合わせ</h1>
+      <p class="text-sm text-slate-500 mb-8">
+        ご入力いただいたメールアドレス宛に返信します。
+      </p>
+
+      <!-- 送信完了時の表示。送信できたら入力欄を空に戻す(同じ問い合わせを二重に
+           送る操作を、そのままではできないようにするため)。
+           下の ?sent=1 はモック都合の代用で、実装ではフォームの状態から判定する。 -->
+      <div id="sent-notice" class="alert alert-success mb-6 hidden">
+        <span>お問い合わせを送信しました。ご入力のメールアドレス宛に返信します。</span>
+      </div>
+
+      <!-- 送信できなかったときの表示。**入力内容はそのまま残す**(消すと書き直しを強いる)。
+           理由は throttled / send-failed / not-configured の3つ。 -->
+      <div id="error-notice" class="alert alert-error mb-6 hidden">
+        <span>送信に失敗しました。しばらく時間をおいてからもう一度お試しください。</span>
+      </div>
+
+      <form class="flex flex-col gap-5" onsubmit="return false;">
+        <div class="field">
+          <label class="label" for="email">メールアドレス</label>
+          <input class="input" type="email" id="email" placeholder="you@example.com" />
+          <p class="field-hint">返信先になります。</p>
+        </div>
+
+        <div class="field">
+          <label class="label" for="body">お問い合わせ内容</label>
+          <!-- 実装は素のtextareaを`.input`相当の見た目で描いている(使うのがこの1箇所
+               のみのため、shadcnのtextareaを入れていない。DESIGN.md 2章)。
+               `.input` は高さを 2.5rem に固定しているので、`h-auto` で外して rows を効かせる。 -->
+          <textarea class="input h-auto py-2 leading-relaxed" id="body" rows="8" maxlength="2000"></textarea>
+          <p class="field-hint">2,000文字まで</p>
+        </div>
+
+        <!-- ハニーポット。**画面から隠すだけでなく支援技術からも外す** —
+             sr-onlyだと読み上げられ、スクリーンリーダーの利用者が善意で埋めてしまう。
+             tabindex="-1" でキーボードの順路からも外す。 -->
+        <div aria-hidden="true" class="hidden">
+          <label for="website">website</label>
+          <input type="text" id="website" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <!-- 送信中は無効化してラベルを「送信中...」に変える。
+             既定のsubmitボタンが無効な間は入力欄でEnterを押しても送信が起こらないため、
+             二重送信の防波堤はこれ1つで足りる。 -->
+        <button class="btn btn-primary" type="submit">送信する</button>
+
+        <!-- ベータ版の但し書き。**返信の期限は約束しない**(開発者1人で運用しており、
+             「◯営業日以内」と書くと守れない日が出る)。 -->
+        <p class="field-hint">
+          本サービスはベータ版です。開発者1人で運用しているため、返信までにお時間をいただく場合があります。
+        </p>
+      </form>
+    </div>
+  </main>
+
+  <footer class="public-footer">
+    <div class="public-footer-inner">
+      <p>© 2026 FIRE-FIRE</p>
+      <div class="public-footer-links">
+        <a class="link" href="a9-terms.html">利用規約</a>
+        <a class="link" href="a10-privacy.html">プライバシーポリシー</a>
+        <a class="link" href="a11-contact.html">お問い合わせ</a>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+  // いずれもモック都合の代用(上のコメントを参照)。実装では認証状態とフォームの状態から判定する。
+  const params = new URLSearchParams(location.search);
+
+  if (params.get("signedIn") === "1") {
+    document.getElementById("nav-signed-out").classList.add("hidden");
+    document.getElementById("nav-signed-in").classList.remove("hidden");
+  }
+
+  if (params.get("sent") === "1") {
+    document.getElementById("sent-notice").classList.remove("hidden");
+  }
+
+  if (params.get("failed") === "1") {
+    document.getElementById("error-notice").classList.remove("hidden");
+  }
+</script>
+
+</body>
+</html>
