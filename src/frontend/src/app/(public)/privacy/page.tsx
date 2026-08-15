@@ -17,8 +17,8 @@ export const metadata: Metadata = {
  *
  * - 取得する情報 — Firebase Authentication と `users/{uid}` 配下のFirestore
  * - 取得しない情報 — 生CSVを保存しない(要件定義書 4.2)。ブラウザ内で解析し数値だけを保存する
- * - 外部サービス — Google(Firebase / Identity Platform)と Resend(ログイン通知メール。
- *   `src/backend/src/login-notification`)
+ * - 外部サービス — Google(Firebase / Google Cloud。認証はIdentity Platform)と
+ *   Resend(ログイン通知メール。`src/backend/src/login-notification`)
  *
  * 「取得しない情報」を独立した項にしているのは、扱うのが資産データであるだけに、生CSVを
  * 保存しない設計が利用者にとって最も知りたい部分になるためである。
