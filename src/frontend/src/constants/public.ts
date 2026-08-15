@@ -150,3 +150,14 @@ export const LEGAL_LAST_REVISED_ON = LEGAL_ENACTED_ON;
  */
 export const CONTACT_PREPARING_NOTICE =
   "本ポリシーに関するお問い合わせ先は現在準備中です。用意ができしだい、本ページに掲載します。";
+
+/**
+ * B10でアカウントを削除した直後にA0で1回だけ出す文言
+ * (docs/auth-login-requirements.md 3.11)。
+ *
+ * **再登録には招待が要ることまで書く。** 許可リストの該当ドキュメントも削除するため、
+ * 同じメールアドレスでもそのままでは登録し直せない(同3.10)。書かないと、登録できない
+ * 理由が分からないままA1で弾かれることになる。
+ */
+export const ACCOUNT_DELETED_NOTICE =
+  "アカウントとデータを削除しました。ご利用ありがとうございました。再度ご利用になる場合は、あらためて招待をお受けください。";

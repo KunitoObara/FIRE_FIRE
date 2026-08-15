@@ -18,6 +18,7 @@ const getLinkedProviders = vi.fn<() => LinkedProviderStatus[]>();
 const linkGoogleAccount = vi.fn();
 const unlinkProvider = vi.fn();
 const unlinkPasswordProvider = vi.fn();
+const hasPasswordProvider = vi.fn<(...args: unknown[]) => boolean>();
 const replace = vi.fn();
 
 vi.mock("@/lib/firebase/client", () => ({
@@ -50,6 +51,8 @@ vi.mock("@/lib/auth/linked-providers", () => ({
   linkGoogleAccount: () => linkGoogleAccount(),
   unlinkProvider: (...args: unknown[]) => unlinkProvider(...args),
   unlinkPasswordProvider: (...args: unknown[]) => unlinkPasswordProvider(...args),
+  // アカウント削除カードの可否判定に使う(docs/auth-login-requirements.md 3.11)
+  hasPasswordProvider: (...args: unknown[]) => hasPasswordProvider(...args),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -90,6 +93,7 @@ describe("AccountSettingsScreen", () => {
     vi.clearAllMocks();
     currentUser.mockReturnValue({ email: "taro.yamada@example.com" });
     hasEnrolledTotp.mockReturnValue(true);
+    hasPasswordProvider.mockReturnValue(true);
     requestPasswordReset.mockResolvedValue({ ok: true });
     fetchRecoveryCodeStatus.mockResolvedValue({
       ok: true,

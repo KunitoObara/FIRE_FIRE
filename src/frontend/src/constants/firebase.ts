@@ -50,3 +50,9 @@ export const RESET_MFA_ENROLLMENT_FUNCTION = "resetMfaEnrollment";
  * バックエンドのexport名(src/backend/src/linked-providers/functions.ts)と一致させる。
  */
 export const UNLINK_PASSWORD_PROVIDER_FUNCTION = "unlinkPasswordProvider";
+
+/**
+ * 本人確認のうえアカウントと利用者のデータをすべて削除するcallable関数の名前(B10)。
+ * バックエンドのexport名(src/backend/src/account-deletion/functions.ts)と一致させる。
+ */
+export const DELETE_ACCOUNT_FUNCTION = "deleteAccount";

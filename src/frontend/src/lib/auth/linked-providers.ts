@@ -25,6 +25,9 @@ import type { User } from "firebase/auth";
 /** 画面に出す順。A1・A4と同じくメール/パスワードを主、Googleを副として並べる */
 const MANAGED_PROVIDER_IDS: readonly LinkedProviderId[] = ["password", "google.com"];
 
+/** メール/パスワードのログイン方法の識別子。Firebaseが付ける値そのもの */
+const PASSWORD_PROVIDER_ID: LinkedProviderId = "password";
+
 /**
  * 連携後・解除後にブラウザ側が持つユーザー情報を取り直す。
  *
@@ -104,6 +107,19 @@ const toUnlinkFailureReason = (error: unknown): UnlinkProviderFailureReason => {
       return "unknown";
   }
 };
+
+/**
+ * パスワードでのログインが設定されているか(docs/auth-login-requirements.md 3.3)。
+ *
+ * パスワードの再入力を本人確認に使う操作 — 2FAの再設定・リカバリーコードの発行/再発行・
+ * アカウントの削除(3.11) — は、Googleのみのアカウントでは通せない。押してから断るのではなく、
+ * 押す前に無効化して理由を出すために画面が使う。
+ *
+ * 判定は`providerData`そのものから行う。IDトークンの内容ではなくSDKが保持している現在の
+ * 連携状況を見るため、別タブでの連携・解除の直後でも取り違えにくい。
+ */
+export const hasPasswordProvider = (user: User | null): boolean =>
+  user?.providerData.some((provider) => provider.providerId === PASSWORD_PROVIDER_ID) ?? false;
 
 /**
  * 現在のログイン方法の一覧を作る。

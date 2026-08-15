@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import type { passwordConfirmSchema } from "@/schemas/account";
+import type { accountDeletionSchema, passwordConfirmSchema } from "@/schemas/account";
 
 // アカウント設定画面(B10)関連の型。import を持つため既にモジュールであり、
 // `declare global` でグローバルへ公開する。
@@ -32,6 +32,66 @@ declare global {
      * メッセージが返った場合はダイアログを閉じず、その場で再入力できるようにする。
      */
     onConfirm: (password: string) => Promise<string | null>;
+  };
+
+  /**
+   * B10のアカウント削除の入力値(docs/auth-login-requirements.md 3.11)。
+   * パスワードに加えて登録メールアドレスの入力を求める。
+   */
+  type AccountDeletionFormValues = z.infer<typeof accountDeletionSchema>;
+
+  /**
+   * B10でアカウントを削除できなかった理由
+   * (`src/lib/auth/account-deletion.ts`、src/backend/src/account-deletion/functions.ts)。
+   */
+  type AccountDeletionFailureReason =
+    /** セッションが無い(直接アクセス・サインアウト済み) */
+    | "signed-out"
+    /** パスワードでのログインが無い。Googleのみのアカウントは本人確認を通せない */
+    | "password-not-linked"
+    /** 入力された確認用のメールアドレスが登録メールアドレスと一致しない */
+    | "email-mismatch"
+    /** 本人確認のパスワードが渡らなかった */
+    | "password-required"
+    /** 本人確認のパスワードが誤り */
+    | "invalid-credential"
+    | "too-many-requests"
+    /** データを消せなかった。**アカウントは残っている**のでやり直せる */
+    | "data-deletion-failed"
+    /** データは消えたがアカウントを消せなかった。**やり直しが要る** */
+    | "account-deletion-failed"
+    | CallableSharedFailureReason;
+
+  type AccountDeletionResult = { ok: true } | { ok: false; reason: AccountDeletionFailureReason };
+
+  /** B10のアカウント削除カードのProps */
+  type AccountDeletionCardProps = {
+    /** 確認ダイアログに何を入力すればよいかを示すための登録メールアドレス */
+    email: string | null;
+    /**
+     * この画面から削除できるか。パスワードでのログインが無いアカウント(Googleのみ)は
+     * 本人確認を通せないため`false`にし、ボタンを無効化して理由を併記する
+     */
+    canDelete: boolean;
+  };
+
+  /**
+   * B10のアカウント削除の確認ダイアログのProps。
+   *
+   * `PasswordConfirmDialog`と分けているのは、入力がパスワードだけではないため
+   * (登録メールアドレスの入力も求める)。共用にすると、他の3つの操作にも要らない入力欄が
+   * 増えるか、ダイアログ側が用途で分岐することになる。
+   */
+  type AccountDeleteConfirmDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    /** 入力を照合するためではなく、何を入力すればよいかを画面に示すために渡す */
+    email: string | null;
+    /**
+     * 入力値で削除を実行する。成功なら`null`、失敗なら画面に出すメッセージを返す。
+     * メッセージが返った場合はダイアログを閉じず、その場で入力し直せるようにする。
+     */
+    onConfirm: (values: AccountDeletionFormValues) => Promise<string | null>;
   };
 
   /** B10のアカウント情報カードのProps */

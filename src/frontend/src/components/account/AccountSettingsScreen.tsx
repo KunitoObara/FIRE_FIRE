@@ -1,10 +1,12 @@
 "use client";
 
+import { AccountDeletionCard } from "@/components/account/AccountDeletionCard";
 import { AccountInfoCard } from "@/components/account/AccountInfoCard";
 import { AccountPasswordCard } from "@/components/account/AccountPasswordCard";
 import { LinkedAccountsCard } from "@/components/account/LinkedAccountsCard";
 import { MfaResetCard } from "@/components/account/MfaResetCard";
 import { RecoveryCodeCard } from "@/components/account/RecoveryCodeCard";
+import { hasPasswordProvider } from "@/lib/auth/linked-providers";
 import { hasEnrolledTotp } from "@/lib/auth/mfa-enrollment";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 
@@ -19,7 +21,8 @@ import type { JSX } from "react";
  *
  * セクションの並びはモック(src/frontend/docs/html_mock/b10-account-settings.html)に合わせ、
  * ログイン手段そのものの話(アカウント情報・パスワード・ログイン方法)を先に、
- * 2FA関連(リカバリーコード・再設定)を後に置く。
+ * 2FA関連(リカバリーコード・再設定)を後に置く。**アカウントの削除は最後**に置く
+ * (docs/auth-login-requirements.md 3.11)。設定を見に来ただけの人の目に最初に入る場所ではない。
  */
 export const AccountSettingsScreen = (): JSX.Element => {
   const user = getFirebaseAuth().currentUser;
@@ -34,6 +37,7 @@ export const AccountSettingsScreen = (): JSX.Element => {
       <LinkedAccountsCard />
       <RecoveryCodeCard />
       <MfaResetCard />
+      <AccountDeletionCard email={user?.email ?? null} canDelete={hasPasswordProvider(user)} />
     </div>
   );
 };
