@@ -65,7 +65,57 @@ describe("PublicAuthActions(docs/screen-requirements-public.md 2章)", () => {
 
     const { container } = render(<PublicAuthActions />);
 
-    expect(container.firstElementChild).toHaveClass("h-7");
+    expect(container.querySelector(".min-h-7")).toBeInTheDocument();
+  });
+
+  /** A0のCTAはヘッダーより大きい。確保する高さもボタンの実寸に合わせる */
+  it("size=lgでは大きい導線の高さで領域を保つ", () => {
+    subscribeToPublicSessionState.mockReturnValue(() => {});
+
+    const { container } = render(<PublicAuthActions size="lg" />);
+
+    expect(container.querySelector(".min-h-11")).toBeInTheDocument();
+  });
+
+  /**
+   * 登録の案内なので、ログイン中には出さない(A0のヒーローでのみ使う)。
+   * docs/screen-requirements-public.md A0「サインアップボタンは置いたうえで招待制を添える」。
+   */
+  it("招待制の注記は未ログインのときだけ出す", () => {
+    withSessionState("signed-out");
+
+    render(<PublicAuthActions size="lg" withInviteOnlyNotice />);
+
+    expect(
+      screen.getByText("現在はベータ版のため、登録は招待制で運用しています。"),
+    ).toBeInTheDocument();
+  });
+
+  it("ログイン中は招待制の注記を出さない", () => {
+    withSessionState("signed-in");
+
+    render(<PublicAuthActions size="lg" withInviteOnlyNotice />);
+
+    expect(
+      screen.queryByText("現在はベータ版のため、登録は招待制で運用しています。"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** 注記も判定確定で文字が入るため、入る前から1行分の高さを確保しておく */
+  it("注記を出す設定なら、判定中も1行分の高さを確保する", () => {
+    subscribeToPublicSessionState.mockReturnValue(() => {});
+
+    const { container } = render(<PublicAuthActions size="lg" withInviteOnlyNotice />);
+
+    expect(container.querySelector("p.min-h-4")).toBeInTheDocument();
+  });
+
+  it("注記を出さない設定なら領域ごと置かない", () => {
+    withSessionState("signed-out");
+
+    const { container } = render(<PublicAuthActions size="lg" />);
+
+    expect(container.querySelector("p")).not.toBeInTheDocument();
   });
 
   it("アンマウント時に購読を解除する", () => {
