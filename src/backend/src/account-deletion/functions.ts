@@ -105,7 +105,19 @@ export const deleteAccount = onCall(
 
     // IDトークンの内容ではなくAdmin SDKで取得した現在の状態で判定する
     // (別タブでの連携解除などがトークンに反映される前に古い前提で消さないため)
-    const user = await getAuth().getUser(uid);
+    let user;
+
+    try {
+      user = await getAuth().getUser(uid);
+    } catch (error) {
+      // 1回目の呼び出しが最後まで終わったあとに2回目が届くと、ここで見つからない。
+      // 目的は達しているので成功として返す(下の`deleteUser`と同じ理由)
+      if (isUserNotFoundError(error)) {
+        return { ok: true };
+      }
+
+      throw error;
+    }
 
     if (!user.providerData.some((provider) => provider.providerId === PASSWORD_PROVIDER_ID)) {
       throw failure(
