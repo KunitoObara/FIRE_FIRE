@@ -14,7 +14,9 @@ function Card({
       className={cn(
         /*
           モック `.card` に合わせている(`ui/button.tsx` と同じ理由)。生成時からの変更は3点。
-          - 余白 `--card-spacing` を16px → 24px(モックのカードは `p-6`)
+          - 余白 `--card-spacing` を16px → 24px。**モックの `.card` 自体は余白を持たず、
+            画面側で `p-6`(40箇所)・`p-5`(18)・`p-3`(4)・`p-4`(2)と混在している。**
+            多数派の24pxを既定に採り、そこから外れる箇所は画面を触る回に個別に当てる
           - 角丸を `rounded-xl`(`--radius`×1.4)→ `rounded-lg`(`--radius` そのもの)
           - 境界を `ring-1 ring-foreground/10` → `border` + `shadow-xs`。モックは枠線と
             影の両方を持ち、影(`0 1px 2px 0 rgb(0 0 0/0.05)`)が `shadow-xs` にあたる
