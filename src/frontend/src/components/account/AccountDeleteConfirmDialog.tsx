@@ -42,6 +42,8 @@ import type { JSX } from "react";
  * 確認を素通りできてしまう。ここで落とすのは未入力だけにする。
  *
  * 失敗した場合はダイアログを閉じずにその場でエラーを出す(`PasswordConfirmDialog`と同じ方針)。
+ * **成功した場合は自分では閉じない** — `onConfirm`がA0へ遷移し、このダイアログごと
+ * アンマウントされるため(`LogoutConfirmDialog`と同じ)。
  */
 export const AccountDeleteConfirmDialog = ({
   open,
@@ -79,11 +81,11 @@ export const AccountDeleteConfirmDialog = ({
 
     if (message !== null) {
       setFailureMessage(message);
-      return;
     }
 
-    reset();
-    onOpenChange(false);
+    // 成功したときは何もしない。`onConfirm`がA0へ遷移し、このダイアログごと
+    // アンマウントされるため(`LogoutConfirmDialog`と同じ方針)。ここで閉じにいくと、
+    // 遷移の直前に閉じるアニメーションが一瞬入る
   });
 
   return (
