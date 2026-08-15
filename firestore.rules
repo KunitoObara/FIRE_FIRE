@@ -24,6 +24,19 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // 問い合わせフォームの送信間隔の記録(docs/screen-requirements-public.md A11)。
+    //
+    // ドキュメントIDは送信元IPのSHA-256ハッシュで、中身は最後に送信できた時刻だけ。
+    // **問い合わせの内容そのものはここにも他のどこにも保存しない**(PO判断)。
+    //
+    // 書くのは未ログインから叩ける唯一のcallable(`sendContactMessage`)で、Admin SDK経由の
+    // ためこのルールを経由しない。クライアントに開ける理由が無いので全面的に拒否する
+    // (`mfaRecoveryCodes`・`signupAllowlist`と同じ扱い)。読ませると、送信間隔の記録の有無から
+    // 「誰かが問い合わせたこと」を外から観測できてしまう。
+    match /contactThrottle/{throttleKey} {
+      allow read, write: if false;
+    }
+
     // ユーザー自身の資産データ(docs/fire-asset-management-requirements.md 5章)。
     //
     // B2 CSV取込はクライアントSDKから直接書き込む。認証状態はブラウザ側のFirebase SDKが

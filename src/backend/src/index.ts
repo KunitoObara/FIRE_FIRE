@@ -24,3 +24,5 @@ export { deleteAccount } from "./account-deletion/functions";
 export { sendLoginNotification } from "./login-notification/functions";
 
 export { restrictSignUpToAllowlist } from "./signup-allowlist/functions";
+
+export { sendContactMessage } from "./contact/functions";
