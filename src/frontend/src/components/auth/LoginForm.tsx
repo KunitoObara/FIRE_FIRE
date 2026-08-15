@@ -9,6 +9,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { DevDashboardShortcut } from "@/components/auth/DevDashboardShortcut";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { PasswordField } from "@/components/auth/PasswordField";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -103,9 +104,9 @@ export const LoginForm = (): JSX.Element => {
 
       <CardContent>
         {showLoggedOutNotice ? (
-          <p role="status" className="mb-5 rounded-lg bg-primary/10 px-4 py-2 text-sm text-primary">
+          <Alert variant="success" role="status" className="mb-5">
             ログアウトしました。
-          </p>
+          </Alert>
         ) : null}
 
         <form noValidate onSubmit={handleSubmit(handleValidSubmit)}>
