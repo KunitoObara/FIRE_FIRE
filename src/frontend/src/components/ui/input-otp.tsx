@@ -31,8 +31,13 @@ function InputOTPGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="input-otp-group"
+      /*
+        モック `.otp-row` は桁ごとに独立した枠を `gap: 0.5rem` で並べる。生成時は枠線を
+        共有した1つながりの帯(セグメント表示)だったので、`gap-2` を足して桁を分ける。
+        枠と角丸は各桁側(`InputOTPSlot`)が持つ。
+      */
       className={cn(
-        "flex items-center rounded-lg has-aria-invalid:border-destructive has-aria-invalid:ring-3 has-aria-invalid:ring-destructive/20 dark:has-aria-invalid:ring-destructive/40",
+        "flex items-center gap-2 has-aria-invalid:border-destructive has-aria-invalid:ring-3 has-aria-invalid:ring-destructive/20 dark:has-aria-invalid:ring-destructive/40",
         className,
       )}
       {...props}
@@ -55,7 +60,12 @@ function InputOTPSlot({
       data-slot="input-otp-slot"
       data-active={isActive}
       className={cn(
-        "relative flex size-8 items-center justify-center border-y border-r border-input text-sm transition-all outline-none first:rounded-l-lg first:border-l last:rounded-r-lg aria-invalid:border-destructive data-[active=true]:z-10 data-[active=true]:border-ring data-[active=true]:ring-3 data-[active=true]:ring-ring/50 data-[active=true]:aria-invalid:border-destructive data-[active=true]:aria-invalid:ring-destructive/20 dark:bg-input/30 dark:data-[active=true]:aria-invalid:ring-destructive/40",
+        /*
+          モック `.otp-box` は 2.75rem × 3rem で、桁ごとに四辺の枠と角丸を持つ
+          (`InputOTPGroup` の注記を参照)。生成時は `size-8` の正方形で、左右の枠を
+          隣と共有していた。数字は `tabular-nums` で桁幅を揃える。
+        */
+        "relative flex h-12 w-11 items-center justify-center rounded-lg border border-input text-xl tabular-nums transition-all outline-none aria-invalid:border-destructive data-[active=true]:z-10 data-[active=true]:border-ring data-[active=true]:ring-3 data-[active=true]:ring-ring/50 data-[active=true]:aria-invalid:border-destructive data-[active=true]:aria-invalid:ring-destructive/20 dark:bg-input/30 dark:data-[active=true]:aria-invalid:ring-destructive/40",
         className,
       )}
       {...props}

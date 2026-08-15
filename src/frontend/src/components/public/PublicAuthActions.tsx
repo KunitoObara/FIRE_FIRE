@@ -14,7 +14,7 @@ import type { JSX } from "react";
 /**
  * 判定確定前に確保しておく領域の高さ。**ボタンの実寸と一致させる。**
  *
- * `sm`は`Button size="sm"`の`h-7`、`lg`はA0のCTA用に少し大きくした`h-11`。
+ * `sm`は`Button size="sm"`の`h-8`、`lg`はA0のCTA用に少し大きくした`h-11`。
  * ずれていると、導線が埋まった瞬間に本文が跳ねる。
  *
  * **固定値(`h-*`)ではなく下限(`min-h-*`)にしてある。** 狭い幅で導線が折り返したときに、
@@ -22,7 +22,7 @@ import type { JSX } from "react";
  * 折り返した分は素直に伸びる。
  */
 const ACTIONS_MIN_HEIGHT_CLASS: Record<PublicAuthActionsSize, string> = {
-  sm: "min-h-7",
+  sm: "min-h-8",
   lg: "min-h-11",
 };
 
