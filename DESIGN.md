@@ -13,7 +13,7 @@
 | 用途 | 選定 | 備考 |
 |---|---|---|
 | CSSフレームワーク | Tailwind CSS | 指定 |
-| UIコンポーネント | shadcn/ui | 指定。CLI経由で必要なコンポーネントのみ`src/frontend`に追加する(フルインストールしない) |
+| UIコンポーネント | shadcn/ui | 指定。CLI経由で必要なコンポーネントのみ`src/frontend`に追加する(フルインストールしない)。**`components.json` は `style: radix-nova` / `baseColor: neutral` で、生成されるコンポーネントの寸法も配色もモックと合わない** — 下記の注意を読むこと |
 | アイコン | lucide-react(既定) + FontAwesome | lucide-reactはshadcn/uiの標準アイコンセットで、既定はこちらを使う。FontAwesome(`@fortawesome/react-fontawesome` + `free-solid-svg-icons`)は指定により併用する。**同じ用途のアイコンで2つを混ぜない**(例: パスワード表示トグルは全画面でFontAwesomeの`eye`/`eye-slash`)。1画面に両方が現れること自体は許容する — shadcn/uiのコンポーネントが内部でlucideを使っており(`ui/checkbox.tsx`の`CheckIcon`等)、画面単位で片方に統一することは構造上できないため |
 | フォーム/バリデーション | react-hook-form + zod | shadcn/uiのForm系コンポーネントが前提とする組み合わせ |
 | チャート | Recharts(shadcn/uiの`chart`コンポーネント経由) | 資産推移(資産種別の積み上げ面。負債は0より下の帯として積み、反映の有無を切替)・分類別内訳(円グラフ)・FIRE達成度ゲージ(RadialBarChartで代用)に使用 |
@@ -26,6 +26,16 @@
 | 日本語フォント | next/font 経由でNoto Sans JP等を最適化配信 | 全画面日本語UIのため |
 
 各追加ライブラリは特定の画面要件に対応づけて選定している(3章参照)。要件にない機能のために先回りして追加しない。
+
+### `npx shadcn add` で入れたコンポーネントは、そのままでは使わない
+
+`components.json` の `style` は **`radix-nova`** で、これは**コンパクトな寸法体系**を持つ。生成されるボタン・入力欄は `h-8`(32px)、カードの余白は16pxで、HTMLモック(`docs/html_mock/common.css`)の 40px / 24〜32px より一段小さい。`baseColor` も `neutral` で、3章のとおり配色はモック側を正としている。
+
+そのため **`src/components/ui/**` の一部は、生成後に手で寸法を取り直してある**([X0-7](https://trello.com/c/GGyun7jn))。`button.tsx`(サイズ4段階と `destructive` の塗り)・`input.tsx`・`card.tsx`・`input-otp.tsx`・`alert.tsx` が該当し、いずれも**変更した理由をファイル内のコメントに残してある**。
+
+- **新しいコンポーネントをCLIで足したときは、既存のものと寸法が揃っているか確かめる。** 何もしなければ radix-nova の既定(`h-8` など)で入るので、隣に並ぶ入力欄(40px)と高さが合わない
+- **既存のコンポーネントを再生成しない。** 手を入れた分が黙って消える。どうしても入れ直すときは、コメントの残っている箇所を先に控えておく
+- `src/components/ui/**` を「CLIが再生成するベンダーコード」として扱う[CODING_STANDARDS.md](src/frontend/docs/CODING_STANDARDS.md)の記述は、lintの適用範囲についてのもので、手を入れてはいけないという意味ではない(`sonner.tsx` にも先例がある)
 
 ## 3. カラーシステム
 

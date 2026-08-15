@@ -65,7 +65,8 @@ describe("PublicAuthActions(docs/screen-requirements-public.md 2章)", () => {
 
     const { container } = render(<PublicAuthActions />);
 
-    expect(container.querySelector(".min-h-7")).toBeInTheDocument();
+    // `Button size="sm"` の実寸(`h-8`)と揃える。ずれると確定した瞬間に本文が跳ねる
+    expect(container.querySelector(".min-h-8")).toBeInTheDocument();
   });
 
   /** A0のCTAはヘッダーより大きい。確保する高さもボタンの実寸に合わせる */
