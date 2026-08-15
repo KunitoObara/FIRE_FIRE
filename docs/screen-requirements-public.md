@@ -4,9 +4,9 @@
 
 本ドキュメントは [画面一覧・画面遷移図](./screen-list-and-transitions.md) 2.0節の公開画面(A0・A9・A10)について、画面ごとの要件を詳細化したものである。公開面を持つこと自体の方針は [FIRE-FIRE 要件定義書](./fire-asset-management-requirements.md) 4.15節を参照。
 
-**実装状況: A9・A10は実装済み、A0は未実装。** A9(`/terms`)・A10(`/privacy`)と、3画面が共有する公開用シェル(ヘッダー・フッター・導線)は [screen-spec-drift-check](../.claude/skills/screen-spec-drift-check/SKILL.md) の対象に入っている。A0はルートもコンポーネントもまだ無いため対象外である(実装が入った時点で対象に入る)。
+**実装状況: 3画面とも実装済み。** A0(`/`)・A9(`/terms`)・A10(`/privacy`)と、3画面が共有する公開用シェル(ヘッダー・フッター・導線)は [screen-spec-drift-check](../.claude/skills/screen-spec-drift-check/SKILL.md) の対象である。
 
-**現在の `/` は開発環境構築の動作確認用のプレースホルダー**(`src/frontend/src/app/(setup-check)/page.tsx`)が応答している。A0の実装でこれを置き換え、`(setup-check)` は `spa-check` ごと削除する(3章)。**そのため、A9・A10のヘッダーのロゴが指す `/` は、A0が入るまでこのプレースホルダーに着地する。**
+**`/` はA0が応答する。** 開発環境構築の動作確認用のプレースホルダー(`(setup-check)`)は、A0の実装とともに `spa-check` ごと削除した(3章)。
 
 **フェーズの段には乗らない。** Phase 1〜4が「ダッシュボードに何を載せるか」、Phase 5〜7が「外部への依存の重さ」で分かれているのに対し、この3画面はどちらの軸にも乗らない([要件定義書 7.3](./fire-asset-management-requirements.md#73-サービスの公開面をフェーズ順に乗せない理由))。
 
@@ -218,5 +218,5 @@ B1へ自動で飛ばすと、ログイン中はA0を見返す手段が無くな�
 - **問い合わせ先メールアドレスの用意。** A10に載せる連絡先で、取得済みドメイン(`fire-fire.live`)のアドレスを想定している。ドメインの接続作業と合わせて行う([X4](https://trello.com/c/8wpkp9Gt))。**アドレスの代わりに問い合わせフォームを置く案も出ている**([X6](https://trello.com/c/fYjMjcBS))が、現行のA0は入力項目を持たない方針(A0)なので、フォームを採るならその記述を先に改める
 - ~~**登録を実際に制限するか。**~~ **決定済み** — Blocking Functions(`beforeUserCreated`)と許可リストによる事前承認制にする。仕様は [auth-login-requirements.md](./auth-login-requirements.md) 3.10、実装は [X5](https://trello.com/c/5k33KGEY)。A0のスコープには引き続き含めない(画面の表示と、認証基盤側の遮断は別物のため)
 - **規約改定時の同意の取り直し。** A1の同意チェックは同意した規約の版を記録していない([screen-requirements-auth.md](./screen-requirements-auth.md) A1)。改定時に再同意を求めるなら、版の記録から要る
-- ~~**`(setup-check)/spa-check` の扱い。**~~ **決定済み** — A0の実装で `(setup-check)` を `spa-check` ごと削除する。クライアント遷移の確認は、A0 ⇄ A9・A10 のヘッダー・フッターの導線が実物のSPA遷移になるため役目を果たせている。到達手段の無いルートを本番に配信し続けない
+- ~~**`(setup-check)/spa-check` の扱い。**~~ **対応済み** — A0の実装で `(setup-check)` を `spa-check` ごと削除した。クライアント遷移の確認は、A0 ⇄ A9・A10 のヘッダー・フッターの導線が実物のSPA遷移になるため役目を果たせている(実機でフルリロードが起きないことを確認済み)。到達手段の無いルートを本番に配信し続けない
 - **ヘルプページ([X2](https://trello.com/c/tgP5d1Ue))との関係。** ヘルプを作るなら、A0のフッターからの導線が要る。A0の実装時点では未着手のため、フッターに枠だけ置くことはしない
