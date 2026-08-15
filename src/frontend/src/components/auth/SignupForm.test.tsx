@@ -77,8 +77,27 @@ describe("SignupForm", () => {
       "href",
       "/login",
     );
-    expect(screen.getByRole("link", { name: "利用規約" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "プライバシーポリシー" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "利用規約" })).toHaveAttribute("href", "/terms");
+    expect(screen.getByRole("link", { name: "プライバシーポリシー" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
+  });
+
+  /**
+   * 同意する前に本文を読むためのリンクなので、同じタブで遷移すると入力済みの
+   * メールアドレスとパスワードが消える(このフォームは入力を保存していない)。
+   */
+  it("利用規約・プライバシーポリシーは別タブで開く", () => {
+    render(<SignupForm />);
+
+    [
+      screen.getByRole("link", { name: "利用規約" }),
+      screen.getByRole("link", { name: "プライバシーポリシー" }),
+    ].forEach((link) => {
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
   });
 
   describe("パスワードの表示/非表示トグル", () => {

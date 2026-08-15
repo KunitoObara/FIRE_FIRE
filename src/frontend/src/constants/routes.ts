@@ -3,6 +3,17 @@
  * 遷移先をコンポーネント内に直接書かず、ここに集約する。
  */
 
+/**
+ * A0 サービストップページ。
+ *
+ * 公開画面(A0・A9・A10)は認証フローに属さず、ログイン中に開いてもB1へリダイレクトしない
+ * (docs/screen-requirements-public.md 2章)。A9・A10のヘッダーのロゴから戻る先でもある。
+ */
+export const TOP_PATH = "/";
+/** A9 利用規約画面。A0のフッターとA1の同意チェックからリンクする */
+export const TERMS_PATH = "/terms";
+/** A10 プライバシーポリシー画面。リンク元はA9と同じ */
+export const PRIVACY_PATH = "/privacy";
 /** A1 サインアップ画面 */
 export const SIGNUP_PATH = "/signup";
 /** A2 メールアドレス確認待ち画面 */

@@ -30,7 +30,7 @@ import {
   PASSWORD_POLICY_VIOLATION_MESSAGE,
   SIGN_UP_FORM_LEVEL_MESSAGES,
 } from "@/constants/auth";
-import { LOGIN_PATH, VERIFY_EMAIL_PATH } from "@/constants/routes";
+import { LOGIN_PATH, PRIVACY_PATH, TERMS_PATH, VERIFY_EMAIL_PATH } from "@/constants/routes";
 import { signUpWithEmail } from "@/lib/auth/sign-up";
 import { signupSchema } from "@/schemas/signup";
 
@@ -179,20 +179,30 @@ export const SignupForm = (): JSX.Element => {
                   )}
                 />
                 {/*
-                  TODO: 利用規約・プライバシーポリシーのページを用意してリンク先を差し替える。
-                  docs/screen-list-and-transitions.md の画面一覧(A1〜A8 / B1〜B11)に
-                  該当する画面IDがまだ無いため、静的ページとして持つか外部URLにするかを
-                  決めたうえで src/constants/routes.ts に追加する。
+                  規約2ページ(A9・A10)は**別タブで開く**。同意する前に本文を読むための
+                  リンクなので、同じタブで遷移すると入力済みのメールアドレスとパスワードが
+                  消える(このフォームは入力を保存していない)。
+                  外部サイトではないため`<Link>`を使い、`rel`はタブ間の参照を切るために添える。
                 */}
                 <FieldLabel htmlFor="agreedToTerms" className="font-normal">
                   <span>
-                    <a href="#" className="underline underline-offset-4">
+                    <Link
+                      href={TERMS_PATH}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-4"
+                    >
                       利用規約
-                    </a>{" "}
+                    </Link>{" "}
                     と{" "}
-                    <a href="#" className="underline underline-offset-4">
+                    <Link
+                      href={PRIVACY_PATH}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-4"
+                    >
                       プライバシーポリシー
-                    </a>{" "}
+                    </Link>{" "}
                     に同意します
                   </span>
                 </FieldLabel>
