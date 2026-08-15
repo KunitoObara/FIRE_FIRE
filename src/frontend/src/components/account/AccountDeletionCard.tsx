@@ -16,6 +16,7 @@ import {
 } from "@/constants/account";
 import { TOP_PATH } from "@/constants/routes";
 import { deleteAccount } from "@/lib/auth/account-deletion";
+import { refreshPasswordProviderState } from "@/lib/auth/linked-providers";
 import { clearLoggedOutNotice } from "@/lib/auth/logout-notice";
 import { performSignOut } from "@/lib/auth/sign-out";
 
@@ -41,6 +42,10 @@ import type { JSX } from "react";
  * **パスワードでのログインが無いアカウント(Googleのみ)ではボタンを無効化する。** 本人確認を
  * パスワードで行う以上この画面からは削除できず(3.3の他の操作と同じ制約)、押せてしまうと
  * ダイアログに入力しきってから断られることになる。理由と代わりの手段も併記する。
+ *
+ * 渡された`canDelete`は**画面を描いた時点の値**でしかない。同じ画面の「ログイン方法」から
+ * パスワード連携を解除しても、この画面は再描画されないため古い値のまま残る。ダイアログを
+ * 開く直前にサーバー側の状態で取り直し、**入力させてから断ることのないようにする**。
  */
 export const AccountDeletionCard = ({
   email,
@@ -50,6 +55,25 @@ export const AccountDeletionCard = ({
   // このカードは(dashboard)シェルの内側にあるため`QueryClientProvider`配下にある
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  /** 開こうとした時点で削除できないと分かった場合の理由。`canDelete`が古かったときに出る */
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+
+  const handleOpen = async (): Promise<void> => {
+    setIsChecking(true);
+    setBlockedMessage(null);
+
+    const canStillDelete = await refreshPasswordProviderState();
+
+    setIsChecking(false);
+
+    if (!canStillDelete) {
+      setBlockedMessage(ACCOUNT_DELETION_PASSWORD_REQUIRED_NOTICE);
+      return;
+    }
+
+    setIsDialogOpen(true);
+  };
 
   const handleConfirm = async ({
     password,
@@ -80,15 +104,15 @@ export const AccountDeletionCard = ({
         <Button
           type="button"
           variant="destructive"
-          disabled={!canDelete}
-          onClick={() => setIsDialogOpen(true)}
+          disabled={!canDelete || isChecking}
+          onClick={handleOpen}
         >
           {ACCOUNT_DELETION_BUTTON_LABEL}
         </Button>
 
-        {canDelete ? null : (
+        {canDelete && blockedMessage === null ? null : (
           <p className="text-sm text-muted-foreground">
-            {ACCOUNT_DELETION_PASSWORD_REQUIRED_NOTICE}
+            {blockedMessage ?? ACCOUNT_DELETION_PASSWORD_REQUIRED_NOTICE}
           </p>
         )}
       </CardContent>

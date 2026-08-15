@@ -9,6 +9,7 @@ import { markLoggedOut, wasLoggedOut } from "@/lib/auth/logout-notice";
 const replace = vi.fn();
 const deleteAccount = vi.fn<(password: string, confirmEmail: string) => Promise<unknown>>();
 const performSignOut = vi.fn<(clearQueryCache?: () => void) => Promise<unknown>>();
+const refreshPasswordProviderState = vi.fn<() => Promise<boolean>>();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
@@ -20,6 +21,10 @@ vi.mock("@/lib/auth/account-deletion", () => ({
 
 vi.mock("@/lib/auth/sign-out", () => ({
   performSignOut: (clearQueryCache?: () => void) => performSignOut(clearQueryCache),
+}));
+
+vi.mock("@/lib/auth/linked-providers", () => ({
+  refreshPasswordProviderState: () => refreshPasswordProviderState(),
 }));
 
 /** このカードは(dashboard)シェルの内側にあり、`QueryClientProvider`配下で動く */
@@ -48,6 +53,7 @@ describe("AccountDeletionCard(docs/auth-login-requirements.md 3.11)", () => {
     vi.clearAllMocks();
     deleteAccount.mockResolvedValue({ ok: true });
     performSignOut.mockResolvedValue({ ok: true });
+    refreshPasswordProviderState.mockResolvedValue(true);
   });
 
   it("登録メールアドレスとパスワードを渡して削除する", async () => {
@@ -150,6 +156,34 @@ describe("AccountDeletionCard(docs/auth-login-requirements.md 3.11)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "データは削除しましたが、アカウントを削除できませんでした。",
     );
+  });
+
+  /**
+   * 渡された`canDelete`は画面を描いた時点の値でしかない。同じ画面の「ログイン方法」から
+   * パスワード連携を解除しても再描画されないため、開く直前に取り直す。
+   */
+  it("開く直前にパスワード連携の有無を取り直す", async () => {
+    const user = userEvent.setup();
+    renderCard({ email: "user@example.com", canDelete: true });
+
+    await openDialog(user);
+
+    expect(refreshPasswordProviderState).toHaveBeenCalledOnce();
+    expect(screen.getByLabelText("登録メールアドレス")).toBeInTheDocument();
+  });
+
+  /** 入力させてから断らない。開かずに理由だけを出す */
+  it("開く時点でパスワード連携が消えていればダイアログを開かない", async () => {
+    refreshPasswordProviderState.mockResolvedValue(false);
+    const user = userEvent.setup();
+    renderCard({ email: "user@example.com", canDelete: true });
+
+    await openDialog(user);
+
+    expect(screen.queryByLabelText("登録メールアドレス")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/パスワードでのログインを設定していないアカウントは/),
+    ).toBeInTheDocument();
   });
 
   it("未入力のまま実行しようとすると削除しない", async () => {
