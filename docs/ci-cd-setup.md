@@ -377,6 +377,30 @@ for PROJECT_ID in fire-fire-dev fire-fire-prod; do
 done
 ```
 
+### Cloud Functions 用のシークレット（`CONTACT_RECIPIENT_EMAIL`）
+
+お問い合わせフォーム（[screen-requirements-public.md](./screen-requirements-public.md) A11）の**受信先メールアドレス**を登録する。**登録しないと functions のデプロイが「シークレットが存在しない」で失敗する。**
+
+```bash
+firebase functions:secrets:set CONTACT_RECIPIENT_EMAIL --project fire-fire-dev
+```
+
+- **秘密の値だからではなく、リポジトリに置けない値だからここに置く。** 開発者本人のアドレスで、このリポジトリは公開されている（ルートの `CLAUDE.md`）。`IDENTITY_PLATFORM_WEB_API_KEY` と同じ理由・同じ置き場にする
+- **Resend の共有ドメインから送るため、宛先は Resend アカウントの登録アドレスに限られる**（13 章）。ここに別のアドレスを入れると送信が拒否される。独自ドメインの検証を通すまではその制約のまま
+- dev / prod それぞれのプロジェクトで実行する。同じアドレスでよい（どちらから来たかは件名の `[dev]` で見分ける）
+- 未設定のまま呼ばれた場合、callable は `not-configured` を返し画面は再送を促す。ログに `CONTACT_RECIPIENT_EMAILが未設定` が出る
+
+デプロイ用サービスアカウントへの権限付与も同様に必要。
+
+```bash
+for PROJECT_ID in fire-fire-dev fire-fire-prod; do
+  gcloud secrets add-iam-policy-binding CONTACT_RECIPIENT_EMAIL \
+    --project="$PROJECT_ID" \
+    --member="serviceAccount:github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.admin"
+done
+```
+
 ### Artifact Registry のクリーンアップポリシー（手動設定は不要）
 
 **この節に手動作業は無い。** [deploy.yml](../.github/workflows/deploy.yml) の「Artifact Registry のクリーンアップポリシーを設定する」ステップが毎回設定するので、通常は読み飛ばしてよい。以下は、なぜそのステップが要るのかと、新しいプロジェクト／リージョンを足したときに何が起きるかの説明。
