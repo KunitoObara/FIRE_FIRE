@@ -99,7 +99,15 @@ export const DashboardPreview = (): JSX.Element => (
               strokeWidth="1"
             />
             <defs>
-              {/* 負債のハッチング。B1の円グラフ・推移グラフと同じ模様にする */}
+              {/*
+                負債のハッチング。B1の円グラフ・推移グラフと同じ模様にする。
+
+                このIDは下の円グラフからも `url(#...)` で参照する(同一ドキュメント内なら
+                SVGをまたいで解決される)。**固定の文字列なので、このコンポーネントを同じ
+                ページに2つ以上置くならIDを一意化すること。** 今はA0のヒーローに1つだけで、
+                一意化には`useId`が要り、静的なServer Componentを`"use client"`へ
+                落とすことになるため固定のままにしてある。
+              */}
               <pattern
                 id="top-preview-debt-hatch"
                 patternUnits="userSpaceOnUse"
