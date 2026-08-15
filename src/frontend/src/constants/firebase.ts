@@ -56,3 +56,14 @@ export const UNLINK_PASSWORD_PROVIDER_FUNCTION = "unlinkPasswordProvider";
  * バックエンドのexport名(src/backend/src/account-deletion/functions.ts)と一致させる。
  */
 export const DELETE_ACCOUNT_FUNCTION = "deleteAccount";
+
+/**
+ * アカウント削除の呼び出しを待つ時間(ミリ秒)。
+ *
+ * **バックエンドの`timeoutSeconds`(300秒)と必ず揃える**
+ * (src/backend/src/account-deletion/functions.ts)。SDKの既定は70秒で、指定しないと
+ * **サーバー側を延ばした意味が消える** — 取引が積み上がったアカウントで再帰削除が
+ * 70秒を超えると、削除は進んでいるのにクライアントだけ先に諦めてエラーを見せることになる。
+ * リポジトリが別で値そのものは共有できないため、両側にこの注記を置いて片方だけ変わるのを防ぐ。
+ */
+export const DELETE_ACCOUNT_TIMEOUT_MS = 300_000;

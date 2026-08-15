@@ -96,6 +96,10 @@ export const deleteAccount = onCall(
       (CSV1回の取込で最大20,000件。docs/transaction-import-requirements.md 8章)。
       失敗しても冪等にやり直せるが、**削除を求めた人にエラーを見せてやり直しを迫るのは
       最も避けたい場面**なので、1回で終わる見込みを上げておく。
+
+      **クライアント側のタイムアウトと必ず揃える**
+      (`src/frontend/src/constants/firebase.ts`の`DELETE_ACCOUNT_TIMEOUT_MS`)。
+      呼び出し側のSDKは既定70秒で、そちらが短いままだとここを延ばした意味が消える。
     */
     timeoutSeconds: 300,
   },

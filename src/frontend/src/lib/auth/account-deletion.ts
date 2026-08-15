@@ -1,6 +1,6 @@
 import { httpsCallable } from "firebase/functions";
 
-import { DELETE_ACCOUNT_FUNCTION } from "@/constants/firebase";
+import { DELETE_ACCOUNT_FUNCTION, DELETE_ACCOUNT_TIMEOUT_MS } from "@/constants/firebase";
 import { markAccountDeleted } from "@/lib/auth/account-deleted-notice";
 import { toCallableFailureReason } from "@/lib/auth/callable-error";
 import { getFirebaseFunctions } from "@/lib/firebase/client";
@@ -40,7 +40,11 @@ export const deleteAccount = async (
   confirmEmail: string,
 ): Promise<AccountDeletionResult> => {
   try {
-    const callable = httpsCallable(getFirebaseFunctions(), DELETE_ACCOUNT_FUNCTION);
+    // タイムアウトはサーバー側と揃える。既定(70秒)のままだと、再帰削除が長引いたときに
+    // クライアントだけ先に諦めて「削除できませんでした」を出す(`DELETE_ACCOUNT_TIMEOUT_MS`)
+    const callable = httpsCallable(getFirebaseFunctions(), DELETE_ACCOUNT_FUNCTION, {
+      timeout: DELETE_ACCOUNT_TIMEOUT_MS,
+    });
     await callable({ password, confirmEmail });
 
     markAccountDeleted();
