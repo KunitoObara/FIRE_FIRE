@@ -514,7 +514,9 @@
                   <div class="flex items-center gap-3">
                     <svg viewBox="0 0 120 120" class="shrink-0" style="width: 4.5rem; height: 4.5rem;" role="img" aria-label="FIRE達成度ゲージのサンプル。38%">
                       <circle cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--secondary))" stroke-width="14"/>
-                      <circle cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--primary))" stroke-width="14"
+                      <!-- アークの色は実装(FireProgressGauge.tsx)と同じ --chart-1。B1のゲージだけ
+                         資産分類スロットの1つを使っている -->
+                    <circle cx="60" cy="60" r="45" fill="none" stroke="var(--chart-1)" stroke-width="14"
                               stroke-linecap="round" stroke-dasharray="106 283" transform="rotate(-90 60 60)"/>
                       <text x="60" y="67" text-anchor="middle" font-size="24" font-weight="700" fill="hsl(var(--foreground))">38%</text>
                     </svg>

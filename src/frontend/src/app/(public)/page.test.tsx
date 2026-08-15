@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import TopPage from "@/app/(public)/page";
@@ -95,13 +95,28 @@ describe("A0 サービストップページ(docs/screen-requirements-public.md A
 
   /** 実データのスクリーンショットは置けないため、ダミー値で描いたB1の簡略版を出す */
   it("ヒーローにB1の画面イメージを置く", () => {
+    const { container } = render(<TopPage />);
+
+    expect(
+      screen.getByText(
+        "ダッシュボード(B1)の画面イメージです。実際のデータではなく、説明のためのサンプルです。",
+      ),
+    ).toBeInTheDocument();
+    // 資産推移・分類別内訳・FIRE達成度の3つ
+    expect(container.querySelectorAll('[role="img"]')).toHaveLength(3);
+  });
+
+  /**
+   * 押せるナビも動く数字も無い装飾なので、読み上げの対象から外す。そのまま読み上げると
+   * 本物のダッシュボードと区別が付かない(代わりにサンプルである旨の一文を出す)。
+   */
+  it("画面イメージの中身は読み上げの対象から外す", () => {
     render(<TopPage />);
 
-    const preview = screen.getByRole("img", {
-      name: /資産種別を積み上げた資産推移グラフのサンプル/,
-    });
-
-    expect(preview).toBeInTheDocument();
+    // ダミーのナビ・見出し・数値はいずれも aria-hidden の内側に置く
+    expect(screen.getByText("純金融資産 ▾").closest("[aria-hidden]")).not.toBeNull();
+    expect(screen.getByText("資産推移(純金融資産)").closest("[aria-hidden]")).not.toBeNull();
+    expect(screen.getByText("ダッシュボード").closest("[aria-hidden]")).not.toBeNull();
   });
 
   /**
@@ -110,13 +125,13 @@ describe("A0 サービストップページ(docs/screen-requirements-public.md A
    * (差引後 30,000,000円 = 現在資産額、達成率38%)。
    */
   it("画面イメージの数字が1組で辻褄の合うダミー値になっている", () => {
-    render(<TopPage />);
+    const { container } = render(<TopPage />);
 
-    const gauge = screen.getByRole("img", { name: /FIRE達成度ゲージのサンプル/ });
-    const goalCard = gauge.parentElement?.parentElement as HTMLElement;
+    const preview = container.textContent ?? "";
 
-    expect(within(goalCard).getByText("30,000,000円")).toBeInTheDocument();
-    expect(within(goalCard).getByText("(純金融資産)")).toBeInTheDocument();
-    expect(screen.getByText("差引後")).toHaveTextContent("差引後 30,000,000円");
+    expect(preview).toContain("差引後 30,000,000円");
+    expect(preview).toContain("現在資産額 30,000,000円(純金融資産)");
+    expect(preview).toContain("目標資産額 80,000,000円");
+    expect(preview).toContain("38%");
   });
 });
