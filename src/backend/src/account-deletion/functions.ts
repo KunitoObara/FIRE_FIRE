@@ -89,7 +89,16 @@ const isUserNotFoundError = (error: unknown): boolean =>
  * ベータ期間では受容し、SaaS化の際に再評価する(docs/auth-login-requirements.md 3.11)。
  */
 export const deleteAccount = onCall(
-  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY] },
+  {
+    secrets: [IDENTITY_PLATFORM_WEB_API_KEY],
+    /*
+      既定の60秒では、取引が積み上がったアカウントで再帰削除が収まらないことがある
+      (CSV1回の取込で最大20,000件。docs/transaction-import-requirements.md 8章)。
+      失敗しても冪等にやり直せるが、**削除を求めた人にエラーを見せてやり直しを迫るのは
+      最も避けたい場面**なので、1回で終わる見込みを上げておく。
+    */
+    timeoutSeconds: 300,
+  },
   async (request) => {
     const uid = request.auth?.uid;
 
