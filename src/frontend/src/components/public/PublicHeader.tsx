@@ -7,7 +7,7 @@ import { TOP_PATH } from "@/constants/routes";
 import type { JSX } from "react";
 
 /**
- * 公開画面(A0・A9・A10)の共通ヘッダー(DESIGN.md 5章)。
+ * 公開画面(A0・A9・A10・A11)の共通ヘッダー(DESIGN.md 5章)。
  *
  * スクロールに追従させる。A0は縦に長く、下まで読み終えたところでそのまま導線へ入れる状態を
  * 保つため。**モバイル幅でもハンバーガーメニューにしない** — 畳む対象が最大2つしか無い
