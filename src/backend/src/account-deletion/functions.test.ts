@@ -185,10 +185,31 @@ describe("deleteAccount", () => {
   });
 
   /**
+   * 1回目が最後まで終わったあとに2回目が届くと、`getUser`の時点で見つからない。
+   * ここを素通しにすると、削除は成功しているのに汎用のエラーが画面へ返る。
+   */
+  it("呼び出した時点で既に削除済みなら成功として返す", async () => {
+    getUser.mockRejectedValue(
+      Object.assign(new Error("no user"), { code: "auth/user-not-found" }),
+    );
+
+    await expect(call(validInput)).resolves.toEqual({ ok: true });
+    expect(deleteUserData).not.toHaveBeenCalled();
+  });
+
+  /** 見つからない以外の失敗は握り潰さない。原因が分からないまま成功として返さないため */
+  it("ユーザーを取得できない他の失敗はそのまま投げる", async () => {
+    getUser.mockRejectedValue(new Error("identity platform down"));
+
+    await expect(call(validInput)).rejects.toThrow("identity platform down");
+    expect(deleteUserData).not.toHaveBeenCalled();
+  });
+
+  /**
    * ボタンの二度押しで2回届いた場合、後から着いた呼び出しがここに来る。失敗として返すと
    * 「データは消えたがアカウントが残っている」という誤った案内を出すことになる。
    */
-  it("既に削除済みのユーザーなら成功として返す", async () => {
+  it("削除の直前に消えていた場合も成功として返す", async () => {
     deleteUser.mockRejectedValue(Object.assign(new Error("no user"), {
       code: "auth/user-not-found",
     }));
