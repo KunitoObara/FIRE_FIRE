@@ -34,6 +34,35 @@ describe("PublicAuthActions(docs/screen-requirements-public.md 2章)", () => {
     expect(screen.queryByRole("link", { name: "ダッシュボードへ" })).not.toBeInTheDocument();
   });
 
+  /**
+   * 並び順は置き場所で変わる(docs/screen-requirements-public.md A0 の画面構成表)。
+   * ヘッダーは「ログイン」「サインアップ」、ヒーロー/下部CTAは「サインアップ」「ログイン」。
+   *
+   * **`flex-row-reverse` で見た目だけ入れ替えるとこのテストは通ってしまう**ので、
+   * DOMの並びそのものを見る(タブ順と読み上げ順が見た目とずれないようにするため)。
+   */
+  it("ヘッダー(sm)はログインを先に置く", () => {
+    withSessionState("signed-out");
+
+    render(<PublicAuthActions size="sm" />);
+
+    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "ログイン",
+      "サインアップ",
+    ]);
+  });
+
+  it("A0のCTA(lg)はサインアップを先に置く", () => {
+    withSessionState("signed-out");
+
+    render(<PublicAuthActions size="lg" />);
+
+    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "サインアップ",
+      "ログイン",
+    ]);
+  });
+
   /** ログイン中に「サインアップ」を勧め続けない。差し替えるのは導線だけでリダイレクトはしない */
   it("ログイン中はダッシュボードへの1つに差し替える", () => {
     withSessionState("signed-in");

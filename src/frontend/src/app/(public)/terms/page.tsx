@@ -1,4 +1,5 @@
 import { LegalDocument } from "@/components/public/LegalDocument";
+import { Alert } from "@/components/ui/alert";
 
 import type { Metadata } from "next";
 import type { JSX } from "react";
@@ -20,9 +21,10 @@ export const metadata: Metadata = {
  */
 const TermsPage = (): JSX.Element => (
   <LegalDocument title="利用規約">
-    <div className="mb-8 rounded-lg border bg-muted px-4 py-3 text-sm">
+    {/* 規約本文への注意書き。エラーでも完了でもないので読み上げの対象にしない */}
+    <Alert variant="info" role={undefined} className="mb-8">
       本サービスはベータ版です。第4条の内容をご確認のうえご利用ください。
-    </div>
+    </Alert>
 
     <p>
       本利用規約(以下「本規約」)は、FIRE-FIRE(以下「本サービス」)の提供条件および本サービスの利用に関する条件を定めるものです。

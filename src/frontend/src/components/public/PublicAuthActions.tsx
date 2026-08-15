@@ -42,6 +42,40 @@ const SECONDARY_VARIANT: Record<PublicAuthActionsSize, "ghost" | "outline"> = {
 };
 
 /**
+ * 未ログイン時の2つの導線。**置き場所によって並び順が変わる。**
+ *
+ * - ヘッダー(`sm`)は「ログイン」→「サインアップ」
+ * - A0のページ内CTA(`lg`)は「サインアップ」→「ログイン」
+ *
+ * どちらも docs/screen-requirements-public.md A0 の画面構成表とモックの並びどおり。
+ * ページの本文では登録を主導線として先に置き、常設のヘッダーでは既存ユーザーの
+ * 動線であるログインを先に置く、という違いによる。
+ *
+ * **`flex-row-reverse` で見た目だけ入れ替えない。** キーボードのタブ順と読み上げ順が
+ * 見た目とずれるため、DOM の並び自体を変える。
+ */
+const signedOutActions = (size: PublicAuthActionsSize): JSX.Element => {
+  const login = (
+    <Button
+      key="login"
+      asChild
+      size={size}
+      variant={SECONDARY_VARIANT[size]}
+      className={BUTTON_CLASS[size]}
+    >
+      <Link href={LOGIN_PATH}>ログイン</Link>
+    </Button>
+  );
+  const signup = (
+    <Button key="signup" asChild size={size} className={BUTTON_CLASS[size]}>
+      <Link href={SIGNUP_PATH}>サインアップ</Link>
+    </Button>
+  );
+
+  return <>{size === "lg" ? [signup, login] : [login, signup]}</>;
+};
+
+/**
  * 公開画面(A0・A9・A10・A11)の導線(docs/screen-requirements-public.md 2章)。
  *
  * 未ログインなら「ログイン」「サインアップ」、ログイン中は「ダッシュボードへ」1つに差し替える。
@@ -79,21 +113,7 @@ export const PublicAuthActions = ({
           </Button>
         ) : null}
 
-        {sessionState === "signed-out" ? (
-          <>
-            <Button
-              asChild
-              size={size}
-              variant={SECONDARY_VARIANT[size]}
-              className={BUTTON_CLASS[size]}
-            >
-              <Link href={LOGIN_PATH}>ログイン</Link>
-            </Button>
-            <Button asChild size={size} className={BUTTON_CLASS[size]}>
-              <Link href={SIGNUP_PATH}>サインアップ</Link>
-            </Button>
-          </>
-        ) : null}
+        {sessionState === "signed-out" ? signedOutActions(size) : null}
       </div>
 
       {withInviteOnlyNotice ? (

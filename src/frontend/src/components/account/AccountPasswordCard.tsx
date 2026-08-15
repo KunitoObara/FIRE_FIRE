@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -53,12 +54,12 @@ export const AccountPasswordCard = ({ email }: AccountPasswordCardProps): JSX.El
 
       <CardContent className="flex flex-col items-start gap-4">
         {feedback !== null ? (
-          <p
+          <Alert
+            variant={feedback.kind === "error" ? "error" : "success"}
             role={feedback.kind === "error" ? "alert" : "status"}
-            className={feedback.kind === "error" ? "text-sm text-destructive" : "text-sm"}
           >
             {feedback.message}
-          </p>
+          </Alert>
         ) : null}
 
         {/* 送信先が分からない状態では押させない(宛先の入力欄を持たないため) */}

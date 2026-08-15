@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -116,9 +117,9 @@ export const ContactForm = (): JSX.Element => {
         <FieldError errors={[errors.root]} />
 
         {isSent ? (
-          <p role="status" className="rounded-lg bg-muted p-4 text-sm">
+          <Alert variant="success" role="status">
             {CONTACT_SENT_MESSAGE}
-          </p>
+          </Alert>
         ) : null}
 
         {/*

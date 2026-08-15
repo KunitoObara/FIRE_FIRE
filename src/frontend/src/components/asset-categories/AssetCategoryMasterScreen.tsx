@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AssetCategoryAxisForm } from "@/components/asset-categories/AssetCategoryAxisForm";
 import { AssetCategoryAxisList } from "@/components/asset-categories/AssetCategoryAxisList";
 import { DeleteCategoryAxisDialog } from "@/components/asset-categories/DeleteCategoryAxisDialog";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -323,9 +324,7 @@ export const AssetCategoryMasterScreen = (): JSX.Element => {
       ) : null}
 
       {axesFailureReason ? (
-        <p role="alert" className="text-sm text-destructive">
-          {CATEGORY_AXIS_LOAD_FAILURE_MESSAGES[axesFailureReason]}
-        </p>
+        <Alert variant="error">{CATEGORY_AXIS_LOAD_FAILURE_MESSAGES[axesFailureReason]}</Alert>
       ) : null}
 
       {!axesQuery.isPending && axesFailureReason === null ? (
