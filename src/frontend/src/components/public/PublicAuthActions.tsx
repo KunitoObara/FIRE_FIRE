@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { INVITE_ONLY_NOTICE } from "@/constants/public";
 import { DASHBOARD_PATH, LOGIN_PATH, SIGNUP_PATH } from "@/constants/routes";
 import { subscribeToPublicSessionState } from "@/lib/auth/public-session";
+import { cn } from "@/lib/utils";
 
 import type { JSX } from "react";
 
@@ -67,7 +68,10 @@ export const PublicAuthActions = ({
   return (
     <div className="flex flex-col items-center gap-3">
       <div
-        className={`flex ${ACTIONS_MIN_HEIGHT_CLASS[size]} flex-wrap items-center justify-center gap-2`}
+        className={cn(
+          "flex flex-wrap items-center justify-center gap-2",
+          ACTIONS_MIN_HEIGHT_CLASS[size],
+        )}
       >
         {sessionState === "signed-in" ? (
           <Button asChild size={size} className={BUTTON_CLASS[size]}>
