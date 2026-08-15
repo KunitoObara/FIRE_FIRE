@@ -132,17 +132,27 @@
   --radius: 0.5rem;
   /*
     サイドバー(モック `common.css` の `.app-sidebar` / `.sidebar-link`)。
-    モックは地をカードと同じ白、hoverを `--accent` にしているので、それぞれに揃える。
-    **アクティブ項目だけはモックが `primary/10` + primary文字 + 太字**で、hoverと別の
-    見た目を持つ。shadcnの`Sidebar`はhoverとアクティブの両方に `--sidebar-accent` を使う
-    作りなので、そこはトークンでは吸収できない(コンポーネント側で対応する)。
+    モックは地をカードと同じ白、hoverの背景を `--accent`・文字を `--foreground` に
+    しているので、それぞれに揃える。
+
+    **モックの `.sidebar-link` は通常時の文字がグレー(`--muted-foreground`)だが、
+    それはここでは表現できない。** `--sidebar-foreground` はサイドバー全体に掛かる色で
+    (`ui/sidebar.tsx` が `text-sidebar-foreground` をコンテナに当てている)、
+    `SidebarMenuButton` はそれを継承するだけで自前の文字色を持たない。ここをグレーにすると
+    **同じ色を継承しているヘッダーのブランド名「FIRE-FIRE」まで**グレーになるが、
+    モックのブランド名は色指定を持たず `--foreground` のままである。
+    メニュー項目だけをグレーにするにはコンポーネント側で当てるしかないので、
+    アクティブ項目の見た目(`primary/10` + primary文字 + 太字。shadcnがhoverと
+    アクティブの両方に `--sidebar-accent` を使う作りのため、これもトークンでは表せない)と
+    まとめて、画面個別の詰めのPRで扱う。
   */
   --sidebar: hsl(0 0% 100%);
   --sidebar-foreground: hsl(222.2 84% 4.9%);
   --sidebar-primary: hsl(221.2 83.2% 53.3%);
   --sidebar-primary-foreground: hsl(210 40% 98%);
   --sidebar-accent: hsl(210 40% 96.1%);
-  --sidebar-accent-foreground: hsl(222.2 47.4% 11.2%);
+  /* モックの `.sidebar-link:hover` は `--accent-foreground` ではなく `--foreground` */
+  --sidebar-accent-foreground: hsl(222.2 84% 4.9%);
   --sidebar-border: hsl(214.3 31.8% 91.4%);
   --sidebar-ring: hsl(221.2 83.2% 53.3%);
 }
