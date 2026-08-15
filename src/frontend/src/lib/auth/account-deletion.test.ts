@@ -9,11 +9,13 @@ import type { Functions } from "firebase/functions";
 import type * as FirebaseClientModule from "@/lib/firebase/client";
 
 const callable = vi.fn<(data?: unknown) => Promise<{ data: unknown }>>();
-const httpsCallable = vi.fn<(functions: Functions, name: string) => typeof callable>();
+const httpsCallable =
+  vi.fn<(functions: Functions, name: string, options?: { timeout?: number }) => typeof callable>();
 const getFirebaseFunctions = vi.fn<() => Functions>();
 
 vi.mock("firebase/functions", () => ({
-  httpsCallable: (functions: Functions, name: string) => httpsCallable(functions, name),
+  httpsCallable: (functions: Functions, name: string, options?: { timeout?: number }) =>
+    httpsCallable(functions, name, options),
 }));
 
 vi.mock("@/lib/firebase/client", async () => {
@@ -47,11 +49,23 @@ describe("deleteAccount", () => {
   it("パスワードと確認用のメールアドレスを渡して呼ぶ", async () => {
     await expect(deleteAccount("password", "user@example.com")).resolves.toEqual({ ok: true });
 
-    expect(httpsCallable).toHaveBeenCalledWith(functions, "deleteAccount");
+    expect(httpsCallable).toHaveBeenCalledWith(functions, "deleteAccount", {
+      timeout: 300_000,
+    });
     expect(callable).toHaveBeenCalledWith({
       password: "password",
       confirmEmail: "user@example.com",
     });
+  });
+
+  /**
+   * SDKの既定は70秒。バックエンドの`timeoutSeconds`(300秒)より短いままだと、再帰削除が
+   * 長引いたときにクライアントだけ先に諦めてエラーを出す(サーバー側は完了に向かっている)。
+   */
+  it("サーバー側と同じタイムアウトで呼ぶ", async () => {
+    await deleteAccount("password", "user@example.com");
+
+    expect(httpsCallable.mock.calls[0]?.[2]).toEqual({ timeout: 300_000 });
   });
 
   /** 遷移先のA0で「削除しました」を出すための一過性フラグ */
