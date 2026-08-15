@@ -672,7 +672,7 @@ gcloud services list --enabled --project=fire-fire-dev | grep identitytoolkit
 
 ## 14. サインアップ許可リストの運用（ベータ期間中）
 
-ベータ期間中は、あらかじめ承認したメールアドレスだけがアカウントを作成できる（[auth-login-requirements.md](./auth-login-requirements.md) 3.10）。判定は Blocking Function `restrictSignUpToAllowlist` が行い、**承認の操作はコンソールでのドキュメント追加だけ**である。
+ベータ期間中は、あらかじめ承認したメールアドレスだけがアカウントを作成できる（[auth-login-requirements.md](./auth-login-requirements.md) 3.10）。判定は Blocking Function `restrictSignUpToAllowlist` が行い、**承認の操作は `signupAllowlist` へのドキュメント追加だけ**である（コンソール、または REST API）。
 
 **この節の作業はコードのデプロイでは済まない。** 許可リストは Firestore のデータであり、リポジトリには入らない。
 
@@ -680,13 +680,39 @@ gcloud services list --enabled --project=fire-fire-dev | grep identitytoolkit
 
 Firebase コンソール → Firestore Database → コレクション `signupAllowlist` に、**ドキュメント ID を招待するメールアドレス**としてドキュメントを1件作る。
 
-- **ドキュメント ID は小文字・前後の空白なし**にする。判定側も同じ正規化をしてから照合するので大文字で登録しても通るが、リストを目で見たときに揃っていたほうが重複に気づける
+- **ドキュメント ID は必ず小文字・前後の空白なしにする。** 正規化されるのは**サインアップ時に入力されたアドレスだけ**で（`normalizeEmail`）、照合は正規化後の文字列を ID とする 1 件取得である。**Firestore のドキュメント ID は大文字小文字を区別する**ため、`Taro@Example.com` で登録すると `taro@example.com` の照合にヒットせず、招待した本人が登録できない
 - **フィールドは判定に使わない。** ドキュメントが存在すること自体が承認の印である。誰をいつ招待したかを残したい場合は `note` / `invitedAt` のような任意のフィールドを足してよい
 - **プロジェクトごとに別のリストになる。** `fire-fire-dev`（STG）と `fire-fire-prod`（本番）の両方で有効なので、**開発用のテストアカウントを作るには dev 側のリストにもそのアドレスを入れる**
+
+#### コンソールを使わずに追加する
+
+`gcloud` に Firestore のドキュメントを操作するコマンドはない（`gcloud firestore` はデータベース・インデックス・バックアップの管理だけで、`gcloud firestore documents` は存在しない）。CLI から入れるなら Firestore の REST API を直接叩く。
+
+```bash
+curl -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "Content-Type: application/json" "https://firestore.googleapis.com/v1/projects/fire-fire-dev/databases/(default)/documents/signupAllowlist?documentId=taro.yamada%40example.com" -d '{"fields":{}}'
+```
+
+- **`documentId` はクエリパラメータなので、記号をパーセントエンコードする。** `@` → `%40`、そして **`+` → `%2B`（クエリ文字列の `+` は半角スペースとしてデコードされるため、そのまま送ると `taro yamada@example.com` のような別物のドキュメントが黙って出来る）**。エンコード漏れは 400 にならず「作成には成功したが誰にもマッチしない ID」になるので、**作成後に一覧して ID を目視する**
+- **アドレスは小文字にしてから URL に載せる。** 上記のとおり大文字の ID は照合にヒットしない
+- `{"fields":{}}` はフィールドを持たないドキュメントになる。存在自体が承認の印なので、これで足りる。記録を残す場合は `{"fields":{"note":{"stringValue":"ベータ招待"},"invitedAt":{"timestampValue":"2026-08-15T00:00:00Z"}}}` のように書く
+- **同じ ID が既にあると 409 `ALREADY_EXISTS` で失敗する。** 上書きにならないので、重複追加で招待の記録を消してしまう事故は起きない
+- 実行には対象プロジェクトへの `datastore.user` 相当の権限が要る。`firestore.rules` はこのコレクションをクライアントに対して全面的に閉じているが、**REST API を管理者の資格情報で叩く経路はルールを通らない**ので、この手順は成立する
+
+登録後の確認（ID の一覧）:
+
+```bash
+curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" "https://firestore.googleapis.com/v1/projects/fire-fire-dev/databases/(default)/documents/signupAllowlist?pageSize=100" | python3 -c "import json,sys; print(*[d['name'].split('/')[-1] for d in json.load(sys.stdin).get('documents',[])], sep='\n')"
+```
 
 ### 承認を取り消す
 
 ドキュメントを削除する。**既に作成済みのアカウントには影響しない** — このリストが効くのはアカウント作成の瞬間だけである。作成済みのアカウントを止めたい場合は、コンソールでそのユーザーを無効化する。
+
+CLI から消す場合は同じ URL に `DELETE` を送る（`documentId` はクエリではなくパスの一部になる点に注意）。**パスの `+` は半角スペースにデコードされない**が、`%2B` と書いても同じ文字を指すので、作成時と同じようにエンコードしておくほうが取り違えない。
+
+```bash
+curl -X DELETE -H "Authorization: Bearer $(gcloud auth print-access-token)" "https://firestore.googleapis.com/v1/projects/fire-fire-dev/databases/(default)/documents/signupAllowlist/taro.yamada%40example.com"
+```
 
 ### 締め出されたときの逃げ道
 
