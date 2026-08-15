@@ -4,7 +4,7 @@ import { isAppAccessGuardBypassed } from "@/constants/dev";
 import { FirebaseConfigurationError, getFirebaseAuth } from "@/lib/firebase/client";
 
 /**
- * 公開画面(A0・A9・A10)の導線を切り替えるための認証状態を購読する。
+ * 公開画面(A0・A9・A10・A11)の導線を切り替えるための認証状態を購読する。
  *
  * ログイン後画面のガード(`src/lib/auth/app-access.ts`)とは判定が違う。あちらは
  * 「B1を表示してよいか」を見るためメール確認・2FA登録まで確かめるが、こちらが決めるのは
@@ -18,7 +18,7 @@ import { FirebaseConfigurationError, getFirebaseAuth } from "@/lib/firebase/clie
  * 購読は`onAuthStateChanged`ではなく`onIdTokenChanged`を使う(app-access.tsと同じ)。
  * どちらも購読の直後に現在のユーザーで一度発火するため、セッション復元後の初期判定もこれで足りる。
  *
- * Firebaseの設定値が足りない場合は`signed-out`を通知する。この3画面はFirestoreを一切読まず
+ * Firebaseの設定値が足りない場合は`signed-out`を通知する。この4画面はFirestoreを一切読まず
  * 未ログインのまま完結するため、設定エラーで画面ごと止める理由が無い(同2章)。訪問者には
  * 未ログインの導線が出て、ログインを試みた時点でA4が設定エラーを出す。
  *
