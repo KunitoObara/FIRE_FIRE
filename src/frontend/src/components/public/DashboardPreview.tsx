@@ -26,19 +26,28 @@ import type { JSX } from "react";
  * 見えるため。ただし**対象分類名の併記は落とさない**(揃えてあること自体が読み取れなくなる)。
  *
  * 色は資産分類スロット(`--chart-*`)と負債のハッチングをB1と同じ割り当てで使う。LP用に色を
- * 作らない(DESIGN.md 3章)。
+ * 作らない(DESIGN.md 3章)。**ゲージのアークも実装(`FireProgressGauge.tsx`)と同じ
+ * `--chart-1`にする** — B1のゲージはここだけ資産分類スロットの1つを使っている。
+ *
+ * **中身は丸ごと読み上げの対象から外す(`aria-hidden`)。** 見た目はB1でも、押せるナビも
+ * 動く数字も無い装飾で、そのまま読み上げると本物のダッシュボードと区別が付かない。
+ * 代わりに、ここに何があるかを伝える一文だけをスクリーンリーダーへ出す。
  */
 export const DashboardPreview = (): JSX.Element => (
   <div className="mx-auto mt-10 max-w-[52rem] overflow-hidden rounded-xl border bg-card text-left shadow-[0_20px_40px_-24px_rgb(0_0_0/0.35)]">
+    <p className="sr-only">
+      ダッシュボード(B1)の画面イメージです。実際のデータではなく、説明のためのサンプルです。
+    </p>
+
     {/* ブラウザの枠に見立てた飾り。中身が「画面のイメージ」だと分かるようにするためだけのもの */}
-    <div className="flex items-center gap-1.5 border-b bg-muted px-3.5 py-2.5">
+    <div aria-hidden className="flex items-center gap-1.5 border-b bg-muted px-3.5 py-2.5">
       <span aria-hidden className="size-2 rounded-full bg-border" />
       <span aria-hidden className="size-2 rounded-full bg-border" />
       <span aria-hidden className="size-2 rounded-full bg-border" />
       <span className="ml-2 text-xs text-muted-foreground">B1 ダッシュボード(サンプル)</span>
     </div>
 
-    <div className="flex bg-muted">
+    <div aria-hidden className="flex bg-muted">
       {/* サイドバー。狭い幅では畳む(プレビューとして読ませたいのは本文側のグラフのため) */}
       <aside className="hidden w-36 shrink-0 flex-col gap-0.5 border-r bg-card p-2 pt-3 sm:flex">
         <p className="px-2 pt-1 pb-2.5 text-xs font-bold">FIRE-FIRE</p>
@@ -314,7 +323,7 @@ export const DashboardPreview = (): JSX.Element => (
                   cy="60"
                   r="45"
                   fill="none"
-                  stroke="var(--primary)"
+                  stroke="var(--chart-1)"
                   strokeWidth="14"
                   strokeLinecap="round"
                   strokeDasharray="106 283"
