@@ -1,3 +1,4 @@
+import { AccountDeletedNotice } from "@/components/public/AccountDeletedNotice";
 import { DashboardPreview } from "@/components/public/DashboardPreview";
 import { PublicAuthActions } from "@/components/public/PublicAuthActions";
 import { TOP_BETA_NOTES, TOP_FEATURES, TOP_STEPS } from "@/constants/public";
@@ -27,6 +28,12 @@ export const metadata: Metadata = {
  */
 const TopPage = (): JSX.Element => (
   <>
+    {/*
+      B10でアカウントを削除するとここへ置き換えて遷移してくる。遷移先で何も出ないと、
+      削除できたのか失敗したのかが分からない(docs/auth-login-requirements.md 3.11)。
+    */}
+    <AccountDeletedNotice />
+
     {/*
       1. ヒーロー。
       背景の淡いにじみは`color-mix`で作る。テーマの色は`oklch(...)`の完成した色として
