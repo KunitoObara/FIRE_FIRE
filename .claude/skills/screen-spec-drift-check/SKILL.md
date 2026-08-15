@@ -1,13 +1,13 @@
 ---
 name: screen-spec-drift-check
-description: Cross-checks implemented frontend screens/pages against the screen requirements docs (docs/screen-list-and-transitions.md and docs/screen-requirements-*.md) — screen IDs A0-A10 and B1-B11 (B12-B17 are specified but unimplemented, and are not reported as drift), their listed display/input fields, and their transition conditions. Use this skill after implementing or modifying a page/route under src/frontend, or when the user asks whether a screen "matches the spec" or is "done" — proactively run it once real page components exist, since drift is easy to miss without an explicit diff against the docs.
+description: Cross-checks implemented frontend screens/pages against the screen requirements docs (docs/screen-list-and-transitions.md and docs/screen-requirements-*.md) — screen IDs A0-A11 and B1-B11 (B12-B17 are specified but unimplemented, and are not reported as drift), their listed display/input fields, and their transition conditions. Use this skill after implementing or modifying a page/route under src/frontend, or when the user asks whether a screen "matches the spec" or is "done" — proactively run it once real page components exist, since drift is easy to miss without an explicit diff against the docs.
 ---
 
 # 画面要件⇔実装の整合性チェック
 
 ## なぜこのスキルが必要か
 
-docs/screen-list-and-transitions.md と各 docs/screen-requirements-*.md は、画面ID(A0〜A10, B1〜B17。うち実装済みは A0〜A10 と B1〜B11)ごとに表示項目・入力項目・主な操作・遷移条件を細かく定義している。画面実装が積み上がるにつれて、要件定義書の更新漏れや実装側の解釈違いによる乖離が起きやすい。このスキルは実装後に定期的に差分を検出するためのものであり、実装前の設計フェーズでは単に要件定義書を読めばよい。
+docs/screen-list-and-transitions.md と各 docs/screen-requirements-*.md は、画面ID(A0〜A11, B1〜B17。うち実装済みは A0〜A11 と B1〜B11)ごとに表示項目・入力項目・主な操作・遷移条件を細かく定義している。画面実装が積み上がるにつれて、要件定義書の更新漏れや実装側の解釈違いによる乖離が起きやすい。このスキルは実装後に定期的に差分を検出するためのものであり、実装前の設計フェーズでは単に要件定義書を読めばよい。
 
 ## ルートと画面IDの対応
 
@@ -20,6 +20,7 @@ docs/screen-list-and-transitions.md と各 docs/screen-requirements-*.md は、�
 | A0 サービストップページ | `(public)`(`/`) | `components/public/` |
 | A9 利用規約 | `(public)/terms` | 同上 |
 | A10 プライバシーポリシー | `(public)/privacy` | 同上 |
+| A11 お問い合わせ | `(public)/contact` | 同上 |
 | A1 サインアップ | `(auth)/signup` | `components/auth/` |
 | A2 メール確認待ち | `(auth)/verify-email` | 同上 |
 | A3 2FA登録 | `(auth)/mfa-setup` | 同上 |
@@ -47,7 +48,7 @@ docs/screen-list-and-transitions.md と各 docs/screen-requirements-*.md は、�
 
 **Phase 5〜7の画面(B12〜B17)は、ルートもコンポーネントもまだ存在しない。** 要件だけが先に決まっている状態で、B12〜B14は docs/screen-requirements-lists.md に、B15〜B17は docs/screen-list-and-transitions.md 2.8に概要だけがある。
 
-**公開画面(A0・A9・A10)は3画面とも実装済みで、上の表に入っている**([A0](https://trello.com/c/BT4yT3Zk))。要件との乖離は報告する。`(setup-check)` のプレースホルダーはA0の実装とともに削除され、`/` はA0が応答する。
+**公開画面(A0・A9・A10・A11)は4画面とも実装済みで、上の表に入っている**([A0](https://trello.com/c/BT4yT3Zk)、A11は [X6](https://trello.com/c/fYjMjcBS))。要件との乖離は報告する。`(setup-check)` のプレースホルダーはA0の実装とともに削除され、`/` はA0が応答する。
 
 - **「実装が無い」ことを差分として報告しない。** このスキルが見るのは実装済み画面と要件の乖離であり、未着手を毎回並べても判断の材料にならない
 - 実装が入った時点で上の表に足し、そこから対象に入る
@@ -71,7 +72,7 @@ docs/screen-list-and-transitions.md と各 docs/screen-requirements-*.md は、�
    - FIRE目標・シミュレーション系(B8〜B9) → docs/screen-requirements-fire-goal.md
    - アカウント系(B10) → docs/screen-requirements-account.md
    - リスト管理系(B12〜B14。**Phase 5・未実装**) → docs/screen-requirements-lists.md
-   - 公開画面(A0・A9・A10。**フェーズ外・実装済み**) → docs/screen-requirements-public.md
+   - 公開画面(A0・A9・A10・A11。**フェーズ外・実装済み**) → docs/screen-requirements-public.md
    - 画面遷移条件の全体像 → docs/screen-list-and-transitions.md 3章(Mermaid図)
 3. 表示項目・入力項目が実装コンポーネントに揃っているか照合する。抜けている項目、要件にない項目が追加されている場合は両方を報告する(要件更新漏れの可能性もあるため、「実装が間違っている」と決めつけない)。
 4. 遷移条件(ボタン押下でどの画面に遷移するか)をMermaid図と照合する。特にエラー系の遷移(パース失敗時に画面に留まる、等)は見落とされがちなので注意する。

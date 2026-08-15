@@ -1,14 +1,16 @@
 /**
- * 公開画面(A0・A9・A10)の固定文言(docs/screen-requirements-public.md)。
+ * 公開画面(A0・A9・A10・A11)の固定文言(docs/screen-requirements-public.md)。
  *
- * 3画面が同じヘッダー・フッターを共有するため、コピーライトのような複数画面に出る文言は
+ * 4画面が同じヘッダー・フッターを共有するため、コピーライトのような複数画面に出る文言は
  * ここに集約する。規約・ポリシーの本文そのものは各画面のJSXに置く(条文の順序と本文が
  * 離れると読みにくくなるため)。
  */
 
 import { Building2, ChartNoAxesCombined, PieChart, Target } from "lucide-react";
 
-/** フッターのコピーライト表記。A0・A9・A10で共通 */
+import { FIREBASE_CONFIGURATION_MESSAGE } from "@/constants/auth";
+
+/** フッターのコピーライト表記。公開画面の4つで共通 */
 export const COPYRIGHT_NOTICE = "© 2026 FIRE-FIRE";
 
 /**
@@ -139,17 +141,58 @@ export const LEGAL_ENACTED_ON = "2026年8月15日";
 export const LEGAL_LAST_REVISED_ON = LEGAL_ENACTED_ON;
 
 /**
- * A10のお問い合わせ先。
+ * A10からA11 お問い合わせ画面への案内([X6])。
  *
- * **受信できるアドレスがまだ無いため、アドレスを載せずに準備中と書く。** 取得済みドメイン
- * (`fire-fire.live`)のアドレスの用意はドメイン接続とセットの作業で、[X4] に切り出してある
- * (docs/screen-requirements-public.md 3章)。届かないアドレスを本番に載せると、
- * 送った側は届いたつもりのまま返信を待つことになる。
+ * **メールアドレスは載せない。** このリポジトリは公開されており、開発者本人のアドレスを
+ * 書けない(CLAUDE.md)。取得済みドメイン(`fire-fire.live`)のアドレス整備はドメイン接続と
+ * セットの作業で [X4] に切り出してあるが、**それを待たずに受け口を持てる**のがフォームを
+ * 用意した理由で、宛先はサーバー側のシークレットにだけ置く
+ * (`src/backend/src/contact/functions.ts`)。
  *
- * 代わりの受け口としての問い合わせフォームは [X6] で検討する。
+ * 文言を3つに割っているのは、真ん中をA11へのリンクにするため(文中リンクを本文ごと
+ * JSXに書くと、A10のJSXに文言が戻ってしまう)。
  */
-export const CONTACT_PREPARING_NOTICE =
-  "本ポリシーに関するお問い合わせ先は現在準備中です。用意ができしだい、本ページに掲載します。";
+export const CONTACT_NOTICE_PREFIX = "本ポリシーに関するお問い合わせは、";
+export const CONTACT_NOTICE_LINK_LABEL = "お問い合わせフォーム";
+export const CONTACT_NOTICE_SUFFIX = "からご連絡ください。";
+
+/** A0のフッターからA11へのリンク文言 */
+export const CONTACT_LINK_LABEL = "お問い合わせ";
+
+/** A11 お問い合わせ画面の見出しと説明(docs/screen-requirements-public.md A11) */
+export const CONTACT_TITLE = "お問い合わせ";
+export const CONTACT_DESCRIPTION =
+  "本サービスについてのご質問・ご要望・不具合のご連絡は、こちらからお送りください。いただいた内容には、ご入力のメールアドレス宛にご返信します。";
+
+/**
+ * ベータ版であることの但し書き。
+ *
+ * **返信の期限を約束しない。** 開発者1人で運用しているため(CLAUDE.md「Single-user」)、
+ * 「◯営業日以内」と書くと守れない日が出る。
+ */
+export const CONTACT_BETA_NOTICE = "ベータ版のため、ご返信までお時間をいただくことがあります。";
+
+/** 送信できたときの文言。画面は遷移せず、この文言に切り替える */
+export const CONTACT_SENT_MESSAGE =
+  "お問い合わせを送信しました。ご返信までしばらくお待ちください。";
+
+/**
+ * 送信できなかったときの文言(`src/lib/contact/send-contact-message.ts`の失敗理由)。
+ *
+ * `throttled`だけは利用者の操作で解消できるので、待てばよいことまで書く。それ以外は
+ * 利用者にできることが無いため、原因を細かく述べずやり直しを促す。
+ */
+export const CONTACT_FAILURE_MESSAGES: Record<ContactFailureReason, string> = {
+  throttled: "続けての送信はお受けできません。1分ほどおいてから、もう一度お試しください。",
+  "send-failed": "お問い合わせを送信できませんでした。時間をおいて再度お試しください。",
+  // 宛先・APIキーの設定漏れ。入力をやり直しても直らないが、原因が利用者側に無いことは伝える
+  "not-configured":
+    "お問い合わせを受け付けられませんでした。サービス側の問題のため、時間をおいて再度お試しください。",
+  "invalid-argument": "入力内容をご確認のうえ、もう一度お試しください。",
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  unavailable: "お問い合わせを送信できませんでした。時間をおいて再度お試しください。",
+  unknown: "お問い合わせを送信できませんでした。時間をおいて再度お試しください。",
+};
 
 /**
  * B10でアカウントを削除した直後にA0で1回だけ出す文言

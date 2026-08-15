@@ -1,5 +1,12 @@
+import Link from "next/link";
+
 import { LegalDocument } from "@/components/public/LegalDocument";
-import { CONTACT_PREPARING_NOTICE } from "@/constants/public";
+import {
+  CONTACT_NOTICE_LINK_LABEL,
+  CONTACT_NOTICE_PREFIX,
+  CONTACT_NOTICE_SUFFIX,
+} from "@/constants/public";
+import { CONTACT_PATH } from "@/constants/routes";
 
 import type { Metadata } from "next";
 import type { JSX } from "react";
@@ -121,8 +128,18 @@ const PrivacyPage = (): JSX.Element => (
       本サービスは、認証および2要素認証を必須とし、データベース側のアクセス制御によって、利用者本人以外が登録データを参照できないようにしています。
     </p>
 
+    {/*
+      メールアドレスは書かず、A11 お問い合わせ画面へ送る([X6])。公開リポジトリに開発者の
+      アドレスを置けないため、宛先はサーバー側のシークレットにだけ持たせている(CLAUDE.md)。
+    */}
     <h2>8. お問い合わせ先</h2>
-    <p>{CONTACT_PREPARING_NOTICE}</p>
+    <p>
+      {CONTACT_NOTICE_PREFIX}
+      <Link href={CONTACT_PATH} className="underline underline-offset-4">
+        {CONTACT_NOTICE_LINK_LABEL}
+      </Link>
+      {CONTACT_NOTICE_SUFFIX}
+    </p>
 
     <h2>9. 本ポリシーの変更</h2>
     <p>
