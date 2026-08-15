@@ -200,7 +200,7 @@ B1へ自動で飛ばすと、ログイン中はA0を見返す手段が無くな�
 | **取得しない情報** | **取り込んだCSVファイルそのものを保存しない**(ブラウザ内で解析し、数値だけを保存する) | [要件定義書 4.2](./fire-asset-management-requirements.md)。Firebase Storageに生CSVを置かない |
 | 利用目的 | 本サービスの提供、ログイン通知の送信、不正利用の防止 | ログイン通知は [auth-login-requirements.md](./auth-login-requirements.md) 3章 |
 | 外部サービスへの提供・委託 | Google(Firebase / Identity Platform)、Resend(ログイン通知メールの送信) | `src/backend/src/login-notification` |
-| 保管と削除 | 保管場所、利用者からの削除の求めへの対応。**問い合わせ先が準備中の間は、画面の操作で消せる範囲を併記する**(連絡先の無い宛先へ案内しない) | 各画面の削除操作 |
+| 保管と削除 | 保管場所、利用者からの削除の求めへの対応。**画面から消せる範囲を実態どおりに限定する** — 資産分類・不動産・負債は削除できるが、CSV取込の資産残高・入出金明細は参照専用で削除できない。**アカウントの削除は登録データの削除と別物**として書き、問い合わせ先が準備中の間は受け付けられないことを明記する(連絡先の無い宛先へ案内せず、代替にならない操作を代替として案内しない) | `category-axis-repository.ts` / `property-repository.ts` / `debt-repository.ts` の削除。取込データが参照専用であることは [transaction-import-requirements.md](./transaction-import-requirements.md) 10章・[screen-requirements-dashboard.md](./screen-requirements-dashboard.md)。アカウント削除は**未実装**([X7](https://trello.com/c/Eet6Req0)) |
 | Cookie等の利用 | ログイン状態の保持に用いること。広告目的の利用が無いこと | — |
 | 安全管理 | 認証・2要素認証を必須とし、データベース側のアクセス制御で本人以外が参照できないようにしていること | `firestore.rules` の `canAccessOwnData()`(TOTP必須)。[auth-login-requirements.md](./auth-login-requirements.md) 3.3 |
 | 問い合わせ先 | **準備中である旨のみを書く。** 受信できるアドレスがまだ無いため、アドレスは載せない | **未確定**(3章)。用意は[X4](https://trello.com/c/8wpkp9Gt)、代わりの受け口は[X6](https://trello.com/c/fYjMjcBS) |
