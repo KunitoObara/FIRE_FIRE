@@ -249,6 +249,35 @@ describe("AccountSettingsScreen", () => {
     });
   });
 
+  describe("アカウントの削除", () => {
+    /**
+     * 設定を見に来ただけの人の目に最初に入る場所ではない
+     * (docs/screen-requirements-account.md「アカウントの削除」)。
+     */
+    it("削除カードを画面の最後に置く", () => {
+      const { container } = renderScreen();
+
+      // `CardTitle`は見出し要素ではなく`data-slot`付きのdivとして描画される
+      const titles = [...container.querySelectorAll('[data-slot="card-title"]')].map(
+        (title) => title.textContent,
+      );
+
+      expect(titles.at(-1)).toBe("アカウントの削除");
+    });
+
+    /**
+     * 配線を間違えると、本人確認を通せないGoogle専用アカウントでもボタンを押せてしまう。
+     * 型はどちらもbooleanで拾えないため、ここで固定する。
+     */
+    it("パスワードでのログインが無ければ削除ボタンを無効化する", () => {
+      hasPasswordProvider.mockReturnValue(false);
+
+      renderScreen();
+
+      expect(screen.getByRole("button", { name: "アカウントを削除する" })).toBeDisabled();
+    });
+  });
+
   describe("2FA再設定", () => {
     /** 要件の遷移条件「本人確認を経て現2FAを無効化し、A3の登録フローを再実行」 */
     it("パスワードを確認したうえで解除し、A3へ履歴を置き換えて遷移する", async () => {
