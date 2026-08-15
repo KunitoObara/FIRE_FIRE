@@ -51,7 +51,7 @@
         docs/screen-list-and-transitions.md の画面一覧・遷移図に基づくHTMLモックです。各カードから各画面を確認できます。
         公開画面(A0・A9・A10)はランディングページ型のシェル、認証系(A1〜A8)は中央寄せ1カラムレイアウト、
         ログイン後(B1〜B14)は共通ヘッダー/サイドバーのダッシュボードアプリ型シェルです。
-        A0・A9・A10 と B12〜B14 は未実装画面で、モックだけが先にあります。
+        B12〜B14 は未実装画面で、モックだけが先にあります(公開画面 A0・A9・A10 は実装済みです)。
       </p>
       <p class="text-sm text-slate-500 mt-2">
         ログアウトは画面IDを持たない共通操作です(screen-list-and-transitions.md 2.6)。B1〜B14 のどの画面でも、ヘッダー右上のアバターからユーザーメニューを開いて実行できます。
@@ -62,7 +62,7 @@
          未ログインの訪問者が到達する画面群で、認証フローには属さない。 -->
     <section class="mb-10">
       <h2 class="text-sm font-semibold text-slate-500 mb-3 pb-2 border-b" style="border-color: hsl(var(--border));">
-        公開画面(A0・A9・A10・未実装)
+        公開画面(A0・A9・A10)
       </h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <a class="screen-card" href="a0-top.html">
