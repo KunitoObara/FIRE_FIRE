@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
 import { DeleteDebtsDialog } from "@/components/debts/DeleteDebtsDialog";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -147,7 +148,10 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
         手動入力・自動計算なしであることを最初に示す(要件定義書 4.8)。
         マネーフォワードが負債をCSVに出力しないため、この画面だけが負債の入り口になる
       */}
-      <p className="rounded-md bg-muted p-4 text-sm text-muted-foreground">{DEBT_SCREEN_NOTICE}</p>
+      {/* 画面の前提の説明であってエラーでも完了でもないので、読み上げの対象にしない */}
+      <Alert variant="info" role={undefined}>
+        {DEBT_SCREEN_NOTICE}
+      </Alert>
 
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -217,12 +218,9 @@ export const FireGoalForm = ({
             polite(role="status")にし、インラインエラーの読み上げを妨げない。
           */}
           {hiddenTabNotice ? (
-            <p
-              role="status"
-              className="mb-6 rounded-md border border-destructive/50 px-4 py-3 text-sm text-destructive"
-            >
+            <Alert variant="error" role="status" className="mb-6">
               {hiddenTabNotice}
-            </p>
+            </Alert>
           ) : null}
 
           {/*

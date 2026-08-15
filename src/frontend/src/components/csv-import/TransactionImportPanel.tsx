@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { CsvDropzone } from "@/components/csv-import/CsvDropzone";
 import { TransactionPreviewTable } from "@/components/csv-import/TransactionPreviewTable";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -197,22 +198,15 @@ export const TransactionImportPanel = ({
           </p>
         ) : null}
 
-        {errorMessage ? (
-          <div
-            role="alert"
-            className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
-            {errorMessage}
-          </div>
-        ) : null}
+        {errorMessage ? <Alert variant="error">{errorMessage}</Alert> : null}
 
         {parsed ? (
           <div className="flex flex-col gap-4">
-            <div
-              role="status"
-              className="rounded-md border bg-muted px-4 py-3 text-sm"
-              data-testid="transaction-import-summary"
-            >
+            {/*
+              モック b2-csv-import.html のプレビュー欄は `alert-info`。取込前に内容を
+              確かめてもらう案内なので、`role="status"` と `data-testid` はそのまま残す。
+            */}
+            <Alert variant="info" role="status" data-testid="transaction-import-summary">
               <p>
                 取込対象: <strong className="tabular-nums">{parsed.rows.length}件</strong>(期間:{" "}
                 <span className="tabular-nums">
@@ -242,7 +236,7 @@ export const TransactionImportPanel = ({
               <p className="mt-1 text-muted-foreground">
                 内容を確認のうえ取込を実行してください。同じ取引IDのデータは上書きされます。
               </p>
-            </div>
+            </Alert>
 
             <TransactionPreviewTable rows={toTransactionPreviewRows(parsed.rows)} />
             <p className="text-xs text-muted-foreground">
