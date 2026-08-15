@@ -67,3 +67,9 @@ export const DELETE_ACCOUNT_FUNCTION = "deleteAccount";
  * リポジトリが別で値そのものは共有できないため、両側にこの注記を置いて片方だけ変わるのを防ぐ。
  */
 export const DELETE_ACCOUNT_TIMEOUT_MS = 300_000;
+
+/**
+ * お問い合わせを送信するcallable関数の名前(A11)。
+ * バックエンドのexport名(src/backend/src/contact/functions.ts)と一致させる。
+ */
+export const SEND_CONTACT_MESSAGE_FUNCTION = "sendContactMessage";

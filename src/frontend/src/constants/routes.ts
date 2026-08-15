@@ -14,6 +14,12 @@ export const TOP_PATH = "/";
 export const TERMS_PATH = "/terms";
 /** A10 プライバシーポリシー画面。リンク元はA9と同じ */
 export const PRIVACY_PATH = "/privacy";
+/**
+ * A11 お問い合わせ画面。A0のフッターとA10の本文からリンクする。
+ *
+ * **A0に入力欄を置かないための独立した画面である**(docs/screen-requirements-public.md A11)。
+ */
+export const CONTACT_PATH = "/contact";
 /** A1 サインアップ画面 */
 export const SIGNUP_PATH = "/signup";
 /** A2 メールアドレス確認待ち画面 */
