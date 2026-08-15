@@ -122,6 +122,33 @@ export const hasPasswordProvider = (user: User | null): boolean =>
   user?.providerData.some((provider) => provider.providerId === PASSWORD_PROVIDER_ID) ?? false;
 
 /**
+ * サーバー側の最新の状態でパスワードでのログインの有無を確かめる。
+ *
+ * `hasPasswordProvider`は**描画した時点のSDKの状態**しか見ない。同じ画面でパスワード連携を
+ * 解除した直後は`currentUser`が古いままで、削除ボタンが有効に見えてしまう。後戻りできない
+ * 操作を始める直前だけは`reload`して取り直す。
+ *
+ * 取り直しに失敗したら**現在分かっている値をそのまま返す**。ここで`false`に倒すと、
+ * 一時的な通信の失敗で削除できないと言うことになる(最終的な判定はサーバー側の
+ * `password-not-linked`が持っている)。
+ */
+export const refreshPasswordProviderState = async (): Promise<boolean> => {
+  const user = getFirebaseAuth().currentUser;
+
+  if (user === null) {
+    return false;
+  }
+
+  try {
+    await reload(user);
+  } catch (error) {
+    console.error("ログイン方法を取り直せませんでした", error);
+  }
+
+  return hasPasswordProvider(getFirebaseAuth().currentUser);
+};
+
+/**
  * 現在のログイン方法の一覧を作る。
  *
  * 未サインインでも一覧の形は変えず、すべて未連携として返す。この画面はガードの内側にしか
