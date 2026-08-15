@@ -313,7 +313,7 @@ export const MfaVerifyForm = (): JSX.Element => {
           >
             <InputOTPGroup>
               {TOTP_CODE_SLOT_INDEXES.map((index) => (
-                <InputOTPSlot key={index} index={index} className="size-11 text-base" />
+                <InputOTPSlot key={index} index={index} />
               ))}
             </InputOTPGroup>
           </InputOTP>

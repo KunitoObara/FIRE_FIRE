@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { PasswordField } from "@/components/auth/PasswordField";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FieldError, FieldGroup } from "@/components/ui/field";
@@ -133,7 +134,13 @@ export const AccountLinkForm = (): JSX.Element => {
       </CardHeader>
 
       <CardContent>
-        <p className="rounded-md bg-secondary px-4 py-3 text-sm">{ACCOUNT_LINK_NOTICE}</p>
+        {/*
+          エラーではなく「追加の手続き」として提示する(A8要件)。モックも `alert-info` を当てている。
+          手順の案内なので読み上げの対象にしない(role を持たせない)。
+        */}
+        <Alert variant="info" role={undefined}>
+          {ACCOUNT_LINK_NOTICE}
+        </Alert>
 
         {/* Googleから取得したメールアドレスの確認表示。入力欄ではない */}
         <p className="mt-5 rounded-md bg-secondary px-4 py-3 text-sm break-all">
