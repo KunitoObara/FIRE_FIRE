@@ -83,7 +83,8 @@ export const ContactForm = (): JSX.Element => {
           <FieldLabel htmlFor="body">お問い合わせ内容</FieldLabel>
           {/*
             `textarea`のshadcnコンポーネントはこの画面が初出のため、まだ入れていない
-            (DESIGN.md 4章)。使うのが1箇所のうちは`Input`の見た目に合わせた素の`textarea`で足りる。
+            (DESIGN.md 2章。CLI経由で必要なものだけ追加する方針)。使うのが1箇所のうちは、
+            `Input`の見た目に合わせた素の`textarea`で足りる。
           */}
           <textarea
             id="body"
