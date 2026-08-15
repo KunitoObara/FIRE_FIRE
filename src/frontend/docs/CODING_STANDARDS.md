@@ -78,7 +78,7 @@
   ```
 
 - **shadcn/uiのCLIが生成する`src/components/ui/**`は対象外**。CLIが`function`宣言で出力し、再生成のたびに書き換わるベンダーコードのため、ESLint側でも`func-style`を無効化している
-  - **これはlintの適用範囲についての話で、「手を入れてはいけない」という意味ではない。** 実際に `button.tsx` / `input.tsx` / `card.tsx` / `input-otp.tsx` / `alert.tsx` は寸法と配色をHTMLモックに合わせて取り直してあり、`sonner.tsx` は `next-themes` への依存を外してある。いずれも**理由をファイル内のコメントに残す**運用で、詳細は [DESIGN.md](../../../DESIGN.md) 2章「`npx shadcn add` で入れたコンポーネントは、そのままでは使わない」にある
+  - **これはlintの適用範囲についての話で、「手を入れてはいけない」という意味ではない。** 実際に `button.tsx` / `input.tsx` / `select.tsx` / `card.tsx` / `input-otp.tsx` / `alert.tsx` は寸法と配色をHTMLモックに合わせて取り直してあり、`sonner.tsx` は `next-themes` への依存を外してある。いずれも**理由をファイル内のコメントに残す**運用で、詳細は [DESIGN.md](../../../DESIGN.md) 2章「`npx shadcn add` で入れたコンポーネントは、そのままでは使わない」にある
   - **「再生成のたびに書き換わる」は裏を返せば、再生成すると手を入れた分が消えるということでもある。** 既存のコンポーネントを `npx shadcn add` で入れ直さない
 
 ### SPA的な挙動を維持するためのルール(TECH_STACK.md 0章参照)

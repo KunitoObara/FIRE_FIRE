@@ -31,7 +31,7 @@
 
 `components.json` の `style` は **`radix-nova`** で、これは**コンパクトな寸法体系**を持つ。生成されるボタン・入力欄は `h-8`(32px)、カードの余白は16pxで、HTMLモック(`docs/html_mock/common.css`)の 40px / 24〜32px より一段小さい。`baseColor` も `neutral` で、3章のとおり配色はモック側を正としている。
 
-そのため **`src/components/ui/**` の一部は、生成後に手で寸法を取り直してある**([X0-7](https://trello.com/c/GGyun7jn))。`button.tsx`(サイズ4段階と `destructive` の塗り)・`input.tsx`・`card.tsx`・`input-otp.tsx`・`alert.tsx` が該当し、いずれも**変更した理由をファイル内のコメントに残してある**。
+そのため **`src/components/ui/**` の一部は、生成後に手で寸法を取り直してある**([X0-7](https://trello.com/c/GGyun7jn))。`button.tsx`(サイズ4段階と `destructive` の塗り)・`input.tsx`・`select.tsx`・`card.tsx`・`input-otp.tsx`・`alert.tsx` が該当し、いずれも**変更した理由をファイル内のコメントに残してある**。
 
 - **新しいコンポーネントをCLIで足したときは、既存のものと寸法が揃っているか確かめる。** 何もしなければ radix-nova の既定(`h-8` など)で入るので、隣に並ぶ入力欄(40px)と高さが合わない
 - **既存のコンポーネントを再生成しない。** 手を入れた分が黙って消える。どうしても入れ直すときは、コメントの残っている箇所を先に控えておく
