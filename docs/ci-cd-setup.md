@@ -444,7 +444,9 @@ Upgrade to GitHub Pro or make this repository public to enable this feature.
   - `claude-review` は**含めない**（レビューはコメントのみで、人間の判断を残す）
   - **fork からの PR では `frontend` が必ず失敗する。** Secrets が渡らないためで、ビルドは `NEXT_PUBLIC_FIREBASE_*` を要求する（[3 章](#3-github-の-secrets--variables)）。必須チェックにしている以上そのままではマージできないが、これは意図した状態であり、外部からの PR を取り込む必要が出たときに改めて考える
   - `claude-review` は fork からの PR では**スキップ**される（失敗ではない）。必須チェックに含めていないのでマージ判定には影響しない。レビューする手順は [3 章](#外部prを手動でレビューする)
-- 「Require branches to be up to date before merging」を有効化
+- 「Require branches to be up to date before merging」は **`develop` だけ有効にし、`main` では有効にしない**
+  - リリース PR をマージすると、そのマージコミットは `main` にだけ残り `develop` へは戻さない。**`develop` が `main` の先端を含まない状態はリリースのたびに再発する**（2026-08-16 時点で 17 件）。`main` で有効にしていると、リリース PR を出すたびに `main` を `develop` へ取り込むことになり、STG へ出したものと `develop` の先端がずれる（[開発フロー](./development-workflow.md) 10 章）
+  - 外して失うものは小さい。このチェックが見ているのは「PR を作ったあとに base が進み、その組み合わせでは壊れる」場合だが、`main` が進むのはリリースのマージのときだけで、中身は必ず `develop` を通って STG で動いたものである。**CI 4 ジョブの必須は外さない**
 - Force push / ブランチ削除を禁止
   - force push はローカルでも `.claude/settings.json` の `PreToolUse` フックが止めている。こちらはサーバー側の裏付けで、二重に掛ける
 - 「Do not allow bypassing the above settings」（管理者にも適用）
