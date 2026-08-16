@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
 import { CashflowSummaryCard } from "@/components/dashboard/CashflowSummaryCard";
@@ -16,56 +17,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DASHBOARD_DATA_QUERY_KEY,
-  DASHBOARD_FAILURE_MESSAGES,
   DASHBOARD_RETRY_LABEL,
   DASHBOARD_RETRYING_LABEL,
-  DASHBOARD_UNEXPECTED_ERROR_MESSAGE,
   NO_ASSET_AXIS_EMPTY_STATE,
   NO_CSV_IMPORT_LABEL,
 } from "@/constants/dashboard";
 import { resolveAxisNetAmount } from "@/lib/dashboard/aggregation";
 import { buildBreakdownSlices } from "@/lib/dashboard/category-color";
 import { fetchDashboardData } from "@/lib/dashboard/dashboard-data";
-import { resolveAxisId, resolvePeriodId } from "@/lib/dashboard/filters";
+import { resolveFailureView } from "@/lib/dashboard/failure-view";
+import {
+  buildDashboardHref,
+  resolveAxisId,
+  resolveMonthId,
+  resolvePeriodId,
+  resolveTrendModeId,
+} from "@/lib/dashboard/filters";
+import { toMonthKey } from "@/lib/dashboard/month";
 import { filterSeriesByPeriod } from "@/lib/dashboard/period";
 
 import type { JSX } from "react";
-
-/**
- * 表示できないときの扱いを決める。取得の失敗(理由つき)と、集計まで含めた例外の両方をここに集める。
- * 表示できているあいだは`null`。
- *
- * 文言と再試行の可否を**同じ場所で**決める。別々に判断すると、失敗理由を足したときに
- * 片方だけ直して、文言は「ログインし直してください」なのに再試行ボタンが出る、といった
- * 食い違いが起きる。
- *
- * **例外を先に見る。** rejectしたときTanStack Queryは`data`を更新しないので、`ok: false`で
- * 失敗したあとに再試行が例外で落ちると、`failureReason`には1つ前の理由が残ったままになる。
- * 理由を先に見ると、その古い文言を出し続けてしまう。
- */
-const resolveFailureView = (
-  failureReason: FirestoreAccessFailureReason | null,
-  unexpectedError: unknown,
-): DashboardFailureView | null => {
-  if (unexpectedError) {
-    return { message: DASHBOARD_UNEXPECTED_ERROR_MESSAGE, retryable: true };
-  }
-
-  if (failureReason === null) {
-    return null;
-  }
-
-  return {
-    message: DASHBOARD_FAILURE_MESSAGES[failureReason],
-    /*
-      ログイン切れ・設定不備は再取得しても同じ結果にしかならず、文言で案内している
-      「ログインし直す」より先にボタンを押させてしまう。押せる導線は残さない。
-      `permission-denied`は文言で再ログインを促してはいるが、IDトークンが更新されれば
-      その場で通ることがあるので残す(`unknown`と同じ扱い)。
-    */
-    retryable: failureReason !== "signed-out" && failureReason !== "configuration-error",
-  };
-};
 
 /** 直近CSV取込日時の表示。未取込のときは日時の代わりにその旨を出す */
 const formatLastImportedAt = (isoDateTime: string | null): string =>
@@ -81,7 +52,14 @@ const formatLastImportedAt = (isoDateTime: string | null): string =>
  * 分類軸の切り替えは資産推移グラフと分類別内訳の両方に及ぶ(同要件B1)。切り替えのたびに
  * Firestoreを引き直さず、1度読んだ資産残高を分類軸ごとに集計した結果から選ぶだけにしている。
  */
-export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps): JSX.Element => {
+export const DashboardScreen = ({
+  axisParam,
+  periodParam,
+  debtParam,
+  monthParam,
+}: DashboardScreenProps): JSX.Element => {
+  const router = useRouter();
+
   const dashboardQuery = useQuery({
     queryKey: DASHBOARD_DATA_QUERY_KEY,
     queryFn: fetchDashboardData,
@@ -121,16 +99,36 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
 
   const selectedAxisId = resolveAxisId(axisParam, axes);
   const selectedPeriodId = resolvePeriodId(periodParam);
+  const selectedTrendMode = resolveTrendModeId(debtParam);
+  /*
+    収支サマリの対象月。既定は当月で、未指定・不正な値・当月より後は当月に落とす
+    (同要件B1「年月の選択」)。上限の判定にも期間の絞り込みと同じ`now`を使う。
+    別々に`new Date()`を呼ぶと、月をまたぐ瞬間に「上限は先月なのに既定は今月」のような
+    食い違いが起きうる
+  */
+  const selectedMonth = resolveMonthId(monthParam, now);
+  const currentMonth = toMonthKey(now);
   const selectedAxis = axes.find((axis) => axis.id === selectedAxisId);
   const axisData = selectedAxisId ? data?.byAxis[selectedAxisId] : undefined;
 
   const series = filterSeriesByPeriod(axisData?.netWorthSeries ?? [], selectedPeriodId, now);
   const debtTotal = axisData?.debtTotal ?? 0;
-  const slices = buildBreakdownSlices(axisData?.breakdown ?? [], data?.categories ?? [], debtTotal);
+  const propertyTotal = axisData?.propertyTotal ?? 0;
+  const slices = buildBreakdownSlices(
+    axisData?.breakdown ?? [],
+    data?.categories ?? [],
+    debtTotal,
+    propertyTotal,
+    /*
+      B9のリスクレベルは凡例に添えるためのもの(同要件B1「リスクの可視化」)。分類軸を
+      切り替えても効くのは、リスクが分類軸ではなく資産種別に紐づくため
+    */
+    data?.assumptions ?? {},
+  );
   /*
-    差引後の純額は負債を含む分類軸でだけ併記する(同要件B1)。含まない軸では構成比の分母が
-    資産合計そのものなので、断り書きを添える意味が無い。0円の負債はスライスも出ないため
-    `debtTotal`が0のときは`null`になり、断り書きだけが残る状態にはならない。
+    純額は擬似分類(不動産・負債)を含む分類軸でだけ併記する(同要件B1)。含まない軸では
+    構成比の分母が資産合計そのものなので、断り書きを添える意味が無い。どちらも0のときは
+    スライスも出ないため`null`になり、断り書きだけが残る状態にはならない。
 
     絞り込み後の`series`ではなく`axisData`を渡す。純額は「いま何をどれだけ持っているか」を
     表す内訳の相手なので、表示期間ではなく直近の資産残高で出す(`resolveAxisNetAmount`)
@@ -143,6 +141,8 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
         axes={axes}
         selectedAxisId={selectedAxisId ?? ""}
         selectedPeriodId={selectedPeriodId}
+        selectedTrendMode={selectedTrendMode}
+        selectedMonth={selectedMonth}
       />
 
       {dashboardQuery.isPending ? (
@@ -191,7 +191,25 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
           </p>
 
           {selectedAxis ? (
-            <NetWorthTrendCard axisName={selectedAxis.name} series={series} />
+            <NetWorthTrendCard
+              axisName={selectedAxis.name}
+              series={series}
+              mode={selectedTrendMode}
+              hasSpreadProperty={axisData?.hasSpreadProperty ?? false}
+              /*
+                色スロットの割り当ては分類別内訳と共有する。同じ画面の2つのグラフで同じ
+                資産種別が違う色になると見比べられない(同要件B1「積み上げ表示」)
+              */
+              categories={data.categories}
+              buildHref={(mode) =>
+                buildDashboardHref({
+                  axisId: selectedAxisId,
+                  periodId: selectedPeriodId,
+                  trendMode: mode,
+                  month: selectedMonth,
+                })
+              }
+            />
           ) : (
             <Card>
               <CardHeader>
@@ -225,7 +243,24 @@ export const DashboardScreen = ({ axisParam, periodParam }: DashboardScreenProps
           */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <DebtSummaryCard debts={data.debts} />
-            <CashflowSummaryCard cashflow={data.cashflow} />
+            {/*
+              収支サマリは対象の月を自分で取得する(同要件B1「年月の選択」)。ここから渡すのは
+              表示中の月と、選べる上限(当月)と、切り替えたときの遷移だけ
+            */}
+            <CashflowSummaryCard
+              month={selectedMonth}
+              maxMonth={currentMonth}
+              onMonthChange={(month) => {
+                router.replace(
+                  buildDashboardHref({
+                    axisId: selectedAxisId,
+                    periodId: selectedPeriodId,
+                    trendMode: selectedTrendMode,
+                    month,
+                  }),
+                );
+              }}
+            />
           </div>
         </>
       ) : null}

@@ -1,12 +1,19 @@
+"use client";
+
 import { format, parseISO } from "date-fns";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
+import { DeleteRealEstateDialog } from "@/components/real-estate/DeleteRealEstateDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  REAL_ESTATE_ACQUIRED_ON_EMPTY_LABEL,
+  REAL_ESTATE_ACQUIRED_ON_LABEL,
   REAL_ESTATE_BACK_TO_LIST_LINK,
   REAL_ESTATE_BASIC_INFO_SECTION_TITLE,
+  REAL_ESTATE_DELETE_LABEL,
   REAL_ESTATE_EDIT_LABEL,
   REAL_ESTATE_LOAN_BALANCE_LABEL,
   REAL_ESTATE_LOCATION_LABEL,
@@ -45,7 +52,7 @@ const amountToneClass = (amount: number): string =>
  * (docs/screen-requirements-real-estate.md B6「自動計算」)。3項目を並べたうえで
  * 利ざやだけ背景を敷くのは、この画面で確認したい値がそれだからである。
  */
-const RealEstateValuationCard = ({ property }: RealEstateDetailProps): JSX.Element => {
+const RealEstateValuationCard = ({ property }: RealEstateValuationCardProps): JSX.Element => {
   const spread = calculateRealEstateSpread(property);
 
   return (
@@ -133,7 +140,7 @@ const RealEstateRentalCard = ({ rental }: RealEstateRentalCardProps): JSX.Elemen
  * 所在地は画面上部の見出しでは簡略表記にしているため、ここでは登録された住所をそのまま出す
  * (`toShortLocation`のコメントと対応)。
  */
-const RealEstateBasicInfoCard = ({ property }: RealEstateDetailProps): JSX.Element => (
+const RealEstateBasicInfoCard = ({ property }: RealEstateValuationCardProps): JSX.Element => (
   <Card>
     <CardHeader>
       <CardTitle className="text-sm">{REAL_ESTATE_BASIC_INFO_SECTION_TITLE}</CardTitle>
@@ -144,6 +151,18 @@ const RealEstateBasicInfoCard = ({ property }: RealEstateDetailProps): JSX.Eleme
         <dd>{property.name}</dd>
         <dt className="text-muted-foreground">{REAL_ESTATE_LOCATION_LABEL}</dt>
         <dd>{property.location}</dd>
+        {/*
+          取得年月は資産推移グラフが物件を積み始める起点(B1「不動産を含む分類軸の集計」)。
+          入力欄はB7にしか無いので、値が入っているかを参照側でも確かめられるようにする。
+          未入力でも行ごと消さない — 項目名と値が対になるリストでは、行が無いと項目そのものが
+          存在しないように見えるため。
+        */}
+        <dt className="text-muted-foreground">{REAL_ESTATE_ACQUIRED_ON_LABEL}</dt>
+        <dd className="tabular-nums">
+          {property.acquiredOn === null
+            ? REAL_ESTATE_ACQUIRED_ON_EMPTY_LABEL
+            : format(parseISO(`${property.acquiredOn}-01`), "yyyy年M月")}
+        </dd>
         <dt className="text-muted-foreground">{REAL_ESTATE_UPDATED_AT_LABEL}</dt>
         <dd className="tabular-nums">{format(parseISO(property.updatedAt), "yyyy/MM/dd")}</dd>
       </dl>
@@ -169,31 +188,65 @@ const buildPropertySubtitle = (property: RealEstateProperty): string =>
 /**
  * B6 不動産詳細画面の本体(docs/screen-requirements-real-estate.md B6)。
  *
- * 入力項目を持たない参照専用の画面で、操作は「編集」ボタン(B7 編集モード)と
- * 「一覧に戻る」リンク(B5)だけなので、Server Componentのまま組む。
+ * 参照専用の表示に、操作は「編集」(B7 編集モード)・「削除」・「一覧に戻る」(B5)の3つ。
+ * **削除の確認ダイアログの開閉を持つためClient Componentにしている**(B6-1)。それまでは
+ * 入力も状態も無くServer Componentで組めていた。
+ *
+ * 削除そのもの(Firestoreへの書き込み・成功後の遷移・トースト)は呼び出し側が持つ。
+ * 遷移先のB5と一覧のキャッシュはこのコンポーネントの外の関心事であるため。
  */
-export const RealEstateDetail = ({ property }: RealEstateDetailProps): JSX.Element => (
-  <div className="flex max-w-3xl flex-col gap-5">
-    <Link
-      href={REAL_ESTATE_BACK_TO_LIST_LINK.href}
-      className="inline-flex w-fit items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
-    >
-      <ChevronLeft className="size-3.5" aria-hidden />
-      {REAL_ESTATE_BACK_TO_LIST_LINK.label}
-    </Link>
+export const RealEstateDetail = ({
+  property,
+  affectedAxisNames,
+  onDelete,
+}: RealEstateDetailProps): JSX.Element => {
+  const [deleting, setDeleting] = useState(false);
 
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <h2 className="text-lg font-bold">{property.name}</h2>
-        <p className="text-sm text-muted-foreground">{buildPropertySubtitle(property)}</p>
+  return (
+    <div className="flex max-w-3xl flex-col gap-5">
+      <Link
+        href={REAL_ESTATE_BACK_TO_LIST_LINK.href}
+        className="inline-flex w-fit items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
+      >
+        <ChevronLeft className="size-3.5" aria-hidden />
+        {REAL_ESTATE_BACK_TO_LIST_LINK.label}
+      </Link>
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold">{property.name}</h2>
+          <p className="text-sm text-muted-foreground">{buildPropertySubtitle(property)}</p>
+        </div>
+        {/*
+        「削除」は「編集」の隣に置く(B5の一覧には置かない)。一覧の行は全体がこの画面への
+        リンクで、行の中に破壊的な操作を混ぜると誤操作で消えるため
+      */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={buildRealEstateEditPath(property.id)}>{REAL_ESTATE_EDIT_LABEL}</Link>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleting(true)}
+          >
+            {REAL_ESTATE_DELETE_LABEL}
+          </Button>
+        </div>
       </div>
-      <Button asChild variant="outline" size="sm" className="shrink-0">
-        <Link href={buildRealEstateEditPath(property.id)}>{REAL_ESTATE_EDIT_LABEL}</Link>
-      </Button>
-    </div>
 
-    <RealEstateValuationCard property={property} />
-    {property.rental ? <RealEstateRentalCard rental={property.rental} /> : null}
-    <RealEstateBasicInfoCard property={property} />
-  </div>
-);
+      <RealEstateValuationCard property={property} />
+      {property.rental ? <RealEstateRentalCard rental={property.rental} /> : null}
+      <RealEstateBasicInfoCard property={property} />
+
+      <DeleteRealEstateDialog
+        property={deleting ? property : null}
+        affectedAxisNames={affectedAxisNames}
+        onOpenChange={(open) => setDeleting(open)}
+        onConfirm={onDelete}
+      />
+    </div>
+  );
+};

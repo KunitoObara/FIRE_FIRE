@@ -1,6 +1,6 @@
 /** B5 不動産一覧画面・B6 不動産詳細画面・B7 不動産登録・編集画面で使う定数 */
 
-import { REAL_ESTATE_NEW_PATH, REAL_ESTATE_PATH } from "@/constants/routes";
+import { ASSET_CATEGORIES_PATH, REAL_ESTATE_NEW_PATH, REAL_ESTATE_PATH } from "@/constants/routes";
 
 /**
  * 画面上部の説明文。
@@ -10,6 +10,21 @@ import { REAL_ESTATE_NEW_PATH, REAL_ESTATE_PATH } from "@/constants/routes";
  */
 export const REAL_ESTATE_LIST_DESCRIPTION =
   "登録済みの物件の時価とローン残高を一覧します。利ざやは物件を選ぶと詳細画面で確認できます。";
+
+/**
+ * ダッシュボードへの反映はB4で分類軸の集計対象に選ぶ、という導線
+ * (docs/screen-requirements-real-estate.md B5)。
+ *
+ * 登録しただけではB1に現れないため、この画面で触れないと「登録したのにダッシュボードが
+ * 変わらない」の答えがどこにも無い。**行ごとにどの分類軸へ選ばれているかは出さない** —
+ * 分類軸が物件を参照する向きなので、出すには一覧を開くたびに全分類軸を読むことになる。
+ */
+export const REAL_ESTATE_DASHBOARD_LINK = {
+  prefix: "ダッシュボードに反映するには、",
+  label: "資産分類マスタ",
+  href: ASSET_CATEGORIES_PATH,
+  suffix: "で分類軸の集計対象に選んでください。",
+} as const;
 
 /** 「新規登録」ボタン(B7の新規登録モードへの導線) */
 export const REAL_ESTATE_NEW_LINK = {
@@ -53,7 +68,16 @@ export const REAL_ESTATE_RENTAL_BALANCE_LABEL = "収支";
 export const REAL_ESTATE_BASIC_INFO_SECTION_TITLE = "物件基本情報";
 export const REAL_ESTATE_NAME_LABEL = "物件名";
 export const REAL_ESTATE_LOCATION_LABEL = "所在地";
+export const REAL_ESTATE_ACQUIRED_ON_LABEL = "取得年月";
 export const REAL_ESTATE_UPDATED_AT_LABEL = "最終更新日";
+
+/**
+ * 取得年月が未入力のときにB6が出す文言。
+ *
+ * 行ごと消さないのは、項目名と値が対になる基本情報のリストでは、行が無いと項目そのものが
+ * 存在しないように見えるため(B1の負債サマリが未入力の欄を空にするのとは事情が違う)。
+ */
+export const REAL_ESTATE_ACQUIRED_ON_EMPTY_LABEL = "未登録";
 
 /** 収益物件であることを物件名の下に示すラベル。非収益物件には何も出さない */
 export const REAL_ESTATE_RENTAL_PROPERTY_LABEL = "収益物件";
@@ -66,6 +90,67 @@ export const REAL_ESTATE_BACK_TO_LIST_LINK = {
 
 /** 「編集」ボタンのラベル。遷移先は物件IDから組み立てるためここには持たない */
 export const REAL_ESTATE_EDIT_LABEL = "編集";
+
+/**
+ * 「削除」ボタンのラベル(B6)。
+ *
+ * B5の一覧ではなくB6に置く。一覧の行は全体がB6へのリンクで、行の中に破壊的な操作を混ぜると
+ * 誤操作で消えるため。削除の前に時価・ローン残高・利ざやを確かめられる場所もB6である
+ * (docs/screen-requirements-real-estate.md「物件の削除」)。
+ */
+export const REAL_ESTATE_DELETE_LABEL = "削除";
+
+/** 削除確認ダイアログの見出し。どの物件を消すのか分かるよう物件名を示す */
+export const buildDeleteRealEstateConfirmTitle = (name: string): string =>
+  `「${name}」を削除しますか?`;
+
+/**
+ * 削除確認ダイアログの本文(取り消せないこと)。
+ *
+ * 論理削除(ゴミ箱)は設けないので、押した時点で元に戻せない(B11の負債削除と同じ)。
+ */
+export const DELETE_REAL_ESTATE_IRREVERSIBLE_WARNING =
+  "この操作は取り消せません。削除すると一覧に戻ります。";
+
+/**
+ * 履歴が消えることの影響(B4-8以降)。
+ *
+ * 時価・ローン残高の履歴は物件のドキュメント内に持つので、削除すれば一緒に消える。
+ * 資産推移グラフはその履歴から過去の点を描いているため、**過去に遡って額が消える**。
+ * B11の負債削除が残債の履歴について同じ警告を出しているのと揃える。
+ */
+export const DELETE_REAL_ESTATE_HISTORY_WARNING =
+  "時価・ローン残高の履歴も削除され、資産推移グラフからこの物件の額が過去に遡って消えます。";
+
+/**
+ * 削除する物件を集計対象にしている分類軸の案内。
+ *
+ * 物件はチェックボックスで複数の分類軸から独立に選べるため、該当する軸は**すべて列挙する**
+ * (B11の負債削除と同じ)。件数だけを示すと、どの軸の集計が変わるかを確かめるために
+ * B4を開き直させることになる。
+ */
+export const buildDeleteRealEstateAxisWarning = (axisNames: string[]): string =>
+  `この物件を集計対象にしている分類軸「${axisNames.join("」「")}」の集計も変わります。`;
+
+/**
+ * 分類軸を取得できていないときにダイアログへ出す一文。
+ *
+ * **削除は止めない**(分類軸の情報は影響の説明であって、削除の可否を決めるものではない。
+ * 無関係な取得失敗で物件の整理ができなくなるほうが困る)。ただし黙って省くと、
+ * 影響する軸が無いのか確かめられなかっただけなのかを画面から区別できないため、
+ * 取れていないことをそのまま出す(PO判断)。
+ */
+export const DELETE_REAL_ESTATE_AXES_UNKNOWN_WARNING =
+  "分類軸の情報を取得できなかったため、この物件を集計対象にしている分類軸があるかどうかは確認できていません。";
+
+/** 削除確認ダイアログの実行ボタン */
+export const DELETE_REAL_ESTATE_CONFIRM_LABEL = "削除する";
+
+/** 削除中の実行ボタン。二重に押させない */
+export const DELETE_REAL_ESTATE_SUBMITTING_LABEL = "削除中...";
+
+/** 削除完了のトースト(B5へ遷移してから出す) */
+export const REAL_ESTATE_DELETED_MESSAGE = "物件を削除しました";
 
 /**
  * 指定された物件が見つからないときの案内(B6・B7 編集モード)。
@@ -98,6 +183,7 @@ export const REAL_ESTATE_FORM_TITLES = {
 export const REAL_ESTATE_FORM_INITIAL_VALUES: RealEstateFormValues = {
   name: "",
   location: "",
+  acquiredOn: "",
   marketValue: "",
   loanBalance: "",
   isRentalProperty: false,
@@ -129,6 +215,43 @@ export const REAL_ESTATE_FORM_RENTAL_TOGGLE_LABEL = "収益物件として登録
 
 /** 所在地が任意入力であることを入力欄に明示する。未入力でも保存できる */
 export const REAL_ESTATE_FORM_OPTIONAL_SUFFIX = "(任意)";
+
+/**
+ * 取得年月の入力欄に添えるヒント。
+ *
+ * **入れると推移グラフのどこから物件が積まれるようになるのか**を書く
+ * (docs/screen-requirements-real-estate.md B7)。入れてもB6の利ざや・B1の円グラフ・
+ * FIRE達成度ゲージの数字は変わらない(いずれも「いま」の額なので)ため、何のための欄かが
+ * 画面から読めないと入力されないまま残る。B11の発生年月のヒントと同じ考え方。
+ */
+export const REAL_ESTATE_ACQUIRED_ON_HINT =
+  "入力すると、資産推移グラフがこの月から物件を反映します。未入力の場合は最初に記録した日からになります。";
+
+/**
+ * 取得年月の形式(`yyyy-MM`)。B11の発生年月と同じ値を持つ。
+ *
+ * **月を01〜12に絞る。** 桁だけを見る形にすると`2020-13`が通り、当月との比較も文字列の
+ * 辞書順なので保存まで素通りする。`firestore.rules`側にも同じ形を置く。
+ */
+export const REAL_ESTATE_ACQUIRED_ON_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/u;
+
+/** 取得年月の書式(date-fns)。当月との比較に使う */
+export const REAL_ESTATE_ACQUIRED_ON_FORMAT = "yyyy-MM";
+
+/**
+ * 取得年月の下限。桁を打ち間違えた年(`0202`)を止める歯止めで、
+ * 実在しうる取得年を締め出さない値に置く(B11の発生年月と同じ)。
+ */
+export const REAL_ESTATE_ACQUIRED_ON_MIN = "1900-01";
+
+/**
+ * 時価・ローン残高の履歴の件数上限(月1回の更新で50年分)。
+ *
+ * 値はB11の残債の履歴(`DEBT_BALANCE_HISTORY_MAX`)と揃える。この履歴は削除以外で減らず
+ * 運用年数に応じて単調に増えるため、`byType`のように「種別の数で自然に頭打ちになる」
+ * 性質に頼れない。`firestore.rules`側にも同じ値を置く。
+ */
+export const REAL_ESTATE_VALUE_HISTORY_MAX = 600;
 
 /** 物件名の最大文字数。firestore.rulesの`properties`の検証と一致させる */
 export const REAL_ESTATE_NAME_MAX_LENGTH = 60;
@@ -166,18 +289,34 @@ export const REAL_ESTATE_AMOUNT_FORMAT_MESSAGE = "半角数字のみ入力して
 /** 金額が上限を超えたときのエラー */
 export const REAL_ESTATE_AMOUNT_TOO_LARGE_MESSAGE = "金額は12桁以内で入力してください。";
 
+/** 取得年月が`yyyy-MM`として読めないときのエラー */
+export const REAL_ESTATE_ACQUIRED_ON_FORMAT_MESSAGE = `${REAL_ESTATE_ACQUIRED_ON_LABEL}は年月で入力してください。`;
+
+/** 取得年月に未来の年月が入っているときのエラー(まだ取得していない物件を過去のグラフに積まないため) */
+export const REAL_ESTATE_ACQUIRED_ON_FUTURE_MESSAGE = `${REAL_ESTATE_ACQUIRED_ON_LABEL}に未来の年月は入力できません。`;
+
+/** 取得年月が下限より前のときのエラー */
+export const REAL_ESTATE_ACQUIRED_ON_TOO_OLD_MESSAGE = `${REAL_ESTATE_ACQUIRED_ON_LABEL}は${REAL_ESTATE_ACQUIRED_ON_MIN.replace("-", "年")}月以降で入力してください。`;
+
 /** 保存完了のトースト(DESIGN.md 3章のsonner) */
 export const REAL_ESTATE_SAVED_MESSAGES = {
   create: "物件を登録しました",
   edit: "物件情報を更新しました",
 } as const;
 
-/** 物件の取得・保存が失敗したときの文言(B4の`CATEGORY_AXIS_FAILURE_MESSAGES`と同じ考え方) */
-export const REAL_ESTATE_FAILURE_MESSAGES: Record<FirestoreAccessFailureReason, string> = {
+/**
+ * 物件の取得・保存が失敗したときの文言(B4の`CATEGORY_AXIS_FAILURE_MESSAGES`と同じ考え方)。
+ *
+ * 保存側だけが起こしうる`history-limit-exceeded`も同じ表に置く。取得側は
+ * `FirestoreAccessFailureReason`しか返さないが、その部分集合をこの表で引ける
+ * (B11が`DEBT_FAILURE_MESSAGES`1つで両方を賄っているのと同じ)。
+ */
+export const REAL_ESTATE_FAILURE_MESSAGES: Record<RealEstateSaveFailureReason, string> = {
   "signed-out": "ログイン状態が切れています。ログインし直してから操作してください。",
   "configuration-error": "Firebaseの設定が読み込めないため操作できません。",
   "permission-denied": "この操作は許可されていません。ログインし直すか、画面を更新してください。",
   unknown: "操作に失敗しました。時間をおいて再度お試しください。",
+  "history-limit-exceeded": `時価・ローン残高の履歴が上限(${REAL_ESTATE_VALUE_HISTORY_MAX}件)に達しているため保存できません。履歴の持ち方を見直す必要があります。`,
 };
 
 /** 物件一覧のキャッシュキー(TanStack Query) */

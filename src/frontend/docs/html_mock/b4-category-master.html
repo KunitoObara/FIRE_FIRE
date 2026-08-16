@@ -42,6 +42,20 @@
         <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18" stroke-linecap="round"/><path d="M8 15h4" stroke-linecap="round"/></svg>
         負債入力
       </a>
+      <!-- Phase 5(未実装)。ダッシュボードの集計には効かない3画面で、サイドバーはB11の次に並べる
+           (docs/screen-list-and-transitions.md 3.3) -->
+      <a class="sidebar-link" href="b12-subscriptions.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10a8 8 0 0113-5" stroke-linecap="round"/><path d="M17 3v4h-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 14a8 8 0 01-13 5" stroke-linecap="round"/><path d="M7 21v-4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        サブスク一覧
+      </a>
+      <a class="sidebar-link" href="b13-financial-institutions.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18" stroke-linecap="round"/><path d="M12 3l8 5H4z" stroke-linejoin="round"/><path d="M6 11v7M10 11v7M14 11v7M18 11v7" stroke-linecap="round"/></svg>
+        金融機関一覧
+      </a>
+      <a class="sidebar-link" href="b14-belongings.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l9-4 9 4v8l-9 4-9-4z" stroke-linejoin="round"/><path d="M3 8l9 4 9-4M12 12v8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        持ち物一覧
+      </a>
       <div class="my-2 border-t" style="border-color: hsl(var(--border));"></div>
       <a class="sidebar-link" href="b8-fire-goal.html">
         <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -100,18 +114,49 @@
           <label class="label">分類名</label>
           <input class="input" placeholder="例: 純金融資産" />
         </div>
-        <!-- 集計対象は「資産種別」と「負債」の2グループに分ける。
-             資産種別は名前が唯一の識別子、負債はB11で採番するIDを持つため、同じ配列に混ぜない
-             (docs/screen-requirements-dashboard.md B4「集計対象に負債を含める」) -->
+        <!-- 集計対象は「資産種別」「不動産(手動)」「負債」の3グループに分ける。
+             資産種別は名前が唯一の識別子、負債はB11で採番するID、物件はB7で採番するIDに
+             反映方法(利ざや/時価)が付くため、同じ配列に混ぜない
+             (docs/screen-requirements-dashboard.md B4「集計対象に負債を含める」「集計対象に不動産を含める」) -->
         <div class="field mb-4">
           <label class="label">集計対象:資産種別(複数選択可)</label>
           <div class="grid grid-cols-2 gap-2 text-sm mt-1">
             <label class="checkbox-row"><input type="checkbox" checked /><span>普通預金(三井住友)</span></label>
             <label class="checkbox-row"><input type="checkbox" checked /><span>SBI証券(特定口座)</span></label>
             <label class="checkbox-row"><input type="checkbox" /><span>楽天カード</span></label>
+            <!-- マネーフォワードに不動産を登録していると、CSVにもこの資産種別として現れる。
+                 下の「不動産(手動)」で同じ物件を選ぶと二重に数えることになる -->
             <label class="checkbox-row"><input type="checkbox" /><span>不動産</span></label>
           </div>
           <p class="field-hint">1件も選ばない場合は、すべての資産種別が対象になります。</p>
+        </div>
+
+        <!-- 集計対象:不動産(手動)。選択肢はB5〜B7で登録した物件で、選んだ物件の額を加算する
+             (docs/screen-requirements-dashboard.md B4「集計対象に不動産を含める」)。
+             物件名は重複を許すため、簡略表記の所在地を添えて見分ける -->
+        <div class="field mb-4">
+          <label class="label">集計対象:不動産(手動)(複数選択可)</label>
+          <!-- カードで指定された赤字の注意。入力エラーと読み違えられないよう「注意」のラベルを
+               添え、入力エラーが出る欄の直下ではなく選択肢の上に置く(DESIGN.md 3章) -->
+          <div class="alert alert-error mt-1 mb-2">
+            <span><strong>注意</strong> CSV取込データとの重複に注意してください。マネーフォワードに登録済みの不動産は資産種別としてCSVにも現れるため、同じ物件をここで選ぶと二重に集計されます。</span>
+          </div>
+          <div class="flex flex-col gap-2 text-sm mt-1">
+            <!-- 選んだ物件の行にだけ「利ざやのみ反映」を出す。既定はオン(利ざや)。
+                 時価を既定にすると、ローンが残っている物件を選んだ瞬間に控除前の額が載る -->
+            <div class="flex flex-col gap-1">
+              <label class="checkbox-row"><input type="checkbox" checked /><span>〇〇マンション101号室(東京都渋谷区)</span></label>
+              <label class="checkbox-row pl-6 text-xs text-slate-500"><input type="checkbox" checked /><span>利ざやのみ反映(時価 - ローン残高)</span></label>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="checkbox-row"><input type="checkbox" checked /><span>△△アパート202号室(神奈川県横浜市)</span></label>
+              <!-- チェックを外した状態=時価を反映する(投資用は時価で見たい、のような使い分け) -->
+              <label class="checkbox-row pl-6 text-xs text-slate-500"><input type="checkbox" /><span>利ざやのみ反映(時価 - ローン残高)</span></label>
+            </div>
+          </div>
+          <!-- 資産種別の「未選択=すべて」は不動産にも適用しない(負債と同じ理由) -->
+          <p class="field-hint">選んだ物件の額を、この分類軸の集計に加えます。1件も選ばない場合は不動産は反映しません。</p>
+          <p class="field-hint">「利ざやのみ反映」にした物件のローンを下の負債でも選ぶと、同じローンを二重に差し引きます。</p>
         </div>
 
         <div class="field mb-4">
@@ -138,9 +183,10 @@
             <span class="h-3 w-3 rounded-full shrink-0" style="background: var(--chart-1);"></span>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium">総資産</p>
-              <!-- 負債を含む軸だけ末尾に件数が付く(下の「純金融資産」)。
-                   付いていない軸は負債を差し引かない -->
-              <p class="text-xs text-slate-400">すべての口座・資産種別が対象</p>
+              <!-- 不動産・負債を含む軸だけ末尾に件数が付く(この行は不動産2件、下の「純金融資産」は負債2件)。
+                   付いていない軸は不動産を加えない・負債を差し引かない。
+                   利ざや/時価の内訳は一覧に出さない(1行に収まらないため。反映方法は編集フォームで確かめる) -->
+              <p class="text-xs text-slate-400">すべての口座・資産種別が対象 / 不動産 2件</p>
             </div>
             <button class="btn btn-ghost btn-sm">編集</button>
             <button class="btn btn-ghost btn-sm" style="color: hsl(var(--destructive));" onclick="document.getElementById('delete-blocked-dialog').classList.remove('hidden')">削除</button>

@@ -18,9 +18,26 @@
   --muted-foreground: 215.4 16.3% 46.9%;
   --accent: 210 40% 96.1%;
   --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
+  /*
+    エラー(赤)と増減のプラス側(緑)。**この2つだけは実装の値をそのまま持ってきている。**
+
+    当初は Tailwind の red-500 / green-600 相当(`0 84.2% 60.2%` = `#ef4444`、
+    `142.1 76.2% 36.3%` = `#16a34a`)を置いていたが、白背景でのコントラスト比が
+    3.78:1 / 3.26:1 しかなく、**どちらも文字色として使う**(入力エラー・負債の金額 /
+    収支サマリの増減)以上、本文に必要な 4.5:1 を満たさない。実装側の値
+    (`#e7000b` = 4.77:1、`#006300` = 7.55:1)を正とし、こちらを合わせた。
+
+    加えて `--destructive` は DESIGN.md 3章のパレット検証に `#e7000b` として
+    組み込まれており、変えると不動産色 `--real-estate` や `--chart-*` との
+    識別性を検証し直すことになる。**片方だけ変えない。**
+
+    ここがhexではなくHSLなのは、`hsl(var(--destructive) / 0.08)` のように
+    不透明度を変えて使う箇所があるため(`.alert-error` 等)。上記のhexと
+    往復して一致する値を置いてある。
+  */
+  --destructive: 357.1 100% 45.3%;
   --destructive-foreground: 210 40% 98%;
-  --success: 142.1 76.2% 36.3%;
+  --success: 120 100% 19.4%;
   --success-foreground: 210 40% 98%;
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
@@ -46,6 +63,16 @@
   --chart-6: #008300;
   --chart-7: #4a3aa7;
   --chart-8: #e34948;
+
+  /*
+    不動産の色(DESIGN.md 3章)。B4の分類軸が集計対象にする物件は「不動産」1つの帯・スライスに
+    まとめ、資産分類カラーのスロット(--chart-1〜8)を消費しない専用色で描く。
+    負債(--destructive)と同じく、スロットを配る対象にしない色である。
+    --chart-* と同じく実装の globals.css(ライト用)と同一の値・同一のhex表記にする。**片方だけ変えない。**
+    茶色ではなく紫なのは、茶色が --chart-2 / --chart-4 / 負債とCVD下で見分けられず、
+    dataviz スキルの検証を通らなかったため(DESIGN.md 3章に実測値と経緯)。
+  */
+  --real-estate: #95568c;
 }
 
 body {
@@ -535,4 +562,147 @@ body {
   color: hsl(var(--primary));
   border-bottom-color: hsl(var(--primary));
   font-weight: 600;
+}
+
+/* ---- 公開画面シェル(A0・A9・A10) ----
+   認証系の中央寄せカード(.auth-shell)でもログイン後のアプリシェル(.app-shell)でもない
+   3つ目の系統(DESIGN.md 5章)。未ログインの訪問者が到達する画面で使う。
+   ヘッダーとフッターはA0・A9・A10で共通なので、ここに置いて3ファイルで共有する。 */
+
+.public-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: hsl(var(--background));
+}
+
+/* スクロールに追従させる。LPは縦に長く、下まで読んだところで
+   ログイン/サインアップへ入れる状態を保つため。 */
+.public-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: 3.75rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background) / 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.public-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground));
+  text-decoration: none;
+}
+
+.public-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+/* ヘッダー右側の導線。未ログインは「ログイン」「サインアップ」の2つ、
+   ログイン中は「ダッシュボードへ」1つに差し替える(screen-requirements-public.md 2章)。
+   畳む対象がボタン2つしか無いため、モバイル幅でもハンバーガーメニューにしない。 */
+.public-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.public-main {
+  flex: 1;
+}
+
+.public-section {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.public-footer {
+  border-top: 1px solid hsl(var(--border));
+  background-color: hsl(var(--muted));
+}
+
+.public-footer-inner {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.public-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+
+/* ---- 規約・ポリシーの本文(A9・A10) ----
+   読ませることだけが用途の画面。行長を本文向けに絞り、条見出しと本文の
+   間隔だけを決める。装飾は置かない。 */
+
+.legal-body {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 4rem;
+}
+
+.legal-body h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-top: 2rem;
+  margin-bottom: 0.625rem;
+}
+
+.legal-body p,
+.legal-body li {
+  font-size: 0.875rem;
+  line-height: 1.9;
+  color: hsl(var(--foreground));
+}
+
+.legal-body p {
+  margin-bottom: 0.75rem;
+}
+
+.legal-body ol,
+.legal-body ul {
+  margin: 0 0 0.75rem 1.25rem;
+}
+
+.legal-body ol {
+  list-style: decimal;
+}
+
+.legal-body ul {
+  list-style: disc;
+}
+
+.legal-meta {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { LogoutConfirmDialog } from "@/components/auth/LogoutConfirmDialog";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -214,10 +215,11 @@ export const VerifyEmailNotice = (): JSX.Element => {
         <p className="text-sm text-muted-foreground">以下の宛先に確認メールを送信しました。</p>
         {email !== null ? <p className="mt-1 text-sm font-semibold break-all">{email}</p> : null}
 
-        <p className="mt-5 rounded-lg bg-muted p-4 text-left text-sm text-muted-foreground">
+        {/* 手順の案内であってエラーでも完了でもないので、読み上げの対象にしない(role を持たせない) */}
+        <Alert variant="info" role={undefined} className="mt-5">
           メール本文内のリンクをクリックすると確認が完了し、続けて2段階認証(2FA)の登録に進みます。
           メールが届かない場合は、迷惑メールフォルダもご確認ください。
-        </p>
+        </Alert>
 
         {errorMessage !== null ? (
           <p role="alert" className="mt-4 text-sm text-destructive">

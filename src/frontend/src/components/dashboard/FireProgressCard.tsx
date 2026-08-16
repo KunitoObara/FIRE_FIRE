@@ -8,14 +8,14 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/componen
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ACHIEVEMENT_AXIS_MISSING_NOTICE,
+  ASSUMPTION_SETTINGS_LINK,
   DASHBOARD_EMPTY_STATES,
   FIRE_GOAL_LINK,
+  MONTHLY_CONTRIBUTION_LINK_LABEL,
   NEGATIVE_CURRENT_AMOUNT_NOTICE,
+  UNREACHABLE_PROJECTION_NOTICE,
 } from "@/constants/dashboard";
-import {
-  calculateAchievementRate,
-  formatProjectedAchievementDate,
-} from "@/lib/dashboard/fire-progress";
+import { calculateAchievementRate, formatFireProjection } from "@/lib/dashboard/fire-progress";
 import { formatJpy } from "@/lib/format/currency";
 
 import type { JSX } from "react";
@@ -108,11 +108,37 @@ export const FireProgressCard = ({ fireProgress }: FireProgressCardProps): JSX.E
                 <div className="flex gap-2">
                   <dt className="text-muted-foreground">到達予測日</dt>
                   <dd className="font-semibold tabular-nums">
-                    {formatProjectedAchievementDate(fireProgress.projectedAchievementDate)}
+                    {formatFireProjection(fireProgress.projection)}
                   </dd>
                 </div>
               </dl>
             </div>
+
+            {/*
+              「到達見込みなし」のときは**B9・B8の両方**への導線を添える(同要件B1「到達予測日」)。
+              前提を置き直せば予測が出ることが分かるようにするためで、片方に絞らないのは、
+              この状態になる原因が想定利回り(B9)側とは限らず、積立額(B8)がマイナスで
+              資産が減り続ける場合もあるため。B8への導線はカード見出しにもあるが、あちらは
+              「目標を設定する」で積立額を直す先には読めないので、ここでは別に出す
+            */}
+            {fireProgress.projection?.status === "unreachable" ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                {UNREACHABLE_PROJECTION_NOTICE}{" "}
+                <Link
+                  href={ASSUMPTION_SETTINGS_LINK.href}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  {ASSUMPTION_SETTINGS_LINK.label}
+                </Link>
+                {" / "}
+                <Link
+                  href={FIRE_GOAL_LINK.href}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  {MONTHLY_CONTRIBUTION_LINK_LABEL}
+                </Link>
+              </p>
+            ) : null}
           </div>
         )}
       </CardContent>

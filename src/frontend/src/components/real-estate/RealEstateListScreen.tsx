@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   NO_REAL_ESTATE_EMPTY_STATE,
+  REAL_ESTATE_DASHBOARD_LINK,
   REAL_ESTATE_FAILURE_MESSAGES,
   REAL_ESTATE_LIST_DESCRIPTION,
   REAL_ESTATE_NEW_LINK,
@@ -39,7 +40,21 @@ export const RealEstateListScreen = (): JSX.Element => {
   return (
     <div className="flex max-w-3xl flex-col gap-5">
       <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">{REAL_ESTATE_LIST_DESCRIPTION}</p>
+        {/*
+          利ざやをB6で確認できることに加え、ダッシュボードへの反映がB4の分類軸で決まることも
+          添える(B5)。登録しただけではB1に現れないため、ここで触れないと理由が画面のどこにも無い
+        */}
+        <p className="text-sm text-muted-foreground">
+          {REAL_ESTATE_LIST_DESCRIPTION}
+          {REAL_ESTATE_DASHBOARD_LINK.prefix}
+          <Link
+            href={REAL_ESTATE_DASHBOARD_LINK.href}
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            {REAL_ESTATE_DASHBOARD_LINK.label}
+          </Link>
+          {REAL_ESTATE_DASHBOARD_LINK.suffix}
+        </p>
         <Button asChild size="sm" className="shrink-0">
           <Link href={REAL_ESTATE_NEW_LINK.href}>{REAL_ESTATE_NEW_LINK.label}</Link>
         </Button>

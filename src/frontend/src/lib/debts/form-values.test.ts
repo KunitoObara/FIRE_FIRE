@@ -11,6 +11,7 @@ const savedDebt: Debt = {
   id: "debt-1",
   name: "住宅ローン(〇〇銀行)",
   balance: 18_400_000,
+  originatedOn: "2019-04",
   interestRate: 0.475,
   repaymentMonths: 280,
   updatedAt: "2026-07-12",
@@ -47,6 +48,7 @@ describe("toDebtRowFormValues", () => {
       id: "debt-1",
       name: "住宅ローン(〇〇銀行)",
       balance: "18400000",
+      originatedOn: "2019-04",
       interestRate: "0.475",
       repaymentYears: "23",
       repaymentMonths: "4",
@@ -82,6 +84,7 @@ describe("toDebtInput", () => {
       id: "debt-1",
       name: "住宅ローン(〇〇銀行)",
       balance: 18_400_000,
+      originatedOn: "2019-04",
       interestRate: 0.475,
       repaymentMonths: 280,
     });
@@ -95,6 +98,8 @@ describe("toDebtInput", () => {
       id: null,
       name: "カードローン",
       balance: 450_000,
+      // 空文字は「未登録」。今月に倒すと、入力していない負債の反映の起点が勝手に決まる
+      originatedOn: null,
       interestRate: null,
       repaymentMonths: null,
     });

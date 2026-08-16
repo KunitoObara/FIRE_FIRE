@@ -1,9 +1,14 @@
 import { TRANSACTIONS_PATH } from "@/constants/routes";
 import {
+  ALL_TRANSACTION_ACCOUNTS_VALUE,
+  ALL_TRANSACTION_CATEGORIES_VALUE,
+  ALL_TRANSACTION_CATEGORY_MINORS_VALUE,
+  buildUnavailableOptionLabel,
   DEFAULT_TRANSACTION_PERIOD_ID,
   DEFAULT_TRANSACTION_SORT_DIRECTION,
   DEFAULT_TRANSACTION_SORT_KEY,
   TRANSACTION_ACCOUNT_PARAM,
+  TRANSACTION_CATEGORY_MINOR_PARAM,
   TRANSACTION_CATEGORY_PARAM,
   TRANSACTION_KEYWORD_PARAM,
   TRANSACTION_PAGE_PARAM,
@@ -17,6 +22,13 @@ import { firstQueryValue } from "@/lib/query-params";
 type TransactionSearchParamValue = string | string[] | undefined;
 type TransactionSearchParams = Record<string, TransactionSearchParamValue>;
 
+/** セレクタの「すべて」に割り当てたUI専用の値。URLに現れたら未選択として扱う */
+const UI_ONLY_SELECT_VALUES = [
+  ALL_TRANSACTION_CATEGORIES_VALUE,
+  ALL_TRANSACTION_CATEGORY_MINORS_VALUE,
+  ALL_TRANSACTION_ACCOUNTS_VALUE,
+];
+
 /** URLの`period`から表示期間を決める。未指定・不正な値は既定値に落とす */
 export const resolveTransactionPeriodId = (
   value: TransactionSearchParamValue,
@@ -26,17 +38,72 @@ export const resolveTransactionPeriodId = (
 };
 
 /**
- * URLの`category`/`account`から絞り込み値を決める。
+ * URLの`category`/`subcategory`/`account`から絞り込み値を決める。
  *
- * 費目・口座はマスタが無く取引データから動的に抽出するため、既存データに無い値(手で書き換えた
- * URL等)は「すべて」(空文字)に落とす。
+ * **読み込んだ期間に無い値でもそのまま採る。** 費目・口座はマスタが無く、選択肢は期間内の
+ * 取引から作るため、期間を切り替えると選択肢の集合が変わる。そこで空文字へ落とすと、結果が
+ * 0件なのは「本当に無い」からなのか「選択が外れた」からなのかを画面から区別できない
+ * (docs/screen-requirements-dashboard.md B3)。選択肢に無い値は
+ * `buildTransactionSelectOptions`が但し書き付きで選択肢に残す。
+ *
+ * 前後の空白は落とす。見えない差で「同じつもりの選択」が別物になるのを避けるため(6章)。
  */
-export const resolveTransactionOption = (
-  value: TransactionSearchParamValue,
+export const resolveTransactionOption = (value: TransactionSearchParamValue): string => {
+  const raw = firstQueryValue(value)?.trim() ?? "";
+
+  /*
+    「すべて」を表すダミー値がURLに載っていたら未選択として扱う。これはRadix `Select`が
+    item valueに空文字を許さないための**UI専用の値**で、本来URLには現れない。手で書き換えた
+    URL等でそのまま採ると、セレクタは「すべて」を指したまま一覧だけがその文字列で絞られ、
+    画面の表示と絞り込みの結果が食い違う(同じ値の選択肢が2つ並ぶことにもなる)。
+  */
+  return UI_ONLY_SELECT_VALUES.some((uiOnlyValue) => uiOnlyValue === raw) ? "" : raw;
+};
+
+/**
+ * セレクタに並べる選択肢を組み立てる。
+ *
+ * 選択中の値が読み込んだ期間に無ければ、末尾に但し書き付きで足す。**消さない** — 上記のとおり
+ * 0件の理由を画面から区別できなくなるため。
+ */
+export const buildTransactionSelectOptions = (
   options: string[],
-): string => {
-  const raw = firstQueryValue(value);
-  return raw !== null && options.includes(raw) ? raw : "";
+  selected: string,
+): TransactionSelectOption[] => {
+  const available = options.map((option) => ({
+    value: option,
+    label: option,
+    available: true,
+  }));
+
+  if (!selected || options.includes(selected)) {
+    return available;
+  }
+
+  return [
+    ...available,
+    { value: selected, label: buildUnavailableOptionLabel(selected), available: false },
+  ];
+};
+
+/**
+ * 中項目セレクタに並べる中項目を決める。
+ *
+ * 大項目を選ぶとその配下に絞られ、大項目が未選択のときは全ての中項目を並べる
+ * (docs/transaction-import-requirements.md 6章)。同じ名前の中項目が複数の大項目にあっても
+ * 1つにまとめる — 中項目だけで絞ったときは大項目をまたいで一致させるため。
+ */
+export const resolveCategoryMinorOptions = (
+  categoryMinorsByMajor: Record<string, string[]>,
+  category: string,
+): string[] => {
+  if (category) {
+    return categoryMinorsByMajor[category] ?? [];
+  }
+
+  return [...new Set(Object.values(categoryMinorsByMajor).flat())].sort((left, right) =>
+    left.localeCompare(right, "ja"),
+  );
 };
 
 /** URLの`q`からキーワード検索の値を決める。前後の空白は無視する */
@@ -62,14 +129,19 @@ export const resolveTransactionPage = (value: TransactionSearchParamValue): numb
   return Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
 };
 
-/** URLのクエリパラメータ一式から、B3の絞り込み・並び替え・ページの状態をまとめて決める */
+/**
+ * URLのクエリパラメータ一式から、B3の絞り込み・並び替え・ページの状態をまとめて決める。
+ *
+ * 取得したデータを引数に取らない。選択肢に無い値も残す方針にしたため、突き合わせる相手が
+ * 要らなくなった(`resolveTransactionOption`)。
+ */
 export const resolveTransactionFilters = (
   searchParams: TransactionSearchParams,
-  data: TransactionsData,
 ): TransactionFilters => ({
   periodId: resolveTransactionPeriodId(searchParams[TRANSACTION_PERIOD_PARAM]),
-  category: resolveTransactionOption(searchParams[TRANSACTION_CATEGORY_PARAM], data.categories),
-  account: resolveTransactionOption(searchParams[TRANSACTION_ACCOUNT_PARAM], data.accounts),
+  category: resolveTransactionOption(searchParams[TRANSACTION_CATEGORY_PARAM]),
+  categoryMinor: resolveTransactionOption(searchParams[TRANSACTION_CATEGORY_MINOR_PARAM]),
+  account: resolveTransactionOption(searchParams[TRANSACTION_ACCOUNT_PARAM]),
   keyword: resolveTransactionKeyword(searchParams[TRANSACTION_KEYWORD_PARAM]),
   sortKey: resolveTransactionSortKey(searchParams[TRANSACTION_SORT_PARAM]),
   sortDirection: resolveTransactionSortDirection(searchParams[TRANSACTION_SORT_DIRECTION_PARAM]),
@@ -82,15 +154,19 @@ export const buildTransactionsHref = (filters: TransactionFilters): string => {
 
   params.set(TRANSACTION_PERIOD_PARAM, filters.periodId);
 
-  if (filters.category !== "") {
+  if (filters.category) {
     params.set(TRANSACTION_CATEGORY_PARAM, filters.category);
   }
 
-  if (filters.account !== "") {
+  if (filters.categoryMinor) {
+    params.set(TRANSACTION_CATEGORY_MINOR_PARAM, filters.categoryMinor);
+  }
+
+  if (filters.account) {
     params.set(TRANSACTION_ACCOUNT_PARAM, filters.account);
   }
 
-  if (filters.keyword !== "") {
+  if (filters.keyword) {
     params.set(TRANSACTION_KEYWORD_PARAM, filters.keyword);
   }
 
@@ -102,7 +178,7 @@ export const buildTransactionsHref = (filters: TransactionFilters): string => {
   }
 
   const query = params.toString();
-  return query === "" ? TRANSACTIONS_PATH : `${TRANSACTIONS_PATH}?${query}`;
+  return query ? `${TRANSACTIONS_PATH}?${query}` : TRANSACTIONS_PATH;
 };
 
 /**
@@ -119,7 +195,13 @@ export const buildTransactionsHref = (filters: TransactionFilters): string => {
  * 無駄な描画が増える。
  */
 export const buildTransactionsFilterBarKey = (filters: TransactionFilters): string =>
-  [filters.periodId, filters.category, filters.account, filters.keyword].join("|");
+  [
+    filters.periodId,
+    filters.category,
+    filters.categoryMinor,
+    filters.account,
+    filters.keyword,
+  ].join("|");
 
 /**
  * 並び替え列の見出しリンクを組み立てる。

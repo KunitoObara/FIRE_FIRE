@@ -67,6 +67,9 @@ export const fetchFireGoal = async (): Promise<FireGoalResult> => {
         // 対象分類を持たずに保存された既存の目標はキーごと無い。既定(総資産)として扱い、
         // これまでと同じ現在資産額・達成率のままにする(要件B1)
         achievementAxisId: parsed.data.achievementAxisId ?? null,
+        // 積立額を導入する前に保存された目標も同じくキーごと無い。値なしとして扱い、
+        // 画面側が前月の収支を初期値に提示する(要件B8「毎月の積立額」)
+        monthlyContribution: parsed.data.monthlyContribution ?? null,
       },
     };
   } catch (error) {
@@ -97,6 +100,9 @@ export const saveFireGoal = async (goal: FireGoal): Promise<SaveFireGoalResult> 
       // 既定(総資産)も`null`として明示的に書く。キーを省くと、既定を選び直したのか
       // 対象分類を導入する前に保存された目標なのかが読み出し側で区別できなくなる
       achievementAxisId: goal.achievementAxisId,
+      // B8からの保存では常に数値(未入力は0)が入る。キーを省かないのは、積立なしを選んだのか
+      // 積立額を導入する前に保存された目標なのかを読み出し側で区別するため(対象分類と同じ扱い)
+      monthlyContribution: goal.monthlyContribution,
       updatedAt: serverTimestamp(),
     });
 

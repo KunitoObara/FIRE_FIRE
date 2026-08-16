@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { format } from "date-fns";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
@@ -20,12 +21,23 @@ vi.mock("next/navigation", () => ({
 }));
 
 /** 資産推移・内訳のグラフはブラウザ専用(next/dynamic)なので、ここでは描画対象にしない */
-vi.mock("@/components/dashboard/NetWorthTrendChart", () => ({
-  NetWorthTrendChart: () => <div data-testid="net-worth-trend-chart" />,
-}));
-
 vi.mock("@/components/dashboard/CategoryBreakdownChart", () => ({
   CategoryBreakdownChart: () => <div data-testid="category-breakdown-chart" />,
+}));
+
+/**
+ * 収支サマリは対象の月ごとに自分でFirestoreを引く(docs/screen-requirements-dashboard.md B1
+ * 「年月の選択」)。この画面のテストで見たいのは受け取る月と切替の遷移なので、カードは
+ * 差し替えて渡された値だけを出す
+ */
+vi.mock("@/components/dashboard/CashflowSummaryCard", () => ({
+  CashflowSummaryCard: ({ month, maxMonth, onMonthChange }: CashflowSummaryCardProps) => (
+    <div data-testid="cashflow-summary-card" data-month={month} data-max-month={maxMonth}>
+      <button type="button" onClick={() => onMonthChange("2025-03")}>
+        2025年3月を選ぶ
+      </button>
+    </div>
+  ),
 }));
 
 const data: DashboardData = {
@@ -41,33 +53,60 @@ const data: DashboardData = {
   ],
   byAxis: {
     total: {
-      netWorthSeries: [{ date: "2026-08-05", amount: 11_400_000 }],
+      netWorthSeries: [
+        {
+          date: "2026-08-05",
+          amount: 11_400_000,
+          byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000, "預金・現金": 4_400_000 },
+          debtBalance: 0,
+          propertyAmount: 0,
+        },
+      ],
       breakdown: [
         { categoryId: "株式(現物)", amount: 5_400_000 },
         { categoryId: "投資信託", amount: 1_600_000 },
         { categoryId: "預金・現金", amount: 4_400_000 },
       ],
       debtTotal: 0,
+      propertyTotal: 0,
+      hasSpreadProperty: false,
     },
     investment: {
-      netWorthSeries: [{ date: "2026-08-05", amount: 7_000_000 }],
+      netWorthSeries: [
+        {
+          date: "2026-08-05",
+          amount: 7_000_000,
+          byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000 },
+          debtBalance: 0,
+          propertyAmount: 0,
+        },
+      ],
       breakdown: [
         { categoryId: "株式(現物)", amount: 5_400_000 },
         { categoryId: "投資信託", amount: 1_600_000 },
       ],
       debtTotal: 0,
+      propertyTotal: 0,
+      hasSpreadProperty: false,
     },
   },
   debts: [],
+  // B9の想定値。凡例のリスクレベルに使う(B1-17)
+  assumptions: { "株式(現物)": { expectedReturn: 5, riskLevel: "high" } },
   fireProgress: {
     targetAmount: 80_000_000,
     currentAmount: 11_400_000,
     achievementAxisName: "投資性資産",
     achievementAxisMissing: false,
-    projectedAchievementDate: null,
+    projection: { status: "projected", achievementDate: "2033-04-01" },
   },
-  cashflow: null,
 };
+
+/**
+ * 収支サマリの既定は当月(docs/screen-requirements-dashboard.md B1「年月の選択」)。
+ * 画面が`new Date()`から導く値と突き合わせるため、テスト側も実際の時計から作る
+ */
+const currentMonth = format(new Date(), "yyyy-MM");
 
 /** 画面の外から再取得を起こすため、画面と同じインスタンスを掴んでおく */
 let queryClient: QueryClient;
@@ -81,7 +120,13 @@ const renderScreen = (props: Partial<DashboardScreenProps> = {}): RenderResult =
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <DashboardScreen axisParam={undefined} periodParam={undefined} {...props} />
+      <DashboardScreen
+        axisParam={undefined}
+        periodParam={undefined}
+        debtParam={undefined}
+        monthParam={undefined}
+        {...props}
+      />
     </QueryClientProvider>,
   );
 };
@@ -129,9 +174,13 @@ describe("DashboardScreen", () => {
         byAxis: {
           ...data.byAxis,
           total: {
-            netWorthSeries: [{ date: "2000-01-31", amount: 1_000_000 }],
+            netWorthSeries: [
+              { date: "2000-01-31", amount: 1_000_000, byType: { "預金・現金": 1_000_000 } },
+            ],
             breakdown: data.byAxis.total?.breakdown ?? [],
             debtTotal: 0,
+            propertyTotal: 0,
+            hasSpreadProperty: false,
           },
         },
       },
@@ -360,7 +409,87 @@ describe("DashboardScreen", () => {
     await user.click(await screen.findByLabelText("分類軸"));
     await user.click(await screen.findByRole("option", { name: "投資性資産" }));
 
-    expect(replace).toHaveBeenCalledWith("/dashboard?axis=investment&period=1y");
+    expect(replace).toHaveBeenCalledWith(
+      `/dashboard?axis=investment&period=1y&debt=with-debt&month=${currentMonth}`,
+    );
+  });
+});
+
+/**
+ * 収支サマリの対象月(docs/screen-requirements-dashboard.md B1「年月の選択」)。
+ * 対象の月はカードが自分で取得するので、この画面が受け持つのは月の解決と切替の遷移だけ。
+ */
+describe("DashboardScreen(収支サマリの対象月)", () => {
+  beforeEach(() => {
+    fetchDashboardData.mockReset();
+    replace.mockReset();
+    fetchDashboardData.mockResolvedValue({ ok: true, data });
+  });
+
+  it("未指定なら当月を渡し、選べる上限も当月にする", async () => {
+    renderScreen();
+
+    const card = await screen.findByTestId("cashflow-summary-card");
+
+    expect(card).toHaveAttribute("data-month", currentMonth);
+    expect(card).toHaveAttribute("data-max-month", currentMonth);
+  });
+
+  it("URLの月をそのまま渡す", async () => {
+    renderScreen({ monthParam: "2025-03" });
+
+    expect(await screen.findByTestId("cashflow-summary-card")).toHaveAttribute(
+      "data-month",
+      "2025-03",
+    );
+  });
+
+  /** 未来の月には数える取引が無い。ピッカーで押せないのと同じ基準で丸める */
+  it("当月より後の月・読めない値は当月に落として渡す", async () => {
+    renderScreen({ monthParam: "2099-01" });
+
+    expect(await screen.findByTestId("cashflow-summary-card")).toHaveAttribute(
+      "data-month",
+      currentMonth,
+    );
+  });
+
+  it("年月を切り替えると他の選択を保ったままURLのクエリを差し替える", async () => {
+    const user = userEvent.setup();
+    renderScreen({ axisParam: "investment", periodParam: "3y", debtParam: "assets-only" });
+
+    await user.click(await screen.findByRole("button", { name: "2025年3月を選ぶ" }));
+
+    expect(replace).toHaveBeenCalledWith(
+      "/dashboard?axis=investment&period=3y&debt=assets-only&month=2025-03",
+    );
+  });
+
+  /**
+   * 年月切替で読み直すのはその月の取引だけ(同要件B1)。一括取得に混ざったままだと、
+   * 月を変えるたびに資産残高・分類軸・負債・FIRE目標まで読み直すことになる
+   */
+  it("年月が変わってもダッシュボードの一括取得は引き直さない", async () => {
+    const { rerender } = renderScreen({ monthParam: "2026-08" });
+
+    await screen.findByTestId("cashflow-summary-card");
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <DashboardScreen
+          axisParam={undefined}
+          periodParam={undefined}
+          debtParam={undefined}
+          monthParam="2025-03"
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByTestId("cashflow-summary-card")).toHaveAttribute(
+      "data-month",
+      "2025-03",
+    );
+    expect(fetchDashboardData).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -373,6 +502,7 @@ describe("DashboardScreen(負債)", () => {
       id: "debt-1",
       name: "住宅ローン",
       balance: 18_400_000,
+      originatedOn: null,
       interestRate: 0.475,
       repaymentMonths: 280,
       updatedAt: "2026-07-12",
@@ -382,6 +512,7 @@ describe("DashboardScreen(負債)", () => {
       id: "debt-2",
       name: "奨学金",
       balance: 2_300_000,
+      originatedOn: null,
       interestRate: null,
       repaymentMonths: null,
       updatedAt: "2026-05-02",
@@ -436,7 +567,14 @@ describe("DashboardScreen(負債)", () => {
               純額はこの最新点をそのまま採る(スライスの足し直しはしない。
               `resolveAxisNetAmount`)ので、資産11,400,000 - 負債2,000,000 = 9,400,000
             */
-            netWorthSeries: [{ date: "2026-08-05", amount: 9_400_000 }],
+            netWorthSeries: [
+              {
+                date: "2026-08-05",
+                amount: 9_400_000,
+                // 積み上げが描くのは資産種別だけなので、負債を引く前の額を持つ
+                byType: { "株式(現物)": 5_400_000, 投資信託: 1_600_000, "預金・現金": 4_400_000 },
+              },
+            ],
             breakdown: data.byAxis.total?.breakdown ?? [],
             debtTotal: 2_000_000,
           },

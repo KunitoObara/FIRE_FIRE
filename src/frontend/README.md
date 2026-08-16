@@ -181,10 +181,12 @@ npx shadcn@latest add button
 ```
 src/frontend/
 ├── src/
-│   ├── app/                    # App Router。画面ID(A1〜A8 / B1〜B11)をルーティング規約に対応させる
+│   ├── app/                    # App Router。画面ID(A0〜A10 / B1〜B11)をルーティング規約に対応させる
 │   │   ├── layout.tsx          # ルートレイアウト(Noto Sans JP・lang="ja")
 │   │   ├── globals.css         # Tailwind v4 + shadcn/ui のCSS変数テーマ
-│   │   └── (setup-check)/      # ★ 環境構築の動作確認用。画面実装時に削除してよい
+│   │   ├── (public)/           # A0 トップページ・A9 利用規約・A10 プライバシーポリシー(未ログインで到達する)
+│   │   ├── (auth)/             # A1〜A8(認証フロー)
+│   │   └── (dashboard)/        # B1〜B11(ログイン後のアプリシェル)
 │   ├── components/             # 自前コンポーネント(PascalCaseファイル)
 │   │   └── ui/                 # shadcn/ui のCLI生成物(初回 add 時に作られる)
 │   └── lib/                    # ユーティリティ(cn ヘルパー等)
@@ -196,7 +198,6 @@ src/frontend/
 ```
 
 - `src/frontend` は独立した `package.json` を持つ単独のNext.jsプロジェクト(モノレポツールは現時点では導入しない)
-- `src/app/(setup-check)/` は `next/link` 遷移でフルページリロードが起きないことを目視確認するための足場。画面実装タスク着手時にディレクトリごと削除してよい
 - コーディング規約(命名・import順序・スタイリング等)は [docs/CODING_STANDARDS.md](docs/CODING_STANDARDS.md) を参照
 
 ## Lint設定について

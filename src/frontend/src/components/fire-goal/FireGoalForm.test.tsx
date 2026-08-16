@@ -14,13 +14,20 @@ const initialValues: FireGoalFormValues = {
   targetAmount: "",
   annualExpense: "",
   withdrawalRate: "4",
+  monthlyContribution: "",
 };
 
 const onAchievementAxisChange = vi.fn();
 
 /** B4に登録済みの分類軸(対象分類の選択肢) */
 const achievementAxisOptions: AchievementAxisOption[] = [
-  { id: "axis-investment", name: "投資性資産", assetTypeNames: ["株式(現物)"], debtIds: [] },
+  {
+    id: "axis-investment",
+    name: "投資性資産",
+    assetTypeNames: ["株式(現物)"],
+    debtIds: [],
+    propertyValuations: {},
+  },
 ];
 
 const renderForm = (overrides: Partial<FireGoalFormProps> = {}): RenderResult =>
@@ -29,6 +36,7 @@ const renderForm = (overrides: Partial<FireGoalFormProps> = {}): RenderResult =>
       initialValues={initialValues}
       currentAssetTotal={49_600_000}
       achievementAxisName="総資産(マネーフォワードの合計)"
+      monthlyContributionNotice={null}
       achievementAxisOptions={achievementAxisOptions}
       achievementAxisId={null}
       onAchievementAxisChange={onAchievementAxisChange}
@@ -40,6 +48,7 @@ const renderForm = (overrides: Partial<FireGoalFormProps> = {}): RenderResult =>
 const targetAmountInput = (): HTMLElement => screen.getByLabelText("目標資産額(円)");
 const annualExpenseInput = (): HTMLElement => screen.getByLabelText("想定年間支出額(円)");
 const withdrawalRateInput = (): HTMLElement => screen.getByLabelText("逆算係数(%)");
+const monthlyContributionInput = (): HTMLElement => screen.getByLabelText("毎月の積立額(円)");
 const modeTab = (name: string): HTMLElement => screen.getByRole("tab", { name });
 
 /**
@@ -96,6 +105,8 @@ describe("FireGoalForm", () => {
         annualExpense: 3_600_000,
         withdrawalRate: 4,
         achievementAxisId: null,
+        // 空欄のまま保存した積立額は0になる(未入力=積立なし)
+        monthlyContribution: 0,
       });
     });
   });
@@ -115,6 +126,8 @@ describe("FireGoalForm", () => {
         annualExpense: 3_600_000,
         withdrawalRate: 4,
         achievementAxisId: null,
+        // 空欄のまま保存した積立額は0になる(未入力=積立なし)
+        monthlyContribution: 0,
       });
     });
   });
@@ -144,6 +157,8 @@ describe("FireGoalForm", () => {
         annualExpense: null,
         withdrawalRate: 4,
         achievementAxisId: null,
+        // 空欄のまま保存した積立額は0になる(未入力=積立なし)
+        monthlyContribution: 0,
       });
     });
   });
@@ -230,6 +245,8 @@ describe("FireGoalForm", () => {
         annualExpense: null,
         withdrawalRate: 4,
         achievementAxisId: null,
+        // 空欄のまま保存した積立額は0になる(未入力=積立なし)
+        monthlyContribution: 0,
       });
     });
   });
@@ -254,9 +271,85 @@ describe("FireGoalForm", () => {
         annualExpense: 3_600_000,
         withdrawalRate: 4,
         achievementAxisId: null,
+        // 空欄のまま保存した積立額は0になる(未入力=積立なし)
+        monthlyContribution: 0,
       });
     });
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  /** 目標額の決め方によって積立額が変わる理由が無いため、タブの外に置く(要件B8) */
+  it("毎月の積立額はタブを切り替えても消えず、どちらの方式でも同じ値が保存される", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(monthlyContributionInput(), "180000");
+    await user.click(modeTab("年間支出額から逆算"));
+
+    expect(monthlyContributionInput()).toHaveValue("180000");
+
+    await user.type(annualExpenseInput(), "3600000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: "reverse", monthlyContribution: 180_000 }),
+      );
+    });
+  });
+
+  /** 取り崩しの局面を表せるようにするため(要件B8) */
+  it("マイナスの積立額は形式エラーにせず、符号のまま保存する", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(targetAmountInput(), "80000000");
+    await user.type(monthlyContributionInput(), "-50000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ monthlyContribution: -50_000 }),
+      );
+    });
+  });
+
+  /**
+   * 未入力は0(積立なし)として扱うので入力を求めず、保存も0で行う(要件B8)。
+   * `null`のままにすると、次に開いたときの初期値の提示が意図して空にした設定を上書きする。
+   */
+  it("積立額が未入力でも保存でき、0として保存される", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(targetAmountInput(), "80000000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ monthlyContribution: 0 }));
+    });
+  });
+
+  it("カンマ区切りの積立額はインラインエラーになる", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(targetAmountInput(), "80000000");
+    await user.type(monthlyContributionInput(), "180,000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(
+      await screen.findByText("半角数字のみ入力してください(取り崩しはマイナスを先頭に付けます)。"),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  /** 初期値の出所は状況によって変わるので、固定の説明とは別に添える */
+  it("初期値の注記を受け取ったら入力欄に添える", () => {
+    const notice = "前月(2026年7月)の取引が無いため、初期値は提示していません。";
+    renderForm({ monthlyContributionNotice: notice });
+
+    expect(screen.getByText(notice)).toBeInTheDocument();
   });
 
   it("逆算タブでは入力しながら目標資産額を算出して見せる", async () => {

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -82,9 +83,9 @@ export const ForgotPasswordForm = (): JSX.Element => {
               <MailCheckIcon className="size-7 text-primary" />
             </span>
 
-            <p role="status" className="mt-5 rounded-lg bg-muted p-4 text-left text-sm">
+            <Alert variant="success" role="status" className="mt-5">
               {PASSWORD_RESET_SENT_MESSAGE}
-            </p>
+            </Alert>
 
             {/* 入力欄は残したままなので、宛先を打ち間違えていても入力し直すだけで送り直せる */}
             <Button

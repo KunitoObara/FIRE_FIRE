@@ -18,6 +18,8 @@ const getLinkedProviders = vi.fn<() => LinkedProviderStatus[]>();
 const linkGoogleAccount = vi.fn();
 const unlinkProvider = vi.fn();
 const unlinkPasswordProvider = vi.fn();
+const hasPasswordProvider = vi.fn<(...args: unknown[]) => boolean>();
+const refreshPasswordProviderState = vi.fn<() => Promise<boolean>>();
 const replace = vi.fn();
 
 vi.mock("@/lib/firebase/client", () => ({
@@ -50,6 +52,11 @@ vi.mock("@/lib/auth/linked-providers", () => ({
   linkGoogleAccount: () => linkGoogleAccount(),
   unlinkProvider: (...args: unknown[]) => unlinkProvider(...args),
   unlinkPasswordProvider: (...args: unknown[]) => unlinkPasswordProvider(...args),
+  // アカウント削除カードの可否判定に使う(docs/auth-login-requirements.md 3.11)
+  hasPasswordProvider: (...args: unknown[]) => hasPasswordProvider(...args),
+  // 削除ボタンを押した時点で取り直す。**モックのファクトリが返さない名前は`undefined`になる**ため、
+  // ここに無いとこのファイルで削除ボタンを押した瞬間に`is not a function`で落ちる
+  refreshPasswordProviderState: () => refreshPasswordProviderState(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -90,6 +97,8 @@ describe("AccountSettingsScreen", () => {
     vi.clearAllMocks();
     currentUser.mockReturnValue({ email: "taro.yamada@example.com" });
     hasEnrolledTotp.mockReturnValue(true);
+    hasPasswordProvider.mockReturnValue(true);
+    refreshPasswordProviderState.mockResolvedValue(true);
     requestPasswordReset.mockResolvedValue({ ok: true });
     fetchRecoveryCodeStatus.mockResolvedValue({
       ok: true,
@@ -242,6 +251,50 @@ describe("AccountSettingsScreen", () => {
       expect(
         screen.getByRole("button", { name: "リカバリーコードを発行する" }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("アカウントの削除", () => {
+    /**
+     * 設定を見に来ただけの人の目に最初に入る場所ではない
+     * (docs/screen-requirements-account.md「アカウントの削除」)。
+     */
+    it("削除カードを画面の最後に置く", () => {
+      const { container } = renderScreen();
+
+      // `CardTitle`は見出し要素ではなく`data-slot`付きのdivとして描画される
+      const titles = [...container.querySelectorAll('[data-slot="card-title"]')].map(
+        (title) => title.textContent,
+      );
+
+      expect(titles.at(-1)).toBe("アカウントの削除");
+    });
+
+    /**
+     * 配線を間違えると、本人確認を通せないGoogle専用アカウントでもボタンを押せてしまう。
+     * 型はどちらもbooleanで拾えないため、ここで固定する。
+     */
+    it("パスワードでのログインが無ければ削除ボタンを無効化する", () => {
+      hasPasswordProvider.mockReturnValue(false);
+
+      renderScreen();
+
+      expect(screen.getByRole("button", { name: "アカウントを削除する" })).toBeDisabled();
+    });
+
+    /**
+     * 押す経路まで通しておく。**モックの取りこぼしはここでしか出ない** — 画面が呼ぶ関数が
+     * モックのファクトリに無いと`undefined`になり、押した瞬間に`is not a function`で落ちる。
+     * カード単体のテスト(`AccountDeletionCard.test.tsx`)は自前のモックを持つため気付けない。
+     */
+    it("削除ボタンから確認ダイアログを開ける", async () => {
+      const user = userEvent.setup();
+      renderScreen();
+
+      await user.click(screen.getByRole("button", { name: "アカウントを削除する" }));
+
+      expect(await screen.findByLabelText("登録メールアドレス")).toBeInTheDocument();
+      expect(refreshPasswordProviderState).toHaveBeenCalledOnce();
     });
   });
 

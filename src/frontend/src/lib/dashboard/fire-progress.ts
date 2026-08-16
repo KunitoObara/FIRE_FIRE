@@ -1,8 +1,19 @@
 import { format, parseISO } from "date-fns";
 
-import { NO_PROJECTED_DATE_LABEL } from "@/constants/dashboard";
+import {
+  ACHIEVED_PROJECTION_LABEL,
+  NO_PROJECTED_DATE_LABEL,
+  UNREACHABLE_PROJECTION_LABEL,
+} from "@/constants/dashboard";
 import { DEFAULT_ACHIEVEMENT_AXIS_NAME } from "@/constants/fire-goal";
-import { resolveAxisDebts, sumAxisAmount } from "@/lib/dashboard/aggregation";
+import {
+  resolveAxisDebts,
+  resolveAxisProperties,
+  sumAxisAmount,
+  sumDebtBalance,
+  sumPropertyAmount,
+} from "@/lib/dashboard/aggregation";
+import { buildFireProjection, resolveProjectionBase } from "@/lib/dashboard/fire-projection";
 import { resolveFireGoalTargetAmount } from "@/lib/fire-goal/calculation";
 
 /**
@@ -25,6 +36,7 @@ export const resolveAchievementAxis = (
       name: DEFAULT_ACHIEVEMENT_AXIS_NAME,
       assetTypeNames: null,
       debtIds: [],
+      propertyValuations: {},
       missing: false,
     };
   }
@@ -36,6 +48,7 @@ export const resolveAchievementAxis = (
       name: DEFAULT_ACHIEVEMENT_AXIS_NAME,
       assetTypeNames: null,
       debtIds: [],
+      propertyValuations: {},
       missing: true,
     };
   }
@@ -44,6 +57,7 @@ export const resolveAchievementAxis = (
     name: axis.name,
     assetTypeNames: axis.assetTypeNames,
     debtIds: axis.debtIds,
+    propertyValuations: axis.propertyValuations,
     missing: false,
   };
 };
@@ -66,19 +80,38 @@ export const resolveAchievementAxis = (
  * 逆に、分類軸を選んだときは資産推移グラフ・分類別内訳と同じ`sumAxisAmount`で集計する。
  * B1のセレクタで同じ分類軸を選んだときに、推移グラフの最新点とゲージの現在資産額が
  * 一致することを、集計方法を共有することで保証する。
+ *
+ * **差し引くのは現在の残債(`sumDebtBalance`)。** ここは「いま」を表す表示なので、
+ * 履歴から直近の資産残高の日の残債を引く形にはしない
+ * (docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」)。推移グラフの
+ * 最新点も同じ値を引いており、上記の一致はその一致でもある。
  */
 export const resolveAchievementAmount = (
   resolution: AchievementAxisResolution,
   latest: AssetSnapshot | undefined,
   debts: Debt[],
+  properties: RealEstateProperty[],
 ): number | null => {
   if (latest === undefined) {
     return null;
   }
 
+  /*
+    既定(総資産)はCSVの「合計(円)」列をそのまま採るため、**手動で登録した不動産は
+    入らない**(docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
+    含めたい場合はB4で物件を選んだ分類軸を作り、B8の対象分類に指定する
+  */
   return resolution.assetTypeNames === null
     ? latest.total
-    : sumAxisAmount(latest, resolution.assetTypeNames, resolveAxisDebts(debts, resolution.debtIds));
+    : sumAxisAmount(
+        latest,
+        resolution.assetTypeNames,
+        sumDebtBalance(resolveAxisDebts(debts, resolution.debtIds)),
+        sumPropertyAmount(
+          resolveAxisProperties(properties, resolution.propertyValuations),
+          resolution.propertyValuations,
+        ),
+      );
 };
 
 /**
@@ -97,12 +130,15 @@ export const resolveAchievementAmount = (
  * 倒すと、目標を設定済みのユーザーに「FIRE目標が未設定です」と出てしまうため。
  * 未取込であることは同じ画面の「直近CSV取込」が示す。
  */
-export const buildFireProgress = (
-  goal: FireGoal | null,
-  latest: AssetSnapshot | undefined,
-  axes: AchievementAxisOption[],
-  debts: Debt[],
-): FireProgress | null => {
+export const buildFireProgress = ({
+  goal,
+  latest,
+  axes,
+  debts,
+  properties,
+  assumptions,
+  now,
+}: BuildFireProgressInput): FireProgress | null => {
   if (!goal) {
     return null;
   }
@@ -118,11 +154,26 @@ export const buildFireProgress = (
 
   return {
     targetAmount,
-    currentAmount: resolveAchievementAmount(resolution, latest, debts) ?? 0,
+    currentAmount: resolveAchievementAmount(resolution, latest, debts, properties) ?? 0,
     achievementAxisName: resolution.name,
     achievementAxisMissing: resolution.missing,
-    // 到達予測日は想定利回り(B9)を前提とする別の計算なので、ここでは算出しない
-    projectedAchievementDate: null,
+    /*
+      B9の想定値を取得できなかった場合だけ予測を出さない(「算出できません」)。
+      前提の解決そのものに失敗した場合の保険で、ダッシュボードの他のカードは巻き込まない
+      (docs/screen-requirements-fire-goal.md「到達予測日の算出」)。
+
+      積立額を持たない目標(この欄を導入する前に保存されたもの)は0として扱う。同要件。
+    */
+    projection:
+      assumptions === null
+        ? null
+        : buildFireProjection({
+            targetAmount,
+            ...resolveProjectionBase(resolution, latest, debts, properties),
+            monthlyContribution: goal.monthlyContribution ?? 0,
+            assumptions,
+            now,
+          }),
   };
 };
 
@@ -172,17 +223,29 @@ export const toDisplayAchievementRate = (achievementRate: number): number =>
   Math.max(achievementRate, 0);
 
 /**
- * 到達予測日を「2033年4月頃」の形に整形する。
+ * 到達予測を画面に出す文言へ整形する(docs/screen-requirements-dashboard.md B1「到達予測日」)。
  *
- * 予測値であって確定日ではないため「頃」を添え、日付までは出さない。
- * 予測の算出そのものは想定利回り(B9)を前提とするため、B1では行わない。
+ * 到達月は「2033年4月頃」の粒度にする。予測値であって確定日ではないため「頃」を添え、
+ * 日付までは出さない。「達成済み」「到達見込みなし」を同じ表示にまとめないのは、
+ * ユーザーが次に取る行動が変わるため(正本「結果の区別」)。
+ *
+ * 日付として読めない値も「算出できません」に倒す。`null`と同じく前提の解決に失敗した
+ * 場合の保険で、通常は起こらない。
  */
-export const formatProjectedAchievementDate = (isoDate: string | null): string => {
-  if (isoDate === null) {
+export const formatFireProjection = (projection: FireProjection | null): string => {
+  if (projection === null) {
     return NO_PROJECTED_DATE_LABEL;
   }
 
-  const parsed = parseISO(isoDate);
+  if (projection.status === "achieved") {
+    return ACHIEVED_PROJECTION_LABEL;
+  }
+
+  if (projection.status === "unreachable") {
+    return UNREACHABLE_PROJECTION_LABEL;
+  }
+
+  const parsed = parseISO(projection.achievementDate);
 
   if (Number.isNaN(parsed.getTime())) {
     return NO_PROJECTED_DATE_LABEL;

@@ -30,6 +30,7 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
@@ -53,24 +54,45 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /*
+    ベースカラー(DESIGN.md 3章)。`components.json` は `baseColor: neutral` で scaffold して
+    あるが、HTMLモック(`docs/html_mock/common.css`)は**青のprimaryを持つslate系**で描かれており、
+    無彩色の既定のままでは全画面がモックと違う配色になる。モック側を正とし、同じ値をここに置く。
+
+    **モックと同じHSLの数値をそのまま書く。** モックは `hsl(var(--primary))` の形で使うため
+    変数には数値だけを持たせているが、こちらは `hsl()` で包んだ完成した色を入れる
+    (Tailwind v4 / shadcn がそのまま色として解決するため)。数値の並びを揃えてあるのは、
+    `--chart-*` と同じく**片方だけ変わっていないかをgrepで確かめられるようにする**ため。
+  */
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(222.2 84% 4.9%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222.2 84% 4.9%);
+  /* モックは `.card` と別の面を持たないので、shadcnの既定と同じく `--card` に揃える */
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222.2 84% 4.9%);
+  --primary: hsl(221.2 83.2% 53.3%);
+  --primary-foreground: hsl(210 40% 98%);
+  --secondary: hsl(210 40% 96.1%);
+  --secondary-foreground: hsl(222.2 47.4% 11.2%);
+  --muted: hsl(210 40% 96.1%);
+  --muted-foreground: hsl(215.4 16.3% 46.9%);
+  --accent: hsl(210 40% 96.1%);
+  --accent-foreground: hsl(222.2 47.4% 11.2%);
+  /*
+    **ここはモックに合わせない。** モックの `0 84.2% 60.2%`(`#ef4444`)は白背景で
+    コントラスト比3.78:1しかなく、入力エラー・負債の金額という**文字**に使う色として
+    4.5:1を満たさない。この値(`#e7000b` 相当・4.77:1)を正とし、モックの側を直す。
+    加えてDESIGN.md 3章のパレット検証は `#e7000b` で通してあり、変えると `--real-estate`
+    および `--chart-*` との識別性を検証し直すことになる。
+  */
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* 塗りつぶしの削除ボタン(モック `.btn-destructive`)で `--destructive` に載せる文字色 */
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: hsl(214.3 31.8% 91.4%);
+  --input: hsl(214.3 31.8% 91.4%);
+  /* モックはフォーカスリングにprimaryをそのまま使う(`.input:focus` / `.otp-box:focus`) */
+  --ring: hsl(221.2 83.2% 53.3%);
   /*
     資産分類の質的パレット(DESIGN.md 3章)。shadcn/uiの既定はグレースケール5色で、
     分類別内訳の円グラフのように「複数の分類を並べて区別させる」用途では判別できない。
@@ -90,21 +112,59 @@
   --chart-7: #4a3aa7;
   --chart-8: #e34948;
   /*
+    不動産の色(DESIGN.md 3章)。B4の分類軸が集計対象にする物件は「不動産」1つの帯・
+    スライスにまとめ、資産分類カラーのスロット(--chart-1〜8)を消費しない専用色で描く。
+    負債(--destructive)と同じく、スロットを配る対象にしない色である。
+
+    不動産の帯・スライスは資産種別の後ろ・負債の前に入るので、負債とは常に隣り合い、
+    資産種別の側は登録件数で最後のスロットが変わる。**--chart-1〜8 と --destructive の
+    どれとも隣り合いうる**ため、dataviz スキルの検証はその全部を相手に行っている
+    (最悪 CVD ΔE 11.6 / 通常視力 ΔE 16.8)。当初置いていた茶色 #8a5a2b は
+    ダークで --chart-2 と通常視力でも ΔE 8.8 しか離れず不成立だった(DESIGN.md 3章)。
+    値はモックの common.css と同じhex表記で揃える(--chart-* と同じ扱い。**片方だけ変えない**)。
+  */
+  --real-estate: #95568c;
+  /*
     増減の「プラス側」を示す文字色(収支サマリ等)。マイナス側は`--destructive`を使う。
     色だけに意味を持たせないため、必ず符号付きの数値と併記する。
   */
   --success: #006300;
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.5rem;
+  /*
+    サイドバー(モック `common.css` の `.app-sidebar` / `.sidebar-link`)。
+    モックは地をカードと同じ白、hoverの背景を `--accent`・文字を `--foreground` に
+    しているので、それぞれに揃える。
+
+    **モックの `.sidebar-link` は通常時の文字がグレー(`--muted-foreground`)だが、
+    それはここでは表現できない。** `--sidebar-foreground` はサイドバー全体に掛かる色で
+    (`ui/sidebar.tsx` が `text-sidebar-foreground` をコンテナに当てている)、
+    `SidebarMenuButton` はそれを継承するだけで自前の文字色を持たない。ここをグレーにすると
+    **同じ色を継承しているヘッダーのブランド名「FIRE-FIRE」まで**グレーになるが、
+    モックのブランド名は色指定を持たず `--foreground` のままである。
+    メニュー項目だけをグレーにするにはコンポーネント側で当てるしかないので、
+    アクティブ項目の見た目(`primary/10` + primary文字 + 太字。shadcnがhoverと
+    アクティブの両方に `--sidebar-accent` を使う作りのため、これもトークンでは表せない)と
+    まとめて、画面個別の詰めのPRで扱う。
+  */
+  --sidebar: hsl(0 0% 100%);
+  --sidebar-foreground: hsl(222.2 84% 4.9%);
+  --sidebar-primary: hsl(221.2 83.2% 53.3%);
+  --sidebar-primary-foreground: hsl(210 40% 98%);
+  --sidebar-accent: hsl(210 40% 96.1%);
+  /* モックの `.sidebar-link:hover` は `--accent-foreground` ではなく `--foreground` */
+  --sidebar-accent-foreground: hsl(222.2 84% 4.9%);
+  --sidebar-border: hsl(214.3 31.8% 91.4%);
+  --sidebar-ring: hsl(221.2 83.2% 53.3%);
 }
 
+/*
+  **ライト側をモックのslate系へ寄せた際、ここは意図的に据え置いている。**
+  モックはダークモードを持たないため寄せる先が無く、暗い面に載せる青は明度を取り直さないと
+  沈む(`--chart-*` や `--real-estate` を手で取り直したのと同じ事情)。
+  そもそもテーマ切替の機構をまだ持たず(`ui/sonner.tsx` のコメント)、ダークモード対応の
+  要否自体がDESIGN.md 8章の未決事項なので、この画面に到達する経路は現状無い。
+  対応すると決めた時点で、ライトと同じ手順で取り直す。
+*/
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -133,6 +193,8 @@
   --chart-6: #008300;
   --chart-7: #9085e9;
   --chart-8: #e66767;
+  /* ダーク用。ライトの #95568c は暗い背景で沈むため、明度を上げた同系色にする(自動反転ではない) */
+  --real-estate: #8a46a7;
   --success: #0ca30c;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);

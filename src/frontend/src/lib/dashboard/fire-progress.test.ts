@@ -4,7 +4,7 @@ import { DEFAULT_ACHIEVEMENT_AXIS_NAME } from "@/constants/fire-goal";
 import {
   buildFireProgress,
   calculateAchievementRate,
-  formatProjectedAchievementDate,
+  formatFireProjection,
   resolveAchievementAmount,
   resolveAchievementAxis,
   toDisplayAchievementRate,
@@ -17,6 +17,7 @@ const directGoal: FireGoal = {
   annualExpense: null,
   withdrawalRate: null,
   achievementAxisId: null,
+  monthlyContribution: null,
 };
 
 /**
@@ -36,6 +37,7 @@ const investmentAxis: AchievementAxisOption = {
   name: "投資性資産",
   assetTypeNames: ["株式(現物)"],
   debtIds: [],
+  propertyValuations: {},
 };
 
 const allTypesAxis: AchievementAxisOption = {
@@ -43,6 +45,7 @@ const allTypesAxis: AchievementAxisOption = {
   name: "総資産(自作)",
   assetTypeNames: [],
   debtIds: [],
+  propertyValuations: {},
 };
 
 describe("resolveAchievementAxis", () => {
@@ -51,6 +54,7 @@ describe("resolveAchievementAxis", () => {
       name: DEFAULT_ACHIEVEMENT_AXIS_NAME,
       assetTypeNames: null,
       debtIds: [],
+      propertyValuations: {},
       missing: false,
     });
   });
@@ -60,6 +64,7 @@ describe("resolveAchievementAxis", () => {
       name: "投資性資産",
       assetTypeNames: ["株式(現物)"],
       debtIds: [],
+      propertyValuations: {},
       missing: false,
     });
   });
@@ -70,6 +75,7 @@ describe("resolveAchievementAxis", () => {
       name: DEFAULT_ACHIEVEMENT_AXIS_NAME,
       assetTypeNames: null,
       debtIds: [],
+      propertyValuations: {},
       missing: true,
     });
   });
@@ -77,7 +83,9 @@ describe("resolveAchievementAxis", () => {
 
 describe("resolveAchievementAmount", () => {
   it("既定(総資産)はCSVの合計列をそのまま採る", () => {
-    expect(resolveAchievementAmount(resolveAchievementAxis(null, []), latest, [])).toBe(49_600_000);
+    expect(resolveAchievementAmount(resolveAchievementAxis(null, []), latest, [], [])).toBe(
+      49_600_000,
+    );
   });
 
   /** 資産推移グラフ・分類別内訳と同じ`sumAxisAmount`で集計することの確認 */
@@ -87,6 +95,7 @@ describe("resolveAchievementAmount", () => {
         resolveAchievementAxis(investmentAxis.id, [investmentAxis]),
         latest,
         [],
+        [],
       ),
     ).toBe(30_000_000);
   });
@@ -94,23 +103,49 @@ describe("resolveAchievementAmount", () => {
   /** ずれるのは合計に資産種別の列として現れない額がある場合だけで、そのときはCSVの合計が正しい */
   it("集計対象が空の分類軸は全種別の足し合わせになり、既定とわずかにずれうる", () => {
     expect(
-      resolveAchievementAmount(resolveAchievementAxis(allTypesAxis.id, [allTypesAxis]), latest, []),
+      resolveAchievementAmount(
+        resolveAchievementAxis(allTypesAxis.id, [allTypesAxis]),
+        latest,
+        [],
+        [],
+      ),
     ).toBe(49_000_000);
   });
 
   it("資産残高が無ければnullを返す(未取込の判断は呼び出し側に委ねる)", () => {
-    expect(resolveAchievementAmount(resolveAchievementAxis(null, []), undefined, [])).toBeNull();
+    expect(
+      resolveAchievementAmount(resolveAchievementAxis(null, []), undefined, [], []),
+    ).toBeNull();
   });
+});
+
+/**
+ * `buildFireProgress`の入力。既定を1か所に置き、テストごとに要る分だけ差し替える。
+ *
+ * 想定利回りは空(=どの資産種別も年率0%)、積立額は0が既定なので、断らない限り資産は
+ * 増えず「到達見込みなし」になる。予測そのものの検証は`fire-projection.test.ts`にある。
+ */
+const progressInput = (
+  overrides: Partial<BuildFireProgressInput> = {},
+): BuildFireProgressInput => ({
+  goal: directGoal,
+  latest,
+  axes: [],
+  debts: [],
+  properties: [],
+  assumptions: {},
+  now: new Date(2026, 7, 14),
+  ...overrides,
 });
 
 describe("buildFireProgress", () => {
   it("直接入力の目標資産額と直近の資産残高からゲージの表示値を組み立てる", () => {
-    expect(buildFireProgress(directGoal, latest, [], [])).toEqual({
+    expect(buildFireProgress(progressInput())).toEqual({
       targetAmount: 80_000_000,
       currentAmount: 49_600_000,
       achievementAxisName: DEFAULT_ACHIEVEMENT_AXIS_NAME,
       achievementAxisMissing: false,
-      projectedAchievementDate: null,
+      projection: { status: "unreachable" },
     });
   });
 
@@ -122,28 +157,29 @@ describe("buildFireProgress", () => {
       annualExpense: 3_000_000,
       withdrawalRate: 4,
       achievementAxisId: null,
+      monthlyContribution: null,
     };
 
-    expect(buildFireProgress(goal, latest, [], [])?.targetAmount).toBe(75_000_000);
+    expect(buildFireProgress(progressInput({ goal }))?.targetAmount).toBe(75_000_000);
   });
 
   it("目標が未設定ならnullを返す(ゲージの代わりにB8への導線を出す)", () => {
-    expect(buildFireProgress(null, latest, [], [])).toBeNull();
+    expect(buildFireProgress(progressInput({ goal: null }))).toBeNull();
   });
 
   it("有効な方式の欄が埋まっていなければnullを返す", () => {
     expect(
       buildFireProgress(
-        {
-          mode: "reverse",
-          targetAmount: 80_000_000,
-          annualExpense: null,
-          withdrawalRate: 4,
-          achievementAxisId: null,
-        },
-        latest,
-        [],
-        [],
+        progressInput({
+          goal: {
+            mode: "reverse",
+            targetAmount: 80_000_000,
+            annualExpense: null,
+            withdrawalRate: 4,
+            achievementAxisId: null,
+            monthlyContribution: null,
+          },
+        }),
       ),
     ).toBeNull();
   });
@@ -153,55 +189,80 @@ describe("buildFireProgress", () => {
    * 「FIRE目標が未設定です」と出てしまう
    */
   it("CSVが未取込でも、目標が設定済みなら現在資産額0円として表示する", () => {
-    expect(buildFireProgress(directGoal, undefined, [], [])).toEqual({
+    expect(buildFireProgress(progressInput({ latest: undefined }))).toEqual({
       targetAmount: 80_000_000,
       currentAmount: 0,
       achievementAxisName: DEFAULT_ACHIEVEMENT_AXIS_NAME,
       achievementAxisMissing: false,
-      projectedAchievementDate: null,
+      projection: { status: "unreachable" },
     });
   });
 
   it("対象分類に分類軸を設定していればその分類軸で集計し、分類名を併記する", () => {
     expect(
       buildFireProgress(
-        { ...directGoal, achievementAxisId: investmentAxis.id },
-        latest,
-        [investmentAxis],
-        [],
+        progressInput({
+          goal: { ...directGoal, achievementAxisId: investmentAxis.id },
+          axes: [investmentAxis],
+        }),
       ),
     ).toEqual({
       targetAmount: 80_000_000,
       currentAmount: 30_000_000,
       achievementAxisName: "投資性資産",
       achievementAxisMissing: false,
-      projectedAchievementDate: null,
+      projection: { status: "unreachable" },
     });
   });
 
   /** 削除された分類軸を指したままでも、既定で計算して注意書きの材料だけを渡す(要件B1) */
   it("対象分類の分類軸が削除されていたら既定で計算し、フォールバックした旨を返す", () => {
     expect(
-      buildFireProgress({ ...directGoal, achievementAxisId: "axis-deleted" }, latest, [], []),
+      buildFireProgress(
+        progressInput({ goal: { ...directGoal, achievementAxisId: "axis-deleted" } }),
+      ),
     ).toEqual({
       targetAmount: 80_000_000,
       currentAmount: 49_600_000,
       achievementAxisName: DEFAULT_ACHIEVEMENT_AXIS_NAME,
       achievementAxisMissing: true,
-      projectedAchievementDate: null,
+      projection: { status: "unreachable" },
     });
   });
 
   /** 対象分類を持たずに保存された既存の目標が、これまでと同じ値のままになることの確認 */
   it("対象分類が未設定の既存の目標は、分類軸が登録済みでも総資産のまま計算する", () => {
-    expect(buildFireProgress(directGoal, latest, [investmentAxis], [])?.currentAmount).toBe(
+    expect(buildFireProgress(progressInput({ axes: [investmentAxis] }))?.currentAmount).toBe(
       49_600_000,
     );
   });
 
-  /** 到達予測日は想定利回り(B9)を前提とする別の計算 */
-  it("到達予測日は算出せずnullのままにする", () => {
-    expect(buildFireProgress(directGoal, latest, [], [])?.projectedAchievementDate).toBeNull();
+  /**
+   * 予測はB9の想定利回りを前提に置くので、それが読めなかった場合だけ`null`にする。
+   * 画面はこのとき「算出できません」を出す(要件「前提の解決に失敗した場合の保険」)。
+   */
+  it("想定利回りを取得できなかった場合だけ予測をnullにする", () => {
+    expect(buildFireProgress(progressInput({ assumptions: null }))?.projection).toBeNull();
+  });
+
+  /** 積立額を持たない既存の目標は0として扱う(要件B8) */
+  it("積立額が未設定の既存の目標は積立0として予測する", () => {
+    const goal: FireGoal = { ...directGoal, monthlyContribution: null };
+
+    expect(buildFireProgress(progressInput({ goal }))?.projection).toEqual({
+      status: "unreachable",
+    });
+  });
+
+  /** 予測もゲージと同じ対象分類・同じ現在資産額から始まる(初月一致は正本の検算) */
+  it("積立額があれば到達月を返す", () => {
+    const goal: FireGoal = { ...directGoal, monthlyContribution: 1_000_000 };
+
+    // 49,600,000 + 1,000,000 × 31ヶ月 で 80,600,000 円。31ヶ月目に目標を超える
+    expect(buildFireProgress(progressInput({ goal }))?.projection).toEqual({
+      status: "projected",
+      achievementDate: "2029-03-01",
+    });
   });
 });
 
@@ -250,17 +311,27 @@ describe("toGaugeRatio", () => {
   });
 });
 
-describe("formatProjectedAchievementDate", () => {
-  it("年月までを「頃」付きで返す(予測値なので日までは出さない)", () => {
-    expect(formatProjectedAchievementDate("2033-04-01")).toBe("2033年4月頃");
+describe("formatFireProjection", () => {
+  it("到達月は年月までを「頃」付きで返す(予測値なので日までは出さない)", () => {
+    expect(formatFireProjection({ status: "projected", achievementDate: "2033-04-01" })).toBe(
+      "2033年4月頃",
+    );
   });
 
-  it("未算出(null)は算出できない旨を返す", () => {
-    expect(formatProjectedAchievementDate(null)).toBe("算出できません");
+  /** 「目標に達する月」と「設定した結果として届かない」を同じ表示にまとめない(要件) */
+  it("達成済みと到達見込みなしをそれぞれの文言で返す", () => {
+    expect(formatFireProjection({ status: "achieved" })).toBe("達成済み");
+    expect(formatFireProjection({ status: "unreachable" })).toBe("到達見込みなし");
+  });
+
+  it("前提の解決に失敗した場合(null)は算出できない旨を返す", () => {
+    expect(formatFireProjection(null)).toBe("算出できません");
   });
 
   it("日付として読めない値も算出できない扱いにする", () => {
-    expect(formatProjectedAchievementDate("not-a-date")).toBe("算出できません");
+    expect(formatFireProjection({ status: "projected", achievementDate: "not-a-date" })).toBe(
+      "算出できません",
+    );
   });
 });
 
@@ -271,6 +342,7 @@ const debt: Debt = {
   id: "debt-1",
   name: "住宅ローン",
   balance: 20_000_000,
+  originatedOn: null,
   interestRate: null,
   repaymentMonths: null,
   updatedAt: "2026-08-05",
@@ -282,34 +354,73 @@ const netAxis: AchievementAxisOption = {
   name: "純資産",
   assetTypeNames: [],
   debtIds: ["debt-1"],
+  propertyValuations: {},
 };
 
 describe("負債を含む対象分類", () => {
   it("現在資産額は負債控除後の額になる", () => {
     expect(
-      resolveAchievementAmount(resolveAchievementAxis(netAxis.id, [netAxis]), latest, [debt]),
+      resolveAchievementAmount(resolveAchievementAxis(netAxis.id, [netAxis]), latest, [debt], []),
       // 分類軸を選んだ場合は`total`ではなく`byType`の足し合わせ(49,000,000)から引く
     ).toBe(49_000_000 - 20_000_000);
   });
 
   /** 既定(総資産)はCSVの合計そのもの。マネーフォワードの合計に負債は含まれない(B8) */
   it("既定(総資産)では負債を差し引かない", () => {
-    expect(resolveAchievementAmount(resolveAchievementAxis(null, []), latest, [debt])).toBe(
+    expect(resolveAchievementAmount(resolveAchievementAxis(null, []), latest, [debt], [])).toBe(
       49_600_000,
     );
   });
 
   it("負債が資産を上回れば現在資産額はマイナスになる", () => {
-    const hugeDebt: Debt = { ...debt, balanceHistory: { "2026-08-01": 60_000_000 } };
+    const hugeDebt: Debt = {
+      ...debt,
+      balance: 60_000_000,
+      balanceHistory: { "2026-08-01": 60_000_000 },
+    };
 
     expect(
       buildFireProgress(
-        { ...directGoal, achievementAxisId: netAxis.id },
-        latest,
-        [netAxis],
-        [hugeDebt],
+        progressInput({
+          goal: { ...directGoal, achievementAxisId: netAxis.id },
+          axes: [netAxis],
+          debts: [hugeDebt],
+        }),
       )?.currentAmount,
     ).toBe(49_000_000 - 60_000_000);
+  });
+
+  /**
+   * ゲージは「いま」を表す表示なので、履歴ではなく現在の残債を引く
+   * (docs/screen-requirements-dashboard.md B1「負債を含む分類軸の集計」)。
+   * 履歴に従うと、資産残高の最新日より後に負債を保存した直後だけゲージが
+   * 「負債なし」と同じ額を出す(B1-15の起票理由)。
+   */
+  it("資産残高の最新日より後に登録された負債も差し引く", () => {
+    const justRegistered: Debt = {
+      ...debt,
+      balance: 15_000_000,
+      // 資産残高の最新日(latest.date)より後の日付しか履歴に無い
+      balanceHistory: { "2026-08-20": 15_000_000 },
+    };
+
+    expect(
+      resolveAchievementAmount(
+        resolveAchievementAxis(netAxis.id, [netAxis]),
+        latest,
+        [justRegistered],
+        [],
+      ),
+    ).toBe(49_000_000 - 15_000_000);
+  });
+
+  /** 残債を手で更新したあと、CSVを取り込み直す前でも最新の残債で出す */
+  it("履歴の最後の記録ではなく現在の残債を引く", () => {
+    const repaid: Debt = { ...debt, balance: 12_000_000 };
+
+    expect(
+      resolveAchievementAmount(resolveAchievementAxis(netAxis.id, [netAxis]), latest, [repaid], []),
+    ).toBe(49_000_000 - 12_000_000);
   });
 });
 

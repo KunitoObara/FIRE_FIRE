@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -35,6 +36,8 @@ import {
   FIRE_GOAL_FIELDS,
   FIRE_GOAL_MODE_LABELS,
   FIRE_GOAL_MODES,
+  FIRE_GOAL_MONTHLY_CONTRIBUTION_HINT,
+  FIRE_GOAL_MONTHLY_CONTRIBUTION_LABEL,
   FIRE_GOAL_REVERSE_DESCRIPTION,
   FIRE_GOAL_SUBMIT_LABEL,
   FIRE_GOAL_SUBMITTING_LABEL,
@@ -76,6 +79,7 @@ export const FireGoalForm = ({
   initialValues,
   currentAssetTotal,
   achievementAxisName,
+  monthlyContributionNotice,
   achievementAxisOptions,
   achievementAxisId,
   onAchievementAxisChange,
@@ -214,12 +218,9 @@ export const FireGoalForm = ({
             polite(role="status")にし、インラインエラーの読み上げを妨げない。
           */}
           {hiddenTabNotice ? (
-            <p
-              role="status"
-              className="mb-6 rounded-md border border-destructive/50 px-4 py-3 text-sm text-destructive"
-            >
+            <Alert variant="error" role="status" className="mb-6">
               {hiddenTabNotice}
-            </p>
+            </Alert>
           ) : null}
 
           {/*
@@ -277,6 +278,40 @@ export const FireGoalForm = ({
                 </>
               ) : null}
             </FieldDescription>
+          </Field>
+
+          {/*
+            毎月の積立額。対象分類と同じくタブの外に置き、両方式で共通の設定であることを
+            並び順でも示す(要件B8)。区切り線もHTMLモック b8-fire-goal.html に合わせる。
+          */}
+          <Field className="mb-6 border-b pb-6">
+            <FieldLabel htmlFor="monthlyContribution">
+              {FIRE_GOAL_MONTHLY_CONTRIBUTION_LABEL}
+            </FieldLabel>
+            <Input
+              id="monthlyContribution"
+              type="text"
+              /*
+                マイナスを受け付けるので`numeric`ではなく`decimal`にする。`numeric`は
+                モバイルのキーボードに符号が出ず、取り崩しの入力ができなくなる端末がある
+              */
+              inputMode="decimal"
+              autoComplete="off"
+              className="tabular-nums"
+              disabled={saving}
+              aria-invalid={errors.monthlyContribution !== undefined}
+              {...register("monthlyContribution")}
+            />
+            <FieldError errors={[errors.monthlyContribution]} />
+            <FieldDescription>{FIRE_GOAL_MONTHLY_CONTRIBUTION_HINT}</FieldDescription>
+            {/*
+              初期値をどこから入れたか(入れられなかったか)は状況によって変わるので、固定の
+              説明とは別の段落にする。提示できなかったことは入力を妨げないため、エラーではなく
+              説明として出す(現在資産額の参考表示と同じ扱い)
+            */}
+            {monthlyContributionNotice ? (
+              <FieldDescription>{monthlyContributionNotice}</FieldDescription>
+            ) : null}
           </Field>
 
           <Tabs

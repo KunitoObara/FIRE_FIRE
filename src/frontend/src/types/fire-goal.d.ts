@@ -46,6 +46,22 @@ declare global {
      * (B1のゲージ・B8の参考表示)が既定へフォールバックする責務を持ち、B4の削除は禁止しない。
      */
     achievementAxisId: string | null;
+    /**
+     * 毎月の積立額(円)。到達予測が1ヶ月ごとに足す額
+     * (docs/screen-requirements-fire-goal.md B8「毎月の積立額」)。
+     *
+     * **マイナスを取りうる。** 取り崩しの局面を表せるようにするためで、その場合は資産が
+     * 減る方向に効く。金額の型で符号を落とさないこと(物件の利ざやと同じ扱い)。
+     *
+     * **`null`はこの欄を導入する前に保存された目標だけが持つ**(要件では未入力=0)。
+     * 空欄のまま保存した場合は0を書く。`null`のままにすると、次にB8を開いたときに前月の収支が
+     * また初期値として提示され、意図して空にした設定が次の保存で化けるため
+     * (`toMonthlyContribution`)。初期値の提示が働くのは`null`のときだけ。
+     *
+     * 設定方式(`mode`)ごとには持たない。目標額の決め方と毎月いくら積むかは別の話で、
+     * 方式を切り替えただけで到達予測が変わる理由が無いため(`achievementAxisId`と同じ)。
+     */
+    monthlyContribution: number | null;
     /** 目標資産額(円)。直接入力タブの値 */
     targetAmount: number | null;
     /** 想定年間支出額(円)。逆算タブの値 */
@@ -105,6 +121,8 @@ declare global {
      * 黙って純資産の軸へ変わるのを避けるため。
      */
     debtIds: string[];
+    /** 集計に加える物件と反映方法。空のマップは「不動産を反映しない」(B4)。`debtIds`と同じ非対称 */
+    propertyValuations: CategoryAxisPropertyValuations;
   };
 
   /**
@@ -126,8 +144,30 @@ declare global {
      * 選ぶ必要がある(docs/screen-requirements-fire-goal.md B8)。
      */
     debtIds: string[];
+    /**
+     * 集計に加える物件と反映方法。
+     *
+     * 既定(総資産)は空のマップになる。マネーフォワードの合計に手動で登録した物件は
+     * 含まれないため、不動産を達成度に効かせるには物件を含む分類軸を作って選ぶ必要がある
+     * (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
+     */
+    propertyValuations: CategoryAxisPropertyValuations;
     /** 設定されていた分類軸が見つからず既定へフォールバックした場合に`true` */
     missing: boolean;
+  };
+
+  /**
+   * 毎月の積立額の初期値を前月の収支から解決した結果
+   * (docs/screen-requirements-fire-goal.md B8「毎月の積立額」)。
+   *
+   * 金額と注記を1組で返す。別々に求めると、金額を入れたのに「提示できませんでした」の
+   * 注記が残る、といった食い違いが起きうる(`AchievementAxisResolution`と同じ考え方)。
+   */
+  type MonthlyContributionPrefill = {
+    /** 初期値に入れる金額(円)。提示できなかった場合は`null`(空欄のまま) */
+    amount: number | null;
+    /** 入力欄に添える注記。前月の収支を読んでいない場合は`null`(添えるものが無い) */
+    notice: string | null;
   };
 
   /** B8の画面上部に出す参考表示(現在有効な設定方式・現在資産額)のProps */
@@ -150,6 +190,13 @@ declare global {
     achievementAxisName: string;
     /** 選択肢にする分類軸(B4の登録順)。1件も無い場合は既定のみを選べる */
     achievementAxisOptions: AchievementAxisOption[];
+    /**
+     * 毎月の積立額の入力欄に添える注記。添えるものが無ければ`null`。
+     *
+     * 初期値をどこから入れたか(または入れられなかったか)は画面を開いた時点で決まるので、
+     * フォームではなく呼び出し側が解決して渡す(`MonthlyContributionPrefill`)。
+     */
+    monthlyContributionNotice: string | null;
     /** 選択中の対象分類。既定(総資産)は`null` */
     achievementAxisId: string | null;
     onAchievementAxisChange: (axisId: string | null) => void;

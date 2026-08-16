@@ -12,6 +12,7 @@ const fetchFireGoal = vi.fn();
 const saveFireGoal = vi.fn();
 const fetchLatestAssetSnapshot = vi.fn();
 const fetchCategoryAxes = vi.fn();
+const fetchCashflowData = vi.fn();
 const push = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -28,6 +29,10 @@ vi.mock("@/lib/asset-categories/category-axis-repository", () => ({
   fetchCategoryAxes: () => fetchCategoryAxes(),
 }));
 
+vi.mock("@/lib/dashboard/cashflow-data", () => ({
+  fetchCashflowData: (...args: unknown[]) => fetchCashflowData(...args),
+}));
+
 /**
  * 直近の資産残高。合計(49,600,000)は資産種別の足し合わせ(49,000,000)と一致させていない。
  * 対象分類の切替で参考表示が実際に集計し直されていることを、値の違いで確かめられるようにする。
@@ -36,6 +41,19 @@ const latestSnapshot: AssetSnapshot = {
   date: "2026-08-01",
   total: 49_600_000,
   byType: { "預金・現金": 19_000_000, "株式(現物)": 30_000_000 },
+};
+
+/**
+ * 前月の収支。毎月の積立額の初期値(収入 − 支出 = 180,000円)の出所になる。
+ *
+ * `month`は初期値の算出に使わない(読む月は画面が`Date`から導き、注記もその月で書く)ので、
+ * 実際の前月と一致していなくてよい。
+ */
+const previousMonthCashflow: CashflowSummary = {
+  month: "2026-07",
+  income: 500_000,
+  expense: 320_000,
+  expenseByCategory: [],
 };
 
 /** B4に登録済みの分類軸(対象分類の選択肢) */
@@ -73,6 +91,7 @@ describe("FireGoalScreen", () => {
     saveFireGoal.mockReset();
     fetchLatestAssetSnapshot.mockReset();
     fetchCategoryAxes.mockReset();
+    fetchCashflowData.mockReset();
     push.mockReset();
     toastSuccess.mockReset();
 
@@ -80,6 +99,7 @@ describe("FireGoalScreen", () => {
     saveFireGoal.mockResolvedValue({ ok: true });
     fetchLatestAssetSnapshot.mockResolvedValue({ ok: true, snapshot: latestSnapshot });
     fetchCategoryAxes.mockResolvedValue({ ok: true, axes: [investmentAxis] });
+    fetchCashflowData.mockResolvedValue({ ok: true, cashflow: previousMonthCashflow });
   });
 
   it("保存済みの目標を両タブの初期値に入れる", async () => {
@@ -141,6 +161,8 @@ describe("FireGoalScreen", () => {
         annualExpense: null,
         withdrawalRate: 4,
         achievementAxisId: null,
+        // 積立額は未保存なので、前月の収支(500,000 − 320,000)が初期値のまま保存される
+        monthlyContribution: 180_000,
       });
     });
     expect(toastSuccess).toHaveBeenCalledWith("FIRE目標を保存しました");
@@ -253,6 +275,78 @@ describe("FireGoalScreen", () => {
     expect(screen.getByLabelText("達成度の対象分類")).toHaveTextContent(
       "総資産(マネーフォワードの合計)",
     );
+  });
+
+  /** 要件B8「既定値として、前月の月次収支(収入 − 支出)を初期表示する」 */
+  it("積立額が未保存なら前月の収支を初期値に入れ、その旨を添える", async () => {
+    renderScreen();
+
+    expect(await screen.findByLabelText("毎月の積立額(円)")).toHaveValue("180000");
+    expect(screen.getByText(/初期値には前月/)).toBeInTheDocument();
+  });
+
+  /**
+   * 保存した値がそのまま到達予測に使われる、という関係を崩さないため(要件B8)。
+   * 読まないことで、B8を開くたびに1ヶ月分の取引を読みに行くこともなくなる。
+   */
+  it("保存済みの積立額があれば前月の収支を読まない", async () => {
+    fetchFireGoal.mockResolvedValue({
+      ok: true,
+      goal: {
+        mode: "direct",
+        targetAmount: 80_000_000,
+        annualExpense: null,
+        withdrawalRate: null,
+        achievementAxisId: null,
+        monthlyContribution: 200_000,
+      },
+    });
+    renderScreen();
+
+    expect(await screen.findByLabelText("毎月の積立額(円)")).toHaveValue("200000");
+    expect(fetchCashflowData).not.toHaveBeenCalled();
+    expect(screen.queryByText(/初期値には前月/)).not.toBeInTheDocument();
+  });
+
+  /** 0円を提示すると「収支がちょうど0だった」と読める(要件B8) */
+  it("前月の取引が0件なら積立額は空欄のままにし、提示できなかった旨を添える", async () => {
+    fetchCashflowData.mockResolvedValue({ ok: true, cashflow: null });
+    renderScreen();
+
+    expect(await screen.findByLabelText("毎月の積立額(円)")).toHaveValue("");
+    expect(screen.getByText(/取引が無いため、初期値は提示していません。/)).toBeInTheDocument();
+  });
+
+  /** 取り込めば埋まるのか読み直せば直るのかが違うので、0件とは文言を分ける */
+  it("前月の収支を取得できなくても目標は設定でき、0件とは別の文言を添える", async () => {
+    const user = userEvent.setup();
+    fetchCashflowData.mockResolvedValue({ ok: false, reason: "unknown" });
+    renderScreen();
+
+    expect(
+      await screen.findByText(/収支を取得できなかったため、初期値は提示していません。/),
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("目標資産額(円)"), "80000000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith("/dashboard");
+    });
+  });
+
+  it("提示した初期値をそのまま保存できる", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.type(await screen.findByLabelText("目標資産額(円)"), "80000000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(saveFireGoal).toHaveBeenCalledWith(
+        expect.objectContaining({ monthlyContribution: 180_000 }),
+      );
+    });
   });
 
   it("目標を取得できなければ理由を表示してフォームを出さない", async () => {

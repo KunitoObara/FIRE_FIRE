@@ -30,6 +30,7 @@ const mortgage: Debt = {
   id: "debt-mortgage",
   name: "住宅ローン(〇〇銀行)",
   balance: 18_400_000,
+  originatedOn: null,
   interestRate: 0.475,
   repaymentMonths: 280,
   updatedAt: "2026-07-12",
@@ -40,6 +41,7 @@ const scholarship: Debt = {
   id: "debt-scholarship",
   name: "奨学金(第一種)",
   balance: 2_300_000,
+  originatedOn: null,
   interestRate: null,
   repaymentMonths: null,
   updatedAt: "2026-05-02",
@@ -51,6 +53,7 @@ const netAxis: AssetCategoryAxisDocument = {
   name: "純金融資産",
   assetTypeNames: [],
   debtIds: ["debt-mortgage"],
+  propertyValuations: {},
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 
@@ -121,6 +124,7 @@ describe("DebtInputScreen", () => {
             id: null,
             name: "カードローン",
             balance: 450_000,
+            originatedOn: null,
             interestRate: null,
             repaymentMonths: null,
           },
@@ -148,6 +152,53 @@ describe("DebtInputScreen", () => {
         [],
       );
     });
+  });
+
+  /**
+   * 発生年月(B11-7)。資産推移グラフがこの月から負債を差し引き始めるための入力で、
+   * 任意(docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。
+   */
+  it("発生年月を入力すると、その値を保存に渡す", async () => {
+    const user = userEvent.setup();
+    fetchDebts.mockResolvedValue({ ok: true, debts: [] });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: /負債を追加/u }));
+    await user.type(screen.getByLabelText("項目名"), "カードローン");
+    await user.type(screen.getByLabelText("残債(円)"), "450000");
+    await user.type(screen.getByLabelText(/発生年月/u), "2019-04");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(saveDebts).toHaveBeenCalledWith(
+        [expect.objectContaining({ originatedOn: "2019-04" })],
+        [],
+      );
+    });
+  });
+
+  /** 未来に借りた負債は無い。過去のグラフに反映させないため保存を止める */
+  it("当月より後の発生年月はインラインエラーを出し、保存しない", async () => {
+    const user = userEvent.setup();
+    fetchDebts.mockResolvedValue({ ok: true, debts: [] });
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: /負債を追加/u }));
+    await user.type(screen.getByLabelText("項目名"), "カードローン");
+    await user.type(screen.getByLabelText("残債(円)"), "450000");
+    await user.type(screen.getByLabelText(/発生年月/u), "2099-12");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(await screen.findByText("発生年月に未来の年月は入力できません。")).toBeInTheDocument();
+    expect(saveDebts).not.toHaveBeenCalled();
+
+    /*
+      エラー中はヒント文ではなくエラー文を指す。`role="alert"`は発生した瞬間しか読み上げず、
+      あとからこの欄へフォーカスしたときに理由を辿れるのは`aria-describedby`側だけ
+    */
+    expect(screen.getByLabelText(/発生年月/u)).toHaveAccessibleDescription(
+      "発生年月に未来の年月は入力できません。",
+    );
   });
 
   it("項目名・残債の不正はインラインエラーを出し、保存しない", async () => {
@@ -300,6 +351,7 @@ describe("DebtInputScreen(保存してから続けて保存する)", () => {
     id: "debt-created",
     name: "カードローン",
     balance: 450_000,
+    originatedOn: null,
     interestRate: null,
     repaymentMonths: null,
     updatedAt: "2026-08-08",

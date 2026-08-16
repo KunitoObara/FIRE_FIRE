@@ -40,11 +40,47 @@ describe("RealEstateForm", () => {
       expect(onSubmit).toHaveBeenCalledWith({
         name: "〇〇マンション101号室",
         location: "東京都渋谷区神南1-2-3",
+        // 取得年月は任意入力。入れずに保存すれば`null`が渡る(B7)
+        acquiredOn: null,
         marketValue: 32_000_000,
         loanBalance: 18_400_000,
         rental: null,
       });
     });
+  });
+
+  /**
+   * 取得年月は任意入力で、入れると資産推移グラフがその月から物件を積み始める
+   * (docs/screen-requirements-real-estate.md B7)。
+   */
+  it("取得年月を入力して保存すると、そのまま渡す", async () => {
+    const user = userEvent.setup();
+    renderCreateForm();
+
+    await user.type(screen.getByLabelText("物件名"), "□□戸建て");
+    await user.type(screen.getByLabelText("取得年月(任意)"), "2019-04");
+    await user.type(screen.getByLabelText("時価(円)"), "18000000");
+    await user.type(screen.getByLabelText("ローン残高(円)"), "0");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ acquiredOn: "2019-04" }));
+    });
+  });
+
+  /** まだ取得していない物件を過去のグラフに積まないため、当月より後は弾く */
+  it("取得年月に未来の年月を入れると保存しない", async () => {
+    const user = userEvent.setup();
+    renderCreateForm();
+
+    await user.type(screen.getByLabelText("物件名"), "□□戸建て");
+    await user.type(screen.getByLabelText("取得年月(任意)"), "2099-12");
+    await user.type(screen.getByLabelText("時価(円)"), "18000000");
+    await user.type(screen.getByLabelText("ローン残高(円)"), "0");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(await screen.findByText("取得年月に未来の年月は入力できません。")).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("所在地は未入力でも保存できる", async () => {
@@ -141,6 +177,7 @@ describe("RealEstateForm", () => {
         initialValues={{
           name: "〇〇マンション101号室",
           location: "東京都渋谷区神南1-2-3",
+          acquiredOn: "2019-04",
           marketValue: "32000000",
           loanBalance: "18400000",
           isRentalProperty: true,
@@ -167,6 +204,7 @@ describe("RealEstateForm", () => {
         initialValues={{
           name: "〇〇マンション101号室",
           location: "東京都渋谷区神南1-2-3",
+          acquiredOn: "2019-04",
           marketValue: "32000000",
           loanBalance: "18400000",
           isRentalProperty: true,

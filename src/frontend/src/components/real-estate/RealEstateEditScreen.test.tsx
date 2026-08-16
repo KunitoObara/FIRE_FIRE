@@ -29,10 +29,12 @@ const RENTAL_PROPERTY: RealEstateProperty = {
   id: "shibuya-101",
   name: "〇〇マンション101号室",
   location: "東京都渋谷区神南1-2-3",
+  acquiredOn: null,
   marketValue: 32_000_000,
   loanBalance: 18_400_000,
   rental: { monthlyIncome: 128_000, monthlyExpense: 22_000 },
   updatedAt: "2026-06-01",
+  valueHistory: {},
 };
 
 const renderScreen = (): RenderResult =>
@@ -69,6 +71,7 @@ describe("RealEstateEditScreen", () => {
       expect(updateRealEstateProperty).toHaveBeenCalledWith("shibuya-101", {
         name: "〇〇マンション101号室",
         location: "東京都渋谷区神南1-2-3",
+        acquiredOn: null,
         marketValue: 33_500_000,
         loanBalance: 18_400_000,
         rental: { monthlyIncome: 128_000, monthlyExpense: 22_000 },

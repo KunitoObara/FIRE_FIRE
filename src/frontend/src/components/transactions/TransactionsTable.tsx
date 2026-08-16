@@ -16,7 +16,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { NO_MATCHING_TRANSACTIONS_LABEL } from "@/constants/transactions";
+import {
+  NO_MATCHING_TRANSACTIONS_LABEL,
+  NON_CALCULATION_TARGET_BADGE_DESCRIPTION,
+  NON_CALCULATION_TARGET_BADGE_LABEL,
+  TRANSFER_BADGE_DESCRIPTION,
+  TRANSFER_BADGE_LABEL,
+} from "@/constants/transactions";
 import { formatSignedJpy } from "@/lib/format/currency";
 import { buildTransactionsHref, buildTransactionSortHref } from "@/lib/transactions/filters";
 
@@ -51,9 +57,22 @@ const buildColumns = (filters: TransactionFilters): ColumnDef<Transaction>[] => 
     cell: ({ row }) => format(parseISO(row.original.date), "yyyy/MM/dd"),
   },
   {
-    accessorKey: "category",
+    accessorKey: "categoryMajor",
     header: "費目",
-    cell: ({ row }) => <Badge variant="secondary">{row.original.category}</Badge>,
+    /*
+      大項目を主・中項目を従として1列に収める(docs/screen-requirements-dashboard.md B3)。
+      絞り込んだ結果がどの中項目なのかが行から読めないと、絞り込みの結果を確かめられない。
+      中項目が空の取引は大項目だけを出し、「(未分類)」のような名前をアプリ側で与えない
+      (docs/transaction-import-requirements.md 6章)
+    */
+    cell: ({ row }) => (
+      <span className="flex flex-wrap items-center gap-1.5">
+        <Badge variant="secondary">{row.original.categoryMajor}</Badge>
+        {row.original.categoryMinor ? (
+          <span className="text-xs text-muted-foreground">{row.original.categoryMinor}</span>
+        ) : null}
+      </span>
+    ),
   },
   {
     accessorKey: "amount",
@@ -69,9 +88,31 @@ const buildColumns = (filters: TransactionFilters): ColumnDef<Transaction>[] => 
     header: "口座",
   },
   {
-    accessorKey: "description",
+    accessorKey: "content",
     header: "摘要",
-    cell: ({ row }) => <span className="text-muted-foreground">{row.original.description}</span>,
+    /*
+      収支の集計から外れる行に印を付ける(docs/screen-requirements-dashboard.md B3)。
+      印が無いと、一覧の金額を足してもB1の収支サマリと合わない理由が分からない。
+      **振替と計算対象外は別の印**にする — 前者はマネーフォワードが自動で付ける分類、
+      後者はユーザーが下した判断で、意味が違う(docs/transaction-import-requirements.md 5章)。
+      両方に当てはまる行では2つとも出す。片方だけにすると、印を手掛かりに理由を
+      確かめようとしたときにもう一方の理由が消える
+    */
+    cell: ({ row }) => (
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span className="text-muted-foreground">{row.original.content}</span>
+        {row.original.isTransfer ? (
+          <Badge variant="outline" title={TRANSFER_BADGE_DESCRIPTION}>
+            {TRANSFER_BADGE_LABEL}
+          </Badge>
+        ) : null}
+        {!row.original.isCalculationTarget ? (
+          <Badge variant="outline" title={NON_CALCULATION_TARGET_BADGE_DESCRIPTION}>
+            {NON_CALCULATION_TARGET_BADGE_LABEL}
+          </Badge>
+        ) : null}
+      </span>
+    ),
   },
 ];
 

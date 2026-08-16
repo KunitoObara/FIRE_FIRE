@@ -101,12 +101,49 @@ export const ACHIEVEMENT_AXIS_INVALID_MESSAGE =
   "選択した対象分類が見つかりません。分類を選び直してから保存してください。";
 
 /** 入力欄の見出し。単位を添えて、円単位なのか%なのかを入力欄だけで判断できるようにする */
+export const FIRE_GOAL_MONTHLY_CONTRIBUTION_LABEL = "毎月の積立額(円)";
 export const FIRE_GOAL_TARGET_AMOUNT_LABEL = "目標資産額(円)";
 export const FIRE_GOAL_ANNUAL_EXPENSE_LABEL = "想定年間支出額(円)";
 export const FIRE_GOAL_WITHDRAWAL_RATE_LABEL = "逆算係数(%)";
 
 /** 逆算係数の入力欄に添える説明(HTMLモックの文言に合わせる) */
 export const FIRE_GOAL_WITHDRAWAL_RATE_HINT = `${DEFAULT_WITHDRAWAL_RATE}%ルール(目標資産額 = 年間支出額 ÷ 逆算係数)が既定値です。編集できます。`;
+
+/**
+ * 毎月の積立額の入力欄に添える説明(docs/screen-requirements-fire-goal.md B8「毎月の積立額」)。
+ *
+ * 初期値の出所は状況によって変わる(前月の収支を入れた/入れられなかった)ので、
+ * この文言には含めず`buildMonthlyContribution*Notice`を後ろに足す形にする。
+ */
+export const FIRE_GOAL_MONTHLY_CONTRIBUTION_HINT =
+  "到達予測日の算出に使います。取り崩しを見込む場合はマイナスも入力できます。";
+
+/**
+ * 初期値に前月の収支を入れたときの注記。
+ *
+ * どの月の収支を入れたかまで出す。「前月」だけでは、画面を開いた日によって指す月が変わり、
+ * B1の収支サマリでその月を見比べることもできないため。
+ */
+export const buildMonthlyContributionPrefillNotice = (monthLabel: string): string =>
+  `初期値には前月(${monthLabel})の収支(収入 − 支出)を入れています。`;
+
+/**
+ * 前月の取引が0件で初期値を提示できなかったときの注記。
+ *
+ * 0円を初期値にしない(要件B8)。「収支がちょうど0だった」と読めてしまうため、
+ * 空欄のまま、提示できなかった理由を添える。
+ */
+export const buildMonthlyContributionEmptyNotice = (monthLabel: string): string =>
+  `前月(${monthLabel})の取引が無いため、初期値は提示していません。`;
+
+/**
+ * 前月の収支の**取得そのもの**に失敗したときの注記。
+ *
+ * 取引0件と文言を分ける。0件は取り込めば埋まるもの、こちらは読み込み直せば直りうるもので、
+ * 次にすべきことが違うため。どちらの場合も目標の設定自体は続けられる(現在資産額の参考表示と同じ扱い)。
+ */
+export const buildMonthlyContributionFailureNotice = (monthLabel: string): string =>
+  `前月(${monthLabel})の収支を取得できなかったため、初期値は提示していません。`;
 
 /**
  * 金額の上限(円)。firestore.rulesの`settings/fireGoal`の検証と一致させる。
@@ -128,6 +165,14 @@ export const FIRE_GOAL_AMOUNT_PATTERN = /^[0-9]+$/u;
  */
 export const FIRE_GOAL_WITHDRAWAL_RATE_PATTERN = /^[0-9]+(?:\.[0-9]+)?$/u;
 
+/**
+ * 毎月の積立額で受け付ける形式。**先頭のマイナスだけは許す**(要件B8)。
+ *
+ * 取り崩しの局面を表せるようにするためで、それ以外(カンマ区切り・全角数字・指数表記)は
+ * 他の金額欄と同じく受け付けない。小数を許さないのも他の金額欄に揃える。
+ */
+export const FIRE_GOAL_MONTHLY_CONTRIBUTION_PATTERN = /^-?[0-9]+$/u;
+
 /** 必須の欄が未入力のときのエラー。どの欄かが分かるよう項目名を添える */
 export const buildFireGoalRequiredMessage = (label: string): string =>
   `${label}を入力してください。`;
@@ -145,6 +190,24 @@ export const FIRE_GOAL_AMOUNT_TOO_LARGE_MESSAGE = "金額は12桁以内で入力
  * 逆算した目標資産額も0になるため、どちらも1円以上を求める。
  */
 export const FIRE_GOAL_AMOUNT_TOO_SMALL_MESSAGE = "1円以上の金額を入力してください。";
+
+/**
+ * 毎月の積立額の形式エラー。
+ *
+ * 他の金額欄と文言を分ける。こちらはマイナスを受け付けるので、「半角数字のみ」とだけ出すと
+ * 先頭のマイナスまで弾かれたように読めるため。
+ */
+export const FIRE_GOAL_MONTHLY_CONTRIBUTION_FORMAT_MESSAGE =
+  "半角数字のみ入力してください(取り崩しはマイナスを先頭に付けます)。";
+
+/**
+ * 毎月の積立額が上限を超えたときのエラー。**絶対値**で見る。
+ *
+ * 桁数の歯止めは他の金額欄と同じ根拠(`FIRE_GOAL_AMOUNT_MAX`)だが、マイナスを受け付けるため
+ * 下限側にも同じ幅を持たせる。
+ */
+export const FIRE_GOAL_MONTHLY_CONTRIBUTION_TOO_LARGE_MESSAGE =
+  "積立額は符号を除いて12桁以内で入力してください。";
 
 /** 逆算係数の形式エラー */
 export const FIRE_GOAL_WITHDRAWAL_RATE_FORMAT_MESSAGE = "半角数字で入力してください。";

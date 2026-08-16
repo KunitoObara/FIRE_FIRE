@@ -1,8 +1,15 @@
+import { format } from "date-fns";
 import { Timestamp } from "firebase/firestore";
 import { z } from "zod";
 
 import {
   buildRealEstateAmountRequiredMessage,
+  REAL_ESTATE_ACQUIRED_ON_FORMAT,
+  REAL_ESTATE_ACQUIRED_ON_FORMAT_MESSAGE,
+  REAL_ESTATE_ACQUIRED_ON_FUTURE_MESSAGE,
+  REAL_ESTATE_ACQUIRED_ON_MIN,
+  REAL_ESTATE_ACQUIRED_ON_PATTERN,
+  REAL_ESTATE_ACQUIRED_ON_TOO_OLD_MESSAGE,
   REAL_ESTATE_AMOUNT_FORMAT_MESSAGE,
   REAL_ESTATE_AMOUNT_MAX,
   REAL_ESTATE_AMOUNT_PATTERN,
@@ -53,6 +60,40 @@ const validateAmount = (value: string, label: string): string | null => {
 };
 
 /**
+ * 取得年月の検証。エラーが無ければ`null`を返す。
+ *
+ * 空文字は「未登録」であってエラーではない(任意入力)。入力されている場合だけ、
+ * 形式・下限・**当月より後でないこと**を見る
+ * (docs/screen-requirements-real-estate.md B7「入力の制約」)。
+ *
+ * **時価・ローン残高の履歴との前後関係はここで見ない。** 履歴はユーザーに見えないところで
+ * 積まれる記録なので、「最初の記録より後の取得年月」を入力エラーとして突き返すと、原因が
+ * 画面から分からないまま保存できなくなる。その場合の集計上の扱いはB1側が決めている
+ * (取得年月より前の点には積まない)。B11の発生年月と同じ扱い。
+ *
+ * 当月の判定に端末の日付を使うのは`updatedAt`と同じ理由で、`firestore.rules`側は
+ * `request.time`がUTCのため月をまたぐ前後で正常な入力を弾きうる。ルールは形だけを見る。
+ */
+export const validateAcquiredOn = (value: string, now: Date): string | null => {
+  if (value.length === 0) {
+    return null;
+  }
+
+  if (!REAL_ESTATE_ACQUIRED_ON_PATTERN.test(value)) {
+    return REAL_ESTATE_ACQUIRED_ON_FORMAT_MESSAGE;
+  }
+
+  if (value < REAL_ESTATE_ACQUIRED_ON_MIN) {
+    return REAL_ESTATE_ACQUIRED_ON_TOO_OLD_MESSAGE;
+  }
+
+  // 形が`yyyy-MM`に揃っているので、文字列のままの比較で辞書順=時系列になる
+  return value > format(now, REAL_ESTATE_ACQUIRED_ON_FORMAT)
+    ? REAL_ESTATE_ACQUIRED_ON_FUTURE_MESSAGE
+    : null;
+};
+
+/**
  * B7 不動産登録・編集フォームの入力値。
  *
  * 金額は`number`ではなく文字列で持つ。`<input type="number">`にすると指数表記(`1e5`)や
@@ -73,6 +114,7 @@ export const realEstateFormSchema = z
       .string()
       .trim()
       .max(REAL_ESTATE_LOCATION_MAX_LENGTH, REAL_ESTATE_LOCATION_TOO_LONG_MESSAGE),
+    acquiredOn: z.string().trim(),
     marketValue: z.string().trim(),
     loanBalance: z.string().trim(),
     isRentalProperty: z.boolean(),
@@ -80,6 +122,12 @@ export const realEstateFormSchema = z
     rentalMonthlyExpense: z.string().trim(),
   })
   .superRefine((values, ctx) => {
+    const acquiredOnMessage = validateAcquiredOn(values.acquiredOn, new Date());
+
+    if (acquiredOnMessage !== null) {
+      ctx.addIssue({ code: "custom", message: acquiredOnMessage, path: ["acquiredOn"] });
+    }
+
     // 収益物件でない場合、賃貸の2欄は検証しない。書きかけの値が残っていても保存はされず
     // (`toRealEstatePropertyInput`が捨てる)、チェックを戻せばそのまま使えるようにする
     const amounts = values.isRentalProperty
@@ -116,8 +164,27 @@ export const realEstateFormSchema = z
 export const realEstatePropertyDocumentSchema = z.object({
   name: z.string(),
   location: z.string(),
+  /**
+   * 取得年月。**B4-8より前に登録された物件はこのフィールドを持たない**ため、欠損を`null`に倒す
+   * (`debts.originatedOn`・`categoryAxes.debtIds`と同じ扱い)。未入力と区別する必要は無く、
+   * どちらも「起点は最初の記録の日」を意味する。
+   */
+  acquiredOn: z.string().regex(REAL_ESTATE_ACQUIRED_ON_PATTERN).nullable().default(null),
   marketValue: z.number(),
   loanBalance: z.number(),
+  /**
+   * 時価・ローン残高の履歴。こちらも既存の物件は持たないため、欠損を空のマップに倒す。
+   *
+   * キーは`yyyy-MM-dd`。**日付の形まで見る** — 資産推移グラフがこのキーを資産残高の集計日と
+   * 文字列のまま比較するため(`yyyy-MM-dd`は辞書順=時系列)、形が崩れた記録が混じると
+   * 過去の点が黙って別の日に効く。
+   */
+  valueHistory: z
+    .record(
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+      z.object({ marketValue: z.number(), loanBalance: z.number() }),
+    )
+    .default({}),
   rental: z
     .object({
       monthlyIncome: z.number(),

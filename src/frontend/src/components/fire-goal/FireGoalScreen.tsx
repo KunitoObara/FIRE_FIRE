@@ -2,14 +2,18 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { FireGoalForm } from "@/components/fire-goal/FireGoalForm";
 import { FireGoalSummary } from "@/components/fire-goal/FireGoalSummary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORY_AXES_QUERY_KEY } from "@/constants/asset-categories";
-import { DASHBOARD_DATA_QUERY_KEY } from "@/constants/dashboard";
+import {
+  CASHFLOW_DATA_QUERY_KEY,
+  CASHFLOW_DATA_STALE_TIME_MS,
+  DASHBOARD_DATA_QUERY_KEY,
+} from "@/constants/dashboard";
 import { DEBTS_QUERY_KEY } from "@/constants/debts";
 import {
   ACHIEVEMENT_AXIS_MISSING_MESSAGE,
@@ -19,13 +23,20 @@ import {
   FIRE_GOAL_SAVED_MESSAGE,
   LATEST_ASSET_SNAPSHOT_QUERY_KEY,
 } from "@/constants/fire-goal";
+import { REAL_ESTATE_PROPERTIES_QUERY_KEY } from "@/constants/real-estate";
 import { DASHBOARD_PATH } from "@/constants/routes";
 import { fetchCategoryAxes } from "@/lib/asset-categories/category-axis-repository";
 import { fetchLatestAssetSnapshot } from "@/lib/csv-import/asset-balance-repository";
+import { fetchCashflowData } from "@/lib/dashboard/cashflow-data";
 import { resolveAchievementAmount, resolveAchievementAxis } from "@/lib/dashboard/fire-progress";
 import { fetchDebts } from "@/lib/debts/debt-repository";
 import { fetchFireGoal, saveFireGoal } from "@/lib/fire-goal/fire-goal-repository";
 import { toFireGoalFormValues } from "@/lib/fire-goal/form-values";
+import {
+  resolveContributionSourceMonth,
+  resolveMonthlyContributionPrefill,
+} from "@/lib/fire-goal/monthly-contribution";
+import { fetchRealEstateProperties } from "@/lib/real-estate/property-repository";
 
 import type { JSX } from "react";
 
@@ -64,6 +75,15 @@ export const FireGoalScreen = (): JSX.Element => {
   */
   const debtsQuery = useQuery({ queryKey: DEBTS_QUERY_KEY, queryFn: fetchDebts });
 
+  /*
+    物件も同じ理由で読む。対象分類が不動産を含む軸なら現在資産額に加わるため
+    (B4-8)、これが無いとB8の参考表示だけがB1のゲージと違う額になる
+  */
+  const propertiesQuery = useQuery({
+    queryKey: REAL_ESTATE_PROPERTIES_QUERY_KEY,
+    queryFn: fetchRealEstateProperties,
+  });
+
   /**
    * 選択中の対象分類。`undefined`は「まだ触っていない」で、保存済みの設定に追従する。
    *
@@ -73,6 +93,47 @@ export const FireGoalScreen = (): JSX.Element => {
   const [selectedAxisId, setSelectedAxisId] = useState<string | null | undefined>(undefined);
 
   const goalResult = goalQuery.data;
+  const savedGoal = goalResult?.ok === true ? goalResult.goal : null;
+
+  /*
+    毎月の積立額の初期値に使う前月(docs/screen-requirements-fire-goal.md B8「毎月の積立額」)。
+    画面を開いた時点の`Date`から1度だけ導き、読む月と注記に出す月を同じ値にする
+    (別々に`new Date()`を呼ぶと、月をまたぐ瞬間に食い違いうる。B1の`now`と同じ扱い)
+  */
+  const contributionSourceMonth = useMemo(() => resolveContributionSourceMonth(new Date()), []);
+
+  /*
+    **保存済みの積立額があるなら前月の収支は読まない。** 保存した値がそのまま到達予測に使われる、
+    という関係を崩さないため(同要件「保存後に追従して変わることはしない」)。読まないことで、
+    B8を開くたびに1ヶ月分の取引を読みに行くこともなくなる。
+    目標の取得に失敗した場合も読まない(初期値を入れる先のフォーム自体を出さないため)
+  */
+  const needsContributionPrefill =
+    goalResult?.ok === true && (savedGoal?.monthlyContribution ?? null) === null;
+
+  const cashflowQuery = useQuery({
+    // 月をキーに含めるのはB1の収支サマリと同じ。同じ月をB1で見ていればその結果を使い回せる
+    queryKey: [...CASHFLOW_DATA_QUERY_KEY, contributionSourceMonth],
+    queryFn: () => fetchCashflowData(contributionSourceMonth),
+    enabled: needsContributionPrefill,
+    staleTime: CASHFLOW_DATA_STALE_TIME_MS,
+    // `fetchCashflowData`はFirestoreの失敗を`ok: false`として解決させるので、例外は集計が
+    // 壊れたデータで落ちたときだけ。同じ入力で繰り返しても結果は変わらない(B1と同じ扱い)
+    retry: false,
+  });
+
+  /*
+    例外で終わった場合も「前月の収支を取得できなかった」ことに変わりはないので、失敗として扱う。
+    ここで潰さないと、注記の無い空欄になり、初期値が出ない理由が画面から読み取れない
+  */
+  const cashflowResult: CashflowDataResult | undefined =
+    cashflowQuery.data ?? (cashflowQuery.isError ? { ok: false, reason: "unknown" } : undefined);
+
+  const contributionPrefill = needsContributionPrefill
+    ? resolveMonthlyContributionPrefill(cashflowResult, contributionSourceMonth)
+    : // 保存済みの値を使う場合は初期値を提示していないので、添える注記も無い
+      { amount: null, notice: null };
+
   const axesResult = axesQuery.data;
   const axes = axesResult?.ok === true ? axesResult.axes : [];
   const savedAxisId = goalResult?.ok === true ? (goalResult.goal?.achievementAxisId ?? null) : null;
@@ -94,10 +155,12 @@ export const FireGoalScreen = (): JSX.Element => {
   // 失敗を重ねて表示しても増える情報が無く、「—」で分からないことは伝わる
   const latestSnapshot = snapshotQuery.data?.ok === true ? snapshotQuery.data.snapshot : null;
   const debts = debtsQuery.data?.ok === true ? debtsQuery.data.debts : [];
+  const properties = propertiesQuery.data?.ok === true ? propertiesQuery.data.properties : [];
   const currentAssetTotal = resolveAchievementAmount(
     achievementAxis,
     latestSnapshot ?? undefined,
     debts,
+    properties,
   );
 
   const handleSubmit = async (goal: FireGoal): Promise<SaveFireGoalResult> => {
@@ -115,7 +178,16 @@ export const FireGoalScreen = (): JSX.Element => {
     return saved;
   };
 
-  if (goalQuery.isPending || goalResult === undefined || axesQuery.isPending) {
+  /*
+    前月の収支もフォームの初期値になるので、提示する場合は揃うまで待つ(保存済みの目標と同じ理由)。
+    `enabled: false`のクエリは`isPending`のままなので、提示する場合だけ待ち合わせる
+  */
+  if (
+    goalQuery.isPending ||
+    goalResult === undefined ||
+    axesQuery.isPending ||
+    (needsContributionPrefill && cashflowQuery.isPending)
+  ) {
     return <Skeleton className="h-96 w-full max-w-2xl" />;
   }
 
@@ -156,9 +228,10 @@ export const FireGoalScreen = (): JSX.Element => {
       />
 
       <FireGoalForm
-        initialValues={toFireGoalFormValues(goalResult.goal)}
+        initialValues={toFireGoalFormValues(goalResult.goal, contributionPrefill.amount)}
         currentAssetTotal={currentAssetTotal}
         achievementAxisName={achievementAxis.name}
+        monthlyContributionNotice={contributionPrefill.notice}
         achievementAxisOptions={axes}
         achievementAxisId={achievementAxisId}
         onAchievementAxisChange={setSelectedAxisId}

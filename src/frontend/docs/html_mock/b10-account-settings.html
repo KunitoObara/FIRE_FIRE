@@ -7,6 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css" />
 <link rel="stylesheet" href="common.css" />
 </head>
 <body>
@@ -41,6 +42,20 @@
       <a class="sidebar-link" href="b11-debt-input.html">
         <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18" stroke-linecap="round"/><path d="M8 15h4" stroke-linecap="round"/></svg>
         負債入力
+      </a>
+      <!-- Phase 5(未実装)。ダッシュボードの集計には効かない3画面で、サイドバーはB11の次に並べる
+           (docs/screen-list-and-transitions.md 3.3) -->
+      <a class="sidebar-link" href="b12-subscriptions.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10a8 8 0 0113-5" stroke-linecap="round"/><path d="M17 3v4h-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 14a8 8 0 01-13 5" stroke-linecap="round"/><path d="M7 21v-4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        サブスク一覧
+      </a>
+      <a class="sidebar-link" href="b13-financial-institutions.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18" stroke-linecap="round"/><path d="M12 3l8 5H4z" stroke-linejoin="round"/><path d="M6 11v7M10 11v7M14 11v7M18 11v7" stroke-linecap="round"/></svg>
+        金融機関一覧
+      </a>
+      <a class="sidebar-link" href="b14-belongings.html">
+        <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l9-4 9 4v8l-9 4-9-4z" stroke-linejoin="round"/><path d="M3 8l9 4 9-4M12 12v8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        持ち物一覧
       </a>
       <div class="my-2 border-t" style="border-color: hsl(var(--border));"></div>
       <a class="sidebar-link" href="b8-fire-goal.html">
@@ -195,7 +210,13 @@
     <p class="text-sm text-slate-500 mb-4">現在登録済みの認証アプリは無効になります。本人確認のため、パスワードを再入力してください。</p>
     <div class="field mb-5">
       <label class="label">パスワード</label>
-      <input class="input" type="password" />
+      <!-- 入力欄の右端に表示/非表示トグルを重ねる(DESIGN.md 6章) -->
+      <div class="relative">
+        <input class="input pr-10" type="password" id="mfa-reset-password" />
+        <button class="password-toggle" type="button" aria-label="パスワードを表示" aria-pressed="false" onclick="togglePassword(this, 'mfa-reset-password')">
+          <i class="fa-solid fa-eye" aria-hidden="true"></i>
+        </button>
+      </div>
     </div>
     <div class="flex gap-3">
       <a href="a3-mfa-setup.html" class="btn btn-primary flex-1">確認して再設定する</a>
@@ -217,6 +238,22 @@
     </div>
   </div>
 </div>
+
+<script>
+  // パスワード表示トグル(DESIGN.md 6章。A1・A4・A7・A8・B10で必須)。
+  // 欄ごとに独立して切り替えられるよう、対象の入力欄のidを引数で受ける。
+  function togglePassword(button, inputId) {
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector("i");
+    const willShow = input.type === "password";
+
+    input.type = willShow ? "text" : "password";
+    icon.classList.toggle("fa-eye", !willShow);
+    icon.classList.toggle("fa-eye-slash", willShow);
+    // 状態は aria-pressed だけで伝える(ラベルも切り替えると二重に読み上げられる)
+    button.setAttribute("aria-pressed", String(willShow));
+  }
+</script>
 
 </body>
 </html>

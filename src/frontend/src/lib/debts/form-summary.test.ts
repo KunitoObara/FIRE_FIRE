@@ -11,6 +11,7 @@ const buildDebt = (overrides: Partial<Debt>): Debt => ({
   id: "debt-1",
   name: "住宅ローン",
   balance: 18_400_000,
+  originatedOn: null,
   interestRate: null,
   repaymentMonths: null,
   updatedAt: "2026-07-12",
@@ -23,6 +24,7 @@ const buildAxis = (overrides: Partial<AssetCategoryAxisDocument>): AssetCategory
   name: "純金融資産",
   assetTypeNames: [],
   debtIds: [],
+  propertyValuations: {},
   createdAt: "2026-01-01T00:00:00.000Z",
   ...overrides,
 });

@@ -12,6 +12,31 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // サインアップ許可リスト(docs/auth-login-requirements.md 3.10)。
+    // ベータ期間中は、ここに載っているメールアドレスだけがアカウントを作成できる。
+    // ドキュメントIDが正規化済みのメールアドレスそのもので、存在すること自体が承認の印。
+    //
+    // Blocking Function(`beforeUserCreated`)がAdmin SDKで読み(セキュリティルールを
+    // 経由しない)、承認の追加は開発者がコンソールで行う。**クライアントには読ませない** —
+    // 読めると、どのメールアドレスが招待されているかを未認証の相手が列挙できてしまう。
+    // 書かせないのは言うまでもなく、自分を許可リストへ足せる状態にしないため。
+    match /signupAllowlist/{email} {
+      allow read, write: if false;
+    }
+
+    // 問い合わせフォームの送信間隔の記録(docs/screen-requirements-public.md A11)。
+    //
+    // ドキュメントIDは送信元IPのSHA-256ハッシュで、中身は最後に送信できた時刻だけ。
+    // **問い合わせの内容そのものはここにも他のどこにも保存しない**(PO判断)。
+    //
+    // 書くのは未ログインから叩ける唯一のcallable(`sendContactMessage`)で、Admin SDK経由の
+    // ためこのルールを経由しない。クライアントに開ける理由が無いので全面的に拒否する
+    // (`mfaRecoveryCodes`・`signupAllowlist`と同じ扱い)。読ませると、送信間隔の記録の有無から
+    // 「誰かが問い合わせたこと」を外から観測できてしまう。
+    match /contactThrottle/{throttleKey} {
+      allow read, write: if false;
+    }
+
     // ユーザー自身の資産データ(docs/fire-asset-management-requirements.md 5章)。
     //
     // B2 CSV取込はクライアントSDKから直接書き込む。認証状態はブラウザ側のFirebase SDKが
@@ -22,6 +47,12 @@ service cloud.firestore {
     // アカウントに資産データを溜めさせないため(A2でメール確認を必須にしているのと同じ理由)。
     //
     // 2FA(TOTP)の完了もここで要求する。詳しくは`hasCompletedTotp()`の注記を見ること。
+    //
+    // **アクセス制御と、画面の要件そのものは別。** 前者(他人のデータに触れないこと)はここが
+    // 唯一の砦だが、後者には**クライアントだけが担保している制約**がある。ルールに繰り返しが
+    // 無い・コレクションの件数を数えられない・他のドキュメントを引くと読み取りが増える、
+    // といった理由によるもので、一覧は docs/fire-asset-management-requirements.md 8.1 にある。
+    // ルールを変えるときはその表も合わせて見直すこと。
 
     // アプリが日付を持つ書式(`yyyy-MM-dd`。src/constants/csv-import.ts の STORED_DATE_FORMAT)。
     // 資産残高のドキュメントIDにも使うため、形の崩れた日付を作らせない
@@ -39,11 +70,25 @@ service cloud.firestore {
     // 物件1件の中身(B7で保存する形)。作成・更新のどちらでも同じ形を要求する
     function isValidProperty(property) {
       return property.keys().hasAll(
-          ['name', 'location', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'createdAt']
+          ['name', 'location', 'acquiredOn', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'valueHistory', 'createdAt']
         )
         && property.keys().hasOnly(
-          ['name', 'location', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'createdAt']
+          ['name', 'location', 'acquiredOn', 'marketValue', 'loanBalance', 'rental', 'updatedAt', 'valueHistory', 'createdAt']
         )
+        // 取得年月(yyyy-MM)は任意入力で、未登録はnull。資産推移グラフがこの月から物件を
+        // 積み始める(B1「不動産を含む分類軸の集計」)ので、形は崩させない。
+        // **当月より後でないことはここでは見ない**(debts.originatedOnと同じ制約。要件8.1)。
+        // 月は01〜12だけを通す(REAL_ESTATE_ACQUIRED_ON_PATTERNと同じ形)
+        && (
+          property.acquiredOn == null
+          || (property.acquiredOn is string && property.acquiredOn.matches('^[0-9]{4}-(0[1-9]|1[0-2])$'))
+        )
+        // 時価・ローン残高の履歴は「日付→{時価, ローン残高}」のマップ。キーも値もルールでは
+        // 検査しきれないため(debts.balanceHistoryと同じ制約)、形はパース側
+        // (src/schemas/real-estate.ts)で担保し、ここでは件数の上限だけを見る。
+        // 上限は REAL_ESTATE_VALUE_HISTORY_MAX と揃える
+        && property.valueHistory is map
+        && property.valueHistory.size() <= 600
         // 文字数の上限は src/frontend/src/constants/real-estate.ts と揃える
         && property.name is string
         && property.name.size() > 0
@@ -77,16 +122,27 @@ service cloud.firestore {
     // 上限値は src/frontend/src/constants/debts.ts と揃える
     function isValidDebt(debt) {
       return debt.keys().hasAll(
-          ['name', 'balance', 'interestRate', 'repaymentMonths', 'updatedAt', 'balanceHistory', 'createdAt']
+          ['name', 'balance', 'originatedOn', 'interestRate', 'repaymentMonths', 'updatedAt', 'balanceHistory', 'createdAt']
         )
         && debt.keys().hasOnly(
-          ['name', 'balance', 'interestRate', 'repaymentMonths', 'updatedAt', 'balanceHistory', 'createdAt']
+          ['name', 'balance', 'originatedOn', 'interestRate', 'repaymentMonths', 'updatedAt', 'balanceHistory', 'createdAt']
         )
         // 項目名の上限60文字はB7の物件名に揃える(DEBT_NAME_MAX_LENGTH)。重複は許すので一意性は見ない
         && debt.name is string
         && debt.name.size() > 0
         && debt.name.size() <= 60
         && isDebtBalance(debt.balance)
+        // 発生年月(yyyy-MM)は任意入力で、未登録はnull。資産推移グラフがこの月から負債を
+        // 差し引き始める(B1「発生年月からの反映」)ので、形は崩させない。
+        // **当月より後でないことはここでは見ない。** request.timeはUTCで、クライアントが入れるのは
+        // ローカルの年月なので、月をまたぐ前後で正常な入力を弾きうる(updatedAtと同じ制約。
+        // 要件定義書 8.1)。その判定は画面側(src/schemas/debts.ts)が持つ
+        // 月は01〜12だけを通す(DEBT_ORIGINATED_ON_PATTERNと同じ形)。桁だけを見ると
+        // 2020-13のような実在しない月が保存でき、グラフの起点が想定外の位置に入る
+        && (
+          debt.originatedOn == null
+          || (debt.originatedOn is string && debt.originatedOn.matches('^[0-9]{4}-(0[1-9]|1[0-2])$'))
+        )
         // 金利(年利%)と残りの返済期間(総月数)は任意入力。未登録はnullで保存され、
         // 0%・0ヶ月とは区別する(B11「入力項目の補足」)
         && (
@@ -107,6 +163,33 @@ service cloud.firestore {
         && debt.balanceHistory.size() <= 600;
     }
 
+    // 残債の履歴を**過去へ遡って書き換えさせない**ための条件(要件8.1)。書き換えを許すと
+    // 資産推移グラフが過去の時点で別の値を描くようになる。`diff()`はマップ同士の差分を
+    // 返すので、要素を1件ずつ辿らずに書ける。
+    //
+    // 消すのは一切許さない。**触ってよいのは`editableDate`(その保存が最終更新日として
+    // 刻む日)の記録だけ**で、それ以外の日は追加も書き換えもできない。`affectedKeys()`は
+    // 追加・削除・変更のすべてを含むため、これ1つで**実在しなかった過去の日付を捏造して
+    // 差し込む経路**も塞がる。`changedKeys()`は更新前後の両方にあるキーしか含まないので、
+    // そちらだけを見ていると新しいキーの追加が素通りする([B4-6]のレビューで塞いだ穴)。
+    //
+    // 触ってよい日を「最終更新日」に限る理由は、B11が同じ日に2回保存するとその日の記録を
+    // 上書きする作りだから(`buildNextBalanceHistory`。CSV取込が同じ日付を上書きするのと
+    // 同じ冪等な扱い)。一律に禁じると**同じ日に残債を直しての保存し直しが落ちる**。
+    //
+    // 触れるのが最終更新日の記録だけなら、動かせるのは「今まさに保存している日」になる。
+    // 過去の日を動かすには最終更新日もその日に戻す必要があり、それはB11のフォームと
+    // B1の負債サマリに見える形で現れる。
+    //
+    // **追記が「残債の変わった日」だけかはここでは見られない**(直前の記録と比べる必要が
+    // あり、キーの前後関係を辿れない)。そちらは画面側の担保のまま(要件8.1)。
+    //
+    // ルールに変数束縛が無いため`diff()`は2回書く。関数へ切り出しても評価回数は変わらない
+    function isAppendOnlyBalanceHistory(next, current, editableDate) {
+      return next.diff(current).removedKeys().size() == 0
+        && next.diff(current).affectedKeys().hasOnly([editableDate]);
+    }
+
     // FIRE目標の金額(目標資産額・想定年間支出額)。上限は
     // src/frontend/src/constants/fire-goal.ts の FIRE_GOAL_AMOUNT_MAX と揃える。
     // 使っていない方式の欄はnullで保存されるため、nullも許す。
@@ -121,11 +204,99 @@ service cloud.firestore {
       return value == null || (value is number && value > 0 && value <= 100);
     }
 
+    // 毎月の積立額(円)。到達予測で1ヶ月ごとに足す額(B8 FIRE目標設定画面)。
+    // **マイナスを許す** — 取り崩しの局面を表せるようにするため
+    // (docs/screen-requirements-fire-goal.md B8「毎月の積立額」)。未入力はnull。
+    // 0を許すのが目標額(`isFireGoalAmount`)との違いで、「積立なし」は正当な設定。
+    // 幅は絶対値で金額の上限に揃える(桁の打ち間違いを弾く歯止め)
+    function isMonthlyContribution(value) {
+      return value == null
+        || (value is number && value >= -999999999999 && value <= 999999999999);
+    }
+
     // 分類軸(`users/{userId}/categoryAxes`)のドキュメントIDを指す参照。
     // 既定を表すnullを許し、空文字は許さない(どの軸も指さないなら既定のnullで表す)。
     // 上限はFirestoreのドキュメントIDの上限(1500バイト)より十分に小さい値で足りる
     function isCategoryAxisId(value) {
       return value == null || (value is string && value.size() > 0 && value.size() <= 200);
+    }
+
+    // 取引1件の中身(入出金明細CSVから取り込む形)。
+    // フィールドと文字数の上限は docs/transaction-import-requirements.md 3.1 の表、および
+    // src/frontend/src/constants/transactions-import.ts と揃える。
+    //
+    // `hasAll`を書かないのは、下のフィールドごとの`is`検査が欠損も同時に弾くため
+    // (欠けたフィールドは`is string`を満たさない)。`assetSnapshots`と同じ組み方にしてある。
+    //
+    // 中項目・メモは未設定の取引がありうるので空文字を許す(同2.1)。内容・口座・大項目も
+    // 値の非空までは求めない。CSV側が空で返しているものにアプリが名前を与えないため(同6章)
+    function isValidTransaction(transaction) {
+      return transaction.keys().hasOnly(
+          ['date', 'content', 'amount', 'account', 'categoryMajor', 'categoryMinor', 'memo',
+           'isTransfer', 'isCalculationTarget', 'importedAt']
+        )
+        && isIsoDate(transaction.date)
+        // 収入がプラス・支出がマイナスで、符号はCSVのまま保つ(同5章)。したがって範囲は縛らない。
+        //
+        // **`is number`ではなく`is int`にしてある。** 円未満の取引は無い(同2.2)ため、小数が
+        // 現れるのは列がずれているか別のファイルのとき。JS SDKは安全な整数を`integerValue`、
+        // 小数を`doubleValue`で送るので、`is int`が小数だけを弾く。パーサー側も小数を
+        // `invalid-amount`で弾いており、こちらは書き込みを試された場合の歯止めになる
+        && transaction.amount is int
+        && transaction.content is string
+        && transaction.content.size() <= 200
+        && transaction.account is string
+        && transaction.account.size() <= 100
+        && transaction.categoryMajor is string
+        && transaction.categoryMajor.size() <= 40
+        && transaction.categoryMinor is string
+        && transaction.categoryMinor.size() <= 40
+        && transaction.memo is string
+        && transaction.memo.size() <= 1000
+        && transaction.isTransfer is bool
+        && transaction.isCalculationTarget is bool
+        && transaction.importedAt is timestamp
+        && isServerTime(transaction.importedAt);
+    }
+
+    // 取引のドキュメントID(docs/transaction-import-requirements.md 3.2)。
+    // マネーフォワードの`ID`列そのものを使う。文字種と長さは
+    // src/frontend/src/constants/transactions-import.ts の TRANSACTION_ID_PATTERN と揃える。
+    //
+    // **パーサー側だけの検証にしない。** 再取込の冪等性(同4章)は「ドキュメントIDが
+    // マネーフォワードの値そのもの」であることに依存しており、パーサーだけで担保すると
+    // クライアントの実装を信頼した検証になる。SDKを直接叩けば形の崩れたIDのドキュメントが
+    // 作れ、同じ取引が別IDで重複しうる。他のフィールドの制約をパース側とルールの両方に
+    // 置いているのと同じ扱い。
+    //
+    // **`__…__`をここで重ねて弾くことはしない。** Firestore自身がその形式のドキュメントIDを
+    // 拒否するため、ルールで再度見ても防げるものが増えないため。エミュレータへルールを
+    // 迂回して(`Authorization: Bearer owner`)直接書き込んで確かめた結果が次のとおり。
+    //
+    //   ID "aaaa1111"   → 200
+    //   ID "__x__"      → 400 Resource id "__x__" is invalid because it is reserved.
+    //   ID "__"         → 200
+    //   ID "__aaaa1111" → 200
+    //
+    // 拒否されるのは`__.*__`(最短4文字)に一致するものだけで、`__`単体は通る。
+    // パーサー側(src/frontend/src/lib/csv/transaction-csv.ts)は要件3.2の文言どおり前後一致で
+    // 弾いており、Firestoreより厳しい。**書き込みを試す前に止めるためのもの**で、
+    // 「1件でも不正なら1件も取り込まない」(同2.3)を満たすにはそちらに置く必要がある。
+    function isValidTransactionId(transactionId) {
+      return transactionId.matches('^[A-Za-z0-9_-]{1,200}$');
+    }
+
+    // サーバー時刻で書かれた値か(要件8.1)。
+    //
+    // クライアントは`serverTimestamp()`で書いており、そのとき`request.resource.data`に現れる
+    // 値は`request.time`そのものになる。任意の時刻を書かせないための検査で、これが無いと
+    // 取込履歴の並び順やB1の「直近CSV取込日時」を後から好きな値にできる。
+    //
+    // **`createdAt`には作成時だけ使う。** 更新では`createdAt`に既存の値が現れるため
+    // (クライアントが送らなくてもルールにはドキュメント全体が渡る)、更新でも要求すると
+    // 通常の編集が必ず落ちる。
+    function isServerTime(value) {
+      return value == request.time;
     }
 
     // 2FA(TOTP)まで済ませたセッションからのアクセスか(docs/auth-login-requirements.md 3.3)。
@@ -168,6 +339,7 @@ service cloud.firestore {
           && request.resource.data.date == date
           && request.resource.data.total is number
           && request.resource.data.importedAt is timestamp
+          && isServerTime(request.resource.data.importedAt)
           // `byType`は資産種別が動的に増減するマップなので、キーは列挙できない。
           // ルールに繰り返しが無く値をすべて検査することもできないため、
           // 個々の金額が数値であることはパース側(src/lib/csv/asset-balance-csv.ts)で担保する
@@ -176,8 +348,34 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // 入出金明細CSVから取り込んだ取引(docs/transaction-import-requirements.md 3章)。
+      //
+      // ドキュメントIDはマネーフォワードの`ID`列そのもので、同じ`ID`の再取込は上書きになる。
+      // これが再取込の冪等性そのもの(同4章)なので、`update`も許可する。
+      //
+      // **CSV1ファイル単位の制約はここでは担保できない**(要件8.1)。1回の取込で20,000行まで
+      // (`MAX_TRANSACTION_ROWS`)・同一ファイル内で`ID`が重複しないこと・1件でも不正なら
+      // 1件も取り込まないこと(同2.3)は、ルールが1ドキュメントずつ評価する以上パーサー側
+      // (src/frontend/src/lib/csv/transaction-csv.ts)にしか置けない。
+      //
+      // `assetSnapshots`と同じく`create`と`update`を`write`でまとめない(削除では
+      // `request.resource`が存在せず検証式を評価できないため)。
+      match /transactions/{transactionId} {
+        allow read: if canAccessOwnData(userId);
+        allow create, update: if canAccessOwnData(userId)
+          && isValidTransactionId(transactionId)
+          && isValidTransaction(request.resource.data);
+        // 取引を消す画面は無い。マネーフォワード側で削除された取引をアプリから消す手段も
+        // 現状は無く(同10章の検討事項)、必要になった時点でここに許可を書く
+        allow delete: if false;
+      }
+
       // 取込履歴(B2の「直近の取込履歴」)。取り消し・改ざんの余地を残さないよう、
       // 追加と参照だけを許し、更新・削除は禁じる。
+      //
+      // 期間の前後関係(`periodFrom <= periodTo`)と`importedAt`がサーバー時刻であることも、
+      // 形だけの検査から進めて[B4-6]でここに入れた(要件8.1)。改ざんの余地を残さないという
+      // このブロックの方針そのもので、どちらもルールで表せる。
       match /csvImports/{importId} {
         allow read: if canAccessOwnData(userId);
         allow create: if canAccessOwnData(userId)
@@ -192,7 +390,10 @@ service cloud.firestore {
           && request.resource.data.rowCount >= 0
           && isIsoDate(request.resource.data.periodFrom)
           && isIsoDate(request.resource.data.periodTo)
-          && request.resource.data.importedAt is timestamp;
+          // `yyyy-MM-dd`は辞書順が日付順なので、文字列のまま前後関係を見られる
+          && request.resource.data.periodFrom <= request.resource.data.periodTo
+          && request.resource.data.importedAt is timestamp
+          && isServerTime(request.resource.data.importedAt);
         allow update, delete: if false;
       }
 
@@ -206,7 +407,7 @@ service cloud.firestore {
       match /categoryAxes/{axisId} {
         allow read: if canAccessOwnData(userId);
         allow create: if canAccessOwnData(userId)
-          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'propertyValuations', 'createdAt'])
           && request.resource.data.name is string
           // 文字数の上限はsrc/constants/asset-categories.tsのCATEGORY_AXIS_NAME_MAX_LENGTHと揃える
           && request.resource.data.name.size() > 0
@@ -219,9 +420,17 @@ service cloud.firestore {
           // 負債IDの上限は登録できる負債の件数(src/constants/debts.tsのDEBT_MAX_COUNT)と揃える
           && request.resource.data.debtIds is list
           && request.resource.data.debtIds.size() <= 50
-          && request.resource.data.createdAt is timestamp;
+          // 物件は「物件ID→反映方法」のマップ。値がspread/marketValueのどちらかであることは
+          // ルールでは検査しきれないため(byType・balanceHistoryと同じ制約)、パース側
+          // (src/schemas/asset-categories.ts)で担保し、ここでは件数の上限だけを見る。
+          // 上限は CATEGORY_AXIS_PROPERTY_MAX_COUNT と揃える(選択数の上限であって、
+          // 物件の登録件数そのものは縛らない)
+          && request.resource.data.propertyValuations is map
+          && request.resource.data.propertyValuations.size() <= 50
+          && request.resource.data.createdAt is timestamp
+          && isServerTime(request.resource.data.createdAt);
         allow update: if canAccessOwnData(userId)
-          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['name', 'assetTypeNames', 'debtIds', 'propertyValuations', 'createdAt'])
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.name.size() <= 40
@@ -229,19 +438,32 @@ service cloud.firestore {
           && request.resource.data.assetTypeNames.size() <= 50
           && request.resource.data.debtIds is list
           && request.resource.data.debtIds.size() <= 50
+          && request.resource.data.propertyValuations is map
+          && request.resource.data.propertyValuations.size() <= 50
           // 登録順が分類別内訳の色スロットに対応するため、登録日時は編集で変えさせない(DESIGN.md 3章)
           && request.resource.data.createdAt == resource.data.createdAt;
         // 集計対象が1件以上割り当てられた分類の削除は禁止する(画面の要件そのものを
         // ルール側でも担保する。クライアント側の判定はscreen-requirements-dashboard.md B4参照)。
         // 先に編集で割り当てを解除すれば削除できるようになる。
         //
-        // **負債だけが割り当てられた分類軸も削除できない。** 集計対象が割り当てられた軸を
-        // 消させないという制約を資産・負債で分ける理由が無いため(B4の遷移条件)。
-        // `debtIds`は後から足したフィールドなので、持たない既存のドキュメントでも
-        // 評価が落ちないよう`get`の既定値で受ける(持たない=負債を差し引かない、と同じ意味)。
+        // **見るのは`assetTypeNames`だけで、`debtIds`と`propertyValuations`は見ない。**
+        // 負債だけ・物件だけが割り当てられた分類軸を削除させない方針(B4の遷移条件)は
+        // 変わっていないが、その判定をここでは正しく行えないため、意図的に外してある(B4-3)。
+        //
+        // 理由は、負債の参照が「実際に集計対象になっているか」が別コレクション
+        // (`debts`)の存在に依存すること。B11は負債の削除を許しているので、削除済みの負債を
+        // 指したままの参照は正常に起こりうる状態で、その軸は何も集計していない。ところが
+        // ルールには繰り返しが無く、可変長の`debtIds`を1件ずつ`exists()`で確かめることは
+        // 書けない。件数だけで代用すると、**何も集計していない分類軸の削除を永久に
+        // 拒否する**ことになり、制約の理由(集計対象があるから消せない)と実態が食い違う。
+        //
+        // 正しく評価できない条件を近似で置くくらいなら、評価できる部分だけをルールが
+        // 担保し、負債側の判定はクライアント(DeleteCategoryAxisDialog)に任せる。
+        // この緩和で通るようになるのは「生きている負債を参照したままの軸を、画面を経由せず
+        // 直接消す」経路だけで、負債そのものは消えない。参照が消えた側の影響は既に定義済み
+        // (B1は分類軸が消えるだけ、B8の`achievementAxisId`は既定へフォールバックする)。
         allow delete: if canAccessOwnData(userId)
-          && resource.data.assetTypeNames.size() == 0
-          && resource.data.get('debtIds', []).size() == 0;
+          && resource.data.assetTypeNames.size() == 0;
       }
 
       // 負債(B11 負債入力画面)。マネーフォワードが負債をCSVに出力しないため、
@@ -251,16 +473,35 @@ service cloud.firestore {
       // B11の要件そのもので(「削除」ボタン + 保存時の確認ダイアログ)、分類軸から
       // 参照されているだけの負債も消せる。参照が残った分類軸は、その負債を集計対象から
       // 外して計算する(B1「負債を含む分類軸の集計」)。
+      //
+      // **画面側だけが担保している制約がある**(要件8.1)。登録できるのは50件まで
+      // (`DEBT_MAX_COUNT`。ルールはコレクションの件数を数えられない)、`updatedAt`が保存した日
+      // そのものであること(形だけ検査している)、`balanceHistory`の扱い(下記)。
+      //
+      // `balanceHistory`は2つに分かれる。**過去の記録を書き換えない・消さない・過去の日付を
+      // 後から差し込まないことは[B4-6]で`update`側に入れた**(`isAppendOnlyBalanceHistory()`。
+      // `diff()`の`removedKeys()`が0件、`affectedKeys()`が最終更新日の記録だけ)。
+      // **追記するのが残債の変わった日だけであることは書けない** — 追記されたキーの値を
+      // 直前の記録と比べる必要があり、キーの前後関係を辿れないため、そちらは画面側の担保のまま。
       match /debts/{debtId} {
         allow read: if canAccessOwnData(userId);
         allow create: if canAccessOwnData(userId)
           && isValidDebt(request.resource.data)
-          && request.resource.data.createdAt is timestamp;
+          && request.resource.data.createdAt is timestamp
+          && isServerTime(request.resource.data.createdAt);
         // B11のフォームの並び順(登録順)が保存のたびに入れ替わらないよう、
         // 登録日時は編集で変えさせない(categoryAxes・propertiesと同じ扱い)
         allow update: if canAccessOwnData(userId)
           && isValidDebt(request.resource.data)
-          && request.resource.data.createdAt == resource.data.createdAt;
+          && request.resource.data.createdAt == resource.data.createdAt
+          // 残債の履歴は消させず、触れるのを**その保存が最終更新日として刻む日の記録だけ**に
+          // 限る。過去へ遡っての書き換えも、過去の日付の捏造も塞がる(条件と理由は
+          // `isAppendOnlyBalanceHistory()`の定義に書いてある)
+          && isAppendOnlyBalanceHistory(
+            request.resource.data.balanceHistory,
+            resource.data.balanceHistory,
+            request.resource.data.updatedAt
+          );
         allow delete: if canAccessOwnData(userId);
       }
 
@@ -274,24 +515,41 @@ service cloud.firestore {
         // create/updateで同じ形を要求する
         allow create, update: if canAccessOwnData(userId)
           && request.resource.data.keys().hasOnly(
-            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'updatedAt']
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'monthlyContribution', 'updatedAt']
           )
           && request.resource.data.keys().hasAll(
-            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'updatedAt']
+            ['mode', 'targetAmount', 'annualExpense', 'withdrawalRate', 'achievementAxisId', 'monthlyContribution', 'updatedAt']
           )
           // 有効な設定方式。src/frontend/src/types/fire-goal.d.ts の`FireGoalMode`と揃える
           && request.resource.data.mode in ['direct', 'reverse']
-          // 使っていない方式の欄はnullで保存される。必須になるのは有効な方式の欄だけで、
-          // その判定は画面側(src/frontend/src/schemas/fire-goal.ts)が行う
+          // 使っていない方式の欄はnullで保存される。**方式ごとの必須は[B4-6]でここに入れた**
+          // (それまでは画面側だけの担保だった)。形の検査(nullを許す)と、選んだ方式で
+          // 必須になる欄の検査を分けて書く。後者が無いと、どの欄も空の目標が保存でき、
+          // 達成率(現在資産 ÷ 目標資産)も逆算(年間支出額 ÷ 係数)も出せない状態を作れる。
+          // 画面側(src/frontend/src/schemas/fire-goal.ts)と同じ判定をここにも置いてある
           && isFireGoalAmount(request.resource.data.targetAmount)
           && isFireGoalAmount(request.resource.data.annualExpense)
           && isWithdrawalRate(request.resource.data.withdrawalRate)
+          && (
+            request.resource.data.mode != 'direct'
+            || request.resource.data.targetAmount != null
+          )
+          && (
+            request.resource.data.mode != 'reverse'
+            || (
+              request.resource.data.annualExpense != null
+              && request.resource.data.withdrawalRate != null
+            )
+          )
           // 達成度の対象分類(B4の分類軸ID)。既定の「総資産」はnullで保存される。
           // 分類軸が実在するかはここでは確かめられない(ルールから他のドキュメントを
           // 引くと読み取りが増え、B4での削除と競合もする)。存在しない軸を指したままでも
           // 参照側が既定へフォールバックする作りなので、ここは形だけを見る
           && isCategoryAxisId(request.resource.data.achievementAxisId)
-          && request.resource.data.updatedAt is timestamp;
+          // 毎月の積立額(到達予測の入力)。未入力はnullで保存される
+          && isMonthlyContribution(request.resource.data.monthlyContribution)
+          && request.resource.data.updatedAt is timestamp
+          && isServerTime(request.resource.data.updatedAt);
         // FIRE目標を消す画面は無い。方式の切替も上書きで表せる
         allow delete: if false;
       }
@@ -310,10 +568,12 @@ service cloud.firestore {
           // キーを列挙できない。ルールに繰り返しが無く値をすべて検査することもできないため、
           // 個々の想定利回り・リスクレベルの形はパース側(src/frontend/src/schemas/assumptions.ts)
           // で担保し、ここでは件数だけ上限で歯止めをかける(`byType`と同じ扱い)。
+          // 値域(想定利回り±100%・リスクレベルの3値)も同じ理由で画面側だけの担保になる(要件8.1)。
           // 上限は src/frontend/src/constants/assumptions.ts の ASSUMPTION_ENTRIES_MAX と揃える
           && request.resource.data.entries is map
           && request.resource.data.entries.size() <= 200
-          && request.resource.data.updatedAt is timestamp;
+          && request.resource.data.updatedAt is timestamp
+          && isServerTime(request.resource.data.updatedAt);
         // 想定利回り・リスクを消す画面は無い。個々の資産種別の設定解除は上書きで表せる
         allow delete: if false;
       }
@@ -324,16 +584,34 @@ service cloud.firestore {
         allow read: if canAccessOwnData(userId);
         allow create: if canAccessOwnData(userId)
           && isValidProperty(request.resource.data)
-          && request.resource.data.createdAt is timestamp;
+          && request.resource.data.createdAt is timestamp
+          && isServerTime(request.resource.data.createdAt);
         // 一覧の並び順(登録順)が編集のたびに入れ替わらないよう、登録日時は編集で変えさせない
         // (categoryAxesと同じ扱い)。`updateDoc`はドキュメント全体に対して評価されるため、
-        // クライアントが`createdAt`を送らなくても既存の値がここに現れる
+        // クライアントが`createdAt`を送らなくても既存の値がここに現れる。
+        // なお`updatedAt`が保存した日そのものであることは見ていない(debtsと同じ。要件8.1)
         allow update: if canAccessOwnData(userId)
           && isValidProperty(request.resource.data)
-          && request.resource.data.createdAt == resource.data.createdAt;
-        // 物件を削除する画面はまだ無い(B5〜B7の要件に削除は含まれない)。
-        // 必要になった時点でここに許可を書く
-        allow delete: if false;
+          && request.resource.data.createdAt == resource.data.createdAt
+          // 時価・ローン残高の履歴は消させず、触れるのを**その保存が最終更新日として刻む日の
+          // 記録だけ**に限る(debtsの残債の履歴と同じ関数・同じ理由)。B7は履歴のうち
+          // その日のキーだけを書くので、この条件がそのまま通る。
+          //
+          // **保存済み側は`get()`で既定値を与えて読む。** B4-8より前に登録された物件は
+          // `valueHistory`を持たず、素で参照するとエラーになって更新が一切通らなくなる
+          // (既存の物件を編集できなくなる)。既定の空マップと比べれば、初回の保存は
+          // 「その日の記録を1件追加した」形になって条件を満たす
+          && isAppendOnlyBalanceHistory(
+            request.resource.data.valueHistory,
+            resource.data.get('valueHistory', {}),
+            request.resource.data.updatedAt
+          );
+        // 削除はB6の「削除」から行う(B6-1)。分類軸から参照されているだけの物件も消せる —
+        // 参照が残った分類軸は、その物件を集計対象から外して計算する
+        // (B4「集計対象に不動産を含める」)。売却した物件を整理できなくなるほうが困るため、
+        // 負債(debts)と同じく参照を理由に削除を止めない。
+        // 時価・ローン残高の履歴は同じドキュメント内のマップなので一緒に消える
+        allow delete: if canAccessOwnData(userId);
       }
     }
 

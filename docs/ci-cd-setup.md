@@ -377,6 +377,30 @@ for PROJECT_ID in fire-fire-dev fire-fire-prod; do
 done
 ```
 
+### Cloud Functions 用のシークレット（`CONTACT_RECIPIENT_EMAIL`）
+
+お問い合わせフォーム（[screen-requirements-public.md](./screen-requirements-public.md) A11）の**受信先メールアドレス**を登録する。**登録しないと functions のデプロイが「シークレットが存在しない」で失敗する。**
+
+```bash
+firebase functions:secrets:set CONTACT_RECIPIENT_EMAIL --project fire-fire-dev
+```
+
+- **秘密の値だからではなく、リポジトリに置けない値だからここに置く。** 開発者本人のアドレスで、このリポジトリは公開されている（ルートの `CLAUDE.md`）。`IDENTITY_PLATFORM_WEB_API_KEY` と同じ理由・同じ置き場にする
+- **Resend の共有ドメインから送るため、宛先は Resend アカウントの登録アドレスに限られる**（13 章）。ここに別のアドレスを入れると送信が拒否される。独自ドメインの検証を通すまではその制約のまま
+- dev / prod それぞれのプロジェクトで実行する。同じアドレスでよい（どちらから来たかは件名の `[dev]` で見分ける）
+- 未設定のまま呼ばれた場合、callable は `not-configured` を返し画面は再送を促す。ログに `CONTACT_RECIPIENT_EMAILが未設定` が出る
+
+デプロイ用サービスアカウントへの権限付与も同様に必要。
+
+```bash
+for PROJECT_ID in fire-fire-dev fire-fire-prod; do
+  gcloud secrets add-iam-policy-binding CONTACT_RECIPIENT_EMAIL \
+    --project="$PROJECT_ID" \
+    --member="serviceAccount:github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.admin"
+done
+```
+
 ### Artifact Registry のクリーンアップポリシー（手動設定は不要）
 
 **この節に手動作業は無い。** [deploy.yml](../.github/workflows/deploy.yml) の「Artifact Registry のクリーンアップポリシーを設定する」ステップが毎回設定するので、通常は読み飛ばしてよい。以下は、なぜそのステップが要るのかと、新しいプロジェクト／リージョンを足したときに何が起きるかの説明。
@@ -420,13 +444,15 @@ Upgrade to GitHub Pro or make this repository public to enable this feature.
   - `claude-review` は**含めない**（レビューはコメントのみで、人間の判断を残す）
   - **fork からの PR では `frontend` が必ず失敗する。** Secrets が渡らないためで、ビルドは `NEXT_PUBLIC_FIREBASE_*` を要求する（[3 章](#3-github-の-secrets--variables)）。必須チェックにしている以上そのままではマージできないが、これは意図した状態であり、外部からの PR を取り込む必要が出たときに改めて考える
   - `claude-review` は fork からの PR では**スキップ**される（失敗ではない）。必須チェックに含めていないのでマージ判定には影響しない。レビューする手順は [3 章](#外部prを手動でレビューする)
-- 「Require branches to be up to date before merging」を有効化
+- 「Require branches to be up to date before merging」は **`develop` だけ有効にし、`main` では有効にしない**
+  - リリース PR をマージすると、そのマージコミットは `main` にだけ残り `develop` へは戻さない。**`develop` が `main` の先端を含まない状態はリリースのたびに再発する**（2026-08-16 時点で 17 件）。`main` で有効にしていると、リリース PR を出すたびに `main` を `develop` へ取り込むことになり、STG へ出したものと `develop` の先端がずれる（[開発フロー](./development-workflow.md) 10 章）
+  - 外して失うものは小さい。このチェックが見ているのは「PR を作ったあとに base が進み、その組み合わせでは壊れる」場合だが、`main` が進むのはリリースのマージのときだけで、中身は必ず `develop` を通って STG で動いたものである。**CI 4 ジョブの必須は外さない**
 - Force push / ブランチ削除を禁止
   - force push はローカルでも `.claude/settings.json` の `PreToolUse` フックが止めている。こちらはサーバー側の裏付けで、二重に掛ける
 - 「Do not allow bypassing the above settings」（管理者にも適用）
   - 入れないと、リポジトリ管理者である開発者本人は既定ですべてを迂回できる。1 人開発なので迂回しない運用も成り立つが、規律をツール側に持たせる方針（`gh pr merge` の deny、force push のフック）と揃える
 - 「Require approvals」は**設定しない**。1 人開発では自分の PR を自分で承認できず、マージが不可能になる
-- `main` は加えて、`develop` からの PR のみ受け付ける運用とする
+- `main` は加えて、**`develop` か、`develop` から切ったリリースブランチ `release/*` からの PR のみ**受け付ける運用とする（[開発フロー](./development-workflow.md) 10 章。リリースブランチは差分が大きい回の例外で、`main` の過去のリリースマージを `develop` を汚さずに取り込むためにも使う）
 
 ### マージできるユーザーを名指しで限定することについて
 
@@ -670,13 +696,85 @@ Functions deploy had errors with the following functions:
 gcloud services list --enabled --project=fire-fire-dev | grep identitytoolkit
 ```
 
-## 14. 今後の検討事項（オープン課題）
+## 14. サインアップ許可リストの運用（ベータ期間中）
+
+ベータ期間中は、あらかじめ承認したメールアドレスだけがアカウントを作成できる（[auth-login-requirements.md](./auth-login-requirements.md) 3.10）。判定は Blocking Function `restrictSignUpToAllowlist` が行い、**承認の操作は `signupAllowlist` へのドキュメント追加だけ**である（コンソール、または REST API）。
+
+**この節の作業はコードのデプロイでは済まない。** 許可リストは Firestore のデータであり、リポジトリには入らない。
+
+### 承認する（招待する）
+
+Firebase コンソール → Firestore Database → コレクション `signupAllowlist` に、**ドキュメント ID を招待するメールアドレス**としてドキュメントを1件作る。
+
+- **ドキュメント ID は必ず小文字・前後の空白なしにする。** 正規化されるのは**サインアップ時に入力されたアドレスだけ**で（`normalizeEmail`）、照合は正規化後の文字列を ID とする 1 件取得である。**Firestore のドキュメント ID は大文字小文字を区別する**ため、`Taro@Example.com` で登録すると `taro@example.com` の照合にヒットせず、招待した本人が登録できない
+- **フィールドは判定に使わない。** ドキュメントが存在すること自体が承認の印である。誰をいつ招待したかを残したい場合は `note` / `invitedAt` のような任意のフィールドを足してよい
+- **プロジェクトごとに別のリストになる。** `fire-fire-dev`（STG）と `fire-fire-prod`（本番）の両方で有効なので、**開発用のテストアカウントを作るには dev 側のリストにもそのアドレスを入れる**
+
+#### コンソールを使わずに追加する
+
+`gcloud` に Firestore のドキュメントを操作するコマンドはない（`gcloud firestore` はデータベース・インデックス・バックアップの管理だけで、`gcloud firestore documents` は存在しない）。CLI から入れるなら Firestore の REST API を直接叩く。
+
+```bash
+curl -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "Content-Type: application/json" "https://firestore.googleapis.com/v1/projects/fire-fire-dev/databases/(default)/documents/signupAllowlist?documentId=taro.yamada%40example.com" -d '{"fields":{}}'
+```
+
+- **`documentId` はクエリパラメータなので、記号をパーセントエンコードする。** `@` → `%40`、そして **`+` → `%2B`（クエリ文字列の `+` は半角スペースとしてデコードされるため、そのまま送ると `taro yamada@example.com` のような別物のドキュメントが黙って出来る）**。エンコード漏れは 400 にならず「作成には成功したが誰にもマッチしない ID」になるので、**作成後に一覧して ID を目視する**
+- **アドレスは小文字にしてから URL に載せる。** 上記のとおり大文字の ID は照合にヒットしない
+- `{"fields":{}}` はフィールドを持たないドキュメントになる。存在自体が承認の印なので、これで足りる。記録を残す場合は `{"fields":{"note":{"stringValue":"ベータ招待"},"invitedAt":{"timestampValue":"2026-08-15T00:00:00Z"}}}` のように書く
+- **同じ ID が既にあると 409 `ALREADY_EXISTS` で失敗する。** 上書きにならないので、重複追加で招待の記録を消してしまう事故は起きない
+- 実行には対象プロジェクトへの `datastore.user` 相当の権限が要る。`firestore.rules` はこのコレクションをクライアントに対して全面的に閉じているが、**REST API を管理者の資格情報で叩く経路はルールを通らない**ので、この手順は成立する
+
+登録後の確認（ID の一覧）:
+
+```bash
+curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" "https://firestore.googleapis.com/v1/projects/fire-fire-dev/databases/(default)/documents/signupAllowlist?pageSize=100" | python3 -c "import json,sys; print(*[d['name'].split('/')[-1] for d in json.load(sys.stdin).get('documents',[])], sep='\n')"
+```
+
+### 承認を取り消す
+
+ドキュメントを削除する。**既に作成済みのアカウントには影響しない** — このリストが効くのはアカウント作成の瞬間だけである。作成済みのアカウントを止めたい場合は、コンソールでそのユーザーを無効化する。
+
+CLI から消す場合は同じ URL に `DELETE` を送る（`documentId` はクエリではなくパスの一部になる点に注意）。**パスの `+` は半角スペースにデコードされない**が、`%2B` と書いても同じ文字を指すので、作成時と同じようにエンコードしておくほうが取り違えない。
+
+```bash
+curl -X DELETE -H "Authorization: Bearer $(gcloud auth print-access-token)" "https://firestore.googleapis.com/v1/projects/fire-fire-dev/databases/(default)/documents/signupAllowlist/taro.yamada%40example.com"
+```
+
+### 締め出されたときの逃げ道
+
+**Blocking Functions は Admin SDK・コンソールからのユーザー作成では発火しない。** リストの設定を誤っても、コンソールからユーザーを直接作る手段は残る。
+
+> **この挙動は初回のデプロイ後に `fire-fire-dev` で実際に確かめる。** 前提が外れていた場合、リストの誤設定から復旧できなくなるため（3.10 に同じ注記がある）。
+
+### ベータを終えるとき
+
+この制限は恒久的な仕様ではない。`noindex` の解除・A0 の「現在は招待制」の記述と同じタイミングで外す（[X4](https://trello.com/c/8wpkp9Gt)）。
+
+**順序を守る。先に手動で関数を削除し、そのあとで export を落とす。**
+
+```bash
+# 1. プロジェクトごとに手動で削除する（対話実行。dev と prod の両方）
+firebase functions:delete restrictSignUpToAllowlist \
+  --region asia-northeast1 --project fire-fire-dev
+
+# 2. src/backend/src/index.ts から export を落として、通常どおり develop → main へ流す
+```
+
+**逆の順序にするとデプロイが中断する。** export を先に落として push すると、ソースから消えた関数が本番に残っている状態になる。`deploy.yml` の `firebase deploy` は `--non-interactive` で、かつ **`--force` を意図的に付けていない**（8 章。`--force` はソースから消えた関数の削除確認までスキップするため）。この組み合わせでは firebase-tools が削除の確認を出せず、**`FirebaseError` を投げてデプロイを中断する**（`Aborting because deletion cannot proceed in non-interactive mode`）。
+
+デプロイのステップが落ちるとジョブが止まり、**後続の App Hosting ロールアウトごと飛ぶ**（8 章の Artifact Registry の件と同じ壊れ方で、フロントエンドだけ古いまま残る）。回復はできる — エラーが表示するとおり手動で削除してワークフローを再実行すればよい — が、本番のデプロイを一度赤にしてから気づくことになる。
+
+> この挙動は firebase-tools の `lib/deploy/functions/prompts.js`（`promptForFunctionDeletion`）で確かめられる。`options.force` が真なら確認を飛ばして削除し、偽かつ `options.nonInteractive` なら `firebase functions:delete` のコマンドを添えて `FirebaseError` を投げる。
+
+**Firestore のコレクションを空にする形では外さない。** 空のリストは「誰も承認されていない」という意味になり、全員が拒否される。関数を消したあとであれば、コレクションは残しても消してもよい。
+
+## 15. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
 - `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
-## 15. 参考リンク
+## 16. 参考リンク
 
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)

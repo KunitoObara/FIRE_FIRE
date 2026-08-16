@@ -268,3 +268,51 @@ export const MFA_RESET_MESSAGES: Record<MfaResetFailureReason, string> = {
   unavailable: FUNCTIONS_UNAVAILABLE_MESSAGE,
   unknown: "2段階認証を解除できませんでした。時間をおいて再度お試しください。",
 };
+
+/** 「アカウントの削除」セクション(docs/auth-login-requirements.md 3.11) */
+export const ACCOUNT_DELETION_TITLE = "アカウントの削除";
+export const ACCOUNT_DELETION_DESCRIPTION =
+  "アカウントと、取り込んだ資産・入出金・不動産・負債のデータをすべて削除します。削除すると元に戻せません。";
+export const ACCOUNT_DELETION_BUTTON_LABEL = "アカウントを削除する";
+
+/**
+ * パスワードでのログインが無いアカウント(Googleのみ)に出す注記。
+ *
+ * 本人確認をパスワードで行う以上、この画面からは削除できない
+ * (docs/auth-login-requirements.md 3.3の他の操作と同じ制約)。**できない理由と、
+ * 代わりにどうすればよいかの両方を書く** — ボタンを無効化するだけでは手詰まりに見える。
+ */
+export const ACCOUNT_DELETION_PASSWORD_REQUIRED_NOTICE =
+  "パスワードでのログインを設定していないアカウントは、この画面からは削除できません。お問い合わせ先からご連絡ください(お問い合わせ先は現在準備中です)。";
+
+/** 削除の確認ダイアログ */
+export const ACCOUNT_DELETION_DIALOG_TITLE = "アカウントを削除しますか?";
+export const ACCOUNT_DELETION_DIALOG_DESCRIPTION =
+  "アカウントと、取り込んだ資産・入出金・不動産・負債のデータをすべて削除します。この操作は元に戻せません。確認のため、登録メールアドレスとパスワードを入力してください。";
+export const ACCOUNT_DELETION_DIALOG_EMAIL_LABEL = "登録メールアドレス";
+export const ACCOUNT_DELETION_DIALOG_CONFIRM_LABEL = "完全に削除する";
+export const ACCOUNT_DELETION_DIALOG_SUBMITTING_LABEL = "削除中...";
+
+/**
+ * 削除できなかったときのメッセージ。
+ *
+ * `data-deletion-failed`と`account-deletion-failed`で文言を分ける。前者はアカウントが
+ * 残っているのでそのままやり直せるが、後者はデータだけ消えた状態で、**やり直しが要ることを
+ * 伝えないと「消えたのか残ったのか分からない」状態になる**(同3.11)。
+ */
+export const ACCOUNT_DELETION_MESSAGES: Record<AccountDeletionFailureReason, string> = {
+  "signed-out": ACCOUNT_SIGNED_OUT_MESSAGE,
+  "password-not-linked": ACCOUNT_DELETION_PASSWORD_REQUIRED_NOTICE,
+  "email-mismatch": "登録メールアドレスと一致しません。",
+  // 画面は未入力を先に弾くため、通常はここに来ない
+  "password-required": "パスワードを入力してください。",
+  "invalid-credential": "パスワードが正しくありません。",
+  "too-many-requests": TOO_MANY_REQUESTS_MESSAGE,
+  "data-deletion-failed":
+    "データを削除できませんでした。アカウントは削除していません。時間をおいて再度お試しください。",
+  "account-deletion-failed":
+    "データは削除しましたが、アカウントを削除できませんでした。お手数ですが、もう一度削除をお試しください。",
+  "configuration-error": FIREBASE_CONFIGURATION_MESSAGE,
+  unavailable: FUNCTIONS_UNAVAILABLE_MESSAGE,
+  unknown: "アカウントを削除できませんでした。時間をおいて再度お試しください。",
+};

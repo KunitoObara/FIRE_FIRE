@@ -25,6 +25,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "FIRE-FIRE",
   description: "パーソナルFIRE資産管理アプリ",
+  /*
+    ベータ版・単一ユーザー運用の間は検索流入を集めない(docs/screen-requirements-public.md 2章)。
+    **A0だけでなくサイト全体に掛ける** — A0にだけ掛けると、A1 サインアップ画面などが単独で
+    インデックスされうる。トップページが検索に出ないのに登録画面だけが出る状態は、掛けないより悪い。
+    ルートレイアウトに置くのは、これがサイト内の全ページに継承される唯一の場所であるため。
+
+    外すのは「正式公開」の判断とセットで行う([X4] https://trello.com/c/8wpkp9Gt)。
+    なお`noindex`はクロールの禁止ではない。ログイン後のデータを守っているのは`firestore.rules`と
+    認証であって、この設定ではない。
+
+    `follow`は指定しない(出力は`noindex`のみ)。要件とモックが求めているのはインデックスの
+    抑止だけで、リンクを辿らせない理由が無いため。
+  */
+  robots: { index: false },
 };
 
 /**

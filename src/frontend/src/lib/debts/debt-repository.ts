@@ -48,6 +48,7 @@ const toDebt = (id: string, data: unknown): Debt | undefined => {
     id,
     name: parsed.data.name,
     balance: parsed.data.balance,
+    originatedOn: parsed.data.originatedOn,
     interestRate: parsed.data.interestRate,
     repaymentMonths: parsed.data.repaymentMonths,
     updatedAt: parsed.data.updatedAt,
@@ -193,6 +194,9 @@ export const saveDebts = async (
       const fields = {
         name: input.name,
         balance: input.balance,
+        // 未登録は`null`で書く。`firestore.rules`は許可キーと必須キーの両方で見ているので、
+        // 未入力でもキー自体は必ず書き込む(`interestRate`・`repaymentMonths`と同じ扱い)
+        originatedOn: input.originatedOn,
         interestRate: input.interestRate,
         repaymentMonths: input.repaymentMonths,
         // 最終更新日は入力項目ではなく保存時に自動で付ける(B7の時価・ローン残高と同じ扱い)。

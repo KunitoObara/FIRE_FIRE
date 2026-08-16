@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- ベータ期間中は検索エンジンに出さない(screen-requirements-public.md 2章)。
+     実装ではA0だけでなくサイト全体に掛ける — A0にだけ掛けると、A1 サインアップ画面が
+     単独でインデックスされうるため。外すのは正式公開の判断とセット。 -->
+<meta name="robots" content="noindex" />
+<title>A0 サービストップページ | FIRE-FIRE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="common.css" />
+<style>
+  /* A0だけで使う装飾。ヘッダー・フッターは common.css の .public-* を共有する。 */
+
+  .hero {
+    background:
+      radial-gradient(60rem 30rem at 50% -10rem, hsl(var(--primary) / 0.10), transparent 70%),
+      hsl(var(--background));
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .hero-inner {
+    max-width: 64rem;
+    margin: 0 auto;
+    padding: 4.5rem 1.5rem 3.5rem;
+    text-align: center;
+  }
+
+  .hero-title {
+    font-size: 2.25rem;
+    line-height: 1.35;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  @media (min-width: 768px) {
+    .hero-title { font-size: 2.75rem; }
+  }
+
+  /* ベータ版であることの表示その1。もう1つは「ベータ版について」セクション。
+     バッジだけだと読み飛ばされ、セクションだけだと下までスクロールした人にしか
+     届かないため2箇所に置く(screen-requirements-public.md A0)。 */
+  .beta-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background-color: hsl(var(--primary) / 0.10);
+    color: hsl(var(--primary));
+    border: 1px solid hsl(var(--primary) / 0.25);
+  }
+
+  .btn-lg {
+    height: 2.875rem;
+    padding: 0 1.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .feature-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .feature-card {
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+  }
+
+  .feature-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.625rem;
+    background-color: hsl(var(--primary) / 0.10);
+    color: hsl(var(--primary));
+    margin-bottom: 0.875rem;
+  }
+
+  .step-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
+  .section-heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: -0.01em;
+  }
+
+  /* ヒーローの画面イメージ。実データのスクリーンショットは置けない(公開リポジトリ)ため、
+     ダミー値で描いたB1の簡略版を置く。実装では画像でもHTMLでもよい
+     (screen-requirements-public.md A0「画面イメージの扱い」)。 */
+  .preview-frame {
+    margin: 2.5rem auto 0;
+    max-width: 52rem;
+    border-radius: calc(var(--radius) + 4px);
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    box-shadow: 0 20px 40px -24px rgb(0 0 0 / 0.35);
+    overflow: hidden;
+    text-align: left;
+  }
+
+  .preview-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid hsl(var(--border));
+    background-color: hsl(var(--muted));
+  }
+
+  .preview-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: hsl(var(--border));
+  }
+
+  /* プレビューの中身。B1の app-shell(サイドバー + 本文)を縮めたもの。
+     文字は本文より小さくするので、.app-* のクラスをそのまま使わず専用に持つ。 */
+  .preview-app {
+    display: flex;
+    background-color: hsl(var(--muted));
+  }
+
+  .preview-sidebar {
+    width: 9rem;
+    flex-shrink: 0;
+    padding: 0.75rem 0.5rem;
+    background-color: hsl(var(--card));
+    border-right: 1px solid hsl(var(--border));
+    display: none;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  /* 狭い幅ではサイドバーを畳む。プレビューとして読ませたいのは本文側のグラフのため。 */
+  @media (min-width: 640px) {
+    .preview-sidebar { display: flex; }
+  }
+
+  .preview-brand {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.5rem 0.625rem;
+  }
+
+  .preview-nav-item {
+    font-size: 0.6875rem;
+    color: hsl(var(--muted-foreground));
+    padding: 0.3125rem 0.5rem;
+    border-radius: calc(var(--radius) - 2px);
+  }
+
+  .preview-nav-active {
+    background-color: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+    font-weight: 600;
+  }
+
+  .preview-body {
+    flex: 1;
+    min-width: 0;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .preview-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .preview-select {
+    font-size: 0.6875rem;
+    padding: 0.1875rem 0.5rem;
+    border-radius: calc(var(--radius) - 2px);
+    border: 1px solid hsl(var(--input));
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  .preview-tabs {
+    display: flex;
+    gap: 0.125rem;
+  }
+
+  .preview-tab {
+    font-size: 0.6875rem;
+    padding: 0.1875rem 0.375rem;
+    color: hsl(var(--muted-foreground));
+    border-bottom: 2px solid transparent;
+  }
+
+  .preview-tab-active {
+    color: hsl(var(--primary));
+    border-bottom-color: hsl(var(--primary));
+    font-weight: 600;
+  }
+
+  .preview-card-title {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .preview-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.625rem;
+  }
+
+  @media (min-width: 640px) {
+    .preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* 横軸の年月。B1と同じく目盛りの下に等間隔で並べる */
+  .preview-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.125rem;
+    font-size: 0.625rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .preview-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    margin-top: 0.5rem;
+    font-size: 0.625rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .preview-legend li,
+  .preview-breakdown li,
+  .preview-goal li {
+    display: flex;
+    align-items: center;
+    gap: 0.3125rem;
+  }
+
+  /* 凡例の色見本。B1と同じく丸で、負債だけ斜線のパターンを敷く */
+  .preview-swatch {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+
+  .preview-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.625rem;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .preview-pct {
+    margin-left: auto;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .preview-net {
+    margin-top: 0.5rem;
+    padding-top: 0.375rem;
+    border-top: 1px solid hsl(var(--border));
+    font-size: 0.625rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .preview-goal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.625rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* ゲージの現在資産額に添える対象分類名。B1では金額より一段小さく薄い扱いにしてある */
+  .preview-axis-note {
+    font-size: 0.5625rem;
+    color: hsl(var(--muted-foreground));
+    opacity: 0.8;
+  }
+
+  .beta-note {
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    padding: 1.75rem;
+  }
+
+  .cta-band {
+    background-color: hsl(var(--secondary));
+    border-top: 1px solid hsl(var(--border));
+    border-bottom: 1px solid hsl(var(--border));
+  }
+</style>
+</head>
+<body>
+
+<div class="public-shell">
+
+  <!-- ヘッダー(screen-requirements-public.md A0 セクション構成 1)。
+       ログイン中は「ログイン」「サインアップ」を「ダッシュボードへ」1つに差し替える。
+       下の ?signedIn=1 は静的ファイルで認証状態を持てないモック都合の代用で、
+       実装では踏襲しない(A4モックの ?loggedOut=1 と同じ扱い)。
+       実装では認証状態が確定するまでどちらの導線も描かない — 先に未ログイン用を
+       描くと、ログイン中のユーザーに一瞬「ログイン」ボタンが見えるため。 -->
+  <header class="public-header">
+    <a class="public-logo" href="a0-top.html">
+      <span class="public-logo-mark">FF</span>
+      FIRE-FIRE
+    </a>
+
+    <nav class="public-nav" id="nav-signed-out">
+      <a class="btn btn-ghost btn-sm" href="a4-login.html">ログイン</a>
+      <a class="btn btn-primary btn-sm" href="a1-signup.html">サインアップ</a>
+    </nav>
+
+    <nav class="public-nav hidden" id="nav-signed-in">
+      <a class="btn btn-primary btn-sm" href="b1-dashboard.html">ダッシュボードへ</a>
+    </nav>
+  </header>
+
+  <main class="public-main">
+
+    <!-- 2. ヒーロー -->
+    <section class="hero">
+      <div class="hero-inner">
+        <span class="beta-badge">ベータ版</span>
+
+        <h1 class="hero-title mt-5">
+          自分の資産を、<br class="sm:hidden" />自分の分類で数える。
+        </h1>
+
+        <p class="mt-5 text-base text-slate-500 max-w-2xl mx-auto" style="line-height: 1.9;">
+          マネーフォワードからエクスポートしたCSVを取り込むだけ。資産の推移、不動産と負債を含めた純資産、
+          そしてFIREの到達予測日までを1枚のダッシュボードにまとめる、個人のためのFIRE資産管理ツールです。
+        </p>
+
+        <!-- ページ内のCTAもヘッダーと同じ規則で差し替える。ヘッダーだけを直すと、
+             ログイン中のユーザーに画面の真ん中で「サインアップ」を勧め続けることになる
+             (screen-requirements-public.md 2章)。 -->
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3 cta-signed-out">
+          <a class="btn btn-primary btn-lg" href="a1-signup.html">サインアップ</a>
+          <a class="btn btn-outline btn-lg" href="a4-login.html">ログイン</a>
+        </div>
+
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3 cta-signed-in hidden">
+          <a class="btn btn-primary btn-lg" href="b1-dashboard.html">ダッシュボードへ</a>
+        </div>
+
+        <!-- ベータ版であることの明記(その1)に添える招待制の注記。
+             ボタンは置いたうえで期待値だけ先に伝える(screen-requirements-public.md A0)。
+             登録の案内なのでログイン中は出さない。 -->
+        <p class="field-hint mt-3 cta-signed-out">現在はベータ版のため、登録は招待制で運用しています。</p>
+
+        <!-- 画面イメージ:B1ダッシュボードのダミー版。
+             **金額はすべて作り物の丸めた値**で、実データを載せない(CLAUDE.md)。
+
+             構成は b1-dashboard.html をなぞる — サイドバー、分類軸セレクタと期間切替、
+             資産推移(資産種別の積み上げエリア + 0の線より下に負債の帯)、分類別内訳の
+             円グラフ、FIRE達成度ゲージ。LPの縮尺に収まらない要素(収支サマリ・負債サマリ・
+             ツールチップ・年月選択)は落としてあるが、**残した要素の形と色は実装と同じにする。**
+             実際には無い形(数値カードを3枚並べる等)を描くと、登録した人が最初に見る画面と
+             食い違う(screen-requirements-public.md A0「画面イメージの扱い」)。
+
+             色は資産分類スロット(--chart-1 / --chart-2 / --chart-6)と負債のハッチングを
+             B1と同じ割り当てで使う。数字も1組で辻褄を合わせてある:
+             投資信託 30,000,000 + 現金・預金 12,000,000 + 株式 8,000,000 = 50,000,000円、
+             負債 -20,000,000円 → 差引後 30,000,000円。円グラフの構成比の分母は絶対値の
+             合計 70,000,000円(43 / 17 / 11 / 29%)。**ゲージの対象分類は分類軸セレクタと
+             同じ純金融資産に揃えてあるので**、現在資産額は差引後と同じ 30,000,000円で、
+             達成率は 30,000,000 / 80,000,000 = 37.5% → 38%(アーク長 106 / 283)。 -->
+        <div class="preview-frame">
+          <div class="preview-bar">
+            <span class="preview-dot"></span>
+            <span class="preview-dot"></span>
+            <span class="preview-dot"></span>
+            <span class="text-xs text-slate-400 ml-2">B1 ダッシュボード(サンプル)</span>
+          </div>
+
+          <div class="preview-app">
+            <!-- サイドバー。狭い幅では畳む(LPのプレビューとしては本文側が読めれば足りる) -->
+            <aside class="preview-sidebar">
+              <p class="preview-brand">FIRE-FIRE</p>
+              <span class="preview-nav-item preview-nav-active">ダッシュボード</span>
+              <span class="preview-nav-item">CSV取込</span>
+              <span class="preview-nav-item">収支明細一覧</span>
+              <span class="preview-nav-item">資産分類マスタ</span>
+              <span class="preview-nav-item">不動産一覧</span>
+              <span class="preview-nav-item">負債入力</span>
+            </aside>
+
+            <div class="preview-body">
+              <!-- 分類軸セレクタと表示期間の切替(B1のツールバー) -->
+              <div class="preview-toolbar">
+                <span class="preview-select">純金融資産 ▾</span>
+                <div class="preview-tabs">
+                  <span class="preview-tab preview-tab-active">1年</span>
+                  <span class="preview-tab">3年</span>
+                  <span class="preview-tab">全期間</span>
+                </div>
+              </div>
+
+              <!-- 資産推移。B1と同じ viewBox・同じ座標で、資産種別を積み上げたエリアと
+                   0の線より下の負債の帯を描く。 -->
+              <div class="card p-3">
+                <p class="preview-card-title">資産推移(純金融資産)</p>
+                <!-- 高さを固定せず viewBox の比率のまま横幅いっぱいに描く。高さを決め打ちすると
+                     縦横比が合わずグラフが中央に寄って左右に余白が出る。 -->
+                <svg viewBox="0 0 640 210" class="w-full" style="height: auto;" role="img"
+                     aria-label="資産種別を積み上げた資産推移グラフのサンプル。0の線より下に負債の帯がある">
+                  <line x1="0" y1="11" x2="640" y2="11" stroke="hsl(var(--border))" stroke-width="1"/>
+                  <line x1="0" y1="56" x2="640" y2="56" stroke="hsl(var(--border))" stroke-width="1"/>
+                  <line x1="0" y1="100" x2="640" y2="100" stroke="hsl(var(--border))" stroke-width="1"/>
+                  <!-- 0の線。負債の帯がこの下に積まれるので他の目盛りより強く引く -->
+                  <line x1="0" y1="145" x2="640" y2="145" stroke="hsl(var(--muted-foreground))" stroke-width="1"/>
+                  <defs>
+                    <!-- 負債のハッチング。B1の円グラフ・推移グラフと同じ模様にする -->
+                    <pattern id="preview-debt-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+                      <rect width="6" height="6" fill="hsl(var(--destructive))"/>
+                      <line x1="0" y1="0" x2="0" y2="6" stroke="hsl(var(--card))" stroke-width="2" stroke-opacity="0.55"/>
+                    </pattern>
+                  </defs>
+                  <polygon fill="var(--chart-1)" fill-opacity="0.85"
+                    points="0,86 60,84.2 120,82.4 180,79.7 240,78 300,75.3 360,72.6 420,69.9 480,68.1 540,66.3 600,65.4 640,64.5 640,145 0,145" />
+                  <polygon fill="var(--chart-2)" fill-opacity="0.85"
+                    points="0,61.9 60,59.2 120,56.5 180,53.8 240,51.1 300,47.6 360,44 420,40.4 480,37.7 540,35 600,34.1 640,32.4 640,64.5 600,65.4 540,66.3 480,68.1 420,69.9 360,72.6 300,75.3 240,78 180,79.7 120,82.4 60,84.2 0,86" />
+                  <polygon fill="var(--chart-6)" fill-opacity="0.85"
+                    points="0,48.4 60,44.9 120,41.3 180,37.7 240,34.1 300,29.7 360,25.2 420,20.7 480,17.2 540,13.6 600,11.8 640,10 640,32.4 600,34.1 540,35 480,37.7 420,40.4 360,44 300,47.6 240,51.1 180,53.8 120,56.5 60,59.2 0,61.9" />
+                  <polygon fill="url(#preview-debt-hatch)" fill-opacity="0.85"
+                    points="0,145 640,145 640,197.6 600,197.8 540,197.9 480,198.2 420,198.5 360,198.9 300,199.1 240,199.7 180,199.9 120,200.5 60,200.7 0,201" />
+                  <!-- 帯の上端はその帯自身の色で引く(B1と同じ) -->
+                  <polyline fill="none" stroke="var(--chart-1)" stroke-width="1.5"
+                    points="0,86 60,84.2 120,82.4 180,79.7 240,78 300,75.3 360,72.6 420,69.9 480,68.1 540,66.3 600,65.4 640,64.5" />
+                  <polyline fill="none" stroke="var(--chart-2)" stroke-width="1.5"
+                    points="0,61.9 60,59.2 120,56.5 180,53.8 240,51.1 300,47.6 360,44 420,40.4 480,37.7 540,35 600,34.1 640,32.4" />
+                  <polyline fill="none" stroke="var(--chart-6)" stroke-width="1.5"
+                    points="0,48.4 60,44.9 120,41.3 180,37.7 240,34.1 300,29.7 360,25.2 420,20.7 480,17.2 540,13.6 600,11.8 640,10" />
+                  <polyline fill="none" stroke="hsl(var(--destructive))" stroke-width="1.5"
+                    points="0,201 60,200.7 120,200.5 180,199.9 240,199.7 300,199.1 360,198.9 420,198.5 480,198.2 540,197.9 600,197.8 640,197.6" />
+                </svg>
+                <div class="preview-axis tabular-nums">
+                  <span>2025/08</span><span>2025/12</span><span>2026/03</span><span>2026/07</span>
+                </div>
+                <ul class="preview-legend">
+                  <li><span class="preview-swatch" style="background: var(--chart-1);"></span>投資信託</li>
+                  <li><span class="preview-swatch" style="background: var(--chart-2);"></span>現金・預金</li>
+                  <li><span class="preview-swatch" style="background: var(--chart-6);"></span>株式</li>
+                  <li><span class="preview-swatch" style="background: repeating-linear-gradient(45deg, hsl(var(--destructive)) 0 2px, hsl(var(--card)) 2px 3px);"></span>負債</li>
+                </ul>
+              </div>
+
+              <!-- 分類別内訳とFIRE達成度。B1では2カラムに並ぶ -->
+              <div class="preview-grid">
+                <div class="card p-3">
+                  <p class="preview-card-title">分類別内訳(純金融資産)</p>
+                  <div class="flex items-center gap-3">
+                    <svg viewBox="0 0 120 120" class="shrink-0" style="width: 4.5rem; height: 4.5rem;" role="img" aria-label="分類別内訳の円グラフのサンプル">
+                      <circle cx="60" cy="60" r="45" fill="none" stroke="var(--chart-1)" stroke-width="20"
+                              stroke-dasharray="121 283" transform="rotate(-90 60 60)"/>
+                      <circle cx="60" cy="60" r="45" fill="none" stroke="var(--chart-2)" stroke-width="20"
+                              stroke-dasharray="48 283" stroke-dashoffset="-121" transform="rotate(-90 60 60)"/>
+                      <circle cx="60" cy="60" r="45" fill="none" stroke="var(--chart-6)" stroke-width="20"
+                              stroke-dasharray="31 283" stroke-dashoffset="-169" transform="rotate(-90 60 60)"/>
+                      <circle cx="60" cy="60" r="45" fill="none" stroke="url(#preview-debt-hatch)" stroke-width="20"
+                              stroke-dasharray="82 283" stroke-dashoffset="-200" transform="rotate(-90 60 60)"/>
+                    </svg>
+                    <ul class="preview-breakdown tabular-nums">
+                      <li><span class="preview-swatch" style="background: var(--chart-1);"></span>投資信託<span class="preview-pct">43%</span></li>
+                      <li><span class="preview-swatch" style="background: var(--chart-2);"></span>現金・預金<span class="preview-pct">17%</span></li>
+                      <li><span class="preview-swatch" style="background: var(--chart-6);"></span>株式<span class="preview-pct">11%</span></li>
+                      <li><span class="preview-swatch" style="background: repeating-linear-gradient(45deg, hsl(var(--destructive)) 0 2px, hsl(var(--card)) 2px 3px);"></span>負債<span class="preview-pct">29%</span></li>
+                    </ul>
+                  </div>
+                  <p class="preview-net tabular-nums">差引後 <strong>30,000,000円</strong></p>
+                </div>
+
+                <div class="card p-3">
+                  <p class="preview-card-title">FIRE達成度</p>
+                  <div class="flex items-center gap-3">
+                    <svg viewBox="0 0 120 120" class="shrink-0" style="width: 4.5rem; height: 4.5rem;" role="img" aria-label="FIRE達成度ゲージのサンプル。38%">
+                      <circle cx="60" cy="60" r="45" fill="none" stroke="hsl(var(--secondary))" stroke-width="14"/>
+                      <!-- アークの色は実装(FireProgressGauge.tsx)と同じ --chart-1。B1のゲージだけ
+                         資産分類スロットの1つを使っている -->
+                    <circle cx="60" cy="60" r="45" fill="none" stroke="var(--chart-1)" stroke-width="14"
+                              stroke-linecap="round" stroke-dasharray="106 283" transform="rotate(-90 60 60)"/>
+                      <text x="60" y="67" text-anchor="middle" font-size="24" font-weight="700" fill="hsl(var(--foreground))">38%</text>
+                    </svg>
+                    <!-- 現在資産額には**対象分類名を併記する**(screen-requirements-dashboard.md
+                         「FIRE達成度の現在資産額(対象分類)」)。併記しないと、B1のセレクタが別の
+                         分類軸を指しているときにゲージの数字がどちらのものか判別できない。
+
+                         本物のB1モックは、セレクタ(純金融資産)とゲージの対象分類(投資性資産)が
+                         **違う**状態を示している。ここではあえて揃えてある — LPの訪問者に
+                         「2つの軸は別の設定」という区別を読ませる前提を置けないため。同じ軸に
+                         揃えたので、現在資産額は円グラフの差引後と同じ 30,000,000円、達成率は
+                         30,000,000 / 80,000,000 = 37.5% → 38% になる。 -->
+                    <ul class="preview-goal tabular-nums">
+                      <li>目標資産額 <strong>80,000,000円</strong></li>
+                      <li>現在資産額 <strong>30,000,000円</strong><span class="preview-axis-note">(純金融資産)</span></li>
+                      <li>到達予測日 <strong>2033年4月頃</strong></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. できること。載せるのは実装済みの機能だけで、Phase 5以降の予告は置かない
+         (screen-requirements-public.md A0)。CSV取込は手段なので「使い方」側で説明する。 -->
+    <section class="public-section">
+      <h2 class="section-heading">できること</h2>
+      <p class="text-sm text-slate-500 text-center mt-3 mb-10">
+        取り込んだデータを、資産を見るための形に組み直します。
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" />
+            </svg>
+          </div>
+          <h3 class="font-semibold mb-2">資産の推移を1枚で見る</h3>
+          <p class="text-sm text-slate-500" style="line-height: 1.8;">
+            資産種別ごとの積み上げグラフで、これまでの動きをまとめて確認できます。負債を差し引いた表示にも切り替えられます。
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-9-9v9z" /><path d="M15.5 3.5A9 9 0 0 1 20.5 8.5L12 12z" />
+            </svg>
+          </div>
+          <h3 class="font-semibold mb-2">分類の切り口を自分で決める</h3>
+          <p class="text-sm text-slate-500" style="line-height: 1.8;">
+            総資産・純金融資産・投資性資産といった集計の軸は、決め打ちではなく自分で作れます。見たい単位が人によって違うためです。
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" />
+            </svg>
+          </div>
+          <h3 class="font-semibold mb-2">不動産と負債まで含めて数える</h3>
+          <p class="text-sm text-slate-500" style="line-height: 1.8;">
+            物件の時価とローン残高から利ざやを自動計算し、住宅ローンなどの負債と合わせて、純資産としての姿を出します。
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+            </svg>
+          </div>
+          <h3 class="font-semibold mb-2">FIRE到達予測日が出る</h3>
+          <p class="text-sm text-slate-500" style="line-height: 1.8;">
+            目標額は直接の指定でも、年間支出からの逆算(4%ルール等)でも設定できます。毎月の積立額と想定利回りから到達予測日を算出します。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 使い方。1ステップ目でマネーフォワード前提であることを明示する
+         (伏せて登録させると、登録した人が最初に詰まるため)。 -->
+    <section class="public-section pt-0">
+      <h2 class="section-heading">使い方</h2>
+      <p class="text-sm text-slate-500 text-center mt-3 mb-10">
+        入力しなおす作業はありません。すでにある明細をそのまま使います。
+      </p>
+
+      <ol class="flex flex-col gap-5 max-w-2xl mx-auto">
+        <li class="flex gap-4">
+          <span class="step-num">1</span>
+          <div>
+            <p class="font-semibold mb-1">マネーフォワードからCSVをエクスポートする</p>
+            <p class="text-sm text-slate-500" style="line-height: 1.8;">
+              資産残高推移と、収入・支出詳細の2種類に対応しています。
+            </p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="step-num">2</span>
+          <div>
+            <p class="font-semibold mb-1">FIRE-FIREに取り込む</p>
+            <p class="text-sm text-slate-500" style="line-height: 1.8;">
+              取込前に件数と期間のプレビューを出します。CSVファイル自体はサーバーに保存しません。
+            </p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="step-num">3</span>
+          <div>
+            <p class="font-semibold mb-1">ダッシュボードで見る</p>
+            <p class="text-sm text-slate-500" style="line-height: 1.8;">
+              資産推移・分類別内訳・収支サマリ・FIRE達成度が、取り込んだ時点の数字で並びます。
+            </p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 5. ベータ版について(ベータ版であることの明記・その2)。
+         ヒーローのバッジと合わせて2箇所(screen-requirements-public.md A0)。 -->
+    <section class="public-section pt-0">
+      <div class="beta-note max-w-3xl mx-auto">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="beta-badge">ベータ版</span>
+          <h2 class="font-bold">ご利用にあたって</h2>
+        </div>
+
+        <ul class="flex flex-col gap-3">
+          <li class="text-sm text-slate-500" style="line-height: 1.8;">
+            <span class="font-semibold" style="color: hsl(var(--foreground));">開発中のサービスです。</span>
+            画面や仕様は予告なく変わることがあります。
+          </li>
+          <li class="text-sm text-slate-500" style="line-height: 1.8;">
+            <span class="font-semibold" style="color: hsl(var(--foreground));">データが失われる可能性があります。</span>
+            取り込み元のCSVはお手元で保管してください(取り込んだCSVファイル自体はサーバーに保存していません)。
+          </li>
+          <li class="text-sm text-slate-500" style="line-height: 1.8;">
+            <span class="font-semibold" style="color: hsl(var(--foreground));">現在は招待制です。</span>
+            お受けできる登録の数を限らせていただいています。
+          </li>
+          <li class="text-sm text-slate-500" style="line-height: 1.8;">
+            <span class="font-semibold" style="color: hsl(var(--foreground));">投資助言を行うものではありません。</span>
+            表示される金額・予測は、ご自身で入力・取り込んだデータをもとにした計算結果です。
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 6. 下部CTA -->
+    <section class="cta-band">
+      <div class="public-section text-center">
+        <h2 class="section-heading">まずは手元のCSVから。</h2>
+        <p class="text-sm text-slate-500 mt-3 mb-7">
+          取り込んだその日から、資産の全体像が1枚で見えるようになります。
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3 cta-signed-out">
+          <a class="btn btn-primary btn-lg" href="a1-signup.html">サインアップ</a>
+          <a class="btn btn-outline btn-lg" href="a4-login.html">ログイン</a>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-3 cta-signed-in hidden">
+          <a class="btn btn-primary btn-lg" href="b1-dashboard.html">ダッシュボードへ</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 7. フッター。コピーライトと規約2ページへのリンク(カードの要求)。
+       ヘルプ(X2)は未着手のため、枠だけ置くことはしない。 -->
+  <footer class="public-footer">
+    <div class="public-footer-inner">
+      <p>© 2026 FIRE-FIRE</p>
+      <div class="public-footer-links">
+        <a class="link" href="a9-terms.html">利用規約</a>
+        <a class="link" href="a10-privacy.html">プライバシーポリシー</a>
+        <a class="link" href="a11-contact.html">お問い合わせ</a>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+  // モック都合の代用(上のヘッダーのコメントを参照)。実装では認証状態から判定する。
+  // ヘッダーとページ内CTAの3箇所をまとめて差し替える(screen-requirements-public.md 2章)。
+  if (new URLSearchParams(location.search).get("signedIn") === "1") {
+    document.getElementById("nav-signed-out").classList.add("hidden");
+    document.getElementById("nav-signed-in").classList.remove("hidden");
+    document.querySelectorAll(".cta-signed-out").forEach((el) => el.classList.add("hidden"));
+    document.querySelectorAll(".cta-signed-in").forEach((el) => el.classList.remove("hidden"));
+  }
+</script>
+
+</body>
+</html>

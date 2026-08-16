@@ -24,15 +24,42 @@ declare global {
      * 負債の選択を持たない既存の分類軸が、負債の登録と同時に黙って純資産の軸へ変わる。
      */
     debtIds: string[];
+    /**
+     * 集計に加える物件と、その反映方法(B5〜B7で登録した物件。B4「集計対象に不動産を含める」)。
+     *
+     * キーが物件ID、値が**その物件をどちらの額で反映するか**。資産種別・負債と**別のフィールド**で
+     * 持つのは、物件がIDを持つうえに反映方法を1件ごとに添える必要があり、名前の配列
+     * (`assetTypeNames`)にもIDだけの配列(`debtIds`)にも混ぜられないため。
+     *
+     * `debtIds`と同じく、**空のマップは「不動産を反映しない」を意味する**。「未選択=すべて」の
+     * 読み替えは資産種別にだけ適用する — 適用すると、物件の選択を持たない既存の分類軸が、
+     * 物件の登録と同時に黙って不動産を含む軸へ変わる。
+     */
+    propertyValuations: CategoryAxisPropertyValuations;
     /** 登録日時(ISO 8601)。書き込み直後でサーバー時刻が未確定の間は`null` */
     createdAt: string | null;
   };
+
+  /**
+   * 物件をダッシュボードへ反映するときの額の取り方(B4の「利ざやのみ反映」チェックボックス)。
+   *
+   * - `spread` — 利ざや(時価 - ローン残高)。チェックあり
+   * - `marketValue` — 時価。チェックなし
+   *
+   * 居住用は取り崩せないので利ざやで見たいが投資用は時価で見たい、のように見方が物件ごとに
+   * 変わるため、軸に1つの設定にせず物件ごとに持つ(B4)。
+   */
+  type RealEstateValuationMode = "spread" | "marketValue";
+
+  /** 物件IDごとの反映方法。キーを持たない物件はその分類軸の集計に入らない */
+  type CategoryAxisPropertyValuations = Record<string, RealEstateValuationMode>;
 
   /** 分類軸の追加・編集フォームの入力値 */
   type AssetCategoryAxisFormValues = {
     name: string;
     assetTypeNames: string[];
     debtIds: string[];
+    propertyValuations: CategoryAxisPropertyValuations;
   };
 
   /**
@@ -93,6 +120,31 @@ declare global {
     missingCount: number;
   };
 
+  /**
+   * 物件の選択肢の状態。読み込み中・取得失敗・取得済みを1つの値で表す。
+   *
+   * `DebtOptionsState`と同じ理由・同じ形。選択肢が出ないまま保存すると、選択済みの物件が
+   * 黙って外れた分類軸で上書きされるため、取得できるまで保存を止める(B4)。
+   */
+  type PropertyOptionsState =
+    | { status: "loading" }
+    | { status: "error"; message: string }
+    | { status: "ready"; properties: RealEstateProperty[] };
+
+  /**
+   * 分類軸が参照している物件の内訳(B6で削除された参照を見分ける)。
+   *
+   * 負債の`CategoryAxisDebtReferences`と同じ役割だが、**残すのはIDではなく反映方法まで含んだ
+   * マップ**。フォームの初期値がそのまま「どの物件をどちらの額で反映するか」であり、IDだけを
+   * 返すと呼び出し側で反映方法を引き直すことになるため。
+   */
+  type CategoryAxisPropertyReferences = {
+    /** 実際に集計へ加わる物件と反映方法(B5〜B7に残っているもの) */
+    activeValuations: CategoryAxisPropertyValuations;
+    /** 削除されていて集計対象にならない参照の件数 */
+    missingCount: number;
+  };
+
   /** 分類軸の追加・編集フォームのProps */
   type AssetCategoryAxisFormProps = {
     /** 新規追加は空値、編集は対象の分類軸の値を渡す */
@@ -108,6 +160,15 @@ declare global {
      * `initialValues.debtIds`が既に絞り込み後の値だから。新規追加では常に`0`。
      */
     missingDebtCount: number;
+    /** 集計対象に加える物件の選択肢(B5〜B7で登録済みの物件)と、その取得状態 */
+    propertyOptions: PropertyOptionsState;
+    /**
+     * `initialValues`から落とした、削除済みの物件への参照の件数。
+     *
+     * 負債の`missingDebtCount`と同じ理由で呼び出し側から渡す
+     * (`initialValues.propertyValuations`は既に絞り込み後の値なので、フォーム側で数え直せない)。
+     */
+    missingPropertyCount: number;
     submitLabel: string;
     onSubmit: (values: AssetCategoryAxisFormValues) => Promise<SaveCategoryAxisResult>;
     onCancel: () => void;
@@ -122,6 +183,8 @@ declare global {
      * 一覧の件数とB1で差し引かれている額が食い違う。
      */
     debtOptions: DebtOptionsState;
+    /** 物件の選択肢と取得状態。件数を実際に集計へ加わる物件の数で出すために要る(負債と同じ) */
+    propertyOptions: PropertyOptionsState;
     onEdit: (axis: AssetCategoryAxisDocument) => void;
     onDelete: (axis: AssetCategoryAxisDocument) => void;
   };
@@ -130,6 +193,13 @@ declare global {
   type DeleteCategoryAxisDialogProps = {
     /** 削除対象。`null`は非表示 */
     axis: AssetCategoryAxisDocument | null;
+    /**
+     * 登録済みの負債。削除可否を「参照の件数」ではなく「実際に集計対象になっている件数」で
+     * 判定するために要る(B4-3)。読み込み中・取得失敗のあいだは判定できない
+     */
+    debtOptions: DebtOptionsState;
+    /** 登録済みの物件。負債と同じ理由で、削除可否を実際に集計対象になっている件数で判定する */
+    propertyOptions: PropertyOptionsState;
     onOpenChange: (open: boolean) => void;
     onConfirm: (axis: AssetCategoryAxisDocument) => Promise<DeleteCategoryAxisResult>;
   };

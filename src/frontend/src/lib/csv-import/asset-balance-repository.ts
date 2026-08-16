@@ -16,6 +16,7 @@ import {
   FIRESTORE_BATCH_LIMIT,
   IMPORT_HISTORY_LIMIT,
 } from "@/constants/csv-import";
+import { chunk } from "@/lib/csv-import/batch";
 import { resolveFirestoreUserContext, toFirestoreFailureReason } from "@/lib/firebase/user-context";
 import { assetSnapshotDocumentSchema, csvImportHistoryDocumentSchema } from "@/schemas/csv-import";
 
@@ -45,12 +46,6 @@ const assetSnapshotsRef = (firestore: Firestore, uid: string) =>
 /** 取込履歴のコレクション参照 */
 const csvImportsRef = (firestore: Firestore, uid: string) =>
   collection(firestore, USERS_COLLECTION, uid, CSV_IMPORTS_COLLECTION);
-
-/** 500件ずつに区切る。`writeBatch`が1回で扱える書き込みの上限に合わせる */
-const chunk = <T>(items: T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(items.length / size) }, (_unused, index) =>
-    items.slice(index * size, (index + 1) * size),
-  );
 
 /**
  * 取り込もうとしている日付のうち、既にFirestoreにあるものを数える。
@@ -222,11 +217,11 @@ export const fetchLatestAssetSnapshot = async (): Promise<LatestAssetSnapshotRes
 };
 
 /**
- * 直近の資産残高を資産種別ごとに取得する(B9の表示項目「資産・口座一覧(名称、現在残高)」)。
+ * 直近の資産残高を資産種別ごとに取得する(B9の表示項目「資産種別一覧(資産種別名、現在残高)」)。
  *
  * 集計日がいちばん新しい1件の`byType`をそのまま資産種別と残高の組にする。B9が設定対象と
- * するのは要件定義書4.7の「資産クラス」で、アプリが持つ資産の粒度はCSVの資産種別列しか
- * 無いため(口座単位のデータはマネーフォワードのCSVに含まれない)。
+ * するのは要件定義書4.7の**資産種別**で、口座単位のデータはマネーフォワードのCSVに
+ * 含まれないため(docs/screen-requirements-fire-goal.md B9「設定の単位は資産種別」)。
  *
  * 残高の多い順に並べる。金額の大きい資産種別ほど想定利回りが予測に効くため、先に目に
  * 入る位置へ置く。`byType`はマップでキーの順序に意味が無く、そのままでは並びが定まらない。

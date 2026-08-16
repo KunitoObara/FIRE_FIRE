@@ -5,7 +5,185 @@ import {
   DEBT_CATEGORY_NAME,
   OTHER_CATEGORY_ID,
   OTHER_CATEGORY_NAME,
+  PROPERTY_CATEGORY_COLOR,
+  PROPERTY_CATEGORY_ID,
+  PROPERTY_CATEGORY_NAME,
 } from "@/constants/dashboard";
+
+/**
+ * 個別の色を割り当てられる分類の数。
+ * 分類がスロット数に収まるなら全て個別の色にできる。溢れる場合だけ最後のスロットを
+ * 「その他」に使うため、1つ減る。
+ */
+const resolveIndividualSlotCount = (categories: AssetCategory[]): number =>
+  categories.length > CATEGORY_COLOR_SLOT_COUNT
+    ? CATEGORY_COLOR_SLOT_COUNT - 1
+    : CATEGORY_COLOR_SLOT_COUNT;
+
+/**
+ * 分類マスタの登録順を色スロットへ割り当てた一覧を作る。溢れた分の受け皿として
+ * 「その他」を末尾に足す(溢れていなければ足さない)。
+ *
+ * **分類別内訳の円グラフと資産推移グラフの積み上げ表示が、この1つの割り当てを共有する。**
+ * 同じ画面に並ぶ2つのグラフで同じ資産種別が違う色になると、内訳と推移を見比べられない
+ * (docs/screen-requirements-dashboard.md B1「積み上げ表示」/ DESIGN.md 3章)。
+ *
+ * 渡す`categories`は直近1日の資産残高に現れる資産種別で、**符号で絞らない**
+ * (`collectAssetCategories`)。マイナス残高の資産種別も固有の色と凡例を持つ。
+ */
+export const buildCategoryColorSlots = (categories: AssetCategory[]): NetWorthTrendBand[] => {
+  const individualSlotCount = resolveIndividualSlotCount(categories);
+
+  const slots: NetWorthTrendBand[] = categories
+    .slice(0, individualSlotCount)
+    .map((category, index) => ({
+      categoryId: category.id,
+      name: category.name,
+      color: `var(--chart-${index + 1})`,
+    }));
+
+  if (categories.length > individualSlotCount) {
+    slots.push({
+      categoryId: OTHER_CATEGORY_ID,
+      name: OTHER_CATEGORY_NAME,
+      color: `var(--chart-${CATEGORY_COLOR_SLOT_COUNT})`,
+    });
+  }
+
+  return slots;
+};
+
+/**
+ * 資産推移グラフの積み上げ表示に渡す帯と各点を、まとめて組み立てる。
+ *
+ * **帯と点を1つの関数で返す。** 別々に作ると、帯に無いキーを点が持つ(描かれない額が
+ * できる)・点に無い帯が凡例に並ぶ、といったずれが起こりうる。
+ *
+ * 色スロットの割り当ては分類別内訳の円グラフと共有する(`buildCategoryColorSlots`)。
+ * `categories`は直近1日の資産残高に現れる資産種別なので、**過去にだけ保有していた
+ * 資産種別はここに無く、「その他」へまとめられる**(docs/screen-requirements-dashboard.md
+ * B1「積み上げ表示」。許容と決めた挙動)。
+ *
+ * **`categories`がスロットをちょうど使い切っている(8件)ところへ過去だけの資産種別が
+ * 現れた場合に限り、「その他」の色が8番目の資産種別と同じになる。** 円グラフ側の色を
+ * 動かしてまで避けない — 同じ資産種別が2つのグラフで違う色になるほうが、このカードの
+ * 目的そのものを外すため。どちらも凡例に名前が出る。
+ *
+ * 帯に出すのは**期間内のどこかで0以外の額を持つもの**だけにする。全点で0の帯は、
+ * 面としては見えないまま凡例だけを埋める。
+ */
+export const buildStackedTrend = (
+  series: NetWorthPoint[],
+  categories: AssetCategory[],
+  includeDebt: boolean,
+): { bands: NetWorthTrendBand[]; points: NetWorthStackedPoint[] } => {
+  const slots = buildCategoryColorSlots(categories);
+  const individualSlotIds = new Set(
+    slots.filter((slot) => slot.categoryId !== OTHER_CATEGORY_ID).map((slot) => slot.categoryId),
+  );
+
+  // どのスロットに寄せるか。スロットを持たない資産種別(過去だけの保有・溢れた分)は「その他」へ
+  const toSlotId = (assetTypeName: string): string =>
+    individualSlotIds.has(assetTypeName) ? assetTypeName : OTHER_CATEGORY_ID;
+
+  const usedSlotIds = new Set<string>();
+
+  const points = series.map((point) => {
+    const amounts: Record<string, number> = {};
+
+    Object.entries(point.byType).forEach(([assetTypeName, amount]) => {
+      const slotId = toSlotId(assetTypeName);
+
+      amounts[slotId] = (amounts[slotId] ?? 0) + amount;
+    });
+
+    Object.entries(amounts).forEach(([slotId, amount]) => {
+      if (amount !== 0) {
+        usedSlotIds.add(slotId);
+      }
+    });
+
+    /*
+      負債は0より下の帯として積むので、額に-1を掛けて持つ(docs/screen-requirements-dashboard.md
+      B1「積み上げ表示」)。差し引くのではなく負の帯として積むため、面の上端(正の帯の合計)は
+      負債の有無で動かない。項目ごとには分けず、円グラフの負債スライスと同じく1本にまとめる
+    */
+    if (includeDebt && point.debtBalance !== 0) {
+      amounts[DEBT_CATEGORY_ID] = -point.debtBalance;
+      usedSlotIds.add(DEBT_CATEGORY_ID);
+    }
+
+    /*
+      不動産は**負債反映の切替に関わらず**積む(docs/screen-requirements-dashboard.md B1
+      「負債反映の切替との関係」)。切替が動かすのはB11の負債だけで、不動産は分類軸の
+      設定どおりの額になる。利ざやが負の物件では額そのものが負になり、`stackOffset="sign"`
+      によって0より下へ積まれる — 負債と同じ位置に来るので、色と模様の両方で区別する
+    */
+    if (point.propertyAmount !== 0) {
+      amounts[PROPERTY_CATEGORY_ID] = point.propertyAmount;
+      usedSlotIds.add(PROPERTY_CATEGORY_ID);
+    }
+
+    return {
+      date: point.date,
+      /*
+        ツールチップに出す合計は**行に並べた額の総和**で、負の資産種別も符号のまま加える
+        (同要件B1)。負債反映ONのときは負債の行(負の値)も含むので、合計はその時点の
+        純資産そのものになる。面の上端(正の帯だけの合計)とは一致しないことがある。
+        `point.amount`(純額)を使わないのは、こちらが「0円以下の資産種別を除く」等の
+        フィルタと無関係に組み立てた行の総和であるべきだから
+      */
+      total: Object.values(amounts).reduce((sum, amount) => sum + amount, 0),
+      amounts,
+    };
+  });
+
+  const bands = slots.filter((slot) => usedSlotIds.has(slot.categoryId));
+
+  /*
+    「その他」はスロットが溢れたときにしか`buildCategoryColorSlots`に現れないが、
+    過去にだけ保有していた資産種別の受け皿としても要る。溢れていない場合はここで足す
+  */
+  if (
+    usedSlotIds.has(OTHER_CATEGORY_ID) &&
+    !bands.some((band) => band.categoryId === OTHER_CATEGORY_ID)
+  ) {
+    bands.push({
+      categoryId: OTHER_CATEGORY_ID,
+      name: OTHER_CATEGORY_NAME,
+      color: `var(--chart-${CATEGORY_COLOR_SLOT_COUNT})`,
+    });
+  }
+
+  /*
+    負債の帯は**資産種別のスロット順の後ろに固定**する(同要件B1「積み上げ表示」)。
+    描かれる位置は0より下だが、凡例の並びは常に「資産種別 → 負債」になる。
+    色スロット(--chart-1〜8)は消費せず、円グラフの負債スライスと同じ固定色を使う
+    (DESIGN.md 3章)。実際に保有している資産の分類が「その他」へ押し出されないため
+  */
+  /*
+    不動産の帯は**資産種別の後ろ・負債の前**に固定する(B4-8)。「資産種別 → 不動産 → 負債」の
+    順は集計の式と同じで、凡例を上から読む順が集計の順になる。負債と同じく色スロットは
+    消費せず、円グラフの不動産スライスと同じ固定色を使う
+  */
+  if (usedSlotIds.has(PROPERTY_CATEGORY_ID)) {
+    bands.push({
+      categoryId: PROPERTY_CATEGORY_ID,
+      name: PROPERTY_CATEGORY_NAME,
+      color: PROPERTY_CATEGORY_COLOR,
+    });
+  }
+
+  if (usedSlotIds.has(DEBT_CATEGORY_ID)) {
+    bands.push({
+      categoryId: DEBT_CATEGORY_ID,
+      name: DEBT_CATEGORY_NAME,
+      color: DEBT_CATEGORY_COLOR,
+    });
+  }
+
+  return { bands, points };
+};
 
 /**
  * 分類別内訳を、色と構成比を解決した表示用の形へ変換する。
@@ -31,20 +209,29 @@ import {
  * 正の面積でしか比を表せないため、面積は残債の絶対値で取るしかない。%が純資産に対する
  * 割合ではないことは、カード側が差引後の純額を併記して示す
  * (docs/screen-requirements-dashboard.md B1)。
+ *
+ * **B9のリスクレベル(`assumptions`)は資産種別のスライスにだけ付ける。** 擬似分類
+ * (その他 / 不動産 / 負債)は`null`で固定する — 「その他」は複数の資産種別をまとめた
+ * もので単一のリスクレベルに対応せず、「不動産」「負債」はB9に対応する行そのものが無い
+ * (同要件B1「リスクの可視化」)。ここで決めておくと、凡例の側が分類の種類を判定せずに済む。
  */
 export const buildBreakdownSlices = (
   entries: AssetBreakdownEntry[],
   categories: AssetCategory[],
   debtTotal = 0,
+  propertyTotal = 0,
+  assumptions: AssetAssumptions = {},
 ): AssetBreakdownSlice[] => {
-  const total = entries.reduce((sum, entry) => sum + entry.amount, 0) + debtTotal;
+  /*
+    分母は**各スライスの絶対値の合計**(資産種別 + 不動産 + 負債)。円グラフは正の面積でしか
+    比を表せず、不動産はオーバーローンで負になりうるため絶対値で足す
+    (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)
+  */
+  const total =
+    entries.reduce((sum, entry) => sum + entry.amount, 0) + Math.abs(propertyTotal) + debtTotal;
   const toRatio = (amount: number): number => (total === 0 ? 0 : amount / total);
 
-  // 分類がスロット数に収まるなら全て個別の色にできる。溢れる場合だけ最後のスロットを「その他」に使う
-  const individualSlotCount =
-    categories.length > CATEGORY_COLOR_SLOT_COUNT
-      ? CATEGORY_COLOR_SLOT_COUNT - 1
-      : CATEGORY_COLOR_SLOT_COUNT;
+  const individualSlotCount = resolveIndividualSlotCount(categories);
 
   const slices: AssetBreakdownSlice[] = [];
   let otherAmount = 0;
@@ -65,6 +252,11 @@ export const buildBreakdownSlices = (
       amount: entry.amount,
       ratio: toRatio(entry.amount),
       color: `var(--chart-${index + 1})`,
+      /*
+        分類のIDは資産種別名そのもの(`collectAssetCategories`)で、B9の想定値も
+        資産種別名をキーにしているため、そのまま引ける。未設定は`null`のまま
+      */
+      riskLevel: assumptions[category.id]?.riskLevel ?? null,
     });
   });
 
@@ -82,13 +274,41 @@ export const buildBreakdownSlices = (
       amount: otherAmount,
       ratio: toRatio(otherAmount),
       color: `var(--chart-${CATEGORY_COLOR_SLOT_COUNT})`,
+      // 複数の資産種別をまとめたものなので、単一のリスクレベルに対応しない(同要件)
+      riskLevel: null,
+    });
+  }
+
+  /*
+    不動産は資産種別の後ろ・負債の前に置く。「資産種別 → 不動産 → 負債」の順は集計の式
+    (資産 + 不動産 - 負債)と同じで、凡例を上から読む順が集計の順になる(B4-8)。
+
+    **面積は絶対値で取り、凡例には符号付きの額を出す**(`amount`は符号のまま持つ)。
+    オーバーローンの物件だけを含む軸では合計が負になるが、そこでスライスを落とすと、
+    その分類軸が不動産を対象にしていること自体が円グラフから消える。
+    出さないのは**ちょうど0円のとき**だけ
+  */
+  if (propertyTotal !== 0) {
+    slices.push({
+      categoryId: PROPERTY_CATEGORY_ID,
+      name: PROPERTY_CATEGORY_NAME,
+      amount: propertyTotal,
+      ratio: toRatio(Math.abs(propertyTotal)),
+      color: PROPERTY_CATEGORY_COLOR,
+      // 不動産・負債はB9に対応する行そのものが無い(B9「不動産・負債の想定は置けない」)
+      riskLevel: null,
     });
   }
 
   /*
     負債は最後に置く。資産のスライスの並び(分類マスタの登録順)を崩さないためと、
     符号の違うものを資産の間に挟まないため。残債の合計が0円のときはスライスを出さない
-    (0円以下の資産種別を除いているのと同じ理由。0円のスライスは凡例を埋めるだけになる)
+    (0円のスライスは凡例を埋めるだけになるため)。
+
+    出さないのは**ちょうど0円のとき**であって、資産種別に掛けている「0円以下を除く」
+    フィルタ(`buildAxisBreakdown`)とは別のものである。残債は0以上なので負債では差が
+    出ないが、同じ擬似分類の不動産(上記)は利ざやが負になりうるため、そちらは絶対値で
+    面積を取って描く(同要件の「グラフでの見せ方」で2つまとめて決めてある)
   */
   if (debtTotal > 0) {
     slices.push({
@@ -97,6 +317,7 @@ export const buildBreakdownSlices = (
       amount: debtTotal,
       ratio: toRatio(debtTotal),
       color: DEBT_CATEGORY_COLOR,
+      riskLevel: null,
     });
   }
 

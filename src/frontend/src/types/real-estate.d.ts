@@ -19,11 +19,35 @@ declare global {
   };
 
   /**
+   * ある日の時価とローン残高(`RealEstateValueHistory`の値)。
+   *
+   * **2つを組で持つ。** 利ざやを求めるときに「時価は3月の記録・ローン残高は7月の記録」
+   * という実在しない日の組み合わせを作らないため
+   * (docs/screen-requirements-real-estate.md B7「時価・ローン残高の履歴」)。
+   * 片方だけが変わった保存でも両方を書く。
+   */
+  type RealEstateValueRecord = {
+    marketValue: number;
+    loanBalance: number;
+  };
+
+  /**
+   * 時価・ローン残高の履歴。キーは記録した日(`yyyy-MM-dd`)。
+   *
+   * 資産推移グラフが各時点の物件の額を積むために使う
+   * (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
+   * 負債の`DebtBalanceHistory`と同じく**追記のみ**で、過去の記録は書き換えない。
+   */
+  type RealEstateValueHistory = Record<string, RealEstateValueRecord>;
+
+  /**
    * 物件1件(docs/screen-requirements-real-estate.md B5〜B7)。
    *
    * 利ざや(時価-ローン残高)はここに持たず、表示時に計算する
    * (`src/lib/real-estate/calculation.ts`)。保存された値と計算結果が食い違う状態を
-   * 作らないため、要件どおり「自動計算」で通す。
+   * 作らないため、要件どおり「自動計算」で通す。**履歴に積むのも時価とローン残高であって
+   * 利ざやではない**(同2章)。B4で「時価を反映する」を選んだ物件は履歴の時価だけを使うので、
+   * 利ざやを積んでいると使えない。
    */
   type RealEstateProperty = {
     id: string;
@@ -31,10 +55,27 @@ declare global {
     name: string;
     /** 所在地。B7で登録した住所をそのまま持ち、B5は簡略表記に落として表示する。任意入力(空文字可) */
     location: string;
+    /**
+     * 取得年月(`yyyy-MM`)。未入力は`null`。
+     *
+     * 資産推移グラフがこの物件を積み始める起点になる(B1「不動産を含む分類軸の集計」)。
+     * 未入力の物件は最初に記録した日が起点になるため、任意入力のままでも困らない。
+     * 日まで持たないのはB11の発生年月と同じ理由で、推移グラフが月次の点で描くため。
+     */
+    acquiredOn: string | null;
     /** 時価(円)。手動更新の想定値(要件定義書 4.5) */
     marketValue: number;
     /** ローン残高(円)。完済済みの物件は0 */
     loanBalance: number;
+    /**
+     * 時価・ローン残高の履歴。保存のたびに、**どちらかが変わった物件についてのみ**
+     * その日の値を組で積む(B7「時価・ローン残高の履歴」)。
+     *
+     * B4-8より前に登録された物件はこのフィールドを持たないため、読み出し側で空の
+     * マップに倒す(`categoryAxes.debtIds`と同じ扱い)。その物件は次に保存した時点で
+     * 最初の記録が積まれる。
+     */
+    valueHistory: RealEstateValueHistory;
     /**
      * 賃貸収支。**この値を持つ物件が収益物件**である。
      *
@@ -55,16 +96,18 @@ declare global {
   /**
    * B7で保存する物件の内容。
    *
-   * `RealEstateProperty`との違いは、IDと最終更新日を含まないこと。どちらも入力項目ではなく
-   * 保存時に決まる値で(IDは採番、最終更新日は保存日)、リポジトリが埋める。
+   * `RealEstateProperty`との違いは、ID・最終更新日・履歴を含まないこと。いずれも入力項目では
+   * なく保存時に決まる値で(IDは採番、最終更新日は保存日、履歴は前回の値との差から積む)、
+   * リポジトリが埋める。
    *
    * 収益物件でない場合の`rental`は`undefined`ではなく`null`にする。Firestoreに
    * 「収益物件ではない」と明示的に書き込み、前回の賃貸収入/支出を残さないため
-   * (docs/screen-requirements-real-estate.md B7)。
+   * (docs/screen-requirements-real-estate.md B7)。取得年月も同じ理由で、未入力を`null`で書く。
    */
   type RealEstatePropertyInput = {
     name: string;
     location: string;
+    acquiredOn: string | null;
     marketValue: number;
     loanBalance: number;
     rental: RealEstateRental | null;
@@ -91,9 +134,18 @@ declare global {
     | { ok: true; property: RealEstateProperty | null }
     | { ok: false; reason: FirestoreAccessFailureReason };
 
+  /**
+   * 物件の保存が失敗した理由。
+   *
+   * `history-limit-exceeded`だけはFirestoreへのアクセスの失敗ではなく、時価・ローン残高の
+   * 履歴が上限に達している状態を指す(B11の残債の履歴と同じ扱い)。到達しない前提で置く
+   * 歯止めだが、古い記録から捨てると過去の資産推移グラフが黙って変わるため保存を止める。
+   */
+  type RealEstateSaveFailureReason = FirestoreAccessFailureReason | "history-limit-exceeded";
+
   /** 物件の保存(登録・更新)結果。成功時のIDは保存後のB6への遷移に使う */
   type SaveRealEstatePropertyResult =
-    { ok: true; id: string } | { ok: false; reason: FirestoreAccessFailureReason };
+    { ok: true; id: string } | { ok: false; reason: RealEstateSaveFailureReason };
 
   /** 物件一覧(RealEstatePropertyList)のProps */
   type RealEstatePropertyListProps = {
@@ -115,9 +167,50 @@ declare global {
     params: Promise<{ id: string }>;
   };
 
+  /** 物件の削除結果(B6)。成功後はB5へ遷移するため、返すのは可否だけでよい */
+  type DeleteRealEstatePropertyResult =
+    { ok: true } | { ok: false; reason: FirestoreAccessFailureReason };
+
+  /**
+   * 削除する物件を集計対象にしている分類軸の状態(B6の確認ダイアログ)。
+   *
+   * 「該当が無い」と「取得できていない」を型で分ける。空配列に倒すと、影響する軸が無いのか
+   * 確かめられなかっただけなのかがダイアログから区別できない
+   * (`AssetTypeOptionsState`などと同じ考え方)。削除自体はどちらの状態でも止めない。
+   */
+  type AffectedAxisNamesState = { status: "unknown" } | { status: "ready"; axisNames: string[] };
+
+  /**
+   * B6の内部カード(時価・ローン残高・利ざや / 物件基本情報)のProps。
+   *
+   * `RealEstateDetailProps`と分けるのは、カード側が削除の導線を持たないため。
+   * 画面本体のPropsをそのまま渡すと、カードが使わない`onDelete`まで受けることになる。
+   */
+  type RealEstateValuationCardProps = {
+    property: RealEstateProperty;
+  };
+
   /** B6 不動産詳細画面の本体(RealEstateDetail)のProps */
   type RealEstateDetailProps = {
     property: RealEstateProperty;
+    /**
+     * 削除の確認ダイアログに出す、この物件を集計対象にしている分類軸。
+     *
+     * 取得は画面側(`RealEstateDetailScreen`)が行う。B6の表示そのものには要らないが、
+     * 削除の影響を伝えるために要る(docs/screen-requirements-real-estate.md「物件の削除」)。
+     */
+    affectedAxisNames: AffectedAxisNamesState;
+    /** 削除の実行。成功後の遷移とトーストは呼び出し側が持つ */
+    onDelete: () => Promise<DeleteRealEstatePropertyResult>;
+  };
+
+  /** 削除確認ダイアログ(DeleteRealEstateDialog)のProps */
+  type DeleteRealEstateDialogProps = {
+    /** 削除対象。`null`は非表示 */
+    property: RealEstateProperty | null;
+    affectedAxisNames: AffectedAxisNamesState;
+    onOpenChange: (open: boolean) => void;
+    onConfirm: () => Promise<DeleteRealEstatePropertyResult>;
   };
 
   /**

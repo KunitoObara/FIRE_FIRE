@@ -9,6 +9,7 @@ import { useForm, useWatch } from "react-hook-form";
 
 import { PasswordField } from "@/components/auth/PasswordField";
 import { PasswordPolicyChecklist } from "@/components/auth/PasswordPolicyChecklist";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FieldError, FieldGroup } from "@/components/ui/field";
@@ -223,9 +224,9 @@ export const ResetPasswordForm = ({ oobCode }: ResetPasswordFormProps): JSX.Elem
         </CardHeader>
 
         <CardContent className="text-center">
-          <p role="status" className="rounded-lg bg-muted p-4 text-left text-sm">
+          <Alert variant="success" role="status">
             {PASSWORD_RESET_COMPLETED_MESSAGE}
-          </p>
+          </Alert>
 
           <p className="mt-6 text-sm text-muted-foreground">
             まもなくログイン画面へ移動します。移動しない場合は{" "}

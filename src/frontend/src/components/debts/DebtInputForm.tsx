@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
 import { DeleteDebtsDialog } from "@/components/debts/DeleteDebtsDialog";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -23,6 +24,8 @@ import {
   DEBT_NAME_LABEL,
   DEBT_NOT_SAVED_LABEL,
   DEBT_OPTIONAL_SUFFIX,
+  DEBT_ORIGINATED_ON_HINT,
+  DEBT_ORIGINATED_ON_LABEL,
   DEBT_REAL_ESTATE_LOAN_NOTICE,
   DEBT_REMOVE_ROW_LABEL,
   DEBT_REPAYMENT_PERIOD_LABEL,
@@ -145,7 +148,10 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
         手動入力・自動計算なしであることを最初に示す(要件定義書 4.8)。
         マネーフォワードが負債をCSVに出力しないため、この画面だけが負債の入り口になる
       */}
-      <p className="rounded-md bg-muted p-4 text-sm text-muted-foreground">{DEBT_SCREEN_NOTICE}</p>
+      {/* 画面の前提の説明であってエラーでも完了でもないので、読み上げの対象にしない */}
+      <Alert variant="info" role={undefined}>
+        {DEBT_SCREEN_NOTICE}
+      </Alert>
 
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
@@ -221,6 +227,58 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {/*
+                      発生年月。資産推移グラフがこの月から負債を差し引き始める
+                      (docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。
+                      残債の履歴はB11で保存したときにしか積まれないので、これが無いと
+                      段差が「借りた月」ではなく「アプリに登録した月」に出る。
+                      金額欄と違い`type="month"`にするのは、`yyyy-MM`の形をブラウザに
+                      揃えさせるため(手入力の表記ゆれをこちらで正規化せずに済む)
+                    */}
+                    <Field>
+                      <FieldLabel htmlFor={`debt-originated-on-${field.rowKey}`}>
+                        {DEBT_ORIGINATED_ON_LABEL}
+                        <span className="font-normal text-muted-foreground">
+                          ・{DEBT_OPTIONAL_SUFFIX}
+                        </span>
+                      </FieldLabel>
+                      <Input
+                        id={`debt-originated-on-${field.rowKey}`}
+                        type="month"
+                        autoComplete="off"
+                        className="tabular-nums"
+                        disabled={saving}
+                        aria-invalid={errors.debts?.[index]?.originatedOn !== undefined}
+                        aria-describedby={
+                          /*
+                            エラーが出ているあいだはエラー文、それ以外はヒント文を指す。
+                            `FieldError`は`role="alert"`を持つので発生時には読み上げられるが、
+                            あとからこの欄へフォーカスしたときに理由を辿れるのは
+                            `aria-describedby`で結び付けている側だけ。ヒント文を持つ欄は
+                            この欄だけなので、この分岐もここにしか要らない
+                          */
+                          errors.debts?.[index]?.originatedOn === undefined
+                            ? `debt-originated-on-hint-${field.rowKey}`
+                            : `debt-originated-on-error-${field.rowKey}`
+                        }
+                        {...register(`debts.${index}.originatedOn`)}
+                      />
+                      <FieldError
+                        id={`debt-originated-on-error-${field.rowKey}`}
+                        errors={[errors.debts?.[index]?.originatedOn]}
+                      />
+                      {/*
+                        入れても負債サマリ・円グラフ・ゲージの数字は変わらないので、
+                        何のための欄かを添えないと入力されないまま残る(同要件B11)
+                      */}
+                      <p
+                        id={`debt-originated-on-hint-${field.rowKey}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        {DEBT_ORIGINATED_ON_HINT}
+                      </p>
+                    </Field>
+
                     <Field>
                       <FieldLabel htmlFor={`debt-rate-${field.rowKey}`}>
                         {DEBT_INTEREST_RATE_LABEL}
