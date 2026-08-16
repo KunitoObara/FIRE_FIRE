@@ -440,3 +440,31 @@ B11の `categoryAxes.debtIds` はこの形にできた(実際、既存ドキュ�
 5. 本文には**含まれるカード**と、**STGで確認した範囲 / していない範囲**を書く。claude-review が走らない以上、ここが唯一の申し送りになる
 6. **マージはPO。** feature のPRと同じ。ただしリリースPRの head は `develop` **ブランチそのもの**なので、待っている間に `develop` へ別のPRが入ると**差分だけが黙って増える**。本文の「含まれるカード」が実態に追いつかなくなるため、2本目を作るのではなく本文を直す
 7. **マージしたら `deploy.yml` の結果を見る。** 失敗は GitHub の通知でしか気づけない。デプロイが途中で落ちると、Functions だけ新しくフロントエンドが古い、のような中途半端な状態が本番に残りうる
+
+### リリースブランチを使う場合(例外)
+
+**既定は head が `develop` そのものの直PRである。** それでは困る回だけ、`develop` から切ったリリースブランチを head にする。どちらにするかはPOが決める。
+
+**切る理由になるもの**
+
+- **差分が大きく、PRが開いている間 `develop` を止めたくない。** 直PRの head は `develop` なので、開いている間に入ったマージがそのPRの中身に黙って混ざる(手順の要点6)。ブランチを切れば、出す内容はその時点で固定される
+- **`main` を head 側へ取り込む必要がある。** `main` には過去のリリースのマージコミットが載っていて `develop` へは戻していないため、`develop` は `main` の先端を含まない。両ブランチとも「Require branches to be up to date before merging」が有効なので([ci-cd-setup.md](./ci-cd-setup.md) 6章)、リリースPRが「基底が古い」と判定されうる。直PRでこれを解くと `main` を `develop` へ取り込むことになり、STGへ出したものと `develop` の先端がずれる。リリースブランチなら取り込みをそこに閉じ込められる
+
+**手順**(直PRとの差分だけ)
+
+1. **STGに出ている先端から切る。** 手順の要点1の確認を先に済ませ、`deploy.yml` が成功した `headSha` と一致する `origin/develop` から切る
+
+   ```bash
+   git fetch origin
+   git switch -c release/YYYY-MM-DD origin/develop
+   git push -u origin release/YYYY-MM-DD
+   ```
+
+2. ブランチ名は `release/YYYY-MM-DD`。カードの作業ではないので `feature/fire-fire-<カードID>` は使わない(5章)
+3. `gh pr create --base main --head release/YYYY-MM-DD`。タイトルと本文の規約は直PRと同じ
+4. 「基底が古い」と言われたら、**このブランチにだけ `main` を取り込む**(GitHubの Update branch でもよい)。`develop` は触らない
+5. マージされたらブランチを削除する
+
+**このブランチに新しい変更を積まない。** 直すものが見つかったら `develop` で直してSTGで確認し、**リリースブランチを切り直す。** `deploy.yml` は `develop` と `main` にしか反応しないので、ここに積んだものはSTGで一度も動かないまま本番へ入る。手順4の `main` の取り込みだけが例外で、これは既に本番に出ているものを足す操作なので、本番へ入る内容は変わらない。
+
+**CIとレビューの扱いは直PRと同じ。** `ci.yml` は `main` 宛てのPRで走り(4ジョブとも必須チェック)、`claude-review` は `develop` 宛てだけなので走らない(9章)。`deploy.yml` は `release/*` への push には反応しない。

@@ -450,7 +450,7 @@ Upgrade to GitHub Pro or make this repository public to enable this feature.
 - 「Do not allow bypassing the above settings」（管理者にも適用）
   - 入れないと、リポジトリ管理者である開発者本人は既定ですべてを迂回できる。1 人開発なので迂回しない運用も成り立つが、規律をツール側に持たせる方針（`gh pr merge` の deny、force push のフック）と揃える
 - 「Require approvals」は**設定しない**。1 人開発では自分の PR を自分で承認できず、マージが不可能になる
-- `main` は加えて、`develop` からの PR のみ受け付ける運用とする
+- `main` は加えて、**`develop` か、`develop` から切ったリリースブランチ `release/*` からの PR のみ**受け付ける運用とする（[開発フロー](./development-workflow.md) 10 章。リリースブランチは差分が大きい回の例外で、`main` の過去のリリースマージを `develop` を汚さずに取り込むためにも使う）
 
 ### マージできるユーザーを名指しで限定することについて
 
