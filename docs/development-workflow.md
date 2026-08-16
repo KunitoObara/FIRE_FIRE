@@ -463,7 +463,7 @@ B11の `categoryAxes.debtIds` はこの形にできた(実際、既存ドキュ�
 2. ブランチ名は `release/YYYY-MM-DD`。カードの作業ではないので `feature/fire-fire-<カードID>` は使わない(5章)
 3. `gh pr create --base main --head release/YYYY-MM-DD`。タイトルと本文の規約は直PRと同じ
 4. 「基底が古い」と言われたら、**このブランチにだけ `main` を取り込む**(GitHubの Update branch でもよい)。`develop` は触らない
-5. マージされたらブランチを削除する
+5. **デプロイの成功を確かめたらブランチを削除する。** リポジトリの `delete_branch_on_merge` は無効なので、マージしただけでは消えない(`/release` のB節に手順がある)
 
 **このブランチに新しい変更を積まない。** 直すものが見つかったら `develop` で直してSTGで確認し、**リリースブランチを切り直す。** `deploy.yml` は `develop` と `main` にしか反応しないので、ここに積んだものはSTGで一度も動かないまま本番へ入る。手順4の `main` の取り込みだけが例外で、これは既に本番に出ているものを足す操作なので、本番へ入る内容は変わらない。
 
