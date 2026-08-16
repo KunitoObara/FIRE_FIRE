@@ -238,8 +238,10 @@ A10 が問い合わせ先を掲げる以上、受け口が要る。メールア�
 | 送信経路 | Cloud Functions の callable(`sendContactMessage`)から Resend の HTTP API。ログイン通知と同じ `sendMail` を使う |
 | 保存 | **しない。** 問い合わせの内容はFirestoreにもどこにも残さず、メールとして送るだけ |
 | 入力 | 返信先のメールアドレスと本文。本文は2,000文字まで |
-| 失敗時 | 画面にメッセージを出して再送を促す。理由は `throttled` / `send-failed` / `not-configured` の3つ |
+| 失敗時 | 画面にメッセージを出して再送を促す。理由は**A11固有の4つ**(`throttled` / `send-failed` / `not-configured` / `invalid-argument`)と、**callableで共通の3つ**(`configuration-error` / `unavailable` / `unknown`) |
 
+- **失敗の文言そのものはここに書かない。** 正は `src/frontend/src/constants/public.ts` の `CONTACT_FAILURE_MESSAGES` で、写すと要件書の側が先に古くなる(実際、`invalid-argument` の追加とcallable共通の理由の導入に追随できておらず「3つ」のまま残っていた)。理由の種類が増えたかどうかは `ContactFailureReason`(`src/frontend/src/types/contact.d.ts`)を見る
+  - callable共通の3つは他の画面と同じ扱いで、A11に固有の仕様ではない。`unavailable` / `unknown` は表示の文言が `send-failed` と同じなので、**画面に出る文言としては5種**になる
 - **保存しないのは、A10の「取得しない情報」の方針と揃えるため。** 併せて、**未ログインから書けるFirestoreの領域を増やさずに済む**
 - 受信先が Resend アカウントの登録アドレスに限られる制約はログイン通知と同じ(共有ドメインを使っているため)。問い合わせの宛先は開発者自身なので成立する
 
