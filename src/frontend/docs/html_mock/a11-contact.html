@@ -67,11 +67,17 @@
       </div>
 
       <!-- 送信できなかったときの表示。**入力内容はそのまま残す**(消すと書き直しを強いる)。
-           実装は失敗理由ごとに文言を出し分ける(CONTACT_FAILURE_MESSAGES)。ここには代表として
-           send-failed を置く。残りは次のとおり。
+
+           実装は失敗理由ごとに文言を出し分ける(CONTACT_FAILURE_MESSAGES)。モックは静的なので
+           代表として send-failed を置く。**以下はA11固有の理由だけで、網羅ではない** —
+           `ContactFailureReason` にはこのほかに callable 共通の
+           configuration-error / unavailable / unknown が入る。
              throttled       : 続けての送信はお受けできません。1分ほどおいてから、もう一度お試しください。
              not-configured  : お問い合わせを受け付けられませんでした。サービス側の問題のため、時間をおいて再度お試しください。
-             invalid-argument: 入力内容をご確認のうえ、もう一度お試しください。 -->
+             invalid-argument: 入力内容をご確認のうえ、もう一度お試しください。
+
+           **文言の一覧をここに写し取らない。** 写すとこのコメント自体が実装より古くなる。
+           正は src/constants/public.ts で、ここは代表を1つ描くためだけの覚書に留める。 -->
       <div id="error-notice" class="alert alert-error mb-6 hidden">
         <span>お問い合わせを送信できませんでした。時間をおいて再度お試しください。</span>
       </div>
