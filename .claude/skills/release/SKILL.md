@@ -113,16 +113,18 @@ gh pr create --base main --head develop \
 **既定はA-4の直PR(`--head develop`)。** POが「リリースブランチで出す」と言ったときだけこちらを採る(正本 10章「リリースブランチを使う場合(例外)」)。**自分の判断で切り替えない。** 差分が大きくて直PRでは困りそうなときは、切り替えずに理由を添えて提案する。
 
 ```bash
+git fetch origin
 git switch -c release/YYYY-MM-DD origin/develop
 git push -u origin release/YYYY-MM-DD
 gh pr create --base main --head release/YYYY-MM-DD \
   --title "リリース YYYY-MM-DD" --body-file <file>
 ```
 
+- **`git fetch origin` を省かない**(A-1と同じ理由)。追跡ブランチが古いと `origin/develop` が過去のSHAを指し、STGに出ていない内容から切ることになる。A-1で流していても、この節だけを見て再開されることがある
 - **A-1で `deploy.yml` の成功と一致を確かめた `origin/develop` から切る。** そのSHAがSTGに出ている内容そのもので、ここで切った時点の中身が本番へ行く
 - ブランチ名は `release/YYYY-MM-DD`。`feature/fire-fire-<カードID>` は使わない
-- **このブランチにコミットを積まない。** 直すものが出たら `develop` で直し、STGに出てからブランチを切り直す。`deploy.yml` は `release/*` に反応しないので、積んだものはSTGを通らずに本番へ入る
-- 「基底が古い」と出たときだけ、**このブランチに `main` を取り込む**。`develop` には取り込まない(正本 10章)
+- **このブランチにコミットを積まない。例外は無い。** 直すものが出たら `develop` で直し、STGに出てからブランチを切り直す。`deploy.yml` は `release/*` に反応しないので、積んだものはSTGを通らずに本番へ入る
+- **「基底が古い」は起きない。** `main` では up-to-date チェックを有効にしていない(正本 10章)。もし出たなら設定が戻っているので、`develop` へ `main` を取り込む前にPOへ報告する
 - **A-6の追いつかせは要らない。** head が `develop` ではないので、`develop` に別のPRが入ってもこのPRの中身は動かない。逆に、切ったあとに `develop` へ入ったものは**このリリースには入らない**ので、本文の「含まれるカード」はA-2の一覧のままでよい
 
 ### A-5. 報告してマージを待つ
@@ -188,6 +190,10 @@ gh run watch <run-id> --exit-status
 1. `gh run view <run-id> --log-failed` で落ちた場所を特定する
 2. 一過性のものなら再実行を提案する(Firebase CLI の認証は確率的に失敗することがある。[ci-cd-setup.md](../../../docs/ci-cd-setup.md) 8章)
 3. 一過性でないなら、**戻すのではなく直して出し直す**のが既定。`main` への force push も revert の直接pushも行わない。`develop` で直してから、もう一度リリースPRを出す
+
+**head が `release/*` だったときは、そのブランチを直して出し直さない。** 落ちた原因を `develop` で直し、STGに出たことを確かめてから**別の名前で切り直す**(同じ日なら `release/YYYY-MM-DD-2`)。A-4′の「コミットを積まない」がここでも効く — 落ちたブランチに修正を積むと、STGを通っていないものを本番へ入れることになる。
+
+**落ちたブランチはすぐ消さない。** 何を出して失敗したのかを追う手がかりになる。削除を促すのは、次のリリースが成功したあと(「成功したとき」の項)。
 
 **自分でロールバックしない。** 何を戻すべきかの判断はPOのもので、この工程は状況を正確に報告するところまでを受け持つ。
 
