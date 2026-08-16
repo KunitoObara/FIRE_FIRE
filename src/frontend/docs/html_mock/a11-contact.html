@@ -59,34 +59,10 @@
         本サービスについてのご質問・ご要望・不具合のご連絡は、こちらからお送りください。いただいた内容には、ご入力のメールアドレス宛にご返信します。
       </p>
 
-      <!-- 送信完了時の表示。送信できたら入力欄を空に戻す(同じ問い合わせを二重に
-           送る操作を、そのままではできないようにするため)。
-           下の ?sent=1 はモック都合の代用で、実装ではフォームの状態から判定する。 -->
-      <div id="sent-notice" class="alert alert-success mb-6 hidden">
-        <span>お問い合わせを送信しました。ご返信までしばらくお待ちください。</span>
-      </div>
-
-      <!-- 送信できなかったときの表示。**入力内容はそのまま残す**(消すと書き直しを強いる)。
-
-           実装は失敗理由ごとに文言を出し分ける(CONTACT_FAILURE_MESSAGES)。モックは静的なので
-           代表として send-failed を置く。**以下はA11固有の理由だけで、網羅ではない** —
-           `ContactFailureReason` にはこのほかに callable 共通の
-           configuration-error / unavailable / unknown が入る。
-             throttled       : 続けての送信はお受けできません。1分ほどおいてから、もう一度お試しください。
-             not-configured  : お問い合わせを受け付けられませんでした。サービス側の問題のため、時間をおいて再度お試しください。
-             invalid-argument: 入力内容をご確認のうえ、もう一度お試しください。
-
-           **文言の一覧をここに写し取らない。** 写すとこのコメント自体が実装より古くなる。
-           正は src/constants/public.ts で、ここは代表を1つ描くためだけの覚書に留める。 -->
-      <div id="error-notice" class="alert alert-error mb-6 hidden">
-        <span>お問い合わせを送信できませんでした。時間をおいて再度お試しください。</span>
-      </div>
-
       <form class="flex flex-col gap-5" onsubmit="return false;">
         <div class="field">
           <label class="label" for="email">メールアドレス</label>
           <input class="input" type="email" id="email" placeholder="you@example.com" />
-          <p class="field-hint">返信先になります。</p>
         </div>
 
         <div class="field">
@@ -104,6 +80,32 @@
         <div aria-hidden="true" class="hidden">
           <label for="website">website</label>
           <input type="text" id="website" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <!-- 送信できなかったときの表示。**入力内容はそのまま残す**(消すと書き直しを強いる)。
+
+             **枠付きの箱(`.alert`)ではなく、枠も背景も無い赤文字にする。** 実装は
+             `setError("root", ...)` → `<FieldError>` で出しており、`ui/alert.tsx` 自身が
+             「`Alert` はカード単位の通知に使い、入力欄ごとのエラーには使わない」と定めている。
+             他の認証フォームも `errors.root` はすべて `FieldError` で出している。
+
+             実装は失敗理由ごとに文言を出し分ける(CONTACT_FAILURE_MESSAGES)。モックは静的なので
+             代表として send-failed を1つ描く。**理由は全部でA11固有の4つとcallable共通の3つ**で、
+             **文言の一覧をここに写し取らない** — 写すとこのコメント自体が実装より古くなる。
+             正は src/constants/public.ts。 -->
+        <!-- `<p>` にしないのは、この画面が `.legal-body` の中にあるため。
+             `.legal-body p`(詳細度 0,1,1)が `.field-error`(0,1,0)に勝ってしまい、
+             文字が本文と同じ大きさ・色に戻る。`.legal-body` は p と li にしか当たらない。 -->
+        <div id="error-notice" class="field-error hidden">
+          お問い合わせを送信できませんでした。時間をおいて再度お試しください。
+        </div>
+
+        <!-- 送信完了時の表示。**こちらは箱(`.alert-success`)でよい** — 実装も
+             `<Alert variant="success">` で出している(フォーム単位のエラーとは別系統)。
+             送信できたら入力欄を空に戻す(同じ問い合わせを二重に送る操作を、
+             そのままではできないようにするため)。 -->
+        <div id="sent-notice" class="alert alert-success hidden">
+          <span>お問い合わせを送信しました。ご返信までしばらくお待ちください。</span>
         </div>
 
         <!-- 送信中は無効化してラベルを「送信中...」に変える。
