@@ -93,7 +93,7 @@ describe("subscribeToPublicSessionState", () => {
   });
 
   /**
-   * この4画面はFirestoreを読まず未ログインのまま完結するため、設定不足で画面ごと止めない
+   * この5画面はFirestoreを読まず未ログインのまま完結するため、設定不足で画面ごと止めない
    * (docs/screen-requirements-public.md 2章)。
    */
   it("Firebaseの設定値が足りない場合はsigned-outを通知する", () => {
