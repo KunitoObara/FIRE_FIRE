@@ -1,7 +1,7 @@
 /**
- * 公開画面(A0・A9・A10・A11)の固定文言(docs/screen-requirements-public.md)。
+ * 公開画面(A0・A9・A10・A11・A12)の固定文言(docs/screen-requirements-public.md)。
  *
- * 4画面が同じヘッダー・フッターを共有するため、コピーライトのような複数画面に出る文言は
+ * 5画面が同じヘッダー・フッターを共有するため、コピーライトのような複数画面に出る文言は
  * ここに集約する。規約・ポリシーの本文そのものは各画面のJSXに置く(条文の順序と本文が
  * 離れると読みにくくなるため)。
  */
@@ -10,7 +10,7 @@ import { Building2, ChartNoAxesCombined, PieChart, Target } from "lucide-react";
 
 import { FIREBASE_CONFIGURATION_MESSAGE } from "@/constants/auth";
 
-/** フッターのコピーライト表記。公開画面の4つで共通 */
+/** フッターのコピーライト表記。公開画面の5つで共通 */
 export const COPYRIGHT_NOTICE = "© 2026 FIRE-FIRE";
 
 /**
@@ -204,3 +204,127 @@ export const CONTACT_FAILURE_MESSAGES: Record<ContactFailureReason, string> = {
  */
 export const ACCOUNT_DELETED_NOTICE =
   "アカウントとデータを削除しました。ご利用ありがとうございました。再度ご利用になる場合は、あらためて招待をお受けください。";
+
+/** A0のフッターからA12へのリンク文言 */
+export const HELP_LINK_LABEL = "ヘルプ";
+
+/** A12 ヘルプページの見出しと説明(docs/screen-requirements-public.md A12) */
+export const HELP_TITLE = "ヘルプ";
+export const HELP_DESCRIPTION = "使い方・よくある質問・用語集をまとめています。";
+
+/**
+ * A12「使い方」の手順(docs/screen-requirements-public.md A12)。
+ *
+ * A0の「使い方」(`TOP_STEPS`)は登録前の訪問者への3行の要約で、こちらは実際に使う手順を
+ * もう少し詳しく書く。ステップの粒度が違うため`TOP_STEPS`を流用しない。
+ */
+export const HELP_USAGE_STEPS: HelpUsageStep[] = [
+  {
+    id: "export",
+    title: "マネーフォワードからCSVをエクスポートする",
+    description: "「資産残高推移」と「収入・支出詳細」の2種類に対応しています。",
+  },
+  {
+    id: "import",
+    title: "CSV取込画面で取り込む",
+    description:
+      "取込前に件数と期間のプレビューを表示します。ファイル自体はサーバーには保存しません。",
+  },
+  {
+    id: "dashboard",
+    title: "ダッシュボードで資産の推移とFIRE達成度を確認する",
+    description:
+      "資産推移・分類別内訳・収支サマリ・FIRE達成度ゲージが、取り込んだ時点の数字で並びます。",
+  },
+  {
+    id: "fire-goal",
+    title: "FIRE目標を設定する",
+    description:
+      "目標資産額と、毎月の積立額・想定利回りを登録すると、ダッシュボードに到達予測日が表示されます。",
+  },
+];
+
+/**
+ * A12「よくある質問」(docs/screen-requirements-public.md A12)。
+ *
+ * 問い合わせが増えそうな項目から採る。ここに載っていない・個別の回答が要る用件は、A11
+ * お問い合わせフォームへ誘導する。
+ */
+export const HELP_FAQ_ITEMS: HelpFaqItem[] = [
+  {
+    id: "csv-source",
+    question: "マネーフォワード以外のサービスのCSVは取り込めますか?",
+    answer:
+      "現在対応しているのは、マネーフォワードが出力する「資産残高推移」と「収入・支出詳細」の2種類のみです。",
+  },
+  {
+    id: "csv-storage",
+    question: "取り込んだCSVファイルそのものは保存されますか?",
+    answer:
+      "保存されません。ファイルはブラウザ内で解析し、集計に必要な数値だけをデータベースに保存します(詳しくはプライバシーポリシーをご覧ください)。",
+  },
+  {
+    id: "accuracy",
+    question: "表示されている金額やFIRE到達予測日は正確ですか?",
+    answer:
+      "ご自身が入力・取り込んだデータと、ご自身が設定した想定利回り等の前提に基づく計算結果です。将来の結果を保証するものではなく、投資助言ではありません。",
+  },
+  {
+    id: "forgot-password",
+    question: "パスワードを忘れてしまいました",
+    answer:
+      "ログイン画面の「パスワードをお忘れの方」から再設定できます。Googleでログインしている場合は、Googleアカウント側でパスワードを管理してください。",
+  },
+  {
+    id: "lost-authenticator",
+    question: "2段階認証の認証アプリを機種変更・紛失しました",
+    answer:
+      "発行済みのリカバリーコードでログインでき、ログイン後に2段階認証を登録し直せます。リカバリーコードも失った場合は、お問い合わせフォームからご連絡ください。",
+  },
+  {
+    id: "delete-account",
+    question: "アカウントを削除したい",
+    answer:
+      "ログイン後、アカウント設定画面からご自身で削除できます。Googleのみでログインしているアカウントは画面から削除できないため、お問い合わせフォームからご連絡ください。",
+  },
+];
+
+/**
+ * A12「用語集」(docs/screen-requirements-public.md A12)。
+ *
+ * ダッシュボード等の画面に出てくる用語のうち、初見では意味が読み取りにくいものだけを載せる。
+ * **資産分類そのもの(純金融資産・投資性資産等)は説明しない。** B4でユーザーが自由に作れる
+ * 編集可能なマスタデータであり(要件定義書 4.3)、固定の用語集に載せると決め打ちに見える。
+ * ここでは「分類軸」という仕組みの説明にとどめる。
+ */
+export const HELP_GLOSSARY_TERMS: HelpGlossaryTerm[] = [
+  {
+    id: "category-axis",
+    term: "分類軸",
+    description:
+      "資産をどの単位で集計するかの切り口です。総資産のほか、純金融資産・投資性資産のように自分で作った単位に切り替えて見られます(資産分類マスタで登録)。",
+  },
+  {
+    id: "total-assets",
+    term: "総資産(マネーフォワードの合計)",
+    description:
+      "分類軸を1つも選んでいない、既定の集計単位です。マネーフォワードの合計をそのまま使います。",
+  },
+  {
+    id: "spread",
+    term: "利ざや",
+    description:
+      "不動産の時価からローン残高を差し引いた額です。時価・ローン残高を更新するたびに計算し直します。",
+  },
+  {
+    id: "fire-achievement",
+    term: "FIRE達成度",
+    description: "目標資産額に対する、現在の資産額の割合です。",
+  },
+  {
+    id: "projected-date",
+    term: "到達予測日",
+    description:
+      "現在の資産額・毎月の積立額・想定利回りをもとに、目標資産額に到達すると計算される時期です。",
+  },
+];
