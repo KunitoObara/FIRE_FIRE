@@ -49,7 +49,15 @@ export const CategoryBreakdownCard = ({
   slices,
   netAmount,
 }: CategoryBreakdownCardProps): JSX.Element => (
-  <Card>
+  /*
+    `Card`は既定で`overflow-hidden`(角丸をクリップするため)。ここでは上書きする —
+    円グラフのツールチップ(Rechartsが同じdiv内に絶対配置で描くHTML。ポータル外)が
+    カードの境界にかかると、`overflow-hidden`のせいでツールチップの一部が見えなくなる
+    (Trelloカード Y-01「円グラフのツールチップが隠れる」)。このカードの中身はグラフと
+    凡例だけで、角丸のクリップに頼る画像等が無いため、ここだけ`overflow-visible`にしても
+    見た目に副作用が無い。
+  */
+  <Card className="overflow-visible">
     <CardHeader>
       <CardTitle className="text-sm">分類別内訳({axisName})</CardTitle>
     </CardHeader>

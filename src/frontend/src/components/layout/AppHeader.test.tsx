@@ -74,6 +74,20 @@ describe("AppHeader", () => {
 
       expect(screen.getByRole("menuitem", { name: /ログアウト/ })).toBeInTheDocument();
     });
+
+    /**
+     * モック(`common.css`の`.user-menu-panel`)は`width: 15rem`(240px)固定。既定は
+     * トリガー(アバター)の幅と`min-w-32`(128px)に依存し、メールアドレスの長さで
+     * 見た目が変わってしまう(Trelloカード Y-01)
+     */
+    it("幅を240pxに固定する(モックに合わせる)", async () => {
+      const user = userEvent.setup();
+      render(renderHeader(queryClient));
+
+      await openUserMenu(user);
+
+      expect(screen.getByRole("menu")).toHaveClass("w-60");
+    });
   });
 
   describe("ログアウト", () => {
