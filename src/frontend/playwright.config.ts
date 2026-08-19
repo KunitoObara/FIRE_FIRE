@@ -17,15 +17,19 @@ loadEnv({ path: ".env.local" });
  */
 export default defineConfig({
   testDir: "./e2e",
-  // Identity Platformのレート制限に配慮し、同時実行数を絞る(development-workflow.md 4章の
-  // 「実行環境」に関する合意事項)。CI組み込みは[X20]で別途検討する
+  // Identity Platformのレート制限に配慮し、同時実行数を絞る([X18]のリファインメント時に
+  // POと合意した実行環境の方針。development-workflow.mdには章立てされていない)。
+  // CI組み込みは[X20]で別途検討する
   fullyParallel: false,
   workers: 1,
-  // 誤って本番向けの設定でCIに検知されずに残らないよう、CI環境ではリトライさせない
+  // 常に0(CI/ローカルで分岐していない)。CIには未組み込みのため今は実害が無いが、
+  // [X20]でCIに組み込む際はCI環境でのリトライ要否とあわせて見直す
   retries: 0,
   reporter: "list",
   use: {
     baseURL: "http://localhost:3100",
+    // retriesが常に0の間はリトライ自体が起きないため実質発火しない。[X20]でretriesを
+    // 有効にするときに合わせて効かせる
     trace: "on-first-retry",
   },
   projects: [
