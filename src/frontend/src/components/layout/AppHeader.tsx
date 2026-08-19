@@ -66,7 +66,12 @@ export const AppHeader = (): JSX.Element => {
           </button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end">
+        {/*
+          幅をモック(`common.css` `.user-menu-panel`)に合わせて240px固定にする。
+          既定は`w-(--radix-dropdown-menu-trigger-width)`(トリガー=アバターの幅)と
+          `min-w-32`(128px)で、メールアドレスの長さによって見た目の幅が変わってしまう
+        */}
+        <DropdownMenuContent align="end" className="w-60">
           {/* ログアウトの前に、どのアカウントでログインしているかを確かめられるようにする */}
           {email !== null ? (
             <DropdownMenuLabel className="font-normal break-all text-muted-foreground">

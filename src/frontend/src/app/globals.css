@@ -216,4 +216,20 @@
   html {
     @apply font-sans;
   }
+
+  /*
+    クリッカブルな要素はhoverでcursor: pointerにする(Trelloカード Y-01)。Tailwind
+    v3.4以降、Preflightはbuttonにcursor: pointerを既定で当てなくなっており、
+    ブラウザ既定の`cursor: default`のままになっていた。個々のコンポーネントを
+    網羅的に触るのではなく、ここでまとめて当てる。
+
+    無効化状態は対象外にする — 押せない要素にポインタを出すと押せる誤認を与える。
+    ネイティブの`disabled`(button)と、Radix系コンポーネントが使う`aria-disabled`
+    (disabled属性を持てないdiv/liベースのメニュー項目等)の両方を除く。
+  */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href] {
+    cursor: pointer;
+  }
 }
