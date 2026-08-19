@@ -444,9 +444,10 @@ Upgrade to GitHub Pro or make this repository public to enable this feature.
   - `claude-review` は**含めない**（レビューはコメントのみで、人間の判断を残す）
   - **fork からの PR では `frontend` が必ず失敗する。** Secrets が渡らないためで、ビルドは `NEXT_PUBLIC_FIREBASE_*` を要求する（[3 章](#3-github-の-secrets--variables)）。必須チェックにしている以上そのままではマージできないが、これは意図した状態であり、外部からの PR を取り込む必要が出たときに改めて考える
   - `claude-review` は fork からの PR では**スキップ**される（失敗ではない）。必須チェックに含めていないのでマージ判定には影響しない。レビューする手順は [3 章](#外部prを手動でレビューする)
-- 「Require branches to be up to date before merging」は **`develop` だけ有効にし、`main` では有効にしない**
-  - リリース PR をマージすると、そのマージコミットは `main` にだけ残り `develop` へは戻さない。**`develop` が `main` の先端を含まない状態はリリースのたびに再発する**（2026-08-16 時点で 17 件）。`main` で有効にしていると、リリース PR を出すたびに `main` を `develop` へ取り込むことになり、STG へ出したものと `develop` の先端がずれる（[開発フロー](./development-workflow.md) 10 章）
-  - 外して失うものは小さい。このチェックが見ているのは「PR を作ったあとに base が進み、その組み合わせでは壊れる」場合だが、`main` が進むのはリリースのマージのときだけで、中身は必ず `develop` を通って STG で動いたものである。**CI 4 ジョブの必須は外さない**
+- 「Require branches to be up to date before merging」は **`develop` と `main` の両方で有効にする**
+  - 当初は「`main` では有効にしない」と決めていたが、実測と食い違ったため撤回した（[開発フロー](./development-workflow.md) 10 章「`main` の『基底が古い』は実害が無い」）。**この設定を外す作業は発生していない** — リリース PR #184（`main...release/2026-08-16` が `ahead_by 129 / behind_by 17`）が `mergeStateStatus=CLEAN` のままブロックされずにマージできたことを実測で確認しており、有効にしたままで問題ない
+  - `behind_by` の値はリリースのたびに増える（2026-08-16 時点で 17 件）が、これは「マージ内容が食い違っている」ことを意味しない。`develop → main` のリリース PR が残す `Merge pull request #N from develop` というコミットオブジェクトを、後から `develop` を切り直したブランチは（内容が同じでも）持っていない、という構造的な差分にすぎない
+  - この設定でブロックが実際に働くのは「PR を作ったあとに base が進んだ」場合だけで、`main` が進むのはリリース PR のマージのときだけ。リリース PR を 2 本同時に開かない運用（[開発フロー](./development-workflow.md) 10 章）があるため、リリース PR が開いている間に `main` が進むことはなく、`behind_by` がどれだけ大きくてもブロックされない。**CI 4 ジョブの必須は外さない**
 - Force push / ブランチ削除を禁止
   - force push はローカルでも `.claude/settings.json` の `PreToolUse` フックが止めている。こちらはサーバー側の裏付けで、二重に掛ける
 - 「Do not allow bypassing the above settings」（管理者にも適用）

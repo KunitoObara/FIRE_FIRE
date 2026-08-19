@@ -119,3 +119,26 @@ describe("CategoryBreakdownCard の凡例", () => {
     expect(within(legendRow("株式(現物)")).getByText("リスク")).toBeInTheDocument();
   });
 });
+
+describe("CategoryBreakdownCard のカード", () => {
+  /**
+   * `Card`は既定で`overflow-hidden`。円グラフのツールチップ(Rechartsが同じdiv内に
+   * 絶対配置のHTMLとして描く。ポータル外)がカード境界にかかると隠れてしまうため、
+   * このカードだけ上書きする(Trelloカード Y-01)
+   */
+  it("overflow-hiddenを上書きし、ツールチップがカード境界で切れないようにする", () => {
+    const { container } = render(
+      <CategoryBreakdownCard
+        axisName="投資性資産"
+        slices={[slice("投資信託", "投資信託", null)]}
+        netAmount={null}
+      />,
+    );
+
+    const card = container.querySelector('[data-slot="card"]');
+
+    expect(card).not.toBeNull();
+    expect(card).toHaveClass("overflow-visible");
+    expect(card).not.toHaveClass("overflow-hidden");
+  });
+});
