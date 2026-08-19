@@ -30,7 +30,12 @@ const DashboardLayout = ({ children }: AppShellProps): JSX.Element => (
         */}
         <SidebarInset className="min-w-0">
           <AppHeader />
-          <main className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</main>
+          {/*
+            `SidebarInset`の既定は`bg-background`(白)だが、モック(`common.css`の`body`)は
+            `--muted`。`SidebarInset`自体は変えず`<main>`側だけ上書きする — ヘッダー
+            (`bg-background`のまま)まで一緒に変わらないようにするため
+          */}
+          <main className="flex flex-1 flex-col gap-6 bg-muted p-4 md:p-6">{children}</main>
         </SidebarInset>
         <Toaster />
       </SidebarProvider>
