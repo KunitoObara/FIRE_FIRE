@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { APP_NAME, PRIMARY_NAV_GROUPS } from "@/constants/navigation";
 import { DASHBOARD_PATH } from "@/constants/routes";
@@ -29,11 +30,28 @@ import type { JSX } from "react";
  */
 export const AppSidebar = (): JSX.Element => {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  /*
+    SP幅(Sheetに切り替わったドロワー)でリンクを押して遷移したら、ドロワーを閉じる
+    (Trelloカード Y-01「開きっぱなし」)。PC幅の常時表示サイドバーは`isMobile`が
+    falseなので何もしない — 閉じる/開くという概念が無いこちらの挙動は変えない。
+  */
+  const handleNavigate = (): void => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   return (
     <Sidebar collapsible="offcanvas">
       <SidebarHeader className="h-15 justify-center border-b px-4">
-        <Link href={DASHBOARD_PATH} className="text-sm font-bold">
+        {/*
+          `SidebarHeader`もSP幅では`SidebarContent`と同じSheet内に描画されるため、
+          ここも押したらドロワーを閉じる対象(claude-reviewの指摘。ナビゲーション項目
+          だけに付けると、ロゴ経由の遷移だけ「開きっぱなし」が残る)
+        */}
+        <Link href={DASHBOARD_PATH} className="text-sm font-bold" onClick={handleNavigate}>
           {APP_NAME}
         </Link>
       </SidebarHeader>
@@ -46,7 +64,7 @@ export const AppSidebar = (): JSX.Element => {
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.screenId}>
                     <SidebarMenuButton asChild isActive={pathname === item.path}>
-                      <Link href={item.path}>
+                      <Link href={item.path} onClick={handleNavigate}>
                         <item.icon aria-hidden />
                         <span>{item.label}</span>
                       </Link>
