@@ -46,7 +46,12 @@ export const AppSidebar = (): JSX.Element => {
   return (
     <Sidebar collapsible="offcanvas">
       <SidebarHeader className="h-15 justify-center border-b px-4">
-        <Link href={DASHBOARD_PATH} className="text-sm font-bold">
+        {/*
+          `SidebarHeader`もSP幅では`SidebarContent`と同じSheet内に描画されるため、
+          ここも押したらドロワーを閉じる対象(claude-reviewの指摘。ナビゲーション項目
+          だけに付けると、ロゴ経由の遷移だけ「開きっぱなし」が残る)
+        */}
+        <Link href={DASHBOARD_PATH} className="text-sm font-bold" onClick={handleNavigate}>
           {APP_NAME}
         </Link>
       </SidebarHeader>
