@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 declare global {
   /**
-   * 公開画面(A0・A9・A10・A11)のヘッダー・CTAに出す導線の判定状態
+   * 公開画面(A0・A9・A10・A11・A12)のヘッダー・CTAに出す導線の判定状態
    * (docs/screen-requirements-public.md 2章)。
    *
    * `checking`を独立した状態として持つのは、**確定するまでどちらの導線も描かない**ため。
