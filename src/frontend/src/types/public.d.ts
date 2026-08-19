@@ -67,4 +67,30 @@ declare global {
     lead: string;
     body: string;
   };
+
+  /**
+   * A12「使い方」の1ステップ。表示上の番号は並び順から振る。
+   *
+   * `TopStep`(A0)と形は同じだが、A0のほうは登録前の訪問者への3行の要約、こちらは
+   * 実際に使う手順を詳しく書くもので粒度が違うため、型・定数とも分けて持つ。
+   */
+  type HelpUsageStep = {
+    id: string;
+    title: string;
+    description: string;
+  };
+
+  /** A12「よくある質問」の1項目 */
+  type HelpFaqItem = {
+    id: string;
+    question: string;
+    answer: string;
+  };
+
+  /** A12「用語集」の1項目 */
+  type HelpGlossaryTerm = {
+    id: string;
+    term: string;
+    description: string;
+  };
 }
