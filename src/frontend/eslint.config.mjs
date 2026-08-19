@@ -61,6 +61,10 @@ const eslintConfig = defineConfig([
             "**/vitest.config.ts",
             "**/vitest.setup.ts",
             "**/*.config.{ts,mts,mjs,js}",
+            // [X18] E2Eテスト基盤。e2e/配下は全体がPlaywrightのテストコードで、
+            // ヘルパー(e2e/helpers/**)もspec本体と同じくdevDependencies(@playwright/test・
+            // otplib・dotenv)しか使わない
+            "e2e/**",
           ],
         },
       ],
