@@ -41,3 +41,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright ([X18] E2Eテスト基盤。実行結果であり、fixtureのCSV(e2e/fixtures/)とは別物)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

@@ -44,11 +44,25 @@ Tailwind CSS / shadcn/ui およびその周辺ライブラリ(フォーム・チ
 
 - next/font経由でNoto Sans JP等を最適化配信(DESIGN.md 4章と同じ方針)
 
-## 5. テスト(ユニットのみ)
+## 5. テスト
 
 - **Vitest**: ユニットテストランナー。特にFIRE達成度・到達予測の計算ロジック([fire-calc-verify](../../../.claude/skills/fire-calc-verify/SKILL.md)スキルで検証する対象)を優先的にカバーする
 - **React Testing Library**: コンポーネントの最小限の振る舞いテスト
-- E2Eテストは現時点では導入しない(8章オープン課題)
+- **Playwright**: E2Eテスト([X18](https://trello.com/c/6VHGIzKA)で導入)。`src/frontend/e2e/`配下に置き、`src/**/*.{test,spec}.{ts,tsx}`だけを見るVitestの`include`設定(`vitest.config.ts`)とは対象を分けている
+
+### E2Eテストの実行方法(ローカル・手動のみ)
+
+- **接続先は常に`fire-fire-dev`(STG)。** Firebase Emulatorは使わない — TOTP・メール確認・Googleログインが動かないため(B0-1と同じ理由)。`.env.local`の`NEXT_PUBLIC_FIREBASE_*`がそのまま使われる
+- テスト専用アカウントの資格情報を`.env.local`に追加する(`.env.example`のE2E_TEST_*を参照。値は開発者本人が把握している、開発者本人のアカウントとは別のテスト専用アカウントのもの)
+  ```
+  E2E_TEST_EMAIL=
+  E2E_TEST_PASSWORD=
+  E2E_TEST_TOTP_SECRET=
+  ```
+- 初回だけ、そのテスト専用アカウントでA1サインアップ〜A2メール確認(手動でリンクをクリック)〜A3のTOTP登録を行い、A3画面に表示されるシークレットキー(スペース区切り)を上記`E2E_TEST_TOTP_SECRET`に控える(スペースは入れても除いても可)。以降のテスト実行はログイン(A4→A5)から先だけを自動化する
+- 実行: `npm run test:e2e`(内部は`playwright test`)。ローカルの`next dev`を自動起動する(ポート3100。他セッションの`npm run dev`が使う3000との衝突を避けるため)。既に3100番で起動済みならそれを再利用する
+- CIへの組み込みは行っていない(手動実行のみ。要否・頻度は別カードで検討する)
+- 画面別の網羅的なテストケースは`e2e/smoke.spec.ts`(疎通確認のみ)以外は未整備
 
 ## 6. Lint / Format
 
@@ -67,5 +81,4 @@ Tailwind CSS / shadcn/ui およびその周辺ライブラリ(フォーム・チ
 
 ## 9. 今後の検討事項(オープン課題)
 
-- E2Eテスト(Playwright等)導入の要否とタイミング
 - フロント/バックエンド間の型・バリデーションスキーマ共有(npm workspaces化)の要否
