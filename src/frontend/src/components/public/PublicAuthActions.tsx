@@ -76,7 +76,7 @@ const signedOutActions = (size: PublicAuthActionsSize): JSX.Element => {
 };
 
 /**
- * 公開画面(A0・A9・A10・A11)の導線(docs/screen-requirements-public.md 2章)。
+ * 公開画面(A0・A9・A10・A11・A12)の導線(docs/screen-requirements-public.md 2章)。
  *
  * 未ログインなら「ログイン」「サインアップ」、ログイン中は「ダッシュボードへ」1つに差し替える。
  * **ヘッダーとA0のページ内CTA(ヒーロー・下部)を同じこのコンポーネントで作る。** 置き場所ごとに
