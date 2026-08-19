@@ -20,6 +20,12 @@ export const PRIVACY_PATH = "/privacy";
  * **A0に入力欄を置かないための独立した画面である**(docs/screen-requirements-public.md A11)。
  */
 export const CONTACT_PATH = "/contact";
+/**
+ * A12 ヘルプページ。A0のフッターからリンクする。
+ *
+ * 使い方ガイド・FAQ・用語集をまとめた公開画面(docs/screen-requirements-public.md A12)。
+ */
+export const HELP_PATH = "/help";
 /** A1 サインアップ画面 */
 export const SIGNUP_PATH = "/signup";
 /** A2 メールアドレス確認待ち画面 */

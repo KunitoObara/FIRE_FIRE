@@ -1,23 +1,20 @@
 import Link from "next/link";
 
-import { CONTACT_LINK_LABEL, COPYRIGHT_NOTICE } from "@/constants/public";
-import { CONTACT_PATH, PRIVACY_PATH, TERMS_PATH } from "@/constants/routes";
+import { CONTACT_LINK_LABEL, COPYRIGHT_NOTICE, HELP_LINK_LABEL } from "@/constants/public";
+import { CONTACT_PATH, HELP_PATH, PRIVACY_PATH, TERMS_PATH } from "@/constants/routes";
 
 import type { JSX } from "react";
 
 /**
- * 公開画面(A0・A9・A10・A11)の共通フッター(docs/screen-requirements-public.md A0)。
+ * 公開画面(A0・A9・A10・A11・A12)の共通フッター(docs/screen-requirements-public.md A0)。
  *
- * 置くのはコピーライトと規約2本、それにA11 お問い合わせへのリンクだけ。**A0へ戻る導線は
- * 置かない**(ヘッダーのロゴがその役目を持つ)。規約を読んでいる人がフッターまで到達した
- * ときに欲しいのは、トップページではなくもう一方の規約である
+ * 置くのはコピーライトと規約2本、それにA12 ヘルプ・A11 お問い合わせへのリンク。**A0へ戻る
+ * 導線は置かない**(ヘッダーのロゴがその役目を持つ)。規約を読んでいる人がフッターまで
+ * 到達したときに欲しいのは、トップページではなくもう一方の規約である
  * (docs/screen-list-and-transitions.md 3.4)。
  *
- * お問い合わせは規約ではないため、`nav`を分ける(読み上げたときに「規約」の一覧に
+ * ヘルプ・お問い合わせは規約ではないため、`nav`を分ける(読み上げたときに「規約」の一覧に
  * 混ざらないようにする)。
- *
- * ヘルプページ([X2])は未着手のため、枠だけ置くことはしない
- * (docs/screen-requirements-public.md 3章)。
  */
 export const PublicFooter = (): JSX.Element => (
   <footer className="border-t bg-muted">
@@ -33,6 +30,10 @@ export const PublicFooter = (): JSX.Element => (
             プライバシーポリシー
           </Link>
         </nav>
+
+        <Link href={HELP_PATH} className="underline underline-offset-4 hover:text-foreground">
+          {HELP_LINK_LABEL}
+        </Link>
 
         <Link href={CONTACT_PATH} className="underline underline-offset-4 hover:text-foreground">
           {CONTACT_LINK_LABEL}
