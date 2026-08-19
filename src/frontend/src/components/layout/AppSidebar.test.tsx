@@ -40,5 +40,22 @@ describe("AppSidebar", () => {
 
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
+
+    /*
+      claude-reviewの指摘(PR #188)。`SidebarHeader`もSP幅では`SidebarContent`と同じ
+      Sheet内に描画されるため、ナビゲーション項目だけに閉じる処理を付けると、
+      ロゴ/アプリ名リンク経由の遷移だけ「開きっぱなし」が残っていた。
+    */
+    it("ロゴ/アプリ名リンクを押して遷移したときも、開いているドロワーを閉じる", async () => {
+      const user = userEvent.setup();
+      render(renderMobileSidebar());
+
+      await user.click(screen.getByRole("button", { name: "Toggle Sidebar" }));
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("link", { name: "FIRE-FIRE" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 });
