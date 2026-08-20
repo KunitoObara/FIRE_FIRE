@@ -83,6 +83,8 @@ export const MonthPicker = ({
     onSelect(value);
   };
 
+  const valueLabel = month === "" ? MONTH_PICKER_UNSET_LABEL : formatMonthLabel(month);
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
@@ -95,15 +97,18 @@ export const MonthPicker = ({
           disabled={disabled}
           aria-invalid={ariaInvalid}
           aria-describedby={ariaDescribedBy}
+          /*
+            見えている文字(ラベル+選択中の月)をそのまま読み上げ名にする。`<button>`は
+            アクセシブルネームの算出で「外側の`<label htmlFor>`」が「自分の中身の文字」より
+            優先されるため、`id`を指定して外側にlabelを持つ呼び出し側(B7・B11)では
+            中身のテキストだけでは選択中の月が読み上げ名に乗らない
+            (dom-accessibility-apiで実測して確認済み)。`aria-label`はそのlabel関連付けより
+            さらに優先されるため、外側labelの有無によらず確実に月を含められる
+          */
+          aria-label={`${label}${valueLabel}`}
           onBlur={onBlur}
         >
-          {/*
-            見えている文字を読み上げの名前にしたいので、ラベルは視覚的に隠して添える。
-            外側に`<label htmlFor>`(id指定時)がある呼び出し側では、そちらの表示文言が
-            読み上げ名として優先されるため、実質的には冗長だが害はない。
-          */}
-          <span className="sr-only">{label}</span>
-          {month === "" ? MONTH_PICKER_UNSET_LABEL : formatMonthLabel(month)}
+          {valueLabel}
           <ChevronDownIcon aria-hidden className="size-4 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
