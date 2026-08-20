@@ -55,9 +55,10 @@ export const UNSET_RISK_LEVEL_LABEL = "未設定";
  * 出るのはB9の一覧の中だけで、分類色の凡例やグラフと同じ画面には並ばない。
  *
  * `badgeClassName`の不透明度`/10`は、モックの新規パステル背景をそのままトークン化するのではなく
- * 既存の淡色バッジと揃えた値(`components/ui/badge.tsx`のdestructiveバリアント`bg-destructive/10
- * text-destructive`、`components/ui/alert.tsx`のerrorバリアント等、コードベース全体で`/10`に統一
- * されている)。
+ * 既存の淡色バッジと揃えた値(`components/ui/badge.tsx`のdestructiveバリアント
+ * `bg-destructive/10 text-destructive`)。`alert.tsx`のerror/successバリアントは`/8`、
+ * infoバリアントは`/6`で、コードベース全体が`/10`に統一されているわけではないが、
+ * バッジという同じ部品(`Badge`コンポーネント)の既存バリアントに揃えた。
  */
 export const ASSUMPTION_RISK_LEVELS: AssumptionRiskLevelOption[] = [
   { id: "low", label: "低", icon: Circle, badgeClassName: "bg-chart-1/10 text-chart-1" },
