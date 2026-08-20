@@ -234,7 +234,7 @@ export const HELP_USAGE_STEPS: HelpUsageStep[] = [
     id: "dashboard",
     title: "ダッシュボードで資産の推移とFIRE達成度を確認する",
     description:
-      "資産推移・分類別内訳・収支サマリ・FIRE達成度ゲージが、取り込んだ時点の数字で並びます。",
+      "資産推移・分類別内訳・FIRE達成度ゲージ・収支サマリが、取り込んだ時点の数字で並びます。",
   },
   {
     id: "fire-goal",
