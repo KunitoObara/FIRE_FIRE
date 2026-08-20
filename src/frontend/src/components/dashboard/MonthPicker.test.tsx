@@ -192,4 +192,46 @@ describe("MonthPicker", () => {
 
     expect(onBlur).toHaveBeenCalled();
   });
+
+  /**
+   * `<button>`のアクセシブルネームは、外側に`<label htmlFor>`があるとそちらが自分の中身の
+   * テキストより優先される。B7・B11のように`id`を指定して外側にlabelを持つ呼び出し側で、
+   * 中身のテキストだけに頼ると選択中の月が読み上げ名に乗らない
+   * (レビュー指摘。dom-accessibility-apiベースの`getByRole`名前一致で実測して確認した)。
+   * `aria-label`はその優先順位よりさらに強いため、外側labelの有無によらず月を含められる。
+   */
+  it("外側に<label htmlFor>があっても、読み上げ名に選択中の月を含める", () => {
+    render(
+      <div>
+        <label htmlFor="picker-with-label">発生年月</label>
+        <MonthPicker
+          id="picker-with-label"
+          month="2019-04"
+          maxMonth="2026-08"
+          label="発生年月"
+          onSelect={onSelect}
+        />
+      </div>,
+    );
+
+    expect(screen.getByRole("button", { name: "発生年月2019年4月" })).toBeInTheDocument();
+  });
+
+  it("外側に<label htmlFor>があっても、未設定のときは読み上げ名に「未設定」を含める", () => {
+    render(
+      <div>
+        <label htmlFor="picker-with-label">取得年月</label>
+        <MonthPicker
+          id="picker-with-label"
+          month=""
+          maxMonth="2026-08"
+          label="取得年月"
+          clearable
+          onSelect={onSelect}
+        />
+      </div>,
+    );
+
+    expect(screen.getByRole("button", { name: "取得年月未設定" })).toBeInTheDocument();
+  });
 });
