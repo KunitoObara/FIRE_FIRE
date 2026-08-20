@@ -4,8 +4,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 
+import { MonthPicker } from "@/components/dashboard/MonthPicker";
 import { DeleteDebtsDialog } from "@/components/debts/DeleteDebtsDialog";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import {
   NO_DEBTS_LABEL,
 } from "@/constants/debts";
 import { ASSET_CATEGORIES_PATH, DASHBOARD_PATH, REAL_ESTATE_PATH } from "@/constants/routes";
+import { toMonthKey } from "@/lib/dashboard/month";
 import {
   buildDebtDeletionPreviews,
   collectAffectedAxisNames,
@@ -77,6 +79,12 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
     保存済みの負債を新規として書き込んでしまう。
   */
   const { fields, append, remove } = useFieldArray({ control, name: "debts", keyName: "rowKey" });
+
+  /*
+    発生年月ピッカーの選べる上限(当月)。未来に借りた負債は無く、`validateOriginatedOn`が
+    検証する上限と揃える(Y-01分割計画2本目「上限は当月まで」)。
+  */
+  const maxOriginatedOn = toMonthKey(new Date());
 
   const [pendingValues, setPendingValues] = useState<DebtFormValues | null>(null);
   const [saving, setSaving] = useState(false);
@@ -232,8 +240,10 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
                       (docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。
                       残債の履歴はB11で保存したときにしか積まれないので、これが無いと
                       段差が「借りた月」ではなく「アプリに登録した月」に出る。
-                      金額欄と違い`type="month"`にするのは、`yyyy-MM`の形をブラウザに
-                      揃えさせるため(手入力の表記ゆれをこちらで正規化せずに済む)
+                      B1収支サマリの年月ピッカーと同じ`MonthPicker`を使う(Y-01)。ネイティブの
+                      `<input type="month">`より`yyyy-MM`の表記ゆれが起きにくく見た目も揃う。
+                      `register`ではなく`Controller`を介するのは、値のやり取り(`onSelect`/`month`)が
+                      `change`イベントではないため(B9リスクレベルSelectと同じ組み方)。
                     */}
                     <Field>
                       <FieldLabel htmlFor={`debt-originated-on-${field.rowKey}`}>
@@ -242,26 +252,34 @@ export const DebtInputForm = ({ debts, axes, onSave }: DebtInputScreenProps): JS
                           ・{DEBT_OPTIONAL_SUFFIX}
                         </span>
                       </FieldLabel>
-                      <Input
-                        id={`debt-originated-on-${field.rowKey}`}
-                        type="month"
-                        autoComplete="off"
-                        className="tabular-nums"
-                        disabled={saving}
-                        aria-invalid={errors.debts?.[index]?.originatedOn !== undefined}
-                        aria-describedby={
-                          /*
-                            エラーが出ているあいだはエラー文、それ以外はヒント文を指す。
-                            `FieldError`は`role="alert"`を持つので発生時には読み上げられるが、
-                            あとからこの欄へフォーカスしたときに理由を辿れるのは
-                            `aria-describedby`で結び付けている側だけ。ヒント文を持つ欄は
-                            この欄だけなので、この分岐もここにしか要らない
-                          */
-                          errors.debts?.[index]?.originatedOn === undefined
-                            ? `debt-originated-on-hint-${field.rowKey}`
-                            : `debt-originated-on-error-${field.rowKey}`
-                        }
-                        {...register(`debts.${index}.originatedOn`)}
+                      <Controller
+                        control={control}
+                        name={`debts.${index}.originatedOn`}
+                        render={({ field: originatedOnField }) => (
+                          <MonthPicker
+                            id={`debt-originated-on-${field.rowKey}`}
+                            month={originatedOnField.value}
+                            maxMonth={maxOriginatedOn}
+                            label={DEBT_ORIGINATED_ON_LABEL}
+                            clearable
+                            disabled={saving}
+                            aria-invalid={errors.debts?.[index]?.originatedOn !== undefined}
+                            aria-describedby={
+                              /*
+                                エラーが出ているあいだはエラー文、それ以外はヒント文を指す。
+                                `FieldError`は`role="alert"`を持つので発生時には読み上げられるが、
+                                あとからこの欄へフォーカスしたときに理由を辿れるのは
+                                `aria-describedby`で結び付けている側だけ。ヒント文を持つ欄は
+                                この欄だけなので、この分岐もここにしか要らない
+                              */
+                              errors.debts?.[index]?.originatedOn === undefined
+                                ? `debt-originated-on-hint-${field.rowKey}`
+                                : `debt-originated-on-error-${field.rowKey}`
+                            }
+                            onSelect={originatedOnField.onChange}
+                            onBlur={originatedOnField.onBlur}
+                          />
+                        )}
                       />
                       <FieldError
                         id={`debt-originated-on-error-${field.rowKey}`}

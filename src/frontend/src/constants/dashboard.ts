@@ -287,6 +287,15 @@ export const CASHFLOW_MONTH_PICKER_PREVIOUS_YEAR_LABEL = "前の年";
 export const CASHFLOW_MONTH_PICKER_NEXT_YEAR_LABEL = "次の年";
 
 /**
+ * 年月ピッカーが値を持たないとき(`clearable`な呼び出し側で空文字が渡されたとき)にボタンへ
+ * 出す文字(B7取得年月・B11発生年月)。B1の収支サマリは常に実在する月を渡すため出ない。
+ */
+export const MONTH_PICKER_UNSET_LABEL = "未設定";
+
+/** 年月ピッカーの「未設定に戻す」ボタンの文言(同上) */
+export const MONTH_PICKER_CLEAR_LABEL = "未設定に戻す";
+
+/**
  * 負債サマリに並べる項目の件数。超過分は「ほかN件」にまとめてB11へ渡す
  * (docs/screen-requirements-dashboard.md B1「負債サマリ」)。
  * ダッシュボードのカードは俯瞰のための場所で、全件を並べる場所ではB11がある。

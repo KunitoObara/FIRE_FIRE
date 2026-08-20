@@ -16,6 +16,7 @@ import {
   CASHFLOW_DATA_QUERY_KEY,
   CASHFLOW_DATA_STALE_TIME_MS,
   CASHFLOW_DETAIL_LINK,
+  CASHFLOW_MONTH_PICKER_LABEL,
   DASHBOARD_RETRY_LABEL,
   DASHBOARD_RETRYING_LABEL,
   NO_EXPENSE_IN_MONTH_LABEL,
@@ -105,7 +106,12 @@ export const CashflowSummaryCard = ({
       <CardHeader className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <CardTitle className="text-sm">収支サマリ</CardTitle>
-          <MonthPicker month={month} maxMonth={maxMonth} onSelect={onMonthChange} />
+          <MonthPicker
+            month={month}
+            maxMonth={maxMonth}
+            label={CASHFLOW_MONTH_PICKER_LABEL}
+            onSelect={onMonthChange}
+          />
         </div>
         <CardAction className="self-center">
           {/*

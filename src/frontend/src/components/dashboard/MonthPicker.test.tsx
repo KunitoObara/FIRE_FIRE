@@ -7,7 +7,15 @@ import { MonthPicker } from "@/components/dashboard/MonthPicker";
 const onSelect = vi.fn<(month: string) => void>();
 
 const renderPicker = (props: Partial<MonthPickerProps> = {}): void => {
-  render(<MonthPicker month="2026-08" maxMonth="2026-08" onSelect={onSelect} {...props} />);
+  render(
+    <MonthPicker
+      month="2026-08"
+      maxMonth="2026-08"
+      label="対象の年月"
+      onSelect={onSelect}
+      {...props}
+    />,
+  );
 };
 
 /** ポップオーバーを開いて月グリッドを出す */
@@ -116,5 +124,72 @@ describe("MonthPicker", () => {
     await openPicker(user);
 
     expect(screen.getByText("2026年")).toBeInTheDocument();
+  });
+
+  /**
+   * B7取得年月・B11発生年月は任意入力で、空文字を「未設定」として渡す
+   * (Y-01分割計画2本目「MonthPickerに『未設定に戻す』を追加」)。
+   */
+  describe("未設定(空文字)を扱う呼び出し側", () => {
+    it("未設定のときはボタンに「未設定」と出す", () => {
+      renderPicker({ month: "", maxMonth: "2026-08" });
+
+      expect(screen.getByRole("button", { name: /対象の年月/ })).toHaveTextContent("未設定");
+    });
+
+    it("未設定のまま開くと、maxMonthの年を表示する", async () => {
+      const user = userEvent.setup();
+      renderPicker({ month: "", maxMonth: "2025-03" });
+
+      await openPicker(user);
+
+      expect(screen.getByText("2025年")).toBeInTheDocument();
+    });
+
+    it("clearableでないときは「未設定に戻す」を出さない", async () => {
+      const user = userEvent.setup();
+      renderPicker({ month: "2026-08", maxMonth: "2026-08" });
+
+      await openPicker(user);
+
+      expect(screen.queryByRole("button", { name: "未設定に戻す" })).not.toBeInTheDocument();
+    });
+
+    it("clearableのとき「未設定に戻す」を押すと空文字で返し、ポップオーバーを閉じる", async () => {
+      const user = userEvent.setup();
+      renderPicker({ month: "2026-08", maxMonth: "2026-08", clearable: true });
+
+      await openPicker(user);
+      await user.click(screen.getByRole("button", { name: "未設定に戻す" }));
+
+      expect(onSelect).toHaveBeenCalledWith("");
+      expect(screen.queryByRole("button", { name: "未設定に戻す" })).not.toBeInTheDocument();
+    });
+
+    /** 既に未設定のときに押しても意味の無い操作なので、押せなくする */
+    it("clearableでも、すでに未設定なら「未設定に戻す」は押せない", async () => {
+      const user = userEvent.setup();
+      renderPicker({ month: "", maxMonth: "2026-08", clearable: true });
+
+      await openPicker(user);
+
+      expect(screen.getByRole("button", { name: "未設定に戻す" })).toBeDisabled();
+    });
+  });
+
+  /**
+   * `Controller`経由で使う呼び出し側(B7・B11)が`field.onBlur`を渡す。react-hook-formの
+   * `mode: "onTouched"`はこれが呼ばれて初めて「touched」を付けるため、渡された`onBlur`が
+   * トリガーボタンのblurで実際に呼ばれることを確かめる(B9リスクレベルSelectと同じ組み方)。
+   */
+  it("トリガーボタンからフォーカスが外れると、渡されたonBlurを呼ぶ", async () => {
+    const user = userEvent.setup();
+    const onBlur = vi.fn();
+    renderPicker({ onBlur });
+
+    // 開くとRadixのポップオーバーが中身へフォーカスを移すため、トリガー自体がblurする
+    await openPicker(user);
+
+    expect(onBlur).toHaveBeenCalled();
   });
 });

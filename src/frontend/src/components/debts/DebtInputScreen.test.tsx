@@ -156,9 +156,10 @@ describe("DebtInputScreen", () => {
 
   /**
    * 発生年月(B11-7)。資産推移グラフがこの月から負債を差し引き始めるための入力で、
-   * 任意(docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。
+   * 任意(docs/screen-requirements-dashboard.md B1「発生年月からの反映」)。B1収支サマリと
+   * 同じ`MonthPicker`(Y-01)なので、テキスト入力ではなくポップオーバーを開いて月を押す。
    */
-  it("発生年月を入力すると、その値を保存に渡す", async () => {
+  it("発生年月を選ぶと、その値を保存に渡す", async () => {
     const user = userEvent.setup();
     fetchDebts.mockResolvedValue({ ok: true, debts: [] });
     renderScreen();
@@ -166,7 +167,13 @@ describe("DebtInputScreen", () => {
     await user.click(await screen.findByRole("button", { name: /負債を追加/u }));
     await user.type(screen.getByLabelText("項目名"), "カードローン");
     await user.type(screen.getByLabelText("残債(円)"), "450000");
-    await user.type(screen.getByLabelText(/発生年月/u), "2019-04");
+    await user.click(screen.getByRole("button", { name: /発生年月/u }));
+    // 現在の年から2019年まで遡る。実行日に依存させないため、差分を都度計算する
+    const yearsToGoBack = new Date().getFullYear() - 2019;
+    for (let i = 0; i < yearsToGoBack; i += 1) {
+      await user.click(screen.getByRole("button", { name: "前の年" }));
+    }
+    await user.click(screen.getByRole("button", { name: "4月" }));
     await user.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
@@ -177,28 +184,27 @@ describe("DebtInputScreen", () => {
     });
   });
 
-  /** 未来に借りた負債は無い。過去のグラフに反映させないため保存を止める */
-  it("当月より後の発生年月はインラインエラーを出し、保存しない", async () => {
+  /**
+   * 未来に借りた負債は無い。過去のグラフに反映させないため、ネイティブ入力と違い
+   * ピッカーは未来の月のボタンごと押せなくする(Y-01)。
+   */
+  it("発生年月ピッカーは当月より後を選べない", async () => {
     const user = userEvent.setup();
     fetchDebts.mockResolvedValue({ ok: true, debts: [] });
     renderScreen();
 
     await user.click(await screen.findByRole("button", { name: /負債を追加/u }));
-    await user.type(screen.getByLabelText("項目名"), "カードローン");
-    await user.type(screen.getByLabelText("残債(円)"), "450000");
-    await user.type(screen.getByLabelText(/発生年月/u), "2099-12");
-    await user.click(screen.getByRole("button", { name: "保存" }));
+    await user.click(screen.getByRole("button", { name: /発生年月/u }));
 
-    expect(await screen.findByText("発生年月に未来の年月は入力できません。")).toBeInTheDocument();
-    expect(saveDebts).not.toHaveBeenCalled();
+    const currentMonth = new Date().getMonth() + 1;
 
-    /*
-      エラー中はヒント文ではなくエラー文を指す。`role="alert"`は発生した瞬間しか読み上げず、
-      あとからこの欄へフォーカスしたときに理由を辿れるのは`aria-describedby`側だけ
-    */
-    expect(screen.getByLabelText(/発生年月/u)).toHaveAccessibleDescription(
-      "発生年月に未来の年月は入力できません。",
-    );
+    expect(screen.getByRole("button", { name: `${currentMonth}月` })).toBeEnabled();
+
+    if (currentMonth < 12) {
+      expect(screen.getByRole("button", { name: `${currentMonth + 1}月` })).toBeDisabled();
+    } else {
+      expect(screen.getByRole("button", { name: "次の年" })).toBeDisabled();
+    }
   });
 
   it("項目名・残債の不正はインラインエラーを出し、保存しない", async () => {
