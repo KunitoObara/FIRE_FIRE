@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { ASSUMPTION_RISK_LEVELS, UNSET_RISK_LEVEL_LABEL } from "@/constants/assumptions";
+import { cn } from "@/lib/utils";
 
 import type { JSX } from "react";
 
@@ -13,8 +14,13 @@ import type { JSX } from "react";
  * 読み上げでは「低」「中」「高」の文字がそのまま段階を表す。
  *
  * **既定(`colored={true}`)ではモック(b9-assumption-settings.html)に合わせた角丸バッジで表示する**
- * (`--chart-1/4/8`を低不透明度で使い、新規の色トークンは定義しない。`ASSUMPTION_RISK_LEVELS`の
- * コメント参照)。B9の選択肢一覧・選択済み表示のどちらもこの形になる。
+ * (`--chart-1/4/8`を低不透明度の背景として使い、新規の色トークンは定義しない。
+ * `ASSUMPTION_RISK_LEVELS`のコメント参照)。B9の選択肢一覧・選択済み表示のどちらもこの形になる。
+ *
+ * **バッジの文字色は着色しない。** `--chart-1/4/8`は文字色としてのコントラストが検証されて
+ * いない値で、特に`--chart-4`は対白コントラストが約2.17:1しかなくWCAG AAの4.5:1を大きく
+ * 下回る。色を当てるのはアイコン(装飾・`aria-hidden`)だけに留め、文字はテーマの既定色
+ * (`Badge`の`secondary`バリアント由来)のまま可読性を保つ。
  *
  * **色を落とした形でも使える**(`colored={false}`)。B1の分類別内訳の凡例がそれで、
  * 同じ行に資産分類のスロット色が並ぶため、リスクにも色を当てると読み分けられなくなる
@@ -46,7 +52,7 @@ export const RiskLevelIndicator = ({
 
   return (
     <Badge variant="secondary" className={option.badgeClassName}>
-      <Icon aria-hidden className="size-3 fill-current" />
+      <Icon aria-hidden className={cn("size-3 fill-current", option.iconClassName)} />
       {option.label}
     </Badge>
   );
