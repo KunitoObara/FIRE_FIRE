@@ -53,11 +53,16 @@ export const UNSET_RISK_LEVEL_LABEL = "未設定";
  * をそのまま借りる。DESIGN.md 3章が「DESIGN.md側に重複した色定義を持たせない」としており、
  * ここで新しい色を定義しないため。分類別内訳の色スロットと同じトークンだが、リスクバッジが
  * 出るのはB9の一覧の中だけで、分類色の凡例やグラフと同じ画面には並ばない。
+ *
+ * `badgeClassName`の不透明度`/10`は、モックの新規パステル背景をそのままトークン化するのではなく
+ * 既存の淡色バッジと揃えた値(`components/ui/badge.tsx`のdestructiveバリアント`bg-destructive/10
+ * text-destructive`、`components/ui/alert.tsx`のerrorバリアント等、コードベース全体で`/10`に統一
+ * されている)。
  */
 export const ASSUMPTION_RISK_LEVELS: AssumptionRiskLevelOption[] = [
-  { id: "low", label: "低", icon: Circle, className: "text-chart-1" },
-  { id: "medium", label: "中", icon: Triangle, className: "text-chart-4" },
-  { id: "high", label: "高", icon: Diamond, className: "text-chart-8" },
+  { id: "low", label: "低", icon: Circle, badgeClassName: "bg-chart-1/10 text-chart-1" },
+  { id: "medium", label: "中", icon: Triangle, badgeClassName: "bg-chart-4/10 text-chart-4" },
+  { id: "high", label: "高", icon: Diamond, badgeClassName: "bg-chart-8/10 text-chart-8" },
 ];
 
 /**

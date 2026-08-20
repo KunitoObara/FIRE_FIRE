@@ -18,8 +18,12 @@ declare global {
     label: string;
     /** 色だけに頼らず段階を区別するための形状(DESIGN.md 3章) */
     icon: LucideIcon;
-    /** アイコンの色を当てるTailwindのクラス */
-    className: string;
+    /**
+     * `colored={true}`のバッジ表示で使う背景+文字色のTailwindのクラス。
+     *
+     * `colored={false}`(B1凡例)では色を一切使わないため、色クラスはこの1系統のみで足りる。
+     */
+    badgeClassName: string;
   };
 
   /**
