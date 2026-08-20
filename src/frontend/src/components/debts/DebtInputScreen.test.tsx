@@ -331,6 +331,12 @@ describe("DebtInputScreen", () => {
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
   });
 
+  /*
+    50行(DEBT_MAX_COUNT)ぶんのMonthPicker(Radix Popover)を一度にマウントする、この
+    ファイルで最も重いレンダリングになる。ネイティブの<input type="month">だった頃(約1秒)の
+    およそ2倍(約2秒)かかると実測しており、既定の5秒ぎりぎりで環境の負荷次第では超えうる
+    ため、この1件だけタイムアウトを延ばす(Y-01)。
+  */
   it("登録件数の上限に達したら「負債を追加」を押せなくする", async () => {
     fetchDebts.mockResolvedValue({
       ok: true,
@@ -344,7 +350,7 @@ describe("DebtInputScreen", () => {
 
     expect(await screen.findByRole("button", { name: /負債を追加/u })).toBeDisabled();
     expect(screen.getByText(`登録できる負債は${DEBT_MAX_COUNT}件までです。`)).toBeInTheDocument();
-  });
+  }, 10_000);
 });
 
 /**
