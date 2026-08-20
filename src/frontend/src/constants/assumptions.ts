@@ -54,16 +54,37 @@ export const UNSET_RISK_LEVEL_LABEL = "未設定";
  * ここで新しい色を定義しないため。分類別内訳の色スロットと同じトークンだが、リスクバッジが
  * 出るのはB9の一覧の中だけで、分類色の凡例やグラフと同じ画面には並ばない。
  *
- * `badgeClassName`の不透明度`/10`は、モックの新規パステル背景をそのままトークン化するのではなく
- * 既存の淡色バッジと揃えた値(`components/ui/badge.tsx`のdestructiveバリアント
- * `bg-destructive/10 text-destructive`)。`alert.tsx`のerror/successバリアントは`/8`、
- * infoバリアントは`/6`で、コードベース全体が`/10`に統一されているわけではないが、
- * バッジという同じ部品(`Badge`コンポーネント)の既存バリアントに揃えた。
+ * `badgeClassName`の不透明度`/10`は、既存の淡色バッジと揃えた値(`components/ui/badge.tsx`の
+ * destructiveバリアント`bg-destructive/10 text-destructive`)。`alert.tsx`のerror/success
+ * バリアントは`/8`、infoバリアントは`/6`で、コードベース全体が`/10`に統一されているわけでは
+ * ないが、バッジという同じ部品(`Badge`コンポーネント)の既存バリアントに揃えた。
+ *
+ * **`badgeClassName`は背景色のみで、文字色は含まない**(`iconClassName`のJSDoc参照)。
+ * `--chart-1/4/8`は文字色としてのコントラストが検証されていない値で、特に`--chart-4`は
+ * 対白コントラストが約2.17:1しかなくWCAG AAの4.5:1を大きく下回るため、文字には使わない。
  */
 export const ASSUMPTION_RISK_LEVELS: AssumptionRiskLevelOption[] = [
-  { id: "low", label: "低", icon: Circle, badgeClassName: "bg-chart-1/10 text-chart-1" },
-  { id: "medium", label: "中", icon: Triangle, badgeClassName: "bg-chart-4/10 text-chart-4" },
-  { id: "high", label: "高", icon: Diamond, badgeClassName: "bg-chart-8/10 text-chart-8" },
+  {
+    id: "low",
+    label: "低",
+    icon: Circle,
+    iconClassName: "text-chart-1",
+    badgeClassName: "bg-chart-1/10",
+  },
+  {
+    id: "medium",
+    label: "中",
+    icon: Triangle,
+    iconClassName: "text-chart-4",
+    badgeClassName: "bg-chart-4/10",
+  },
+  {
+    id: "high",
+    label: "高",
+    icon: Diamond,
+    iconClassName: "text-chart-8",
+    badgeClassName: "bg-chart-8/10",
+  },
 ];
 
 /**
