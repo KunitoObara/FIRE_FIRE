@@ -33,7 +33,7 @@ export const toDebtRowFormValues = (debt: Debt): DebtRowFormValues => ({
   id: debt.id,
   name: debt.name,
   balance: String(debt.balance),
-  // 未登録(`null`)は空文字。`<input type="month">`は空文字で「未入力」を表す
+  // 未登録(`null`)は空文字。`MonthPicker`は空文字で「未設定」を表す(Y-01)
   originatedOn: debt.originatedOn ?? "",
   interestRate: toInputValue(debt.interestRate),
   repaymentYears:
