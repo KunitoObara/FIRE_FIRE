@@ -507,11 +507,27 @@ declare global {
 
   /** 年月ピッカーのProps */
   type MonthPickerProps = {
-    /** 選択中の年月(`yyyy-MM`) */
+    /** 選択中の年月(`yyyy-MM`)。空文字は「未設定」を表す(`clearable`な呼び出し側のみ渡しうる) */
     month: string;
     /** これより後の月は選べない(`yyyy-MM`) */
     maxMonth: string;
+    /** トリガーボタンの読み上げ名。呼び出し側の文脈(B1「対象の年月」・B7「取得年月」等)で変わる */
+    label: string;
+    /** トリガーボタンのid。外側の`<FieldLabel htmlFor>`と対応させたい呼び出し側だけ渡す */
+    id?: string;
+    /** trueのとき「未設定に戻す」を出す。未入力を許す欄(B7取得年月・B11発生年月)向け */
+    clearable?: boolean;
+    disabled?: boolean;
+    "aria-invalid"?: boolean;
+    "aria-describedby"?: string;
     onSelect: (month: string) => void;
+    /**
+     * `Controller`経由で使う呼び出し側(B7・B11)が`field.onBlur`を渡す。react-hook-formの
+     * `mode: "onTouched"`はこれが呼ばれて初めて「touched」を付けるため、渡さないと
+     * インライン検証が(未来月を選べないこと以外の理由で赤くなる場合でも)保存を押すまで出ない
+     * (B9リスクレベルSelectの`Controller`と同じ理由でここも配線する)。
+     */
+    onBlur?: () => void;
   };
 
   /** 各ウィジェットのカードに共通する、データが無いときの表示のProps */

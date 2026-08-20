@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 
+import { MonthPicker } from "@/components/dashboard/MonthPicker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +28,7 @@ import {
   REAL_ESTATE_LOCATION_LABEL,
   REAL_ESTATE_NAME_LABEL,
 } from "@/constants/real-estate";
+import { toMonthKey } from "@/lib/dashboard/month";
 import { toRealEstatePropertyInput } from "@/lib/real-estate/form-values";
 import { realEstateFormSchema } from "@/schemas/real-estate";
 
@@ -89,6 +91,12 @@ export const RealEstateForm = ({
   // `watch()`はReact Compilerがメモ化できないため、購読には`useWatch`を使う
   const isRentalProperty = useWatch({ control, name: "isRentalProperty" });
 
+  /*
+    取得年月ピッカーの選べる上限(当月)。まだ取得していない物件を過去のグラフに積まないため
+    `validateAcquiredOn`が検証する上限と揃える(Y-01分割計画2本目「上限は当月まで」)。
+  */
+  const maxAcquiredOn = toMonthKey(new Date());
+
   const handleValidSubmit = async (values: RealEstateFormValues): Promise<void> => {
     setSaveError(null);
     setSaving(true);
@@ -150,28 +158,41 @@ export const RealEstateForm = ({
               (docs/screen-requirements-dashboard.md B1「不動産を含む分類軸の集計」)。
               時価・ローン残高の履歴はB7で保存したときにしか積まれないので、これが無いと
               段差が「取得した月」ではなく「アプリに登録した月」に出る(B11の発生年月と同じ)。
-              金額欄と違い`type="month"`にするのは、`yyyy-MM`の形をブラウザに揃えさせるため。
+              B1収支サマリの年月ピッカーと同じ`MonthPicker`を使う(Y-01)。ネイティブの
+              `<input type="month">`より`yyyy-MM`の表記ゆれが起きにくく見た目も揃う。
+              `register`ではなく`Controller`を介するのは、値のやり取り(`onSelect`/`month`)が
+              `change`イベントではないため(B9リスクレベルSelectと同じ組み方)。
             */}
             <Field>
               <FieldLabel htmlFor="acquiredOn">
                 {REAL_ESTATE_ACQUIRED_ON_LABEL}
                 {REAL_ESTATE_FORM_OPTIONAL_SUFFIX}
               </FieldLabel>
-              <Input
-                id="acquiredOn"
-                type="month"
-                autoComplete="off"
-                className="tabular-nums"
-                disabled={saving}
-                aria-invalid={errors.acquiredOn !== undefined}
-                /*
-                  エラーが出ているあいだはエラー文、それ以外はヒント文を指す。
-                  `FieldError`は`role="alert"`を持つので発生時には読み上げられるが、
-                  あとからこの欄へフォーカスしたときに理由を辿れるのは`aria-describedby`で
-                  結び付けている側だけ(B11の発生年月と同じ組み方)。
-                */
-                aria-describedby={errors.acquiredOn === undefined ? "acquiredOn-hint" : undefined}
-                {...register("acquiredOn")}
+              <Controller
+                control={control}
+                name="acquiredOn"
+                render={({ field: acquiredOnField }) => (
+                  <MonthPicker
+                    id="acquiredOn"
+                    month={acquiredOnField.value}
+                    maxMonth={maxAcquiredOn}
+                    label={REAL_ESTATE_ACQUIRED_ON_LABEL}
+                    clearable
+                    disabled={saving}
+                    aria-invalid={errors.acquiredOn !== undefined}
+                    /*
+                      エラーが出ているあいだはエラー文、それ以外はヒント文を指す。
+                      `FieldError`は`role="alert"`を持つので発生時には読み上げられるが、
+                      あとからこの欄へフォーカスしたときに理由を辿れるのは`aria-describedby`で
+                      結び付けている側だけ(B11の発生年月と同じ組み方)。
+                    */
+                    aria-describedby={
+                      errors.acquiredOn === undefined ? "acquiredOn-hint" : undefined
+                    }
+                    onSelect={acquiredOnField.onChange}
+                    onBlur={acquiredOnField.onBlur}
+                  />
+                )}
               />
               <FieldError errors={[errors.acquiredOn]} />
               {errors.acquiredOn === undefined ? (
