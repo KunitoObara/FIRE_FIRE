@@ -6,9 +6,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  CASHFLOW_MONTH_PICKER_LABEL,
   CASHFLOW_MONTH_PICKER_NEXT_YEAR_LABEL,
   CASHFLOW_MONTH_PICKER_PREVIOUS_YEAR_LABEL,
+  MONTH_PICKER_CLEAR_LABEL,
+  MONTH_PICKER_UNSET_LABEL,
 } from "@/constants/dashboard";
 import { buildMonthKey, formatMonthLabel, yearOfMonthKey } from "@/lib/dashboard/month";
 
@@ -32,8 +33,23 @@ const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
  * 知らない(読むのは選択中の1ヶ月だけ。docs/transaction-import-requirements.md 8章)。
  *
  * 前月/翌月の矢印は併置しない(同要件)。開けば隣の月も同じ操作数で選べる。
+ *
+ * **`month`は空文字を「未設定」として受け付ける。** B7取得年月・B11発生年月は任意入力で、
+ * 一度選んだ後でも未設定に戻せる必要がある(`clearable`)。B1の収支サマリは常に実在する月を
+ * 渡すので、この状態には入らない。
  */
-export const MonthPicker = ({ month, maxMonth, onSelect }: MonthPickerProps): JSX.Element => {
+export const MonthPicker = ({
+  month,
+  maxMonth,
+  label,
+  id,
+  clearable = false,
+  disabled = false,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedBy,
+  onSelect,
+  onBlur,
+}: MonthPickerProps): JSX.Element => {
   /*
     開閉とグリッドが表示している年。**どちらもURLには載せない。** 押して確定するまで表示は
     変わらないので、リンク共有やブラウザの戻る/進むで再現すべき状態ではない
@@ -43,7 +59,10 @@ export const MonthPicker = ({ month, maxMonth, onSelect }: MonthPickerProps): JS
     ボタンを押しても閉じないので、開いたまま残ると選んだ結果(カードの数字)が隠れる。
   */
   const [open, setOpen] = useState(false);
-  const [displayedYear, setDisplayedYear] = useState(() => yearOfMonthKey(month));
+  // 未設定(空文字)の間は`maxMonth`の年を初期表示にする。`yearOfMonthKey("")`は日付として読めない
+  const [displayedYear, setDisplayedYear] = useState(() =>
+    yearOfMonthKey(month === "" ? maxMonth : month),
+  );
 
   const maxYear = yearOfMonthKey(maxMonth);
 
@@ -55,7 +74,7 @@ export const MonthPicker = ({ month, maxMonth, onSelect }: MonthPickerProps): JS
       選択中の月がグリッドに無く、「いまどの月を見ているか」と表示がずれる
     */
     if (nextOpen) {
-      setDisplayedYear(yearOfMonthKey(month));
+      setDisplayedYear(yearOfMonthKey(month === "" ? maxMonth : month));
     }
   };
 
@@ -67,10 +86,24 @@ export const MonthPicker = ({ month, maxMonth, onSelect }: MonthPickerProps): JS
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="tabular-nums">
-          {/* 見えている文字を読み上げの名前にしたいので、ラベルは視覚的に隠して添える */}
-          <span className="sr-only">{CASHFLOW_MONTH_PICKER_LABEL}</span>
-          {formatMonthLabel(month)}
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          size="sm"
+          className="tabular-nums"
+          disabled={disabled}
+          aria-invalid={ariaInvalid}
+          aria-describedby={ariaDescribedBy}
+          onBlur={onBlur}
+        >
+          {/*
+            見えている文字を読み上げの名前にしたいので、ラベルは視覚的に隠して添える。
+            外側に`<label htmlFor>`(id指定時)がある呼び出し側では、そちらの表示文言が
+            読み上げ名として優先されるため、実質的には冗長だが害はない。
+          */}
+          <span className="sr-only">{label}</span>
+          {month === "" ? MONTH_PICKER_UNSET_LABEL : formatMonthLabel(month)}
           <ChevronDownIcon aria-hidden className="size-4 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
@@ -123,6 +156,18 @@ export const MonthPicker = ({ month, maxMonth, onSelect }: MonthPickerProps): JS
             );
           })}
         </div>
+        {clearable ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="mt-1 w-full"
+            disabled={month === ""}
+            onClick={() => handleSelect("")}
+          >
+            {MONTH_PICKER_CLEAR_LABEL}
+          </Button>
+        ) : null}
       </PopoverContent>
     </Popover>
   );
