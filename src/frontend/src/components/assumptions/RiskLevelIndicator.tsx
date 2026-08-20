@@ -1,6 +1,5 @@
 import { Badge } from "@/components/ui/badge";
 import { ASSUMPTION_RISK_LEVELS, UNSET_RISK_LEVEL_LABEL } from "@/constants/assumptions";
-import { cn } from "@/lib/utils";
 
 import type { JSX } from "react";
 
@@ -46,7 +45,7 @@ export const RiskLevelIndicator = ({
   }
 
   return (
-    <Badge variant="secondary" className={cn("gap-1", option.badgeClassName)}>
+    <Badge variant="secondary" className={option.badgeClassName}>
       <Icon aria-hidden className="size-3 fill-current" />
       {option.label}
     </Badge>
