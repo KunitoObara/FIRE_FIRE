@@ -19,10 +19,16 @@ declare global {
     /** 色だけに頼らず段階を区別するための形状(DESIGN.md 3章) */
     icon: LucideIcon;
     /**
-     * `colored={true}`のバッジ表示で使う背景+文字色のTailwindのクラス。
+     * `colored={true}`のバッジ表示で、アイコン(装飾・`aria-hidden`)にだけ当てる文字色クラス。
      *
-     * `colored={false}`(B1凡例)では色を一切使わないため、色クラスはこの1系統のみで足りる。
+     * バッジ本体の文字(「低」「中」「高」)には**当てない** — `--chart-1/4/8`は円グラフの
+     * スライス同士の識別性を目的に選ばれた色で、白背景上の小さな文字としてのコントラストは
+     * 検証されていない(`text-chart-4`は対白約2.17:1でWCAG AAの4.5:1を大きく下回る)。
+     * `--destructive`/`--success`を文字色に使う際に専用の高コントラスト値へ差し替えた前例
+     * (DESIGN.md 3章)と同じ問題が起きるため、文字は塗らずアイコンだけの装飾に留める。
      */
+    iconClassName: string;
+    /** `colored={true}`のバッジ表示で使う背景色のTailwindのクラス(`/10`の低不透明度) */
     badgeClassName: string;
   };
 
