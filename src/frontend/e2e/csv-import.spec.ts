@@ -28,15 +28,19 @@ test("資産残高推移・入出金明細のCSVを取り込み、B3に反映さ
 
   await page.goto("/csv-import");
 
-  // 資産残高推移(既定タブ、5行)
-  await page.getByLabel("CSVファイル").setInputFiles(ASSET_BALANCE_CSV);
+  // 資産残高推移(既定タブ、5行)。CsvImportScreen.tsxは取込種別タブをforceMountで
+  // 常時両方マウントしており、非表示側もCsvDropzone.tsxのinputがCSSでdisplay:none
+  // になっているだけでDOMには残る。getByLabelは非表示側を除外しないためstrict mode
+  // 違反になりうる一方、getByRoleは除外するため、アクティブな`tabpanel`にスコープ
+  // してから探す
+  await page.getByRole("tabpanel").getByLabel("CSVファイル").setInputFiles(ASSET_BALANCE_CSV);
   await expect(page.getByText("取込対象: 5件")).toBeVisible();
   await page.getByRole("button", { name: "取込を実行する" }).click();
   await expect(page.getByText(/取込が完了しました/)).toBeVisible();
 
   // 入出金明細タブへ切替(9行)
   await page.getByRole("tab", { name: "入出金明細" }).click();
-  await page.getByLabel("CSVファイル").setInputFiles(TRANSACTIONS_CSV);
+  await page.getByRole("tabpanel").getByLabel("CSVファイル").setInputFiles(TRANSACTIONS_CSV);
   await expect(page.getByText("取込対象: 9件")).toBeVisible();
   await page.getByRole("button", { name: "取込を実行する" }).click();
   await expect(page.getByText(/取込が完了しました/)).toBeVisible();
