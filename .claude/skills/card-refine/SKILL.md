@@ -23,6 +23,7 @@ description: Clarifies one under-specified backlog/ToDo Trello card so it become
 |---|---|
 | カードID(24桁の16進) | `mcp__trello__get_card` にそのまま渡す |
 | カードのURL(`https://trello.com/c/<shortLink>/...`) | **`/c/` の次の要素(8桁のshortLink)を取り出し、`mcp__trello__get_card` に渡す。** `get_card` はカードIDだけでなくshortLinkも受け付ける(実測で確認済み) |
+| shortLink単体(`4zZxDbyP` のような8桁の英数字) | URLと同じく `mcp__trello__get_card` にそのまま渡す |
 | カード名 | `mcp__trello__get_cards_by_list_id`(`nameFilter` 付き)でバックログ・ToDoの両リストから探す |
 
 **URLを `nameFilter` に渡さない。** `nameFilter` が見るのはカード名(タイトル)で、URLに入っているのはshortLinkとスラッグ化されたタイトルなので一致しない([X22-1](https://trello.com/c/4zZxDbyP))。
