@@ -42,9 +42,13 @@ test("B8: 目標資産額と毎月の積立額を保存できる", async ({ page
 test("B9: 資産種別の想定利回り・リスクレベルを保存できる", async ({ page }) => {
   await loginWithTotp(page, getE2eTestAccount());
 
-  // 編集対象の行を保証するため、自己完結でfixtureの資産残高推移を取り込んでおく
+  // 編集対象の行を保証するため、自己完結でfixtureの資産残高推移を取り込んでおく。
+  // CsvImportScreen.tsxは取込種別タブをforceMountで常時両方マウントしており、非表示側も
+  // CSSで隠れているだけでDOMには残る(input自身がCsvDropzone.tsxで常にdisplay:noneのため
+  // `:visible`フィルタでも絞り込めない)。`getByRole`は非表示側を正しく除外するため、
+  // アクティブな`tabpanel`にスコープしてから探す
   await page.goto("/csv-import");
-  await page.getByLabel("CSVファイル").setInputFiles(ASSET_BALANCE_CSV);
+  await page.getByRole("tabpanel").getByLabel("CSVファイル").setInputFiles(ASSET_BALANCE_CSV);
   await page.getByRole("button", { name: "取込を実行する" }).click();
   await expect(page.getByText(/取込が完了しました/)).toBeVisible();
 
