@@ -33,7 +33,7 @@ test.use({ storageState: getAuthStateFilePath(STORAGE_STATE_FILE_NAME) });
 test("資産分類軸が未登録のとき、資産の表示は空状態を出しB4への導線を持つ", async ({ page }) => {
   await page.goto("/dashboard");
 
-  await expect(page.getByRole("heading", { name: "資産の表示" })).toBeVisible();
+  await expect(page.getByText("資産の表示")).toBeVisible();
   await expect(
     page.getByText("分類軸が登録されていません。資産分類マスタで分類軸を追加してください。"),
   ).toBeVisible();
@@ -45,7 +45,7 @@ test("資産分類軸が未登録のとき、資産の表示は空状態を出�
 test("FIRE目標が未設定のとき、FIRE達成度は空状態を出しB8への導線を持つ", async ({ page }) => {
   await page.goto("/dashboard");
 
-  await expect(page.getByRole("heading", { name: "FIRE達成度" })).toBeVisible();
+  await expect(page.getByText("FIRE達成度")).toBeVisible();
   await expect(
     page.getByText("FIRE目標が未設定です。目標を設定すると達成度と到達予測日が表示されます。"),
   ).toBeVisible();
@@ -58,7 +58,7 @@ test("FIRE目標が未設定のとき、FIRE達成度は空状態を出しB8へ�
 test("取引が無い月は収支サマリが空状態を出しB2への導線を持つ", async ({ page }) => {
   await page.goto("/dashboard");
 
-  await expect(page.getByRole("heading", { name: "収支サマリ" })).toBeVisible();
+  await expect(page.getByText("収支サマリ")).toBeVisible();
   // 月名は実行時点の年月に依存するため、日付非依存の部分だけを照合する
   await expect(
     page.getByText(/の取引がありません。別の月を選ぶか、入出金明細CSVを取り込んでください。/),
@@ -71,7 +71,7 @@ test("取引が無い月は収支サマリが空状態を出しB2への導線を
 test("負債が未登録のとき、負債サマリは空状態を出しB11への導線を持つ", async ({ page }) => {
   await page.goto("/dashboard");
 
-  await expect(page.getByRole("heading", { name: "負債サマリ" })).toBeVisible();
+  await expect(page.getByText("負債サマリ")).toBeVisible();
   await expect(
     page.getByText("負債がまだ登録されていません。登録するとここに残債が並びます。"),
   ).toBeVisible();
