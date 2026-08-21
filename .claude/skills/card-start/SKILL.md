@@ -107,7 +107,14 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
 
 ### 6. 作業ブランチの作成
 
-質問が解決し、分割の要否が決まってから作る。**メインの作業ツリーで**まず develop を最新にする(worktreeを使う場合もここは変わらない — base refがここでの状態に依存する)。
+質問が解決し、分割の要否が決まってから作る。
+
+**まず、このセッションが既にworktreeの中にいないか確認する**(`pwd` が `.claude/worktrees/` 配下かどうか)。中にいる場合、`EnterWorktree({ name: ... })` は新規作成を拒否する(ツール自身の制約: 「Must not already be in a worktree session when creating a new worktree」)。同一セッションでカードAをworktreeで作業中(PR未マージでworktreeがまだ残っている)、続けてカードBに `/card-start` した場合がこれに当たる。
+
+- 中にいれば、`ExitWorktree({ action: "keep" })` で一旦メインツリーへ戻ってから続ける(`keep` — カードAの作業を消さない)
+- `ExitWorktree` は同一セッションで `EnterWorktree` が作ったworktreeにしか効かない。セッションをまたいで再開していて `ExitWorktree` がno-opになる場合は、`cd` でメインツリーへ直接移動する
+
+**メインの作業ツリーで**develop を最新にする(worktreeを使う場合もここは変わらない — base refがここでの状態に依存する)。
 
 ```bash
 git status --short
