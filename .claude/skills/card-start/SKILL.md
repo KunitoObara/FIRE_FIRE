@@ -46,14 +46,15 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
      ```
      **何か出力されたら削除しない。** `git branch -D` は強制削除で、mergedかどうかを見ずに消す(squash mergeのため通常の `-d` は使えない)。出力があるということはpushされていないローカル限定のコミットが残っているということで、そのまま消すと**その内容を確認なしに失う**。出力が無ければ(=リモート追跡ブランチと同じ内容)、続けて片付ける。
 
-     **片付け対象が、今まさにこのセッションがいるworktree(`pwd` と一致)かどうかで手段を分ける。**
+     **片付け対象が、今まさにこのセッションがいるworktree(`pwd` と一致)なら、先に `ExitWorktree({ action: "keep" })` でメインツリーへ戻る。** 生の `git worktree remove` でCWD自身を消すと、シェルのCWDが実在しないディレクトリを指したまま残り、以降のコマンド(`git fetch`・`git checkout develop` 等)が軒並み失敗しうる(カードBをworktreeで作業→`/card-ship`まで進めてworktreeを出ないまま、同一セッションで続けて次のカードに `/card-start` した、等で起きる)。
 
-     - **一致する場合**(カードBをworktreeで作業→`/card-ship`まで進めてworktreeを出ないまま、同一セッションで続けて次のカードに `/card-start` した、等): `ExitWorktree({ action: "remove" })` を使う。生の `git worktree remove` でCWD自身を消すと、シェルのCWDが実在しないディレクトリを指したまま残り、以降のコマンド(`git fetch`・`git checkout develop` 等)が軒並み失敗しうる。`ExitWorktree` はCWDの復元まで面倒を見る。まず `discard_changes` を付けずに呼び、未コミット・未マージのコミットが残っていて拒否されたら、そのまま報告してユーザーに確認する(安易に `discard_changes: true` を付けない)
-     - **一致しない場合**(別セッション・前回までの作業が残したworktree): 生コマンドを使う
-       ```bash
-       git worktree remove <worktreeのパス> && git branch -D <ブランチ名>
-       ```
-       **`&&` でつなぎ、`worktree remove` が失敗したら `branch -D` を実行しない。** worktreeがまだ実際に使われている(未コミットの変更が残っている)可能性があるため。`git worktree remove` は未コミットの変更が残っていると失敗する仕様で、**`--force` は付けない** — 失敗したらそのまま報告し、消してよいかをユーザーに確認する。**`ExitWorktree` はここでは使えない** — 同一セッション内で `EnterWorktree` が作ったworktreeにしか効かず、別セッションが残したworktreeには効かない(no-op)
+     `action: "remove"` ではなく `keep` を使う。`remove` は `EnterWorktree({ name: ... })` で**新規作成した**worktreeにしか使えず、`EnterWorktree({ path: ... })` で既存worktreeへ**再入場した**場合(`/card-ship`・`/card-review` の手順0のフォールバック)は仕様上拒否される。`keep` はどちらの入り方でも使え、CWDをメインツリーへ戻すだけで削除はしない。
+
+     メインツリーへ戻ったら(元々一致していなかった場合も含め)、生コマンドで実際に片付ける。
+     ```bash
+     git worktree remove <worktreeのパス> && git branch -D <ブランチ名>
+     ```
+     **`&&` でつなぎ、`worktree remove` が失敗したら `branch -D` を実行しない。** worktreeがまだ実際に使われている(未コミットの変更が残っている)可能性があるため。`git worktree remove` は未コミットの変更が残っていると失敗する仕様で、**`--force` は付けない** — 失敗したらそのまま報告し、消してよいかをユーザーに確認する。**`ExitWorktree` の `remove` はここでは使わない** — 同一セッション内で `EnterWorktree({ name: ... })` が新規作成したworktreeにしか効かない(`path` 再入場・別セッション・前回までの作業が残したworktreeには効かない)
 
      放置すると `.claude/worktrees/` に古いworktreeが `locked` のまま残り続ける([X23](https://trello.com/c/oYaYmzSN))
 7. 満たさないカードは移動せず、レビュー状況とあわせて一覧で報告する
