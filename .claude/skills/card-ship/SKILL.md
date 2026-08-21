@@ -11,7 +11,9 @@ description: Takes a finished card from commit through push to a pull request ag
 
 ### 0. 作業ディレクトリを確認する
 
-`git branch --show-current` が着手時に切ったブランチと一致するか確認する。一致しなければ、セッションをまたいでworktreeで再開した可能性がある(正本の文書 5章「作業場所」)。
+**対象カードが明確でない場合、先に確定する。** 実装からそのまま続けている場合は明確なので不要。セッションをまたいで再開した、あるいは複数カードが同時進行している(正本の文書 5章「作業場所」)などで対象が分からない場合は、進行中リストを見る — 1件ならそれを対象にする。複数ある、または判断できない場合はユーザーに確認する(`AskUserQuestion`)。
+
+対象カードが決まったら、`git branch --show-current` が着手時に切ったブランチと一致するか確認する。一致しなければ、セッションをまたいでworktreeで再開した可能性がある。
 
 - `git worktree list` に対象ブランチのworktreeが見つかれば、`EnterWorktree({ path: <そのworktreeのパス> })` で切り替える
 - 見つからなければメインの作業ツリーのはずなので、`git checkout <ブランチ名>` で切り替える
