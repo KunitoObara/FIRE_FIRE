@@ -47,10 +47,11 @@ The frontend does **not** use Firebase Emulator locally (B0-1): `.env.local` poi
 
 ## Development flow
 
-Work is driven by cards on the private Trello board **FIRE-FIRE**, reached through the `mcp__trello__*` tools (`WebFetch` cannot read it). Four skills carry a card from start to merge, and a fifth ships what has landed, with [docs/development-workflow.md](docs/development-workflow.md) as their canonical source of list/label IDs and rules:
+Work is driven by cards on the private Trello board **FIRE-FIRE**, reached through the `mcp__trello__*` tools (`WebFetch` cannot read it). Four skills carry a card from start to merge, a fifth ships what has landed, and a sixth prepares under-specified cards before any of that starts, with [docs/development-workflow.md](docs/development-workflow.md) as their canonical source of list/label IDs and rules:
 
 | | |
 |---|---|
+| `/card-refine` | Clarify one backlog/ToDo card that carries neither 詳細設計・実装 nor テスト実装 (not yet ready for `/card-start`) — read it plus related requirements docs and similar cards, **ask every open question at once**, then show the resulting description/split before writing anything, since (unlike `/card-start`'s spoken-only question phase) this writes straight back to Trello. Invoked manually per card, never as a batch scan |
 | `/card-start` | Sync merged cards to 完了 → pick a 進行中 card labelled 詳細設計・実装 or テスト実装 → read the specs → **ask every open question at once** → plan the PR split → cut `feature/fire-fire-<id>` off `develop` |
 | `/card-split` | Slice one card's work into several PRs that each pass CI alone — planned before implementation (cheap) or carved out of an already-large branch (expensive). A card is the unit of requirements, a PR is the unit of review; **one card may carry several PRs** |
 | `/card-ship` | Run the CI commands and the relevant project skills → **self-review the diff** against the fixed checklist in [docs/development-workflow.md](docs/development-workflow.md) §6 (concurrent writes, double submit, delete fallout, partial failure — the classes B11 shipped green tests over) → commit → push → open the PR against `develop` → move the card to 確認中 |
