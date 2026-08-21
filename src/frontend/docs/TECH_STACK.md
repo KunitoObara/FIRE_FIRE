@@ -60,9 +60,10 @@ Tailwind CSS / shadcn/ui およびその周辺ライブラリ(フォーム・チ
   E2E_TEST_TOTP_SECRET=
   ```
 - 初回だけ、そのテスト専用アカウントでA1サインアップ〜A2メール確認(手動でリンクをクリック)〜A3のTOTP登録を行い、A3画面に表示されるシークレットキー(スペース区切り)を上記`E2E_TEST_TOTP_SECRET`に控える(スペースは入れても除いても可)。以降のテスト実行はログイン(A4→A5)から先だけを自動化する
+- **([X19](https://trello.com/c/O02SOfp3)) A4の分岐先を実結線で確認する2本は、状態を固定した追加フィクスチャアカウントを要る任意設定。** `.env.example`の`E2E_TEST_UNVERIFIED_*`(メール未確認のまま放置)・`E2E_TEST_NO_TOTP_*`(メール確認済みだがTOTP未登録)を参照。未設定の間は該当テストが`test.skip`で見送られるだけで、スイート全体は壊れない
 - 実行: `npm run test:e2e`(内部は`playwright test`)。ローカルの`next dev`を自動起動する(ポート3100。他セッションの`npm run dev`が使う3000との衝突を避けるため)。既に3100番で起動済みならそれを再利用する
 - CIへの組み込みは行っていない(手動実行のみ。要否・頻度は別カードで検討する)
-- 画面別の網羅的なテストケースは`e2e/smoke.spec.ts`(疎通確認のみ)以外は未整備
+- 画面別のテストケースは`e2e/smoke.spec.ts`(疎通確認)・`e2e/public.spec.ts`(公開画面)・`e2e/auth-signup.spec.ts`(A1サインアップ)・`e2e/auth-login.spec.ts`(A4ログイン失敗系・A6/A7)が整備済み。他画面は[X19](https://trello.com/c/O02SOfp3)で順次追加中
 
 ## 6. Lint / Format
 
