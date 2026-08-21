@@ -104,7 +104,10 @@ Claudeが自発的にTrelloの変化を検知することはできない(Webhook
 
 既存の運用を踏襲する。
 
-- **作業場所**: メインの作業ツリー。`develop` から直接ブランチを切る(worktreeは使わない)
+- **作業場所**: **既定はメインの作業ツリー。** `develop` から直接ブランチを切る。**他に進行中のカードがあるとき(進行中リストに他のカードがある、または `git worktree list` にメイン以外のworktreeが存在する)だけ**、`EnterWorktree` で `.claude/worktrees/` 配下にworktreeを切って作業する(オプトイン。単独進行中では使わない — [X23](https://trello.com/c/oYaYmzSN))。手順は [`/card-start`](../.claude/skills/card-start/SKILL.md)「6. 作業ブランチの作成」にある。
+  - **base ref**: `.claude/settings.json` の `worktree.baseRef` を `head` にしてある。`EnterWorktree` の既定(`fresh`)は `origin/<デフォルトブランチ>` から分岐するが、ローカルの `origin/HEAD` が `main` を指したままの環境がありうる(以前デフォルトブランチが `main` だった名残)。`head` はメインツリーの**ローカル現在HEAD**から分岐するので、`git checkout develop && git pull` を先に済ませておけば、`origin/HEAD` のずれに関係なく正しく `develop` から切れる
+  - `EnterWorktree` はブランチ名を渡した `name` そのままにはせず、`worktree-` を前置し `/` を `+` に置換する(実測: `name: "feature/fire-fire-x23"` → ブランチ `worktree-feature+fire-fire-x23`)。作成直後に `git branch -m` でブランチ名規約(下記)へリネームする。worktreeの**ディレクトリ名**は `.claude/worktrees/` 配下に `+` 置換のまま残るが、他の手順から文字列一致で参照されないためリネームしない
+  - マージ済みカードのworktreeは、確認中→完了への同期(`/card-start`「1. 確認中カードのマージ同期」)に合わせて片付ける
 - **ブランチ名**: `feature/fire-fire-<カードIDを小文字にしたもの>` — 例 `feature/fire-fire-b7`、`feature/fire-fire-a5-2`
   - **PRを分割した場合のスライスは `-part<N>` を付ける**(`feature/fire-fire-b11-part1`)。連番だけを足すと枝番カードのブランチ名(`feature/fire-fire-b11-2` = カード `[B11-2]`)と衝突し、マージ同期が別のカードを完了へ動かしうる
 - **コミット/PRタイトル**: `B7 不動産登録・編集画面を実装` — 画面IDを先頭に、体言止めではなく「〜を実装」「〜に対応」

@@ -40,6 +40,17 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
    - **PRが1件以上見つかっている**
    - 見つかったPRが**すべて** `MERGED`
    - 分割計画がある場合は、**PRの数が `全N本` の N に達している**
+   - 移動したら、**そのカードのブランチ(`-partN`のスライスも含む)に対応するworktreeが残っていないか確認する**(`git worktree list`)。見つかれば片付ける
+     ```bash
+     git log <ブランチ名> --not origin/<ブランチ名> --oneline
+     ```
+     **何か出力されたら削除しない。** `git branch -D` は強制削除で、mergedかどうかを見ずに消す(squash mergeのため通常の `-d` は使えない)。出力があるということはpushされていないローカル限定のコミットが残っているということで、そのまま消すと**その内容を確認なしに失う**。出力が無ければ(=リモート追跡ブランチと同じ内容)、続けて片付ける。
+     ```bash
+     git worktree remove <worktreeのパス> && git branch -D <ブランチ名>
+     ```
+     **`&&` でつなぎ、`worktree remove` が失敗したら `branch -D` を実行しない。** worktreeがまだ実際に使われている(未コミットの変更が残っている)可能性があるため。`git worktree remove` は未コミットの変更が残っていると失敗する仕様で、**`--force` は付けない** — 失敗したらそのまま報告し、消してよいかをユーザーに確認する
+
+     **`ExitWorktree` は使わない。** このツールは同一セッション内で `EnterWorktree` が作ったworktreeにしか効かず、別セッション(あるいは前回までの作業)が残したworktreeには効かない(no-op)。放置すると `.claude/worktrees/` に古いworktreeが `locked` のまま残り続ける([X23](https://trello.com/c/oYaYmzSN))
 7. 満たさないカードは移動せず、レビュー状況とあわせて一覧で報告する
 
 **「1件以上」を省かない。** 「すべて `MERGED`」は**PRが0件のときにも成立する**(空の集合に対する「すべて」は真)。PRのURLをコメントに残し忘れた、書式が違う、コメントごと消された、といったカードが、1本もマージされていないのに完了へ動く。
@@ -96,18 +107,32 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
 
 ### 6. 作業ブランチの作成
 
-質問が解決し、分割の要否が決まってから作る。
+質問が解決し、分割の要否が決まってから作る。**メインの作業ツリーで**まず develop を最新にする(worktreeを使う場合もここは変わらない — base refがここでの状態に依存する)。
 
 ```bash
 git status --short
 git fetch origin
 git checkout develop && git pull
-git checkout -b feature/fire-fire-<カードIDを小文字にしたもの>
 ```
 
-**分割する場合はここでブランチを切らない。** `/card-split` のA-4が1本目のスライス用に `feature/fire-fire-<カードID>-part1` を切る。
-
 作業ツリーに未コミットの変更があれば、先にユーザーに確認する。勝手に stash や破棄をしない。
+
+**他に進行中のカードがあるか確認する。** 進行中リストに(これから着手するカード以外に)他のカードがある、または `git worktree list` にメイン以外のworktreeが存在するなら「あり」。
+
+- **無ければ**、これまで通りメインの作業ツリーで直接ブランチを切る
+  ```bash
+  git checkout -b feature/fire-fire-<カードIDを小文字にしたもの>
+  ```
+- **あれば**、`EnterWorktree` でworktreeを切る(オプトイン。単独進行中では使わない — 正本の文書 5章、[X23](https://trello.com/c/oYaYmzSN))
+  ```
+  EnterWorktree({ name: "feature/fire-fire-<カードIDを小文字にしたもの>" })
+  git branch -m feature/fire-fire-<カードIDを小文字にしたもの>
+  ```
+  `.claude/settings.json` の `worktree.baseRef: "head"` により、直前にpullしたメインツリーのローカル `develop` から分岐する。セッションの作業ディレクトリは自動でworktree側に切り替わるので、以降の実装・`/card-ship`・`/card-review` はそのまま続けてよい。
+
+  **`git branch -m` は省略できない。** `EnterWorktree` はブランチ名を渡した `name` そのままにはせず、`worktree-` を前置し `/` を `+` に置換する(実測: `name: "feature/fire-fire-x23"` → ブランチ `worktree-feature+fire-fire-x23`)。渡した `name` どおりのディレクトリ・ブランチ名になるわけではないため、作成直後にリネームして規約(下記)へ揃える。worktreeの**ディレクトリ名**(`.claude/worktrees/` 配下)は `name` の `/` が `+` に置換されたものになり、これはリネームしない(ブランチ名と違い、他の手順から文字列一致で参照されない)
+
+**分割する場合はここでブランチを切らない。** `/card-split` のA-4が1本目のスライス用に `feature/fire-fire-<カードID>-part1` を切る(worktreeを使う場合も同じ判断基準・同じ `name` の付け方で決める)。
 
 ### 7. 実装に入る
 
