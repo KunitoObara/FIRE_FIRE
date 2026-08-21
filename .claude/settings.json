@@ -15,6 +15,7 @@
       "mcp__trello__move_card",
       "mcp__trello__add_comment",
       "mcp__trello__add_card_to_list",
+      "mcp__trello__update_card_details",
       "Bash(gh pr view:*)",
       "Bash(gh pr checks:*)",
       "Bash(gh pr diff:*)",
