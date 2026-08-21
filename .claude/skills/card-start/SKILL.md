@@ -45,12 +45,17 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
      git log <ブランチ名> --not origin/<ブランチ名> --oneline
      ```
      **何か出力されたら削除しない。** `git branch -D` は強制削除で、mergedかどうかを見ずに消す(squash mergeのため通常の `-d` は使えない)。出力があるということはpushされていないローカル限定のコミットが残っているということで、そのまま消すと**その内容を確認なしに失う**。出力が無ければ(=リモート追跡ブランチと同じ内容)、続けて片付ける。
-     ```bash
-     git worktree remove <worktreeのパス> && git branch -D <ブランチ名>
-     ```
-     **`&&` でつなぎ、`worktree remove` が失敗したら `branch -D` を実行しない。** worktreeがまだ実際に使われている(未コミットの変更が残っている)可能性があるため。`git worktree remove` は未コミットの変更が残っていると失敗する仕様で、**`--force` は付けない** — 失敗したらそのまま報告し、消してよいかをユーザーに確認する
 
-     **`ExitWorktree` は使わない。** このツールは同一セッション内で `EnterWorktree` が作ったworktreeにしか効かず、別セッション(あるいは前回までの作業)が残したworktreeには効かない(no-op)。放置すると `.claude/worktrees/` に古いworktreeが `locked` のまま残り続ける([X23](https://trello.com/c/oYaYmzSN))
+     **片付け対象が、今まさにこのセッションがいるworktree(`pwd` と一致)かどうかで手段を分ける。**
+
+     - **一致する場合**(カードBをworktreeで作業→`/card-ship`まで進めてworktreeを出ないまま、同一セッションで続けて次のカードに `/card-start` した、等): `ExitWorktree({ action: "remove" })` を使う。生の `git worktree remove` でCWD自身を消すと、シェルのCWDが実在しないディレクトリを指したまま残り、以降のコマンド(`git fetch`・`git checkout develop` 等)が軒並み失敗しうる。`ExitWorktree` はCWDの復元まで面倒を見る。まず `discard_changes` を付けずに呼び、未コミット・未マージのコミットが残っていて拒否されたら、そのまま報告してユーザーに確認する(安易に `discard_changes: true` を付けない)
+     - **一致しない場合**(別セッション・前回までの作業が残したworktree): 生コマンドを使う
+       ```bash
+       git worktree remove <worktreeのパス> && git branch -D <ブランチ名>
+       ```
+       **`&&` でつなぎ、`worktree remove` が失敗したら `branch -D` を実行しない。** worktreeがまだ実際に使われている(未コミットの変更が残っている)可能性があるため。`git worktree remove` は未コミットの変更が残っていると失敗する仕様で、**`--force` は付けない** — 失敗したらそのまま報告し、消してよいかをユーザーに確認する。**`ExitWorktree` はここでは使えない** — 同一セッション内で `EnterWorktree` が作ったworktreeにしか効かず、別セッションが残したworktreeには効かない(no-op)
+
+     放置すると `.claude/worktrees/` に古いworktreeが `locked` のまま残り続ける([X23](https://trello.com/c/oYaYmzSN))
 7. 満たさないカードは移動せず、レビュー状況とあわせて一覧で報告する
 
 **「1件以上」を省かない。** 「すべて `MERGED`」は**PRが0件のときにも成立する**(空の集合に対する「すべて」は真)。PRのURLをコメントに残し忘れた、書式が違う、コメントごと消された、といったカードが、1本もマージされていないのに完了へ動く。
