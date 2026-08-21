@@ -104,7 +104,7 @@ Claudeが自発的にTrelloの変化を検知することはできない(Webhook
 
 既存の運用を踏襲する。
 
-- **作業場所**: **既定はメインの作業ツリー。** `develop` から直接ブランチを切る。**他に進行中のカードがあるとき(進行中リストに他のカードがある、または `git worktree list` にメイン以外のworktreeが存在する)だけ**、`EnterWorktree` で `.claude/worktrees/` 配下にworktreeを切って作業する(オプトイン。単独進行中では使わない — [X23](https://trello.com/c/oYaYmzSN))。手順は [`/card-start`](../.claude/skills/card-start/SKILL.md)「6. 作業ブランチの作成」にある。
+- **作業場所**: **既定はメインの作業ツリー。** `develop` から直接ブランチを切る。**他に進行中のカードがあるとき(進行中リストに他のカードがある、または `git worktree list` にメイン以外のworktreeが存在する)だけ**、`EnterWorktree` で `.claude/worktrees/` 配下にworktreeを切って作業する(オプトイン。単独進行中では使わない — [X23](https://trello.com/c/oYaYmzSN))。手順は [`/card-start`](../.claude/skills/card-start/SKILL.md)「6. 作業ブランチの作成」にあり、**PRを分割する場合は [`/card-split`](../.claude/skills/card-split/SKILL.md) の A-4・B-3 が同じ判定を行う**(`/card-start` 手順6はブランチ作成を `/card-split` に委譲するため)。
   - **base ref**: `.claude/settings.json` の `worktree.baseRef` を `head` にしてある。`EnterWorktree` の既定(`fresh`)は `origin/<デフォルトブランチ>` から分岐するが、ローカルの `origin/HEAD` が `main` を指したままの環境がありうる(以前デフォルトブランチが `main` だった名残)。`head` はメインツリーの**ローカル現在HEAD**から分岐するので、`git checkout develop && git pull` を先に済ませておけば、`origin/HEAD` のずれに関係なく正しく `develop` から切れる
   - `EnterWorktree` はブランチ名を渡した `name` そのままにはせず、`worktree-` を前置し `/` を `+` に置換する(実測: `name: "feature/fire-fire-x23"` → ブランチ `worktree-feature+fire-fire-x23`)。作成直後に `git branch -m` でブランチ名規約(下記)へリネームする。worktreeの**ディレクトリ名**は `.claude/worktrees/` 配下に `+` 置換のまま残るが、他の手順から文字列一致で参照されないためリネームしない
   - マージ済みカードのworktreeは、確認中→完了への同期(`/card-start`「1. 確認中カードのマージ同期」)に合わせて片付ける

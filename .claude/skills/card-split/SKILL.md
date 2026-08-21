@@ -56,14 +56,32 @@ Bは常にAより高くつく。**大きくなってから呼ばれた場合で�
 
 ### A-4. 1本目だけブランチを切って実装に入る
 
+切り方は [`/card-start`](../card-start/SKILL.md)「6. 作業ブランチの作成」と同じ。**違うのはブランチ名だけ**(`-part1` が付く)。要点を再掲する。
+
+**まず、このセッションが既にworktreeの中にいないか確認する**(`pwd` が `.claude/worktrees/` 配下かどうか)。中にいれば `ExitWorktree({ action: "keep" })` でメインツリーへ戻る — `EnterWorktree({ name: ... })` はworktreeセッションの中からの新規作成を拒否する。
+
+**メインの作業ツリーで** `develop` を最新にする。worktreeを使う場合もここは変わらない(base refがこの状態に依存する)。
+
 ```bash
 git checkout develop && git pull
-git checkout -b feature/fire-fire-<カードID>-part1
 ```
+
+**他に進行中のカードがあるか確認する。** 進行中リストに(このカード以外に)他のカードがある、または `git worktree list` にメイン以外のworktreeが存在するなら「あり」。
+
+- **無ければ**、メインの作業ツリーで直接切る
+  ```bash
+  git checkout -b feature/fire-fire-<カードID>-part1
+  ```
+- **あれば**、worktreeを切る(オプトイン。正本 5章「作業場所」)
+  ```
+  EnterWorktree({ name: "feature/fire-fire-<カードID>-part1" })
+  git branch -m feature/fire-fire-<カードID>-part1
+  ```
+  **`git branch -m` は省略できない** — `EnterWorktree` は渡した `name` そのままのブランチ名にはせず、`worktree-` を前置し `/` を `+` に置換する。実測値と理由は `/card-start`「6. 作業ブランチの作成」にある
 
 **スライスのブランチ名は `-part<N>` を付ける。連番だけを足さない。** 枝番カード(`[B11-2]`)のブランチ名が `feature/fire-fire-b11-2` なので、連番だけだと**実在する別カードのブランチと同名になる**。実際 `[B11-2]`・`[B11-3]` は存在するカードで、B11を3分割していたらスライス2・3のブランチ名がそのまま衝突していた。`/card-start` のマージ同期はカード名からブランチ名を導出するため、衝突すると別のカードを完了へ動かしうる。
 
-2本目以降は1本目がマージされてから切る(逐次が既定)。
+2本目以降は1本目がマージされてから切る(逐次が既定)。**そのとき上のworktree判定をやり直す** — 1本目のworktreeが片付いていれば「無し」に転じることがあり、逆に別カードが進行中に入れば「あり」に転じる。
 
 ---
 
@@ -116,15 +134,17 @@ git diff develop...HEAD --name-only
 
 ### B-3. スライスごとにブランチを作る
 
-元のブランチは**消さずに残す**(切り出し元として最後まで参照する)。
+元のブランチは**消さずに残す**(切り出し元として最後まで参照する)。**元のブランチがworktreeにある場合、そのworktreeも残す。**
+
+ブランチの切り方は **A-4 と同じ**(worktree判定・`EnterWorktree`・`git branch -m` を含む)。そのうえでスライスのパスを取り込む。
 
 ```bash
-git checkout develop && git pull
-git checkout -b feature/fire-fire-<カードID>-part1
 git checkout <元のブランチ> -- <このスライスのパス...>
 ```
 
-`git checkout <branch> -- <path>` は指定したパスだけを取り込む。取り込んだ後、**そのスライス単独で成立するように手で調整する**(参照が未実装の関数を呼んでいる、テストが未実装の画面を触っている、等)。
+**モードBでは判定が「あり」に倒れやすい。** 元のブランチがworktreeにあれば、それだけで `git worktree list` にメイン以外が出るため。その場合はスライスも別のworktreeで作る(元のworktreeはそのまま残る)。
+
+`git checkout <branch> -- <path>` は指定したパスだけを取り込む。**別のworktreeでチェックアウト中のブランチからでも取り込める** — ブランチの切り替えではなくファイルの取り出しなので、gitの「同じブランチを2つのworktreeで同時にチェックアウトできない」制約には掛からない(実測で確認済み)。取り込んだ後、**そのスライス単独で成立するように手で調整する**(参照が未実装の関数を呼んでいる、テストが未実装の画面を触っている、等)。
 
 ### B-4. 単独でCIを通す
 
