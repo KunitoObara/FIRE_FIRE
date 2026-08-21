@@ -40,6 +40,7 @@ gh run list --workflow claude-review.yml --branch <ブランチ名> --limit 5
 | `develop` → `main` のリリースPR | **走らない** | 仕様。トリガーが `branches: [develop]` で絞ってある。チェック自体が現れないのが正しい |
 | fork から出たPR | **走らない** | 仕様。Secretsが渡らないためジョブの `if` でスキップする |
 | ワークフローファイルを変更中のPR | 走らない | デフォルトブランチ(`develop`)上のコピーと一致するときだけ動く。`develop` に載るまで効かない |
+| UpdateBranchによる無変更rebase(内容が変わっていない`synchronize`) | **走らない** | 仕様。`before`/`after`のtreeハッシュが一致する回はジョブがチェックアウト・レビュー実行を飛ばす。Update branchを押しても新しいコメントが来ないのはこのケース |
 
 **「走らないのが正しい場合」に待ち続けない。** 上の2〜4行目に当てはまるなら、そう明示したうえでCIの結果とPOのコメントだけで進める。
 
