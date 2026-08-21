@@ -11,7 +11,9 @@ description: Waits for CI and the claude-review bot on a pull request, verifies 
 
 ### 0. 作業ディレクトリを確認する
 
-`git branch --show-current` が対象PRのブランチと一致するか確認する。一致しなければ、セッションをまたいでworktreeで再開した可能性がある(正本の文書 5章「作業場所」)。
+**対象PRが明確でない場合、先に確定する。** `/card-ship` からそのまま続けている場合は明確なので不要。セッションをまたいで再開した、あるいは複数カードが同時進行している(正本の文書 5章「作業場所」)などで対象が分からない場合は、確認中リストのカードのコメントからPR URLを探す — 1件ならそれを対象にする。複数ある、または判断できない場合はユーザーに確認する(`AskUserQuestion`)。
+
+対象PRが決まったら、`git branch --show-current` が対象PRのブランチと一致するか確認する。一致しなければ、セッションをまたいでworktreeで再開した可能性がある。
 
 - `git worktree list` に対象ブランチのworktreeが見つかれば、`EnterWorktree({ path: <そのworktreeのパス> })` で切り替える
 - 見つからなければメインの作業ツリーのはずなので、`git checkout <ブランチ名>` で切り替える
