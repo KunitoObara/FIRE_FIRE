@@ -23,8 +23,9 @@ description: Clarifies one under-specified backlog/ToDo Trello card so it become
 |---|---|
 | カードID(24桁の16進) | `mcp__trello__get_card` にそのまま渡す |
 | カードのURL(`https://trello.com/c/<shortLink>/...`) | **`/c/` の次の要素(8桁のshortLink)を取り出し、`mcp__trello__get_card` に渡す。** `get_card` はカードIDだけでなくshortLinkも受け付ける(実測で確認済み) |
-| shortLink単体(`4zZxDbyP` のような8桁の英数字) | URLと同じく `mcp__trello__get_card` にそのまま渡す |
 | カード名 | `mcp__trello__get_cards_by_list_id`(`nameFilter` 付き)でバックログ・ToDoの両リストから探す |
+
+**shortLink単体(`4zZxDbyP` のような8桁の英数字)は経路として設けない。** 「8桁の英数字」というパターンだけで判定すると、同じ形のカード名・部分文字列がshortLink側へ流れて別のカードを取得しうる(カード名は `[B8] 画面名` 形式が規約だが、`nameFilter` は部分一致なので8文字ちょうどの断片を渡す余地は残る)。呼び出し形式は上の3つ(frontmatterの `<カードID・URL・カード名>`)に揃える。
 
 **URLを `nameFilter` に渡さない。** `nameFilter` が見るのはカード名(タイトル)で、URLに入っているのはshortLinkとスラッグ化されたタイトルなので一致しない([X22-1](https://trello.com/c/4zZxDbyP))。
 
