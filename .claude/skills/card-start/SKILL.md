@@ -42,9 +42,14 @@ description: Starts work on a card in the 進行中 (in progress) list of the FI
    - 分割計画がある場合は、**PRの数が `全N本` の N に達している**
    - 移動したら、**そのカードのブランチ(`-partN`のスライスも含む)に対応するworktreeが残っていないか確認する**(`git worktree list`)。見つかれば片付ける
      ```bash
+     git fetch origin
      git log <ブランチ名> --not origin/<ブランチ名> --oneline
      ```
+     **`git fetch origin` を省かない。** このチェックが見るのはローカルの `origin/<ブランチ名>` 追跡ブランチで、それが古いと判定が環境任せになる。手順6でも `git fetch origin` を実行するが、この手順1はそれより前に走るので前提を共有できていない。
+
      **何か出力されたら削除しない。** `git branch -D` は強制削除で、mergedかどうかを見ずに消す(squash mergeのため通常の `-d` は使えない)。出力があるということはpushされていないローカル限定のコミットが残っているということで、そのまま消すと**その内容を確認なしに失う**。出力が無ければ(=リモート追跡ブランチと同じ内容)、続けて片付ける。
+
+     **`fatal: ambiguous argument 'origin/<ブランチ名>'` は未pushコミットとは別の話。** `origin/<ブランチ名>` 自体が無いとき(リモートのブランチが既に削除された、など)のエラーで、**`git fetch origin` では解消しない** — リモートに無いブランチの追跡ブランチは作られないため。この場合も**削除せず、状況をユーザーに報告して判断を仰ぐ**。比較対象が無い以上、ローカルにしか無いコミットの有無をその場で確かめる手段が無い。
 
      **片付け対象が、今まさにこのセッションがいるworktree(`pwd` と一致)なら、先に `ExitWorktree({ action: "keep" })` でメインツリーへ戻る。** 生の `git worktree remove` でCWD自身を消すと、シェルのCWDが実在しないディレクトリを指したまま残り、以降のコマンド(`git fetch`・`git checkout develop` 等)が軒並み失敗しうる(カードBをworktreeで作業→`/card-ship`まで進めてworktreeを出ないまま、同一セッションで続けて次のカードに `/card-start` した、等で起きる)。
 
