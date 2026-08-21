@@ -16,7 +16,9 @@ description: Takes a finished card from commit through push to a pull request ag
 対象カードが決まったら、`git branch --show-current` が着手時に切ったブランチと一致するか確認する。一致しなければ、セッションをまたいでworktreeで再開した可能性がある。
 
 - `git worktree list` に対象ブランチのworktreeが見つかれば、`EnterWorktree({ path: <そのworktreeのパス> })` で切り替える
-- 見つからなければメインの作業ツリーのはずなので、`git checkout <ブランチ名>` で切り替える
+- 見つからなければメインの作業ツリーのはずなので、`git checkout <ブランチ名>` で切り替える。**その前に `git status --short` で未コミットの変更を確認する。あれば先にユーザーに確認する — 勝手に stash や破棄をしない**(`/card-start`「6. 作業ブランチの作成」と同じ扱い)
+
+`git checkout` 前の確認を省かない。**`git checkout <ブランチ名>` は未コミットの変更を必ず拒否するわけではない。** 切り替え先との差分が無い追跡済みファイルの変更、および未追跡ファイルは、警告なくそのまま持ち越される。別カードの変更を抱えたまま切り替えると、以降の `git diff develop...HEAD` やコミットにそれが紛れ込む(競合する場合だけ `checkout` がエラーになり安全側に倒れる)。
 
 一致していれば(通常、実装からそのまま続けている場合)何もしなくてよい。
 
