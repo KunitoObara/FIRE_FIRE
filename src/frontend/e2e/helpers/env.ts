@@ -75,3 +75,21 @@ export const getE2eUnverifiedTestAccount = (): E2eCredentials | null =>
  */
 export const getE2eNoTotpTestAccount = (): E2eCredentials | null =>
   readOptionalCredentials("E2E_TEST_NO_TOTP_EMAIL", "E2E_TEST_NO_TOTP_PASSWORD");
+
+/**
+ * B10のアカウント削除テスト専用の、使い捨てアカウント(A1〜A3まで完了・TOTP登録済み)。
+ *
+ * 削除は取り消せないため、E2E_TEST_EMAIL(他の全specが共有するアカウント)を使うわけには
+ * いかない。このアカウントは**実行するたびに実際に削除される**ので、テストを1回実行する
+ * たびに新しいアカウントを用意し直す必要がある(分割計画コメント参照、
+ * https://trello.com/c/O02SOfp3)。未設定の間は`test.skip`で見送る。
+ */
+export const getE2eDisposableTestAccount = (): E2eTestAccount | null => {
+  const email = readOptionalEnv("E2E_TEST_DISPOSABLE_EMAIL");
+  const password = readOptionalEnv("E2E_TEST_DISPOSABLE_PASSWORD");
+  const totpSecret = readOptionalEnv("E2E_TEST_DISPOSABLE_TOTP_SECRET");
+
+  return email !== undefined && password !== undefined && totpSecret !== undefined
+    ? { email, password, totpSecret }
+    : null;
+};
