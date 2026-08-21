@@ -257,7 +257,7 @@ B11の `categoryAxes.debtIds` はこの形にできた(実際、既存ドキュ�
 
 ### 何を「レビュー」とみなすか
 
-1. **claude-review ボットのコメント** — [.github/workflows/claude-review.yml](../.github/workflows/claude-review.yml) が PR の `opened` / `synchronize` で投稿する
+1. **claude-review ボットのコメント** — [.github/workflows/claude-review.yml](../.github/workflows/claude-review.yml) が PR の `opened` / `synchronize` で投稿する。ただし `synchronize` は、直前のpushからファイルの中身が一切変わっていない(UpdateBranchボタンによる無変更rebase/マージ更新)ときは投稿されない。判定は `before`/`after` 各コミットのtreeハッシュ一致で行っており、Update branchを押しても新しいコメントが来ないのはこのケースに当たる場合の仕様どおりの動作([X21](https://trello.com/c/WnsaevQP))
 2. **CI(ci.yml)の失敗** — `wip-check` / `hooks` / `frontend` / `backend`
 3. **PO(人間)のPRコメント**
 
@@ -397,6 +397,7 @@ B11の `categoryAxes.debtIds` はこの形にできた(実際、既存ドキュ�
 - claude-review は**デフォルトブランチ(`develop`)上**のワークフローファイルと一致するときだけ実際に動く。編集しても `develop` に載るまで効かないので、レビューコメントを待つ側は「ボットが動いていない」ケースを空振りせずに判定すること(`gh run list --workflow claude-review.yml --branch <ブランチ>` で実行有無を確認する)
 - claude-review は必須チェックではない。コメントを投稿するだけでマージをブロックしない
 - **claude-review が自動で走るのは `develop` 宛てのPRだけ。** `develop` → `main` のリリースPRは対象外で、チェック自体が現れない。同じ差分は `develop` へ入る時点でレビュー済みで、2度目に新しい情報が出ないため(トリガーの `branches` で絞ってある)。`main` 宛てのPRをどうしてもレビューしたいときは `workflow_dispatch` で個別に実行する
+- **UpdateBranch(GitHubのボタンによるrebase/マージ更新)だけを理由にした `synchronize` では、claude-review は投稿されない。** `before`/`after` 各コミットのtreeハッシュが一致する(=ベースブランチが動いておらず中身が完全に同じ)ときはジョブ自体がチェックアウト・レビュー実行を飛ばす([X21](https://trello.com/c/WnsaevQP))。実際の変更を含むpushではtreeが変わるため対象外
 
 ### デフォルトブランチは `develop`
 
