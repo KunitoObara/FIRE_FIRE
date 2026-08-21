@@ -47,3 +47,7 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# [X19] ログイン済みのFirebaseセッションを保存するstorageState(実際のセッショントークンを
+# 含むため、実行結果の一種として絶対にコミットしない。fixtureのCSVとは別物)
+/e2e/.auth/
