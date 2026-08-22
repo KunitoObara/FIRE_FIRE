@@ -57,3 +57,28 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  # [X3] Sentry。DSNはクライアントバンドルに埋め込まれるため BUILD が必須で、
+  # Server Components 側の初期化(sentry.server.config.ts)からも読むので RUNTIME も付ける。
+  - variable: NEXT_PUBLIC_SENTRY_DSN
+    secret: NEXT_PUBLIC_SENTRY_DSN
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ソースマップのアップロードはビルド時にしか起きないので BUILD のみ。
+  # 実行時に渡すと、アップロード権限を持つトークンを不必要に長く生かすことになる。
+  - variable: SENTRY_AUTH_TOKEN
+    secret: SENTRY_AUTH_TOKEN
+    availability:
+      - BUILD
+
+  - variable: SENTRY_ORG
+    secret: SENTRY_ORG
+    availability:
+      - BUILD
+
+  - variable: SENTRY_PROJECT
+    secret: SENTRY_PROJECT
+    availability:
+      - BUILD
