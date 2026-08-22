@@ -1,7 +1,7 @@
 import { defineSecret } from "firebase-functions/params";
 
 /**
- * SentryのDSN([X3])。登録手順は docs/ci-cd-setup.md 16章。
+ * SentryのDSN([X3])。登録手順は docs/ci-cd-setup.md 15.6節。
  *
  * **各関数の`secrets`に入れないと実行時に値が読めない。** Secret Managerの値は
  * 関数へ明示的に結び付けたときだけ環境変数として渡るため、`defineSecret`しただけでは

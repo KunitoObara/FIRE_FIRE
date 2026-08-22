@@ -419,7 +419,7 @@ Error: Functions successfully deployed but could not set up cleanup policy in lo
 firebase functions:artifacts:setpolicy --project "$FIREBASE_PROJECT" --location "$region" --force
 ```
 
-- 保持日数は既定の1日。イメージはビルド済みの成果物で、再デプロイはソースから行えるため長く持つ理由が無い（[src/backend/docs/TECH_STACK.md](../src/backend/docs/TECH_STACK.md) 9章のコスト管理）
+- 保持日数は既定の1日。イメージはビルド済みの成果物で、再デプロイはソースから行えるため長く持つ理由が無い（[src/backend/docs/TECH_STACK.md](../src/backend/docs/TECH_STACK.md) 10章のコスト管理）
 - `$region` はワークフローに直書きせず、`firebase functions:list --json` が返すデプロイ済み関数のリージョンから引く。リージョンを増やしてもワークフローの変更は要らない
 - 冪等。設定済みのリージョンでは `No changes needed.`、`gcf-artifacts` がまだ無いリージョンでは `does not exist in Artifact Registry` と出て、**いずれも exit 0** で終わる。毎回無条件に流してよい
 - `firebase deploy` 側に `--force` を付ける方法もあるが、`--force` はソースから消えた関数の削除確認もスキップしてしまう（誤ってファイルを消したときに本番の関数が黙って消える）ため採らない
@@ -860,7 +860,7 @@ done
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
-- `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
+- `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 9章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
 ## 17. 参考リンク
 
