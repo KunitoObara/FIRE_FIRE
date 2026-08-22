@@ -34,6 +34,31 @@ describe("RiskLevelIndicator", () => {
     },
   );
 
+  /**
+   * アイコンの大きさを`colored`分岐で指定しないのは、`badgeVariants`の`[&>svg]:size-3!`が
+   * Badge配下のsvgに強制するため(Y-01-2)。**この強制は直下のsvgにしか効かない**ので、
+   * アイコンがBadgeの直接の子であることと、強制する側のクラスが残っていることを固定する。
+   * どちらかが崩れると、アイコンだけが黙って既定サイズに戻る。
+   */
+  it("coloredのアイコンはBadge直下のsvgで、大きさをアイコン側で指定しない", () => {
+    render(<RiskLevelIndicator level="low" />);
+
+    const badge = screen.getByText("低").closest('[data-slot="badge"]');
+    const icon = badge?.querySelector(":scope > svg");
+
+    expect(icon).not.toBeNull();
+    expect(icon?.getAttribute("class")).not.toContain("size-");
+    expect(badge?.className).toContain("[&>svg]:size-3!");
+  });
+
+  it("colored=falseはBadgeを使わないため、アイコン側で大きさを指定する", () => {
+    render(<RiskLevelIndicator level="low" colored={false} />);
+
+    const icon = screen.getByText("低").querySelector("svg");
+
+    expect(icon?.getAttribute("class")).toContain("size-3");
+  });
+
   it("未設定の値はバッジ化せず「未設定」の文字だけを出す", () => {
     render(<RiskLevelIndicator level="unset" />);
 
