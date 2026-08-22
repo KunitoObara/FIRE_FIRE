@@ -218,6 +218,7 @@ SDKは `' : '` で分解して `BLOCKING_FUNCTION_ERROR_RESPONSE` を `auth/inte
 
 - **コードは常に `auth/internal-error`** で、他の内部エラーと区別が付かない
 - **理由はメッセージ側にしか無い。** ただし `HttpsError` の第1引数に対応する `status` は残るため、**「未承認(`PERMISSION_DENIED`)」と「確かめられなかった(`INTERNAL`)」は区別できる**
+- **上の包みのうち `error.message` に残るのは分割後の後半だけで、`BLOCKING_FUNCTION_ERROR_RESPONSE` という文字列自体は残らない。** SDKにとってあれはエラーマップの**キー**でしかない(`_performFetchWithErrorHandling`)。判定でこの文字列を探すと、拒否されているのに一度も成立しないまま汎用の「不明なエラー」の文言が出る([A1](https://trello.com/c/idgZRaS3) で実際に起きた)。判定材料に使ってよいのは後半に残るもの、すなわち `status` を含むJSONだけである
 
 **画面はこの2つを別の文言で扱う。** fail-closedで拒否された人に「招待されていません」と伝えると、**招待済みの人に「あなたは招待されていない」と言う**ことになるため。
 

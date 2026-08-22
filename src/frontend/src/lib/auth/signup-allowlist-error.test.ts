@@ -8,7 +8,8 @@ import { detectSignUpBlockedReason } from "./signup-allowlist-error";
  *
  * 判定の材料はエラーメッセージの中身しか無いため、**実物のレスポンスを固定しておく**。
  * 下の文字列は `fire-fire-dev` へデプロイした関数に対して
- * `identitytoolkit.googleapis.com/v1/accounts:signUp` を叩いて得たものをそのまま使っている。
+ * `identitytoolkit.googleapis.com/v1/accounts:signUp` を叩いて得た応答を、
+ * **SDKが `FirebaseError` として投げ直す形**(`' : '` で分解した後半のみ)に直したものである。
  * Identity PlatformやSDKが包み方を変えたらこのテストが落ちる、という形にしておく。
  */
 
@@ -17,12 +18,16 @@ const blockingFunctionMessage = (status: string, message: string): string =>
   `Firebase: HTTP Cloud Function returned an error: {"error":{"message":"${message}","status":"${status}"}} (auth/internal-error).`;
 
 /**
- * SDKは `BLOCKING_FUNCTION_ERROR_RESPONSE : <以降>` を分解し、コロンより後ろを
- * エラーメッセージとして残す。判定はその「後ろ」だけを見ても成立しないため、
- * 実際に投げられる形(コードが `auth/internal-error`、メッセージに包みが残る)を再現する。
+ * SDKは `BLOCKING_FUNCTION_ERROR_RESPONSE : <以降>` を分解し、**コロンより後ろだけ**を
+ * エラーメッセージとして残す。前置きの `BLOCKING_FUNCTION_ERROR_RESPONSE` は
+ * エラーマップのキーに使われるだけで `error.message` には入らないため、ここでも足さない。
+ *
+ * **この固定値がSDKの実際の出力とずれていないことは、`signup-allowlist-error.sdk.test.ts`
+ * が実物のSDKに組み立てさせて確かめている。** かつてここに前置きを足していたために、
+ * 判定が実際には一度も成立しないままテストだけが緑だった([A1](https://trello.com/c/idgZRaS3))。
  */
 const internalError = (message: string): FirebaseError =>
-  new FirebaseError("auth/internal-error", `BLOCKING_FUNCTION_ERROR_RESPONSE : ${message}`);
+  new FirebaseError("auth/internal-error", message);
 
 describe("detectSignUpBlockedReason", () => {
   it("PERMISSION_DENIED は未承認として扱う", () => {

@@ -41,14 +41,13 @@ test("承認されていないメールアドレスでの作成は、拒否メ�
   await expect(page.getByRole("alertdialog", { name: "入力内容の確認" })).toBeVisible();
   await page.getByRole("button", { name: "はい" }).click();
 
-  // 本来はSIGN_UP_NOT_ALLOWED_MESSAGE(「現在はベータ版のため、招待された方のみ〜」)が
-  // 出るべきだが、detectSignUpBlockedReason(signup-allowlist-error.ts)が実際のFirebase SDK
-  // (firebase@12.16.0)に対して機能しておらず、現状は`unknown`扱いの汎用文言になる。
-  // [A1] https://trello.com/c/idgZRaS3 として起票済み。修正後はこのアサーションを
-  // SIGN_UP_NOT_ALLOWED_MESSAGEの文言に戻す。ここではアカウントが実際に作られない
-  // (画面が/signupに留まる)ことまでを確認する — 拒否そのものは正しく機能している。
+  // `SIGN_UP_NOT_ALLOWED_MESSAGE`(src/constants/auth.ts)。文言そのものを書くのは、
+  // 定数を参照すると「定数を変えたらテストの期待値も一緒に変わる」形になり、
+  // 画面に出る文言が変わったことに気づけなくなるため
   await expect(
-    page.getByText("アカウントを作成できませんでした。しばらく待ってから再度お試しください。"),
+    page.getByText(
+      "現在はベータ版のため、招待された方のみアカウントを作成できます。招待をお持ちの場合は、招待に使われたメールアドレスでお試しください。",
+    ),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/signup$/);
 });
