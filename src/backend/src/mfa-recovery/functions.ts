@@ -1,7 +1,9 @@
 import { getAuth } from "firebase-admin/auth";
-import { HttpsError, onCall } from "firebase-functions/https";
+import { HttpsError } from "firebase-functions/https";
 import { z } from "zod";
 
+import { onCallWithSentry } from "../sentry/report";
+import { SENTRY_DSN } from "../sentry/secrets";
 import {
   IDENTITY_PLATFORM_WEB_API_KEY,
   callableFailure,
@@ -134,8 +136,8 @@ const discardRecoveryCodes = async (uid: string): Promise<void> => {
  * サインイン済みであることに加えてパスワードでの本人確認を求める(`hasLiveRecoveryCodes`)。
  * 必須でない場合も、パスワードが渡されていれば必ず検証する。
  */
-export const generateMfaRecoveryCodes = onCall(
-  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY] },
+export const generateMfaRecoveryCodes = onCallWithSentry(
+  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY, SENTRY_DSN] },
   async (request) => {
     const uid = request.auth?.uid;
 
@@ -197,8 +199,8 @@ export const generateMfaRecoveryCodes = onCall(
  * この呼び出しにはサインイン済みのIDトークンが要る。つまり2FAを通過したセッションが前提であり、
  * パスワードだけで2FAを外せる経路にはならない。
  */
-export const resetMfaEnrollment = onCall(
-  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY] },
+export const resetMfaEnrollment = onCallWithSentry(
+  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY, SENTRY_DSN] },
   async (request) => {
     const uid = request.auth?.uid;
 
@@ -239,15 +241,18 @@ export const resetMfaEnrollment = onCall(
  * 平文もハッシュも返さない。クライアントはFirestoreのこの領域を読めないため
  * (`firestore.rules`)、残り本数はここを通して渡す。
  */
-export const getMfaRecoveryCodeStatus = onCall(async (request) => {
-  const uid = request.auth?.uid;
+export const getMfaRecoveryCodeStatus = onCallWithSentry(
+  { secrets: [SENTRY_DSN] },
+  async (request) => {
+    const uid = request.auth?.uid;
 
-  if (uid === undefined) {
-    throw failure("unauthenticated", "unauthenticated", "サインインが必要です");
-  }
+    if (uid === undefined) {
+      throw failure("unauthenticated", "unauthenticated", "サインインが必要です");
+    }
 
-  return getRecoveryCodeStatus(uid);
-});
+    return getRecoveryCodeStatus(uid);
+  },
+);
 
 /**
  * リカバリーコードで2FA(TOTP)の登録を解除する(A5「リカバリーコードを使う」)。
@@ -260,8 +265,8 @@ export const getMfaRecoveryCodeStatus = onCall(async (request) => {
  * 一次認証の通過はパスワードの再検証で確かめる。呼び出し時点でクライアントはサインインしておらず、
  * IDトークンによる本人確認ができないため。
  */
-export const useMfaRecoveryCode = onCall(
-  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY] },
+export const useMfaRecoveryCode = onCallWithSentry(
+  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY, SENTRY_DSN] },
   async (request) => {
     const input = useMfaRecoveryCodeInputSchema.safeParse(request.data);
 

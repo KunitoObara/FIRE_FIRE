@@ -823,6 +823,39 @@ firebase apphosting:secrets:set SENTRY_PROJECT --project fire-fire-dev
 
 届かない場合、まずブラウザの DevTools で `ingest.sentry.io` への POST が出ているかを見る。出ていなければ DSN がバンドルに入っていない（Secret Manager の登録漏れ、または `availability` に `BUILD` が無い）。出ていて 4xx なら DSN の値が誤っている。
 
+### 15.6 Cloud Functions（バックエンド）側の設定
+
+ここまでは App Hosting（フロントエンド）の話。Cloud Functions は別のシークレットの仕組みを使うため、**`SENTRY_DSN` をもう一度、functions 用に登録する**（`IDENTITY_PLATFORM_WEB_API_KEY`・`RESEND_API_KEY` と同じ手順。5 章）。
+
+```bash
+firebase functions:secrets:set SENTRY_DSN --project fire-fire-dev
+```
+
+`--project fire-fire-prod` でも同じものを作る。値は 15.1 の DSN で、フロントエンドと同じもので構わない（Sentry のプラットフォームタグで node / browser を区別できる）。
+
+**登録しないと functions のデプロイが「シークレットが存在しない」で失敗する。** 逆に言えば、DSN が無いまま本番が動くことは起こらない。
+
+続けて、デプロイ用サービスアカウントに権限を付与する。忘れると deploy が `Permission 'secretmanager.secrets.get' denied` で落ちる（理由とロールの選び方は 5 章と同じ）。
+
+```bash
+for PROJECT_ID in fire-fire-dev fire-fire-prod; do
+  gcloud secrets add-iam-policy-binding SENTRY_DSN \
+    --project="$PROJECT_ID" \
+    --member="serviceAccount:github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.admin"
+done
+```
+
+#### バックエンドで送るもの・送らないもの
+
+- **クライアントへ返す失敗（`HttpsError`）は送らない。** パスワード間違い（`unauthenticated`）や入力不備（`invalid-argument`）は制御フローであって障害ではなく、送ると利用者の通常操作で Sentry が埋まる。例外は `internal` だけで、これは「サーバー側で何かが壊れた」合図として送る（`src/backend/src/sentry/report.ts`）
+- **Blocking Functions（`sendLoginNotification`・`restrictSignUpToAllowlist`）は送信完了を待たない。** 7 秒の予算のうちログイン通知は Resend で 5 秒を使いうるため、Sentry を新たなタイムアウト要因にしない。待たない以上、インスタンスが凍結されてイベントを取りこぼす可能性は残る
+- **数字は伏せていない。** フロントエンドは残高が本文に混ざりうるため 4 桁以上の数字を落としているが、バックエンドの 9 つの関数は金額を一切扱わない。ここで数字を潰すと Identity Platform や Resend のステータスコードという切り分け材料を失うだけになる。メールアドレスと UID は伏せる（`src/backend/src/sentry/scrub.ts`）
+
+#### 動作確認
+
+`develop` へのデプロイ後、STG で意図的に失敗させて Sentry に届くことを見る。手軽なのは A11 のお問い合わせで、`CONTACT_RECIPIENT_EMAIL` を一時的に不正な値にすると送信が失敗する。届かない場合は Cloud Functions のログに `SENTRY_DSNが未設定のため、Sentryへの送信を行いません` が出ていないかを見る（出ていればシークレットの結び付け漏れ）。
+
 ## 16. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする

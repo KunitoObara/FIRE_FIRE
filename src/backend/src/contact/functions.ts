@@ -1,8 +1,10 @@
-import { HttpsError, onCall } from "firebase-functions/https";
+import { HttpsError } from "firebase-functions/https";
 import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 
 import { sendMail } from "../login-notification/mailer";
+import { onCallWithSentry } from "../sentry/report";
+import { SENTRY_DSN } from "../sentry/secrets";
 import { buildContactMail } from "./message";
 import { buildThrottleKey, releaseContactSlot, reserveContactSlot } from "./throttle";
 
@@ -108,8 +110,8 @@ const currentProjectId = (): string => {
  * 何が検知されたのかを試行錯誤で特定できる。人には起こらない経路なので、正規の利用者が
  * この分岐で不利益を受けることもない。
  */
-export const sendContactMessage = onCall(
-  { secrets: [RESEND_API_KEY, CONTACT_RECIPIENT_EMAIL] },
+export const sendContactMessage = onCallWithSentry(
+  { secrets: [RESEND_API_KEY, CONTACT_RECIPIENT_EMAIL, SENTRY_DSN] },
   async (request) => {
     const input = contactInputSchema.safeParse(request.data ?? {});
 
