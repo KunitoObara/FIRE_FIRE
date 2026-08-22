@@ -87,6 +87,32 @@ describe("redactSensitiveText", () => {
     expect(redactSensitiveText("year 2026")).toBe(`year ${REDACTED}`);
   });
 
+  it("ハイフン区切りの数値レンジを日付と取り違えない", () => {
+    /*
+      選択肢は各開始位置で「最初に成功した分岐」で確定し、より長く一致する
+      分岐を探しに戻らない。日付側に`(?!\d)`が無いと`1000-2000`が`1000-20`で
+      確定し、**金額がまるごと素通りする**(残りの`00`は2桁なので金額側にも
+      掛からない)。
+    */
+    expect(redactSensitiveText("amount must be between 1000-2000")).toBe(
+      `amount must be between ${REDACTED}-${REDACTED}`,
+    );
+  });
+
+  it("外部由来のレンジ表記(Content-Range等)も伏せる", () => {
+    expect(redactSensitiveText("bytes 1000-2000/5000")).toBe(
+      `bytes ${REDACTED}-${REDACTED}/${REDACTED}`,
+    );
+  });
+
+  it("時刻の後ろに数字が続く場合は時刻として残さない", () => {
+    expect(redactSensitiveText("01:2345")).toBe(`01:${REDACTED}`);
+  });
+
+  it("日付の形に見えて桁が合わない並びは伏せる", () => {
+    expect(redactSensitiveText("2026-0812")).toBe(`${REDACTED}-${REDACTED}`);
+  });
+
   it("UIDを先に潰すので、UIDの頭が素通りしない", () => {
     /*
       数字を先に落とすと`users/aBcD[redacted]`になり、残った`users/aBcD`が
