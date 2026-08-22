@@ -57,17 +57,28 @@
 - **Firebase Emulator Suite**: Firestore/Auth/Functionsをローカルで再現し、実際のFirebaseプロジェクトに影響を与えずに検証する
 - **Vitest**: Cloud Functionsのユニットテスト。ユニットのみとし、E2Eは現時点では導入しない
 
-## 8. Lint / Format
+## 8. 監視・エラー検知
+
+- **Sentry**(`@sentry/node`): 未捕捉エラーの検知([X3](https://trello.com/c/cjBCWQsf)で導入)。Cloud Functionsの失敗はCloud Loggingを能動的に見に行かないと気づけず、既存の「送信失敗はログに残すだけで握りつぶす」設計(ログイン通知メール・お問い合わせメール)は、その失敗自体を検知する手段を持っていなかった
+- 入口は`src/sentry/report.ts`の2つ。**`onCall`は使わず`onCallWithSentry`を使う** — `options`が必須で、`SENTRY_DSN`を`secrets`へ結び付け忘れた関数が「送っているつもりで送れていない」状態で通るのを防ぐため。Blocking Functionは`captureWithoutWaiting`を既存の`catch`から呼ぶ
+- **`HttpsError`は送らない。** クライアントへ返すための制御フローであって障害ではなく、パスワード間違いや入力不備まで送ると利用者の通常操作でSentryが埋まる。例外は`internal`だけ
+- **Blocking Functionでは送信完了を待たない。** 7秒の予算のうちログイン通知はResendで5秒を使いうるため、Sentryを新たなタイムアウト要因にしない。callableは60秒(`deleteAccount`は300秒)あるので2秒待って確実に届ける
+- **初期化は遅延させる。** `SENTRY_DSN.value()`はモジュール読み込み時に解決できない(firebase-toolsがデプロイ前に関数定義を解析する時点ではSecret Managerの値が渡っていない)。あわせて`defaultIntegrations: false`で既定の自動計装を止めてある — OpenTelemetryの登録コストが7秒予算を削るため。**`integrations: []`では止まらない**(既定とマージされるだけ)
+- **個人情報を送らない。** `sendDefaultPii: false`に加え、`beforeSend`(`src/sentry/scrub.ts`)でメールアドレス・UID・リクエストの中身を落とす。単体テストで「送られないこと」を固定してあるので、**方針を変えるときはそのテストも読むこと**
+- **数字は伏せていない。** フロントエンドは残高が本文に混ざりうるため4桁以上の数字を落としているが([X3-1])、バックエンドの関数は金額を扱わない。潰すとステータスコードという切り分け材料を失うだけになる
+- シークレットの登録手順は[docs/ci-cd-setup.md](../../../docs/ci-cd-setup.md) 15.6節
+
+## 9. Lint / Format
 
 - ESLint + Prettier(フロントエンドと同等の構成)
 
-## 9. コスト管理
+## 10. コスト管理
 
 - 個人利用規模ではFirestore/Storage/Cloud Functions/Identity Platformいずれも無料枠内に収まる想定([docs/auth-login-requirements.md](../../../docs/auth-login-requirements.md) 3.1参照)
 - Blazeプラン(従量課金)には自動の支出上限機能がない(廃止済み)ため、Google Cloud Billing Budgetsで月額10,000円の予算アラートを50%/90%/100%のしきい値で設定し、メール通知で異常な利用を検知する。予算超過を検知して自動的に課金を停止する仕組みは導入せず、アラート受信後は手動で原因調査・対応する
 - 費用が想定外に膨らみうる主な要因は「Firestore/Storageのセキュリティルールの不備による外部からの不正アクセス」「Cloud Functionsのバグによる無限ループ的実行」「App Hostingへの頻繁なデプロイによるビルド時間消費」の3つ。セキュリティルールは[firestore-rules-review](../../../.claude/skills/firestore-rules-review/SKILL.md)スキルで都度確認する
 
-## 10. 今後の検討事項(オープン課題)
+## 11. 今後の検討事項(オープン課題)
 
 - ログイン通知メールの独自ドメイン化(docs/auth-login-requirements.md 8章の課題と対応)
 - Cloud FunctionsのNode.jsバージョン固定

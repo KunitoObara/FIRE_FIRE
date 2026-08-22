@@ -54,6 +54,21 @@ const ensureInitialized = (): boolean => {
   Sentry.init({
     dsn,
     /*
+      既定の統合を入れない。`@sentry/node`の既定にはOpenTelemetryベースの自動計装が
+      含まれ、`Sentry.init`の時点で`import-in-the-middle`によるモジュールフックの
+      登録まで走る。この初期化が動くのは「コールドスタートしたインスタンスで最初に
+      エラーが出たとき」で、**ログイン通知ではResendの5秒を使い切った直後**にあたる。
+      7秒の予算に対してそこから初期化を始めるのは薄氷で、ログイン自体を落としかねない。
+
+      **`integrations: []`では止まらない。** `@sentry/core`の`getIntegrationsToSetup`は
+      配列を既定と**マージ**するため(`[...defaultIntegrations, ...userIntegrations]`)、
+      空配列を渡しても既定はそのまま入る。無効化のレバーはこちらだけ。
+
+      代償として、OS・ランタイム情報とソース行の付帯が無くなる。使うのは
+      `captureException`だけなので、例外の型・メッセージ・スタックトレースは残る。
+    */
+    defaultIntegrations: false,
+    /*
       dev/prodは同一Sentryプロジェクトを`environment`で分ける(カード[X3])。
       フロントエンドと同じく、接続先プロジェクトIDをそのまま使う
       — 接続先と表示が食い違うことが原理的に起きないため。
