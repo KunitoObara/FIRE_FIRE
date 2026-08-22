@@ -50,22 +50,50 @@ const SDK_ATTRIBUTE_PREFIX = "sentry.";
 const APP_ORIGIN_ATTRIBUTE_PREFIX = "sentry.message.";
 
 /**
- * 文字列から利用者を特定できる部分(メールアドレス・UID)を伏せる。
+ * 金額らしい数字の並びと、そこから除外する日付・時刻([X3-1])。
  *
- * **数字の並びは落とさない。** ログの`message`や例外メッセージには行番号・
- * ステータスコード・日付・件数が混ざっており、数値をまとめて潰すと
- * 「いつ・どこで・どのくらい」が読めなくなって、Sentryを入れた目的と衝突する。
+ * 1つの正規表現にまとめてあるのは、**先に日付・時刻を食わせる**ため。
+ * 別々に走らせると、`2026-08-22`の`2026`が金額側の「4桁以上」に先に当たって
+ * 日付が壊れる。選択肢は左から順に試されるので、日付・時刻を先頭に置く。
  *
- * この結果、属性側(`scrubLogAttributes`が数値を型ごと落とす)との間に
- * 非対称が残る。これは意図したもので、カードの設計方針3が求めているのは
- * 「メールアドレス等のユーザー識別子」のスクラブであり、数値一般ではない
- * (属性側を数値ごと落としているのは、そちらをカードより厳しくした結果)。
- * `message`に実額が載るのはFirestoreが値をエラー文へ埋め込む経路に限られ、
- * かつその値は保存できなかった値なので、正常な残高が載る組み合わせは狭い。
- * PR #218のレビューで確認済み。
+ * 金額側は2通り。カンマ区切り(`1,234,567`)と、区切りの無い4桁以上(`8500`)。
+ * 4桁で切るのは、このアプリの金額が1,000以上にほぼ収まる一方、
+ * 行番号(2桁)・ステータスコード(3桁)がその下に収まるため。
+ */
+const NUMERIC_PATTERN = /(\d{4}-\d{2}-\d{2}|\d{2}:\d{2}(?::\d{2})?)|\d{1,3}(?:,\d{3})+|\d{4,}/g;
+
+/**
+ * 金額らしい数字を伏せる。日付・時刻はそのまま残す。
+ *
+ * 日付・時刻だけを捕捉グループにしてあり、そこが埋まっていれば
+ * 「残す側に当たった」と判定できる。判定用の正規表現を別に持つと、
+ * 2つの定義がずれたときに気づけない。
+ */
+const redactAmountLikeNumbers = (value: string): string =>
+  value.replace(NUMERIC_PATTERN, (match, dateOrTime: string | undefined) =>
+    dateOrTime === undefined ? REDACTED : match,
+  );
+
+/**
+ * 文字列から利用者を特定できる部分と、金額らしい数字を伏せる。
+ *
+ * **順序に意味がある。** UIDを先に潰さないと、`users/aBcD1234567890`の
+ * 数字部分だけが先に`[redacted]`へ変わり、残った`users/aBcD`が
+ * UIDのパターン(6文字以上)に当たらなくなって、UIDの頭が素通りする。
+ *
+ * 数字を落とすのは[X3-1]で入れた。属性側(`scrubLogAttributes`)は元から
+ * 数値を型ごと落としており、本文側だけが素通りする非対称が残っていた
+ * — PR #218のレビューで指摘された点で、Firestoreは保存を拒否した値を
+ * エラー文へ埋め込む(`valueDescription`が数値を`"" + e`、20文字以下の
+ * 文字列を`JSON.stringify`で埋める)ため、経路としては実在する。
+ *
+ * 巻き添えは承知のうえで受け入れる。日付・時刻だけは`NUMERIC_PATTERN`で
+ * 守るが、ビルドIDやポート番号は潰れる。金額が一つ漏れる方が高くつく。
  */
 export const redactSensitiveText = (value: string): string =>
-  value.replace(EMAIL_PATTERN, REDACTED).replace(USER_DOCUMENT_PATH_PATTERN, `$1${REDACTED}`);
+  redactAmountLikeNumbers(
+    value.replace(EMAIL_PATTERN, REDACTED).replace(USER_DOCUMENT_PATH_PATTERN, `$1${REDACTED}`),
+  );
 
 /**
  * URLからクエリ文字列とフラグメントを落とし、パス部分だけにする。
