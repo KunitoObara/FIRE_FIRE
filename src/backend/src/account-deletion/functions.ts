@@ -1,7 +1,9 @@
 import { getAuth } from "firebase-admin/auth";
-import { HttpsError, onCall } from "firebase-functions/https";
+import { HttpsError } from "firebase-functions/https";
 import { z } from "zod";
 
+import { onCallWithSentry } from "../sentry/report";
+import { SENTRY_DSN } from "../sentry/secrets";
 import {
   IDENTITY_PLATFORM_WEB_API_KEY,
   callableFailure,
@@ -88,9 +90,9 @@ const isUserNotFoundError = (error: unknown): boolean =>
  * トークンの`uid`だけを見るため、ユーザーが消えたあとの書き込みも通る。単一利用者の
  * ベータ期間では受容し、SaaS化の際に再評価する(docs/auth-login-requirements.md 3.11)。
  */
-export const deleteAccount = onCall(
+export const deleteAccount = onCallWithSentry(
   {
-    secrets: [IDENTITY_PLATFORM_WEB_API_KEY],
+    secrets: [IDENTITY_PLATFORM_WEB_API_KEY, SENTRY_DSN],
     /*
       既定の60秒では、取引が積み上がったアカウントで再帰削除が収まらないことがある
       (CSV1回の取込で最大20,000件。docs/transaction-import-requirements.md 8章)。

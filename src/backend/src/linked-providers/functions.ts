@@ -1,6 +1,8 @@
 import { getAuth } from "firebase-admin/auth";
-import { HttpsError, onCall } from "firebase-functions/https";
+import { HttpsError } from "firebase-functions/https";
 
+import { onCallWithSentry } from "../sentry/report";
+import { SENTRY_DSN } from "../sentry/secrets";
 import {
   IDENTITY_PLATFORM_WEB_API_KEY,
   callableFailure,
@@ -63,8 +65,8 @@ const failure = (
  * 残数は`providerData`の全体で数える。ここで扱わないログイン方法が将来増えても、
  * それがログイン方法である以上は「最後の1つ」の判定に含める必要がある。
  */
-export const unlinkPasswordProvider = onCall(
-  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY] },
+export const unlinkPasswordProvider = onCallWithSentry(
+  { secrets: [IDENTITY_PLATFORM_WEB_API_KEY, SENTRY_DSN] },
   async (request) => {
     const uid = request.auth?.uid;
 
