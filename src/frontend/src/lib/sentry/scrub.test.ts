@@ -39,8 +39,50 @@ describe("redactSensitiveText", () => {
     );
   });
 
-  it("金額や行番号のような数値はそのまま残す(スタックトレースを潰さないため)", () => {
-    expect(redactSensitiveText("at line 42 of chunk 1234")).toBe("at line 42 of chunk 1234");
+  it("金額らしい数字(4桁以上)を伏せる", () => {
+    expect(redactSensitiveText("残高 1234567 を保存できませんでした")).toBe(
+      `残高 ${REDACTED} を保存できませんでした`,
+    );
+  });
+
+  it("カンマ区切りの金額も伏せる", () => {
+    expect(redactSensitiveText("合計 1,234,567 円")).toBe(`合計 ${REDACTED} 円`);
+  });
+
+  it("3桁以下は残す(行番号・ステータスコードを潰さないため)", () => {
+    expect(redactSensitiveText("at line 42 returned 500")).toBe("at line 42 returned 500");
+  });
+
+  it("日付はそのまま残す", () => {
+    expect(redactSensitiveText("failed at 2026-08-22")).toBe("failed at 2026-08-22");
+  });
+
+  it("時刻はそのまま残す(秒あり・秒なしの両方)", () => {
+    expect(redactSensitiveText("01:23:45 と 01:23")).toBe("01:23:45 と 01:23");
+  });
+
+  it("ISO形式の日時は日付と時刻の両方を残す", () => {
+    expect(redactSensitiveText("2026-08-22T01:23:45")).toBe("2026-08-22T01:23:45");
+  });
+
+  it("日付の中の年だけが金額として潰れない", () => {
+    /*
+      `2026-08-22`の`2026`は単体なら「4桁以上」に当たる。日付を先に
+      食わせていないと、ここが`[redacted]-08-22`になる。
+    */
+    expect(redactSensitiveText("2026-08-22")).not.toContain(REDACTED);
+  });
+
+  it("日付の形をしていない4桁の年は伏せる(区別できないため)", () => {
+    expect(redactSensitiveText("year 2026")).toBe(`year ${REDACTED}`);
+  });
+
+  it("UIDを先に潰すので、UIDの頭が素通りしない", () => {
+    /*
+      数字を先に落とすと`users/aBcD[redacted]`になり、残った`users/aBcD`が
+      UIDのパターン(6文字以上)に当たらず頭だけ漏れる。
+    */
+    expect(redactSensitiveText("users/aBcD1234567890abcdef")).toBe(`users/${REDACTED}`);
   });
 });
 
@@ -90,6 +132,27 @@ describe("scrubEvent", () => {
 
     expect(scrubEvent(event).exception?.values?.[0]?.value).toBe(
       `no allowlist entry for ${REDACTED}`,
+    );
+  });
+
+  it("例外メッセージに埋め込まれた金額を伏せる", () => {
+    /*
+      PR #218のレビューが指摘した経路そのもの。Firestoreは保存を拒否した値を
+      エラー文へ埋め込む(`valueDescription`)ため、ここに実額が乗りうる。
+    */
+    const event = errorEvent({
+      exception: {
+        values: [
+          {
+            type: "FirebaseError",
+            value: "Unsupported field value: 1234567 (found in field 残高)",
+          },
+        ],
+      },
+    });
+
+    expect(scrubEvent(event).exception?.values?.[0]?.value).toBe(
+      `Unsupported field value: ${REDACTED} (found in field 残高)`,
     );
   });
 
@@ -198,10 +261,10 @@ describe("scrubLog", () => {
     });
   });
 
-  it("本文の数字は残す(意図した非対称。行番号や日付を潰さないため)", () => {
-    const log = { level: "error", message: "failed at 2026-08-22 line 42" } as Log;
+  it("本文の金額を伏せ、日付と行番号は残す", () => {
+    const log = { level: "error", message: "残高 1234567 / 2026-08-22 line 42" } as Log;
 
-    expect(scrubLog(log).message).toBe("failed at 2026-08-22 line 42");
+    expect(scrubLog(log).message).toBe(`残高 ${REDACTED} / 2026-08-22 line 42`);
   });
 
   it("本文のメールアドレスを伏せる", () => {

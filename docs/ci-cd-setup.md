@@ -815,7 +815,8 @@ firebase apphosting:secrets:set SENTRY_PROJECT --project fire-fire-dev
 
 - **Session Replay**：DOM をそのまま録るため、B1 の残高が Sentry に保存される。SDK に入れていない
 - **パフォーマンス監視**：`tracesSampleRate: 0`。無料枠はエラー検知だけに使う
-- **PII**：`sendDefaultPii: false` に加え、`beforeSend` / `beforeSendLog` でメールアドレス・UID・リクエストボディ・クエリ文字列・アプリ由来の数値属性を落とす（`src/frontend/src/lib/sentry/scrub.ts`。単体テストで固定してある）
+- **PII**：`sendDefaultPii: false` に加え、`beforeSend` / `beforeSendLog` でメールアドレス・UID・リクエストボディ・クエリ文字列・アプリ由来の属性値を落とす（`src/frontend/src/lib/sentry/scrub.ts`。単体テストで固定してある）
+- **金額**：本文の文字列からも 4 桁以上の数字とカンマ区切りの数字を落とす（[X3-1]）。日付（`2026-08-22`）と時刻（`01:23:45`）だけは残すが、**ビルド ID やポート番号は巻き添えで潰れる**。Sentry のコンソールで数字が `[redacted]` になっているのは不具合ではない
 
 ### 15.5 動作確認
 
