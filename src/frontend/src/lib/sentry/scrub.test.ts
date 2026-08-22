@@ -57,6 +57,16 @@ describe("redactSensitiveText", () => {
     expect(redactSensitiveText("failed at 2026-08-22")).toBe("failed at 2026-08-22");
   });
 
+  it("年月だけの日付(yyyy-MM)も残す", () => {
+    /*
+      B11の発生年月(`DEBT_ORIGINATED_ON_PATTERN`)とB7の取得年月
+      (`REAL_ESTATE_ACQUIRED_ON_PATTERN`)はこの形でFirestoreに入る。
+      日を必須にすると`2026-08`が`[redacted]-08`になり、
+      「いつ」を守るはずの仕組みがまさにその日付フィールドで年を潰す。
+    */
+    expect(redactSensitiveText("発生年月 2026-08 が不正です")).toBe("発生年月 2026-08 が不正です");
+  });
+
   it("時刻はそのまま残す(秒あり・秒なしの両方)", () => {
     expect(redactSensitiveText("01:23:45 と 01:23")).toBe("01:23:45 と 01:23");
   });

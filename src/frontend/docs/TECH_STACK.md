@@ -82,7 +82,7 @@ Tailwind CSS / shadcn/ui およびその周辺ライブラリ(フォーム・チ
   - `src/instrumentation-client.ts`(ブラウザ)/ `sentry.server.config.ts`(Node)/ `sentry.edge.config.ts`(Edge)
 - **エラー捕捉とログだけを使う。** パフォーマンス監視(`tracesSampleRate: 0`)とSession Replayは意図的に入れていない。Replayは画面のDOMをそのまま録るため、B1の残高がSentry側に保存されてしまう
 - **個人情報・金銭情報を送らない。** `sendDefaultPii: false`に加え、`beforeSend` / `beforeSendLog`(`src/lib/sentry/scrub.ts`)でメールアドレス・UID・リクエストボディ・クエリ文字列・アプリ由来の属性値を落とす。単体テストで「送られないこと」を固定してあるので、**スクラブの方針を変えるときはそのテストも読むこと**
-- **本文の数字も落とす**([X3-1])。4桁以上の連続数字とカンマ区切りの数字を`[redacted]`にする。日付・時刻だけは残すが、ビルドIDやポート番号は巻き添えで潰れる — 金額が一つ漏れる方が高くつくという判断で、巻き添えは承知のうえ
+- **本文の数字も落とす**([X3-1])。4桁以上の連続数字とカンマ区切りの数字を`[redacted]`にする。日付(年月だけの`2026-08`も含む。B11の発生年月・B7の取得年月がこの形)と時刻だけは残すが、ビルドIDやポート番号は巻き添えで潰れる — 金額が一つ漏れる方が高くつくという判断で、巻き添えは承知のうえ
 - ログは`console.warn` / `console.error`だけを拾う(`consoleLoggingIntegration`)。既存の「送信失敗はログに残すだけで握りつぶす」設計(ログイン通知メール・お問い合わせメール)で握りつぶされた失敗を拾うのが狙い
 - DSN(`NEXT_PUBLIC_SENTRY_DSN`)が未設定ならSentryは起動せず、イベントを一切送らない。ローカル開発では通常は空のままにする。dev/prodは同一Sentryプロジェクトを`environment`タグで分け、タグの値には接続先のFirebaseプロジェクトIDをそのまま使う
 - シークレットの登録手順と動作確認は[docs/ci-cd-setup.md](../../../docs/ci-cd-setup.md) 15章
