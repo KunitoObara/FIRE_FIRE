@@ -33,10 +33,37 @@ const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
  */
 const USER_DOCUMENT_PATH_PATTERN = /(users\/)[A-Za-z0-9_-]{6,}/g;
 
-/** SDKが自分で付ける属性の接頭辞。アプリ由来の値ではないので残す。 */
+/** SDKが自分で付ける属性の接頭辞(リリース・環境・SDK名など)。 */
 const SDK_ATTRIBUTE_PREFIX = "sentry.";
 
-/** 文字列から利用者を特定できる部分(メールアドレス・UID)を伏せる。 */
+/**
+ * `sentry.`で始まるが、中身はアプリ由来という属性の接頭辞。
+ *
+ * consoleロギング統合は`console.error(固定メッセージ, error)`の**引数そのもの**を
+ * `sentry.message.parameter.N`へ、組み立てたテンプレートを`sentry.message.template`へ
+ * 入れる(`@sentry/core`の`createConsoleTemplateAttributes`)。
+ *
+ * 接頭辞だけを見てSDK由来と扱うと、引数に載った残高がそのまま素通りする。
+ * このアプリの`console.error`はほぼ全てが`(固定メッセージ, error)`の形なので、
+ * ここを開けたままにするとスクラブ全体が意味を失う。
+ */
+const APP_ORIGIN_ATTRIBUTE_PREFIX = "sentry.message.";
+
+/**
+ * 文字列から利用者を特定できる部分(メールアドレス・UID)を伏せる。
+ *
+ * **数字の並びは落とさない。** ログの`message`や例外メッセージには行番号・
+ * ステータスコード・日付・件数が混ざっており、数値をまとめて潰すと
+ * 「いつ・どこで・どのくらい」が読めなくなって、Sentryを入れた目的と衝突する。
+ *
+ * この結果、属性側(`scrubLogAttributes`が数値を型ごと落とす)との間に
+ * 非対称が残る。これは意図したもので、カードの設計方針3が求めているのは
+ * 「メールアドレス等のユーザー識別子」のスクラブであり、数値一般ではない
+ * (属性側を数値ごと落としているのは、そちらをカードより厳しくした結果)。
+ * `message`に実額が載るのはFirestoreが値をエラー文へ埋め込む経路に限られ、
+ * かつその値は保存できなかった値なので、正常な残高が載る組み合わせは狭い。
+ * PR #218のレビューで確認済み。
+ */
 export const redactSensitiveText = (value: string): string =>
   value.replace(EMAIL_PATTERN, REDACTED).replace(USER_DOCUMENT_PATH_PATTERN, `$1${REDACTED}`);
 
@@ -99,11 +126,30 @@ export const scrubEvent = (event: ErrorEvent): ErrorEvent => ({
 });
 
 /**
- * ログの属性を削る。SDK自身が付ける`sentry.*`(リリース・環境など)は残し、
- * アプリ由来の属性は文字列なら伏せ、それ以外の型は値ごと落とす。
+ * アプリ由来の属性値を削る。文字列は伏せ、真偽値は残し、それ以外の型は値ごと落とす。
  *
  * 数値を落とすのは、このアプリで数値といえば残高・収支・ローン残高だから。
  * ステータスコードや件数も巻き添えになるが、金額が一つ漏れる方が高くつく。
+ * オブジェクト(`console.error`の第2引数に来るErrorなど)も丸ごと落とす
+ * — 中を歩いて判断する形にすると、新しい形の値が来たときに漏れる側へ倒れる。
+ */
+const scrubAttributeValue = (value: unknown): unknown => {
+  if (typeof value === "string") {
+    return redactSensitiveText(value);
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  return REDACTED;
+};
+
+/**
+ * ログの属性を削る。SDK自身の属性(リリース・環境など)だけを残し、
+ * それ以外はアプリ由来として削る。
+ *
+ * `sentry.`で始まるかどうかだけでは判定できない。`sentry.message.*`は
+ * 接頭辞こそSDKのものだが、中身は`console.error`へ渡された引数そのもの
+ * (`APP_ORIGIN_ATTRIBUTE_PREFIX`のコメントを参照)。
  */
 const scrubLogAttributes = (attributes: Log["attributes"]): Log["attributes"] => {
   if (attributes === undefined) {
@@ -112,16 +158,10 @@ const scrubLogAttributes = (attributes: Log["attributes"]): Log["attributes"] =>
 
   return Object.fromEntries(
     Object.entries(attributes).map(([key, value]) => {
-      if (key.startsWith(SDK_ATTRIBUTE_PREFIX)) {
-        return [key, value];
-      }
-      if (typeof value === "string") {
-        return [key, redactSensitiveText(value)];
-      }
-      if (typeof value === "boolean") {
-        return [key, value];
-      }
-      return [key, REDACTED];
+      const isSdkOwnAttribute =
+        key.startsWith(SDK_ATTRIBUTE_PREFIX) && !key.startsWith(APP_ORIGIN_ATTRIBUTE_PREFIX);
+
+      return [key, isSdkOwnAttribute ? value : scrubAttributeValue(value)];
     }),
   );
 };

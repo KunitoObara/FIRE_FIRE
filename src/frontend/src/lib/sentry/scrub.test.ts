@@ -150,6 +150,60 @@ describe("scrubLog", () => {
     });
   });
 
+  it("consoleロギング統合が入れる引数(sentry.message.parameter.N)を素通りさせない", () => {
+    /*
+      `console.error("負債を保存できませんでした", error)`のような呼び出しでは、
+      SDKが第2引数**そのもの**を`sentry.message.parameter.0`へ入れる。
+      接頭辞が`sentry.`だからとSDK由来扱いすると、残高がそのまま送られる。
+    */
+    const log = {
+      level: "error",
+      message: "負債を保存できませんでした",
+      attributes: {
+        "sentry.message.template": "負債を保存できませんでした {}",
+        "sentry.message.parameter.0": { remainingAmount: 12_345_678 },
+        "sentry.release": "abc123",
+      },
+    } as unknown as Log;
+
+    expect(scrubLog(log).attributes).toEqual({
+      "sentry.message.template": "負債を保存できませんでした {}",
+      "sentry.message.parameter.0": REDACTED,
+      "sentry.release": "abc123",
+    });
+  });
+
+  it("sentry.message.parameter が文字列でも、識別子は伏せる", () => {
+    const log = {
+      level: "error",
+      message: "送信に失敗しました",
+      attributes: { "sentry.message.parameter.0": "宛先 taro.yamada@example.com" },
+    } as unknown as Log;
+
+    expect(scrubLog(log).attributes).toEqual({
+      "sentry.message.parameter.0": `宛先 ${REDACTED}`,
+    });
+  });
+
+  it("SDK自身の属性(リリース・環境)は残す", () => {
+    const log = {
+      level: "error",
+      message: "failed",
+      attributes: { "sentry.release": "abc123", "sentry.origin": "auto.log.console" },
+    } as unknown as Log;
+
+    expect(scrubLog(log).attributes).toEqual({
+      "sentry.release": "abc123",
+      "sentry.origin": "auto.log.console",
+    });
+  });
+
+  it("本文の数字は残す(意図した非対称。行番号や日付を潰さないため)", () => {
+    const log = { level: "error", message: "failed at 2026-08-22 line 42" } as Log;
+
+    expect(scrubLog(log).message).toBe("failed at 2026-08-22 line 42");
+  });
+
   it("本文のメールアドレスを伏せる", () => {
     const log = { level: "warn", message: "mail to taro.yamada@example.com failed" } as Log;
 
