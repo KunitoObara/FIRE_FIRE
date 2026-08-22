@@ -23,11 +23,6 @@ import type { JSX } from "react";
  * ため — レイアウト側のimportが効かず、読まないとスタイルが当たらない。
  */
 
-type GlobalErrorProps = {
-  error: Error & { digest?: string };
-  reset: () => void;
-};
-
 const GlobalError = ({ error, reset }: GlobalErrorProps): JSX.Element => {
   useEffect(() => {
     Sentry.captureException(error);
