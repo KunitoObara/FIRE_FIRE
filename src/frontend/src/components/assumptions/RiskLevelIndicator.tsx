@@ -43,6 +43,7 @@ export const RiskLevelIndicator = ({
 
   if (!colored) {
     return (
+      // `Badge`ではないので、アイコンの大きさはここで指定する必要がある(下の分岐の注記参照)
       <span className="flex items-center gap-1.5">
         <Icon aria-hidden className="size-3 fill-current" />
         {option.label}
@@ -52,7 +53,8 @@ export const RiskLevelIndicator = ({
 
   return (
     <Badge variant="secondary" className={option.badgeClassName}>
-      <Icon aria-hidden className={cn("size-3 fill-current", option.iconClassName)} />
+      {/* 大きさは指定しない。`badgeVariants`が`[&>svg]:size-3!`でBadge配下のsvgに強制するため */}
+      <Icon aria-hidden className={cn("fill-current", option.iconClassName)} />
       {option.label}
     </Badge>
   );
