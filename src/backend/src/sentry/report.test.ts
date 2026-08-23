@@ -75,6 +75,60 @@ describe("withSentryReporting", () => {
     expect(captureException).toHaveBeenCalledWith(error);
   });
 
+  it("HttpsErrorでもunavailableは送る(依存先へ届かなかった合図のため)", async () => {
+    /*
+      [X3-4]。このリポジトリの`unavailable`は全て本物の障害を包んでいる —
+      再帰削除の失敗・Identity Platformの更新失敗・Resendへの送信失敗など。
+      ここを除外していたため、**まさに検知したい障害**が届いていなかった。
+    */
+    const error = new HttpsError("unavailable", "削除できませんでした", {
+      reason: "data-deletion-failed",
+    });
+    const wrapped = withSentryReporting(async () => {
+      throw error;
+    });
+
+    await expect(wrapped(request)).rejects.toBe(error);
+    expect(captureException).toHaveBeenCalledWith(error);
+  });
+
+  it.each([
+    ["invalid-argument", "入力内容を確認してください"],
+    ["failed-precondition", "パスワードの入力が必要です"],
+    ["permission-denied", "試行回数が多すぎます"],
+    ["resource-exhausted", "送信の間隔を空けてください"],
+  ] as const)("利用者の通常操作(%s)は送らない", async (code, message) => {
+    /* ここが緩むと、通常操作だけで無料枠(5,000件/月)を食い潰す。 */
+    const error = new HttpsError(code, message);
+    const wrapped = withSentryReporting(async () => {
+      throw error;
+    });
+
+    await expect(wrapped(request)).rejects.toBe(error);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it("お問い合わせの送信失敗でflushまで進む(積まれたイベントを取り残さないため)", async () => {
+    /*
+      [X3-5]の回帰テスト。A11のメール送信が失敗すると、`mailer.ts`が
+      `captureWithoutWaiting`でイベントを積み(flushしない)、`contact/functions.ts`が
+      `unavailable`のHttpsErrorを投げる。この経路でflushが呼ばれないと、Cloud Functions
+      gen2がインスタンスを凍結した場合に**積まれたイベントごと失われる**。
+    */
+    captureWithoutWaiting(new Error("メールを送信できませんでした (status 500)"));
+    expect(flush).not.toHaveBeenCalled();
+
+    const error = new HttpsError("unavailable", "問い合わせを送信できませんでした", {
+      reason: "send-failed",
+    });
+    const wrapped = withSentryReporting(async () => {
+      throw error;
+    });
+
+    await expect(wrapped(request)).rejects.toBe(error);
+    expect(flush).toHaveBeenCalled();
+  });
+
   it("Sentryへの送信が失敗しても、元の例外をそのまま投げ直す", async () => {
     /* Sentryの都合で呼び出し元のエラーが差し替わってはいけない。 */
     captureException.mockImplementationOnce(() => {
@@ -101,6 +155,13 @@ describe("captureWithoutWaiting", () => {
     captureWithoutWaiting(new HttpsError("permission-denied", "許可されていません"));
 
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it("HttpsErrorでもunavailableは送る(判定を待つ側と共有しているため)", () => {
+    /* [X3-4]。`captureAndWait`と同じ`isExpectedFailure`を通す。 */
+    captureWithoutWaiting(new HttpsError("unavailable", "認証基盤に接続できませんでした"));
+
+    expect(captureException).toHaveBeenCalled();
   });
 
   it("Sentryへの送信が失敗しても例外を投げない(呼び出し元を止めないため)", () => {
