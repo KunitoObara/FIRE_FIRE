@@ -11,7 +11,7 @@
 
 runConfig:
   # 個人利用規模のため最小構成。無通信時はインスタンス0までスケールインさせ、
-  # 想定外の課金が起きないよう上限も絞る(src/backend/docs/TECH_STACK.md 9章)。
+  # 想定外の課金が起きないよう上限も絞る(src/backend/docs/TECH_STACK.md 10章)。
   minInstances: 0
   maxInstances: 1
   concurrency: 80
@@ -57,3 +57,28 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  # [X3] Sentry。DSNはクライアントバンドルに埋め込まれるため BUILD が必須で、
+  # Server Components 側の初期化(sentry.server.config.ts)からも読むので RUNTIME も付ける。
+  - variable: NEXT_PUBLIC_SENTRY_DSN
+    secret: NEXT_PUBLIC_SENTRY_DSN
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ソースマップのアップロードはビルド時にしか起きないので BUILD のみ。
+  # 実行時に渡すと、アップロード権限を持つトークンを不必要に長く生かすことになる。
+  - variable: SENTRY_AUTH_TOKEN
+    secret: SENTRY_AUTH_TOKEN
+    availability:
+      - BUILD
+
+  - variable: SENTRY_ORG
+    secret: SENTRY_ORG
+    availability:
+      - BUILD
+
+  - variable: SENTRY_PROJECT
+    secret: SENTRY_PROJECT
+    availability:
+      - BUILD

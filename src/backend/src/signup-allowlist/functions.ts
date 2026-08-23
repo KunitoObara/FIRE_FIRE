@@ -22,6 +22,8 @@
 
 import { beforeUserCreated, HttpsError } from "firebase-functions/identity";
 
+import { captureWithoutWaiting } from "../sentry/report";
+import { SENTRY_DSN } from "../sentry/secrets";
 import { isSignUpAllowed } from "./store";
 
 import type { AuthBlockingEvent } from "firebase-functions/identity";
@@ -96,6 +98,20 @@ export const assertSignUpAllowed = async (event: AuthBlockingEvent): Promise<voi
  * 「確かめられなければ作らせない」ことが要件だからである。想定外の例外も
  * そのまま外へ出し、アカウントが作られない側に倒す。
  */
-export const restrictSignUpToAllowlist = beforeUserCreated(async (event) => {
-  await assertSignUpAllowed(event);
-});
+export const restrictSignUpToAllowlist = beforeUserCreated(
+  { secrets: [SENTRY_DSN] },
+  async (event) => {
+    try {
+      await assertSignUpAllowed(event);
+    } catch (error) {
+      /*
+        Sentryへ送ってから投げ直す([X3])。投げ直すので拒否の向きは変わらない。
+        承認されていないアドレスの拒否(`permission-denied`)は利用者の通常操作なので
+        `captureWithoutWaiting`側で除かれ、Firestoreを読めなかった`internal`と
+        想定外の例外だけが送られる。
+      */
+      captureWithoutWaiting(error);
+      throw error;
+    }
+  },
+);

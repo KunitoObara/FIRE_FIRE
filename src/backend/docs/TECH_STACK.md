@@ -57,17 +57,35 @@
 - **Firebase Emulator Suite**: Firestore/Auth/Functionsをローカルで再現し、実際のFirebaseプロジェクトに影響を与えずに検証する
 - **Vitest**: Cloud Functionsのユニットテスト。ユニットのみとし、E2Eは現時点では導入しない
 
-## 8. Lint / Format
+## 8. 監視・エラー検知
+
+- **Sentry**(`@sentry/node`): 未捕捉エラーの検知([X3](https://trello.com/c/cjBCWQsf)で導入)。Cloud Functionsの失敗はCloud Loggingを能動的に見に行かないと気づけず、既存の「送信失敗はログに残すだけで握りつぶす」設計(ログイン通知メール・お問い合わせメール)は、その失敗自体を検知する手段を持っていなかった
+- 入口は`src/sentry/report.ts`の2つ。**`onCall`は使わず`onCallWithSentry`を使う** — `options`が必須で、`SENTRY_DSN`を`secrets`へ結び付け忘れた関数が「送っているつもりで送れていない」状態で通るのを防ぐため。Blocking Functionは`captureWithoutWaiting`を既存の`catch`から呼ぶ
+- **`HttpsError`は原則送らない。** クライアントへ返すための制御フローであって障害ではなく、パスワード間違いや入力不備まで送ると利用者の通常操作でSentryが埋まる。**例外は`internal`と`unavailable`の2つ**([X3-4](https://trello.com/c/t8AdERPb))。リポジトリ内の`unavailable`は全箇所が本物の障害を包んでおり(認証基盤へ接続不可・Firestoreの再帰削除失敗・Identity Platformの更新失敗・Resendへの送信失敗)、利用者の通常操作は`invalid-argument`・`unauthenticated`・`failed-precondition`・`permission-denied`・`resource-exhausted`に分かれていて混ざっていない。**判別に`details.reason`を使わないのは意図的** — 理由の一覧を持つと、新しい`reason`を足したときに更新を忘れて静かに検知漏れになる。この住み分けを崩す`HttpsError`を足すときは`isExpectedFailure`も一緒に見ること
+- **Blocking Functionでは送信完了を待たない。** 7秒の予算のうちログイン通知はResendで5秒を使いうるため、Sentryを新たなタイムアウト要因にしない。callableは60秒(`deleteAccount`は300秒)あるので2秒待って確実に届ける
+- **callable側のflushは、同じ呼び出しで`captureWithoutWaiting`が積んだイベントも押し出す。** お問い合わせ(A11)のメール送信失敗がこれに当たり、`unavailable`を送信対象にするまでは積まれたまま誰もflushせず、インスタンス凍結で失われうる状態だった([X3-5](https://trello.com/c/EFzBJPWV))。この経路では`mailer.ts`のError(statusコードを持つ)と`HttpsError`(どのcallableかを持つ)の**2件が届くが、これは意図したもの**(2件目以降の連投は下の抑制窓が受け止める)
+- **同じ種類のイベントは10分に1件しか送らない**([X3-6](https://trello.com/c/IwYiZvt3))。`sendContactMessage`(A11)は**サインイン不要で叩ける唯一のcallable**なうえ、失敗した呼び出しには実質的なレート制限がかかっていない — 宛先未設定は送信枠の確保より**前**で投げ、送信失敗は確保した枠を戻すため(`contact/functions.ts`)。**枠を戻すのは[docs/screen-requirements-public.md](../../../docs/screen-requirements-public.md) A11が明記した要件なので、監視の都合で曲げない。** 代わりに送る側で絞る。**種類ごとの1件目は必ず送る** — Sentryのスパイク保護がイベントを無差別に落とすのと違い、別種の障害が同時に起きても取りこぼさない
+- **「種類」の決め方が肝で、3つの分岐がある。** `HttpsError`はコード+`details.reason`。`Error`は**`code`があれば例外名+`code`、無ければ例外名+メッセージ**([X3-7](https://trello.com/c/QkdtEE0n))。**`Error`ですらない値は全部まとめて1つ**(`String()`がどれも`[object Object]`になるため。この分岐だけ別種の障害を取りこぼしうるが、Sentry側でも元々切り分けが難しく、内容をキーにすると非有界なキーを作りかねないので承知のうえ)
+  - **`code`を優先するのは、呼び出し元の多くが手作りしていない生の例外をそのまま渡すから。** `@grpc/grpc-js`のデッドライン超過は`Deadline exceeded after 9.998s,...,remote_addr=142.250.1.1:443`の形で**ミリ秒精度の所要時間と接続先**を含み(`build/src/deadline.js`の`formatDateDifference`が`toFixed(3)`)、メッセージをキーにすると**抑制がまったく効かない**。gRPCは数値、Nodeのシステムエラーは`ECONNREFUSED`、`FirebaseAuthError`は`auth/*`と、どれもコードのほうは有界
+  - **メッセージを使う分岐では`redactSensitiveText`を通してから判定する**(UIDが混ざったままだと同じ障害が利用者ごとに別の種類として通り、抑制が効かない)。**残った可変値は種類を分ける** — `mailer.ts`の`status 500`がその例で、429と503は別の障害なのでどちらも知りたい以上これは意図したもの。上限が「1件/10分」ではなく「ステータスの種類数/10分」になるが、**有限の小さな集合で頭打ち**なので、塞いだ「1リクエストにつき1件」の無制限な増幅とは桁が違う。**`code`を持たない例外のメッセージに非有界な値(件数・所要時間)を入れると話が変わる**
+- **記録が200件で埋まったら、新しい種類を覚えないだけにする。** 既に覚えている種類の抑制は守り、覚えられない種類は毎回送る(=**送る側に倒れる**)。**まるごと捨てる作りにしない** — `code`もメッセージも当てにできない例外が続いて記録が埋まったとき、そこで全部消すと**その巻き添えで無関係な種類の抑制まで巻き戻り、抑制が全体で無効になる**。うるさい1つの経路が効かないのは受け入れるとしても、他を道連れにはしない
+- **Sentry側のレート制限は使えない。** クライアントキーごとのレート制限は[Business / Enterpriseプラン限定](https://docs.sentry.io/pricing/quotas/manage-event-stream-guide/)で、無料のDeveloperプランには無い。上の抑制窓をコード側に置いているのはこのため
+- **初期化は遅延させる。** `SENTRY_DSN.value()`はモジュール読み込み時に解決できない(firebase-toolsがデプロイ前に関数定義を解析する時点ではSecret Managerの値が渡っていない)。あわせて`defaultIntegrations: false`で既定の自動計装を止めてある — OpenTelemetryの登録コストが7秒予算を削るため。**`integrations: []`では止まらない**(既定とマージされるだけ)
+- **個人情報を送らない。** `sendDefaultPii: false`に加え、`beforeSend`(`src/sentry/scrub.ts`)でメールアドレス・UID・リクエストの中身を落とす。単体テストで「送られないこと」を固定してあるので、**方針を変えるときはそのテストも読むこと**
+- **数字は伏せていない。** フロントエンドは残高が本文に混ざりうるため4桁以上の数字を落としているが([X3-1])、バックエンドの関数は金額を扱わない。潰すとステータスコードという切り分け材料を失うだけになる
+- シークレットの登録手順は[docs/ci-cd-setup.md](../../../docs/ci-cd-setup.md) 15.6節
+
+## 9. Lint / Format
 
 - ESLint + Prettier(フロントエンドと同等の構成)
 
-## 9. コスト管理
+## 10. コスト管理
 
 - 個人利用規模ではFirestore/Storage/Cloud Functions/Identity Platformいずれも無料枠内に収まる想定([docs/auth-login-requirements.md](../../../docs/auth-login-requirements.md) 3.1参照)
 - Blazeプラン(従量課金)には自動の支出上限機能がない(廃止済み)ため、Google Cloud Billing Budgetsで月額10,000円の予算アラートを50%/90%/100%のしきい値で設定し、メール通知で異常な利用を検知する。予算超過を検知して自動的に課金を停止する仕組みは導入せず、アラート受信後は手動で原因調査・対応する
 - 費用が想定外に膨らみうる主な要因は「Firestore/Storageのセキュリティルールの不備による外部からの不正アクセス」「Cloud Functionsのバグによる無限ループ的実行」「App Hostingへの頻繁なデプロイによるビルド時間消費」の3つ。セキュリティルールは[firestore-rules-review](../../../.claude/skills/firestore-rules-review/SKILL.md)スキルで都度確認する
 
-## 10. 今後の検討事項(オープン課題)
+## 11. 今後の検討事項(オープン課題)
 
 - ログイン通知メールの独自ドメイン化(docs/auth-login-requirements.md 8章の課題と対応)
 - Cloud FunctionsのNode.jsバージョン固定

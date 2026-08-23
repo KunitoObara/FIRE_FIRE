@@ -75,11 +75,23 @@ Tailwind CSS / shadcn/ui およびその周辺ライブラリ(フォーム・チ
 - **Firebase App Hosting**: Next.jsのSSRをFirebaseエコシステム内で動かす公式の仕組み。単純な静的ホスティング(Firebase Hosting単体)ではダッシュボードのようなログイン後の動的画面をSSRできないため採用
 - 環境変数(Firebase設定値等)は`.env.local`で管理し、リポジトリにはコミットしない(既存の`.gitignore`で除外済み)
 
-## 8. ディレクトリ構成の方針
+## 8. 監視・エラー検知
+
+- **Sentry**(`@sentry/nextjs`): 未捕捉エラーの検知([X3](https://trello.com/c/cjBCWQsf)で導入)。A0公開で不特定多数からアクセスされる状態になり、実行時エラーをCloud Loggingに見に行かないと気づけない状態を解消するために入れた
+- 初期化はランタイムごとに3ファイルへ分かれる(`@sentry/nextjs`の規約)。共通の設定値は`src/lib/sentry/options.ts`に集約しており、片方だけスクラブが外れる状態を作らないようにしている
+  - `src/instrumentation-client.ts`(ブラウザ)/ `sentry.server.config.ts`(Node)/ `sentry.edge.config.ts`(Edge)
+- **エラー捕捉とログだけを使う。** パフォーマンス監視(`tracesSampleRate: 0`)とSession Replayは意図的に入れていない。Replayは画面のDOMをそのまま録るため、B1の残高がSentry側に保存されてしまう
+- **個人情報・金銭情報を送らない。** `sendDefaultPii: false`に加え、`beforeSend` / `beforeSendLog`(`src/lib/sentry/scrub.ts`)でメールアドレス・UID・リクエストボディ・クエリ文字列・アプリ由来の属性値を落とす。単体テストで「送られないこと」を固定してあるので、**スクラブの方針を変えるときはそのテストも読むこと**
+- **本文の数字も落とす**([X3-1])。4桁以上の連続数字とカンマ区切りの数字を`[redacted]`にする。日付(年月だけの`2026-08`も含む。B11の発生年月・B7の取得年月がこの形)と時刻だけは残すが、ビルドIDやポート番号は巻き添えで潰れる — 金額が一つ漏れる方が高くつくという判断で、巻き添えは承知のうえ
+- ログは`console.warn` / `console.error`だけを拾う(`consoleLoggingIntegration`)。既存の「送信失敗はログに残すだけで握りつぶす」設計(ログイン通知メール・お問い合わせメール)で握りつぶされた失敗を拾うのが狙い
+- DSN(`NEXT_PUBLIC_SENTRY_DSN`)が未設定ならSentryは起動せず、イベントを一切送らない。ローカル開発では通常は空のままにする。dev/prodは同一Sentryプロジェクトを`environment`タグで分け、タグの値には接続先のFirebaseプロジェクトIDをそのまま使う
+- シークレットの登録手順と動作確認は[docs/ci-cd-setup.md](../../../docs/ci-cd-setup.md) 15章
+
+## 9. ディレクトリ構成の方針
 
 - `src/frontend`配下は独立した`package.json`を持つNext.jsプロジェクトとする。モノレポツール(npm workspaces等)は現時点では導入しない。フロント/バックエンドの依存関係が今のところ薄く、個別管理の方がシンプルなため
-- 型やzodスキーマをフロント/バックエンドで共有したくなった場合は、その時点でworkspaces化を検討する(8章オープン課題)
+- 型やzodスキーマをフロント/バックエンドで共有したくなった場合は、その時点でworkspaces化を検討する(10章オープン課題)
 
-## 9. 今後の検討事項(オープン課題)
+## 10. 今後の検討事項(オープン課題)
 
 - フロント/バックエンド間の型・バリデーションスキーマ共有(npm workspaces化)の要否

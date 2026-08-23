@@ -5,7 +5,10 @@
  * SMTPクライアント(nodemailer等)の依存を増やさず、`fetch`だけで完結する。
  *
  * 呼び出し元はログインを止めないため(`functions.ts`)、この関数は例外を投げず結果を返す。
+ * **例外を投げない以上、失敗の検知はここでSentryへ送るしかない**([X3])。
  */
+
+import { captureWithoutWaiting } from "../sentry/report";
 
 /** 送信結果。失敗の理由は切り分け用にログへ残し、呼び出し元は成否だけ見る */
 export type MailDeliveryResult =
@@ -52,6 +55,16 @@ export const sendMail = async (
   message: MailMessage,
 ): Promise<MailDeliveryResult> => {
   if (apiKey === "") {
+    /*
+      **本番でここに来たら設定漏れなので、Sentryへ送る。** シークレットが未登録なら
+      デプロイ自体が落ちるが、「登録済みだが値が空」は素通りし、メールが恒久的に
+      送れないまま誰も気づけない — 本カードが無くそうとしている状態そのもの。
+
+      ローカルとエミュレータではSecret Managerの値が解決されず必ずここへ来るが、
+      `SENTRY_DSN`も同時に空になるため`captureWithoutWaiting`は何も送らない
+      (`report.ts`の`ensureInitialized`)。ノイズにはならない。
+    */
+    captureWithoutWaiting(new Error("APIキーが未設定のため、メールを送信しませんでした"));
     return { status: "not-configured" };
   }
 
@@ -74,12 +87,27 @@ export const sendMail = async (
     });
   } catch (error) {
     console.error("メール送信サービスへ接続できませんでした", error);
+    captureWithoutWaiting(error);
     return { status: "failed" };
   }
 
   if (!response.ok) {
     // 本文にはメールアドレスが含まれうるためステータスコードだけ残す
     console.error("メールを送信できませんでした", response.status);
+    /*
+      **戻り値で失敗を返す経路なので、呼び出し側のtry/catchでは拾えない。**
+      ここで送らないと、カード[X3]が検知したかった「握りつぶされた送信失敗」が
+      そのまま漏れる — ログイン通知は呼び出し元が握り潰すため、例外として上がらない。
+      Errorに包むのは、ステータスコードだけでは何が起きたか追えないから。
+
+      お問い合わせ(A11)は`unavailable`のHttpsErrorに変換され、[X3-4]以降はそちらも
+      Sentryへ送られる。**同じ失敗でイベントが2件になるのは承知のうえ** — こちらだけが
+      statusコードを持つため([X3-5]、`sentry/report.ts`の`captureAndWait`)。
+      連投しても増え続けはしない。同じ種類は10分に1件へ絞られる([X3-6])。
+      **ただしステータスコードは種類の一部になる。** 429と500は別の障害なので別々に
+      1件ずつ通る — 上限はResendが返しうるステータスの数で頭打ちになる。
+    */
+    captureWithoutWaiting(new Error(`メールを送信できませんでした (status ${response.status})`));
     return { status: "failed" };
   }
 

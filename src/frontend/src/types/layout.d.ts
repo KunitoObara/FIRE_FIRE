@@ -22,6 +22,18 @@ declare global {
     message: string;
   };
 
+  /**
+   * ルートレイアウトごと巻き込んだ描画エラーの受け皿(`app/global-error.tsx`)のProps。
+   *
+   * 形はNext.jsの規約で決まっている — `digest`は本番ビルドでサーバー側の
+   * エラーに付く識別子で、クライアント側のエラーには付かないため任意。
+   */
+  type GlobalErrorProps = {
+    error: Error & { digest?: string };
+    /** 同じルートの再描画を試みる。Next.jsが渡す */
+    reset: () => void;
+  };
+
   /** 未実装画面のプレースホルダのProps */
   type UnimplementedScreenProps = {
     /** docs/screen-list-and-transitions.md の画面ID(例: `B2`) */

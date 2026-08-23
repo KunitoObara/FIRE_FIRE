@@ -419,7 +419,7 @@ Error: Functions successfully deployed but could not set up cleanup policy in lo
 firebase functions:artifacts:setpolicy --project "$FIREBASE_PROJECT" --location "$region" --force
 ```
 
-- 保持日数は既定の1日。イメージはビルド済みの成果物で、再デプロイはソースから行えるため長く持つ理由が無い（[src/backend/docs/TECH_STACK.md](../src/backend/docs/TECH_STACK.md) 9章のコスト管理）
+- 保持日数は既定の1日。イメージはビルド済みの成果物で、再デプロイはソースから行えるため長く持つ理由が無い（[src/backend/docs/TECH_STACK.md](../src/backend/docs/TECH_STACK.md) 10章のコスト管理）
 - `$region` はワークフローに直書きせず、`firebase functions:list --json` が返すデプロイ済み関数のリージョンから引く。リージョンを増やしてもワークフローの変更は要らない
 - 冪等。設定済みのリージョンでは `No changes needed.`、`gcf-artifacts` がまだ無いリージョンでは `does not exist in Artifact Registry` と出て、**いずれも exit 0** で終わる。毎回無条件に流してよい
 - `firebase deploy` 側に `--force` を付ける方法もあるが、`--force` はソースから消えた関数の削除確認もスキップしてしまう（誤ってファイルを消したときに本番の関数が黙って消える）ため採らない
@@ -769,13 +769,101 @@ firebase functions:delete restrictSignUpToAllowlist \
 
 **Firestore のコレクションを空にする形では外さない。** 空のリストは「誰も承認されていない」という意味になり、全員が拒否される。関数を消したあとであれば、コレクションは残しても消してもよい。
 
-## 15. 今後の検討事項（オープン課題）
+## 15. Sentry（エラー監視）の準備
+
+未捕捉エラーの検知に Sentry を使う（[X3]）。repo の外の作業は、Sentry 側でプロジェクトと認証情報を作り、それを GitHub Secrets と Secret Manager の両方に登録することの 2 つ。
+
+**この登録を済ませる前に実装 PR を `develop` にマージしてはいけない。** `src/frontend/apphosting.yaml` が 4 つのシークレットを参照しているため、Secret Manager 側に実体が無いと App Hosting のビルドが失敗する。CI（`ci.yml`）の方は未登録でも空文字が渡るだけで落ちない（DSN が空なら Sentry は起動せず、トークンが空ならソースマップのアップロードごとスキップされる）。この非対称は意図的で、Secrets を受け取れないフォーク PR でも CI が通るようにするためのもの。
+
+### 15.1 Sentry 側の準備
+
+1. <https://sentry.io> で Organization を作る（GitHub アカウントでサインアップ可）
+2. プランは **Developer（無料）** を選ぶ。単一ユーザー運用（要件定義書 2 章）なので「1 ユーザーまで」の制約は問題にならない。上限（5,000 イベント/月）を超えたイベントは破棄されるだけで、追加請求は発生しない
+3. Project を作る。dev / prod は Project を分けず、`environment` タグで区別する
+4. Settings → Client Keys (DSN) で DSN を控える
+5. Organization Settings → Auth Tokens で **`project:releases` スコープ**の Auth Token を発行する（ソースマップのアップロード用）
+
+`environment` タグには接続先の Firebase プロジェクト ID（`fire-fire-dev` / `fire-fire-prod`）がそのまま入る（`src/frontend/src/lib/sentry/options.ts`）。専用の環境変数を増やさないのは、接続先と表示が食い違うことを原理的に起こさないため。
+
+### 15.2 GitHub Secrets に登録する
+
+CI のビルドステップ（`ci.yml` の frontend ジョブ）が読む。6 章の他のシークレットと同じ手順で登録する。
+
+| 名前 | 値 |
+|---|---|
+| `NEXT_PUBLIC_SENTRY_DSN` | 15.1 の DSN |
+| `SENTRY_AUTH_TOKEN` | 15.1 の Auth Token |
+| `SENTRY_ORG` | Organization のスラッグ |
+| `SENTRY_PROJECT` | Project のスラッグ |
+
+### 15.3 Secret Manager に登録する
+
+実際にデプロイされるビルド（App Hosting）が読む。dev / prod の両方に、同じ 4 つを同じ名前で作る。
+
+```bash
+firebase apphosting:secrets:set NEXT_PUBLIC_SENTRY_DSN --project fire-fire-dev
+firebase apphosting:secrets:set SENTRY_AUTH_TOKEN --project fire-fire-dev
+firebase apphosting:secrets:set SENTRY_ORG --project fire-fire-dev
+firebase apphosting:secrets:set SENTRY_PROJECT --project fire-fire-dev
+```
+
+`--project fire-fire-prod` でも同じ 4 つを作る。DSN は dev / prod で同じ値でよい（区別は `environment` タグが担う）。登録後、デプロイ用サービスアカウントへの Secret Manager Secret Accessor 権限の付与は 5 章と同じ手順。
+
+### 15.4 送らないもの
+
+このアプリは個人の資産・収支データを扱う（CLAUDE.md）。設定側で次を明示的に切ってある — Sentry のコンソールで有効化し直さないこと。
+
+- **Session Replay**：DOM をそのまま録るため、B1 の残高が Sentry に保存される。SDK に入れていない
+- **パフォーマンス監視**：`tracesSampleRate: 0`。無料枠はエラー検知だけに使う
+- **PII**：`sendDefaultPii: false` に加え、`beforeSend` / `beforeSendLog` でメールアドレス・UID・リクエストボディ・クエリ文字列・アプリ由来の属性値を落とす（`src/frontend/src/lib/sentry/scrub.ts`。単体テストで固定してある）
+- **金額**：本文の文字列からも 4 桁以上の数字とカンマ区切りの数字を落とす（[X3-1]）。日付（`2026-08-22`、年月だけの `2026-08` も含む）と時刻（`01:23:45`）だけは残すが、**ビルド ID やポート番号は巻き添えで潰れる**。Sentry のコンソールで数字が `[redacted]` になっているのは不具合ではない
+
+### 15.5 動作確認
+
+ローカル開発では `NEXT_PUBLIC_SENTRY_DSN` を空のままにしておく（手元のエラーが STG の通知に混ざらないようにするため）。実際の確認は `develop` へのデプロイ後、STG の画面で意図的にエラーを起こして Sentry にイベントが届くことを見る。
+
+届かない場合、まずブラウザの DevTools で `ingest.sentry.io` への POST が出ているかを見る。出ていなければ DSN がバンドルに入っていない（Secret Manager の登録漏れ、または `availability` に `BUILD` が無い）。出ていて 4xx なら DSN の値が誤っている。
+
+### 15.6 Cloud Functions（バックエンド）側の設定
+
+ここまでは App Hosting（フロントエンド）の話。Cloud Functions は別のシークレットの仕組みを使うため、**`SENTRY_DSN` をもう一度、functions 用に登録する**（`IDENTITY_PLATFORM_WEB_API_KEY`・`RESEND_API_KEY` と同じ手順。5 章）。
+
+```bash
+firebase functions:secrets:set SENTRY_DSN --project fire-fire-dev
+```
+
+`--project fire-fire-prod` でも同じものを作る。値は 15.1 の DSN で、フロントエンドと同じもので構わない（Sentry のプラットフォームタグで node / browser を区別できる）。
+
+**登録しないと functions のデプロイが「シークレットが存在しない」で失敗する。** 逆に言えば、DSN が無いまま本番が動くことは起こらない。
+
+続けて、デプロイ用サービスアカウントに権限を付与する。忘れると deploy が `Permission 'secretmanager.secrets.get' denied` で落ちる（理由とロールの選び方は 5 章と同じ）。
+
+```bash
+for PROJECT_ID in fire-fire-dev fire-fire-prod; do
+  gcloud secrets add-iam-policy-binding SENTRY_DSN \
+    --project="$PROJECT_ID" \
+    --member="serviceAccount:github-actions-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.admin"
+done
+```
+
+#### バックエンドで送るもの・送らないもの
+
+- **クライアントへ返す失敗（`HttpsError`）は送らない。** パスワード間違い（`unauthenticated`）や入力不備（`invalid-argument`）は制御フローであって障害ではなく、送ると利用者の通常操作で Sentry が埋まる。例外は `internal` だけで、これは「サーバー側で何かが壊れた」合図として送る（`src/backend/src/sentry/report.ts`）
+- **Blocking Functions（`sendLoginNotification`・`restrictSignUpToAllowlist`）は送信完了を待たない。** 7 秒の予算のうちログイン通知は Resend で 5 秒を使いうるため、Sentry を新たなタイムアウト要因にしない。待たない以上、インスタンスが凍結されてイベントを取りこぼす可能性は残る
+- **数字は伏せていない。** フロントエンドは残高が本文に混ざりうるため 4 桁以上の数字を落としているが、バックエンドの 9 つの関数は金額を一切扱わない。ここで数字を潰すと Identity Platform や Resend のステータスコードという切り分け材料を失うだけになる。メールアドレスと UID は伏せる（`src/backend/src/sentry/scrub.ts`）
+
+#### 動作確認
+
+`develop` へのデプロイ後、STG で意図的に失敗させて Sentry に届くことを見る。手軽なのは A11 のお問い合わせで、`CONTACT_RECIPIENT_EMAIL` を一時的に不正な値にすると送信が失敗する。届かない場合は Cloud Functions のログに `SENTRY_DSNが未設定のため、Sentryへの送信を行いません` が出ていないかを見る（出ていればシークレットの結び付け漏れ）。
+
+## 16. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
-- `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 8章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
+- `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 9章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
-## 16. 参考リンク
+## 17. 参考リンク
 
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)
@@ -787,3 +875,4 @@ firebase functions:delete restrictSignUpToAllowlist \
 - [Firebase Authentication: メールアクションハンドラをカスタマイズする](https://firebase.google.com/docs/auth/custom-email-handler)
 - [Firebase Authentication: ブロッキング関数で拡張する](https://firebase.google.com/docs/auth/extend-with-blocking-functions)
 - [Resend: Send with Node.js / REST API](https://resend.com/docs/api-reference/emails/send-email)
+- [Sentry: Next.js 用 SDK のマニュアル設定](https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/)
