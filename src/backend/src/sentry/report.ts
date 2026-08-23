@@ -156,8 +156,15 @@ const DUPLICATE_SUPPRESSION_WINDOW_MS = 600_000;
  * 抑制の記録を保つ上限。
  *
  * インスタンスが生きている間ずっと溜まるので、際限なく増やさない。
- * 超えたら期限切れを掃除し、それでも超えるなら**まるごと捨てる** — 記録を失うと
- * 抑制が効かなくなるだけで、**送る側に倒れる**。監視の記録が監視を止めては困る。
+ * 溢れたときは**新しい種類を記録しないだけ**にして、既に覚えている種類の抑制は守る。
+ * 記録できなかった種類は毎回送られる = **送る側に倒れる**。監視の記録が監視を止めては困る。
+ *
+ * **まるごと捨てる作りにしない。** 呼び出し元の多く(`withSentryReporting`・
+ * `signup-allowlist`・`login-notification`)は**手作りしていない生の例外**をそのまま渡す。
+ * メッセージに毎回変わる値が混ざる例外(gRPCの`DEADLINE_EXCEEDED`など)が続くと、
+ * キーが呼び出しごとに変わって記録が埋まる。ここで全部消すと、**その巻き添えで無関係な
+ * 種類の抑制まで巻き戻り、抑制が全体で無効になる**。うるさい1つの経路が効かないのは
+ * このPR以前と同じだが、他を道連れにするのはこの仕組みが新しく持ち込む害になる。
  */
 const MAX_SUPPRESSION_ENTRIES = 200;
 
@@ -209,9 +216,16 @@ const buildSuppressionKey = (error: unknown): string => {
   return `unknown:${redactSensitiveText(describeUnknown(error))}`;
 };
 
-/** 送信したことを覚える。上限を超えたら掃除する。 */
+/**
+ * 送信したことを覚える。
+ *
+ * 上限に達していたら期限切れを掃除し、それでも空きが無ければ**この種類を覚えない**。
+ * 覚えられなかった種類は次も送られるだけで、既に覚えている種類には影響しない。
+ * フラッドが収まれば、記録は最大でも抑制窓のぶんで期限切れになって空く。
+ */
 const rememberReported = (key: string, now: number): void => {
-  if (lastReportedAt.size >= MAX_SUPPRESSION_ENTRIES) {
+  // 既に覚えている種類の更新は、空きの有無に関係なく通す(件数が増えないため)
+  if (lastReportedAt.size >= MAX_SUPPRESSION_ENTRIES && !lastReportedAt.has(key)) {
     for (const [candidate, reportedAt] of lastReportedAt) {
       if (now - reportedAt >= DUPLICATE_SUPPRESSION_WINDOW_MS) {
         lastReportedAt.delete(candidate);
@@ -219,7 +233,7 @@ const rememberReported = (key: string, now: number): void => {
     }
 
     if (lastReportedAt.size >= MAX_SUPPRESSION_ENTRIES) {
-      lastReportedAt.clear();
+      return;
     }
   }
 
