@@ -22,6 +22,9 @@
 import { defineSecret } from "firebase-functions/params";
 import { beforeUserSignedIn } from "firebase-functions/identity";
 
+import { resolveProjectId } from "../project-id";
+import { captureWithoutWaiting } from "../sentry/report";
+import { SENTRY_DSN } from "../sentry/secrets";
 import { resolveSignInMethodLabel } from "./login-context";
 import { sendMail } from "./mailer";
 import { buildLoginNotificationMail } from "./message";
@@ -36,34 +39,6 @@ import type { AuthBlockingEvent } from "firebase-functions/identity";
  * CIの環境変数を見ないため。
  */
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
-
-/**
- * 実行中のFirebaseプロジェクトID。開発環境からの通知を見分けるために本文へ載せる。
- *
- * 実行環境によって設定される変数が違うため順に見る。`FIREBASE_CONFIG`はFirebaseが
- * デプロイ時に設定するJSONで、環境変数側が空でもここからプロジェクトIDを拾える。
- *
- * どれも読めなければ空文字を返し、`message.ts`は本番以外として扱う。取り違える方向を
- * 「本番の通知に`[dev]`が付く」側に倒してある。逆(開発環境の通知が本番の見た目で届く)より、
- * 気づいたときの実害が小さいため。実際に本番で`[dev]`が付かないことは
- * docs/ci-cd-setup.md 13.3 の手順で確認する。
- */
-const currentProjectId = (): string => {
-  const fromEnv =
-    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? process.env.GCP_PROJECT;
-
-  if (fromEnv !== undefined && fromEnv !== "") {
-    return fromEnv;
-  }
-
-  try {
-    const config = JSON.parse(process.env.FIREBASE_CONFIG ?? "{}") as { projectId?: string };
-    return config.projectId ?? "";
-  } catch (error) {
-    console.error("FIREBASE_CONFIGを解釈できませんでした", error);
-    return "";
-  }
-};
 
 /**
  * ログイン1回ぶんの通知を送る。
@@ -94,7 +69,12 @@ export const notifyLogin = async (event: AuthBlockingEvent): Promise<void> => {
     signInMethod: resolveSignInMethodLabel(event),
     ipAddress: event.ipAddress ?? "",
     userAgent: event.userAgent ?? "",
-    projectId: currentProjectId(),
+    /*
+      実行中のプロジェクトID。開発環境からの通知を見分けるために本文へ載せる
+      (`message.ts`が`[dev]`を付ける)。読めない場合は本番以外として扱われる。
+      実際に本番で`[dev]`が付かないことは docs/ci-cd-setup.md 13.3 で確認する。
+    */
+    projectId: resolveProjectId(),
   });
 
   const result = await sendMail(RESEND_API_KEY.value(), {
@@ -115,13 +95,19 @@ export const notifyLogin = async (event: AuthBlockingEvent): Promise<void> => {
  * 例外も投げないため、このトリガーがログインを拒否することはない。
  */
 export const sendLoginNotification = beforeUserSignedIn(
-  { secrets: [RESEND_API_KEY] },
+  { secrets: [RESEND_API_KEY, SENTRY_DSN] },
   async (event) => {
     try {
       await notifyLogin(event);
     } catch (error) {
       // `notifyLogin`は自前で握り潰す作りだが、想定外の例外でログインが落ちないよう二重に受ける
       console.error("ログイン通知の送信に失敗しました", error);
+      /*
+        握り潰した失敗をここでSentryへ送る([X3])。ログに残すだけでは
+        能動的に見に行かない限り気づけず、それがこのカードの動機そのもの。
+        送信完了は待たない — 7秒の予算のうちResendが既に5秒を使いうるため。
+      */
+      captureWithoutWaiting(error);
     }
   },
 );
