@@ -61,8 +61,9 @@
 
 - **Sentry**(`@sentry/node`): 未捕捉エラーの検知([X3](https://trello.com/c/cjBCWQsf)で導入)。Cloud Functionsの失敗はCloud Loggingを能動的に見に行かないと気づけず、既存の「送信失敗はログに残すだけで握りつぶす」設計(ログイン通知メール・お問い合わせメール)は、その失敗自体を検知する手段を持っていなかった
 - 入口は`src/sentry/report.ts`の2つ。**`onCall`は使わず`onCallWithSentry`を使う** — `options`が必須で、`SENTRY_DSN`を`secrets`へ結び付け忘れた関数が「送っているつもりで送れていない」状態で通るのを防ぐため。Blocking Functionは`captureWithoutWaiting`を既存の`catch`から呼ぶ
-- **`HttpsError`は送らない。** クライアントへ返すための制御フローであって障害ではなく、パスワード間違いや入力不備まで送ると利用者の通常操作でSentryが埋まる。例外は`internal`だけ
+- **`HttpsError`は原則送らない。** クライアントへ返すための制御フローであって障害ではなく、パスワード間違いや入力不備まで送ると利用者の通常操作でSentryが埋まる。**例外は`internal`と`unavailable`の2つ**([X3-4](https://trello.com/c/t8AdERPb))。リポジトリ内の`unavailable`は全箇所が本物の障害を包んでおり(認証基盤へ接続不可・Firestoreの再帰削除失敗・Identity Platformの更新失敗・Resendへの送信失敗)、利用者の通常操作は`invalid-argument`・`unauthenticated`・`failed-precondition`・`permission-denied`・`resource-exhausted`に分かれていて混ざっていない。**判別に`details.reason`を使わないのは意図的** — 理由の一覧を持つと、新しい`reason`を足したときに更新を忘れて静かに検知漏れになる。この住み分けを崩す`HttpsError`を足すときは`isExpectedFailure`も一緒に見ること
 - **Blocking Functionでは送信完了を待たない。** 7秒の予算のうちログイン通知はResendで5秒を使いうるため、Sentryを新たなタイムアウト要因にしない。callableは60秒(`deleteAccount`は300秒)あるので2秒待って確実に届ける
+- **callable側のflushは、同じ呼び出しで`captureWithoutWaiting`が積んだイベントも押し出す。** お問い合わせ(A11)のメール送信失敗がこれに当たり、`unavailable`を送信対象にするまでは積まれたまま誰もflushせず、インスタンス凍結で失われうる状態だった([X3-5](https://trello.com/c/EFzBJPWV))。この経路では`mailer.ts`のError(statusコードを持つ)と`HttpsError`(どのcallableかを持つ)の**2件が届くが、これは意図したもの**
 - **初期化は遅延させる。** `SENTRY_DSN.value()`はモジュール読み込み時に解決できない(firebase-toolsがデプロイ前に関数定義を解析する時点ではSecret Managerの値が渡っていない)。あわせて`defaultIntegrations: false`で既定の自動計装を止めてある — OpenTelemetryの登録コストが7秒予算を削るため。**`integrations: []`では止まらない**(既定とマージされるだけ)
 - **個人情報を送らない。** `sendDefaultPii: false`に加え、`beforeSend`(`src/sentry/scrub.ts`)でメールアドレス・UID・リクエストの中身を落とす。単体テストで「送られないこと」を固定してあるので、**方針を変えるときはそのテストも読むこと**
 - **数字は伏せていない。** フロントエンドは残高が本文に混ざりうるため4桁以上の数字を落としているが([X3-1])、バックエンドの関数は金額を扱わない。潰すとステータスコードという切り分け材料を失うだけになる

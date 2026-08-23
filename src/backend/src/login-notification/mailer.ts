@@ -97,9 +97,12 @@ export const sendMail = async (
     /*
       **戻り値で失敗を返す経路なので、呼び出し側のtry/catchでは拾えない。**
       ここで送らないと、カード[X3]が検知したかった「握りつぶされた送信失敗」が
-      そのまま漏れる — ログイン通知は握り潰し、お問い合わせは`unavailable`の
-      HttpsErrorに変換され、どちらも想定内の失敗としてSentryから除かれるため。
+      そのまま漏れる — ログイン通知は呼び出し元が握り潰すため、例外として上がらない。
       Errorに包むのは、ステータスコードだけでは何が起きたか追えないから。
+
+      お問い合わせ(A11)は`unavailable`のHttpsErrorに変換され、[X3-4]以降はそちらも
+      Sentryへ送られる。**同じ失敗でイベントが2件になるのは承知のうえ** — こちらだけが
+      statusコードを持つため([X3-5]、`sentry/report.ts`の`captureAndWait`)。
     */
     captureWithoutWaiting(new Error(`メールを送信できませんでした (status ${response.status})`));
     return { status: "failed" };

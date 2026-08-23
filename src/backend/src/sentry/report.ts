@@ -14,7 +14,11 @@ import { resolveProjectId } from "../project-id";
 import { scrubEvent } from "./scrub";
 import { SENTRY_DSN } from "./secrets";
 
-import type { CallableOptions, CallableRequest } from "firebase-functions/https";
+import type {
+  CallableOptions,
+  CallableRequest,
+  FunctionsErrorCode,
+} from "firebase-functions/https";
 
 /**
  * callableが送信完了を待つ上限(ミリ秒)。
@@ -86,17 +90,48 @@ const ensureInitialized = (): boolean => {
 };
 
 /**
+ * 障害を表す`HttpsError`のコード。**これ以外は制御フローとみなして送らない。**
+ *
+ * - `internal` — サーバー側で何かが壊れた。`signup-allowlist`がFirestoreの
+ *   読み取りに失敗したときに投げる
+ * - `unavailable` — 依存先へ届かなかった。gRPCの`UNAVAILABLE`の意味そのもの
+ *
+ * **`unavailable`を含めるのはカード[X3-4]で足した。** 当初は`internal`だけを別扱いに
+ * していたが、このリポジトリで`unavailable`を投げている箇所は**全て本物の障害**だった。
+ *
+ * | 箇所 | 包んでいるもの |
+ * |---|---|
+ * | `auth/password-confirmation.ts` | Identity Platformへ接続できなかった |
+ * | `contact/functions.ts` | Resendへ送れなかった / 宛先・APIキーが未設定 |
+ * | `account-deletion/functions.ts` | Firestoreの再帰削除・Authユーザー削除の失敗 |
+ * | `linked-providers/functions.ts` | Identity Platformの更新失敗 |
+ * | `mfa-recovery/functions.ts` | Identity Platformの更新失敗・接続不可 |
+ *
+ * とりわけ`data-deletion-failed`(`account-deletion`)は、同じファイルのコメントが
+ * 「取引が積み上がったアカウントで再帰削除が収まらないことがある」と書いているとおり
+ * **まさに検知したい種類の障害**で、これが除外されたままだった。
+ *
+ * **`details.reason`ではなくコードで判別し続けているのは意図的。** 理由の一覧をここに
+ * 持つと、新しい`reason`を足すたびに更新が要り、忘れると静かに検知漏れになる。
+ * コードで足りるのは、利用者の通常操作が`invalid-argument`・`unauthenticated`・
+ * `failed-precondition`・`permission-denied`・`resource-exhausted`に分かれていて、
+ * 障害用の2つと混ざっていないため。**この住み分けを崩す`HttpsError`を足すときは、
+ * ここも一緒に考えること。**
+ */
+const FAILURE_CODES: ReadonlySet<FunctionsErrorCode> = new Set<FunctionsErrorCode>([
+  "internal",
+  "unavailable",
+]);
+
+/**
  * 想定内の失敗かどうか。
  *
- * `HttpsError`は**クライアントへ返すための制御フロー**であって障害ではない。
+ * `HttpsError`の多くは**クライアントへ返すための制御フロー**であって障害ではない。
  * パスワード間違い(`unauthenticated`)や入力不備(`invalid-argument`)まで送ると、
  * 利用者の通常操作でSentryが埋まり、本当の障害が埋もれる。
- *
- * 唯一`internal`だけは別扱いにする。これは「サーバー側で何かが壊れた」ことを表す
- * コードで、実際`signup-allowlist`はFirestoreの読み取りに失敗したときにこれを投げる。
  */
 const isExpectedFailure = (error: unknown): boolean =>
-  error instanceof HttpsError && error.code !== "internal";
+  error instanceof HttpsError && !FAILURE_CODES.has(error.code);
 
 /**
  * 例外をSentryへ送る。**送信完了を待たない。**
@@ -130,6 +165,19 @@ export const captureWithoutWaiting = (error: unknown): void => {
  *
  * callableの既定タイムアウトは60秒、`deleteAccount`は300秒あるので、
  * ここで数秒使っても呼び出し全体を壊さない。
+ *
+ * **ここでのflushは、この呼び出しの中で`captureWithoutWaiting`が積んだイベントも一緒に
+ * 押し出す。** カード[X3-5]の穴はここだった — お問い合わせ(A11)でメール送信が失敗すると
+ * `mailer.ts`が`captureWithoutWaiting`でイベントを積み、`contact/functions.ts`が
+ * `unavailable`の`HttpsError`を投げるが、当時は`unavailable`が「想定内」と判定されて
+ * この関数が即returnし、**積まれたイベントを誰もflushしないままインスタンスが
+ * 凍結されうる**状態だった。[X3-4]で`unavailable`を送信対象にしたことで、この経路も
+ * flushまで進む。
+ *
+ * その結果、お問い合わせの送信失敗では**イベントが2件届く** — `mailer.ts`のErrorが
+ * 「なぜ送れなかったか」(接続エラー・Resendのstatusコード)を、こちらの`HttpsError`が
+ * 「どのcallableで起きたか」を持つ。**重複は意図したもの**で、失敗自体がまれなので
+ * 無料枠(5,000件/月)を脅かさず、両方あるほうが切り分けやすい([X3-5])。
  */
 const captureAndWait = async (error: unknown): Promise<void> => {
   if (isExpectedFailure(error)) {
