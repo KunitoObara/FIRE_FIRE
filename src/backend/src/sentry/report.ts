@@ -159,12 +159,19 @@ const DUPLICATE_SUPPRESSION_WINDOW_MS = 600_000;
  * 溢れたときは**新しい種類を記録しないだけ**にして、既に覚えている種類の抑制は守る。
  * 記録できなかった種類は毎回送られる = **送る側に倒れる**。監視の記録が監視を止めては困る。
  *
- * **まるごと捨てる作りにしない。** 呼び出し元の多く(`withSentryReporting`・
- * `signup-allowlist`・`login-notification`)は**手作りしていない生の例外**をそのまま渡す。
- * メッセージに毎回変わる値が混ざる例外(gRPCの`DEADLINE_EXCEEDED`など)が続くと、
- * キーが呼び出しごとに変わって記録が埋まる。ここで全部消すと、**その巻き添えで無関係な
- * 種類の抑制まで巻き戻り、抑制が全体で無効になる**。うるさい1つの経路が効かないのは
- * このPR以前と同じだが、他を道連れにするのはこの仕組みが新しく持ち込む害になる。
+ * **まるごと捨てる作りにしない。** `withSentryReporting`(全callableの想定外例外を通す)と
+ * `login-notification`は**手作りしていない生の例外**をそのまま渡す。メッセージに毎回変わる
+ * 値が混ざる例外が続くと、キーが呼び出しごとに変わって記録が埋まる。ここで全部消すと、
+ * **その巻き添えで無関係な種類の抑制まで巻き戻り、抑制が全体で無効になる**。うるさい1つの
+ * 経路が効かないのは受け入れるとしても、他を道連れにするのはこの仕組みが持ち込む害になる。
+ *
+ * ([X3-8] `signup-allowlist`もここに挙げていたが誤りだった。`assertSignUpAllowed`は
+ * Firestoreの例外も`catch`して`HttpsError`に包み直すので、生の例外は外へ出ない。
+ * `HttpsError`はコード+`reason`でキーを作るため、そもそも有界である。)
+ *
+ * [X3-7]で`code`を持つ例外は`code`でキーを作るようにしたので、キーが埋まる経路は
+ * 狭まった。**それでも上限の倒し方は変えない** — `code`もメッセージも当てにできない
+ * 例外が将来出てきたときに、また全体を道連れにされないため。
  */
 const MAX_SUPPRESSION_ENTRIES = 200;
 
@@ -176,6 +183,27 @@ const readFailureReason = (details: unknown): string =>
   typeof details === "object" && details !== null && "reason" in details && typeof details.reason === "string"
     ? details.reason
     : "";
+
+/**
+ * 例外が持つ機械可読なエラーコード。無ければ`undefined`。
+ *
+ * **これがあるとキーを有界にできる**([X3-7])。メッセージに毎回変わる値を埋める例外は、
+ * どれもコードのほうは有限の集合に収まっている。
+ *
+ * | 例外 | `code` |
+ * |---|---|
+ * | gRPC(`ServiceError = StatusObject & Error`) | 数値。`4` = `DEADLINE_EXCEEDED` など |
+ * | Nodeのシステムエラー | `ECONNREFUSED`・`ENOTFOUND` など |
+ * | `FirebaseAuthError` | `auth/user-not-found` など |
+ *
+ * 数値も受けるのはgRPCのため。`code`を持たない例外(手作りの`Error`)は`undefined`が返り、
+ * メッセージでの判別に落ちる。
+ */
+const readErrorCode = (error: Error): string | undefined => {
+  const { code } = error as { code?: unknown };
+
+  return typeof code === "string" || typeof code === "number" ? String(code) : undefined;
+};
 
 /**
  * `Error`ですらない値を投げられたときの記述。
@@ -212,10 +240,17 @@ const describeUnknown = (error: unknown): string => {
  * 扱われ元々切り分けが難しく、内容をキーにすると非有界なキーを作りかねないため
  * ([X3-7](https://trello.com/c/QkdtEE0n)が扱う問題を自分から増やすことになる)。
  *
- * 代償として、`Error`分岐の上限は「1件/10分」ではなく「ステータスの種類数/10分」になる。
- * **有限の小さな集合で頭打ちになる**ので、[X3-6]が塞いだ「1リクエストにつき1件」という
- * 無制限の増幅とは桁が違う。メッセージに**非有界な**値(件数・所要時間・タイムスタンプ)を
- * 入れると話が変わるので、そういうメッセージをここへ流さないこと。
+ * 代償として、メッセージを使う分岐の上限は「1件/10分」ではなく「ステータスの種類数/10分」に
+ * なる。**有限の小さな集合で頭打ちになる**ので、[X3-6]が塞いだ「1リクエストにつき1件」と
+ * いう無制限の増幅とは桁が違う。
+ *
+ * **メッセージを使うのは`code`を持たない例外だけ**([X3-7])。呼び出し元の多くは
+ * 手作りしていない生の例外をそのまま渡すので、メッセージが有界だと当てにできない。
+ * 実際`@grpc/grpc-js`のデッドライン超過は
+ * `Deadline exceeded after 9.998s,LB pick: 0.003s,remote_addr=142.250.1.1:443`の形で、
+ * **ミリ秒精度の所要時間と接続先**を含む(`build/src/deadline.js`の`formatDateDifference`は
+ * `toFixed(3)`)。呼び出しごとに一意なので、これをキーにすると抑制がまったく効かない。
+ * `code`があればそちらを使い、この形の例外を有界なキーへ落とす。
  */
 const buildSuppressionKey = (error: unknown): string => {
   if (error instanceof HttpsError) {
@@ -223,7 +258,20 @@ const buildSuppressionKey = (error: unknown): string => {
   }
 
   if (error instanceof Error) {
-    return `${error.name}:${redactSensitiveText(error.message)}`;
+    const code = readErrorCode(error);
+
+    /*
+      `code`があればメッセージを見ない([X3-7])。見てしまうと、gRPCのように毎回違う
+      メッセージを持つ例外で抑制が効かなくなる。`code`を持たない手作りの`Error`
+      (`mailer.ts`の「(status 500)」など)は今までどおりメッセージで分かれる。
+
+      **どちらの由来かを接頭辞で明示する。** 付けないと、`code`が`4`の例外と
+      メッセージが`code:4`の例外が同じキーになる。まず起きないが、キーの一意性を
+      中身の偶然に委ねる理由も無い。
+    */
+    return code === undefined
+      ? `${error.name}:message:${redactSensitiveText(error.message)}`
+      : `${error.name}:code:${code}`;
   }
 
   return `unknown:${redactSensitiveText(describeUnknown(error))}`;
