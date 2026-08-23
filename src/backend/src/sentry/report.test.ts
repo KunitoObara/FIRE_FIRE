@@ -204,6 +204,33 @@ describe("同じ種類のイベントの抑制([X3-6])", () => {
     expect(captureException).toHaveBeenCalledTimes(1);
   });
 
+  it("String()が投げる値でも、キーの生成で送信ごと落とさない", () => {
+    /*
+      `withSentryReporting`は**全callableの想定外例外**を通すので、`Error`を継承しない
+      値が来ることがある。`Object.create(null)`は`toString`を持たないため`String()`が
+      TypeErrorを投げる(`Symbol`は`String()`が特別扱いするので投げない)。
+      ここで投げると外側のcatchに落ち、**イベントごと送られなくなる**。
+    */
+    expect(() => String(Object.create(null) as object)).toThrow(TypeError);
+
+    captureWithoutWaiting(Object.create(null) as object);
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it("Errorでないプレーンオブジェクトは1つの種類に丸まる(承知のうえの限界)", () => {
+    /*
+      `String({a: 1})`も`String({b: 2})`も`[object Object]`になるため、
+      **この分岐だけは「別種の障害を取りこぼさない」が成り立たない**。
+      内容をキーにすると非有界なキーを作りかねないので、こちらを選んでいる
+      (`report.ts`の`buildSuppressionKey`)。挙動を変えるときはこのテストも読むこと。
+    */
+    captureWithoutWaiting({ reason: "まったく別の失敗A" });
+    captureWithoutWaiting({ cause: "まったく別の失敗B" });
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
   it("抑制窓(10分)を過ぎれば、まだ直っていないことが分かるよう再び送る", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-23T00:00:00Z"));
