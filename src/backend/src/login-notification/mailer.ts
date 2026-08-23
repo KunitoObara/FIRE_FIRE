@@ -103,6 +103,7 @@ export const sendMail = async (
       お問い合わせ(A11)は`unavailable`のHttpsErrorに変換され、[X3-4]以降はそちらも
       Sentryへ送られる。**同じ失敗でイベントが2件になるのは承知のうえ** — こちらだけが
       statusコードを持つため([X3-5]、`sentry/report.ts`の`captureAndWait`)。
+      連投しても増え続けはしない。同じ種類は10分に1件へ絞られる([X3-6])。
     */
     captureWithoutWaiting(new Error(`メールを送信できませんでした (status ${response.status})`));
     return { status: "failed" };
