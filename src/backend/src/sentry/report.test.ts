@@ -219,19 +219,47 @@ describe("同じ種類のイベントの抑制([X3-6])", () => {
     expect(captureException).toHaveBeenCalledTimes(2);
   });
 
-  it("記録が上限に達したら記録を捨て、送る側に倒れる", () => {
-    /* 監視の記録が監視を止めては困る。抑制が効かなくなるだけで済ませる。 */
-    const first = new Error("最初の失敗");
-
-    captureWithoutWaiting(first);
+  /**
+   * 記録を上限まで埋める。
+   *
+   * 生の例外をそのまま渡す呼び出し元(`withSentryReporting`・`signup-allowlist`・
+   * `login-notification`)では、メッセージに毎回変わる値が混ざる例外が続くと
+   * こうなりうる。
+   */
+  const floodSuppressionEntries = (): void => {
     for (let index = 0; index < 200; index += 1) {
-      captureWithoutWaiting(new Error(`別の失敗 ${index}`));
+      captureWithoutWaiting(new Error(`毎回ちがう失敗 ${index}`));
     }
+  };
+
+  it("記録が上限に達しても、既に覚えている種類の抑制は守る", () => {
+    /*
+      **巻き添えを起こさないための回帰テスト。** 記録をまるごと捨てる作りだと、
+      キーが毎回変わる経路が1つあるだけで、無関係な種類の抑制まで巻き戻り、
+      抑制が全体で無効になる。うるさい経路が効かないこと自体は許容するが、
+      他を道連れにはしない。
+    */
+    const known = new Error("覚えている失敗");
+
+    captureWithoutWaiting(known);
+    floodSuppressionEntries();
 
     captureException.mockClear();
-    captureWithoutWaiting(first);
+    captureWithoutWaiting(known);
 
-    expect(captureException).toHaveBeenCalledWith(first);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it("上限に達したあとの新しい種類は覚えず、送る側に倒れる", () => {
+    /* 監視の記録が監視を止めては困る。覚えられないぶんは毎回送る。 */
+    floodSuppressionEntries();
+
+    captureException.mockClear();
+    const unknown = new Error("記録しきれない失敗");
+    captureWithoutWaiting(unknown);
+    captureWithoutWaiting(unknown);
+
+    expect(captureException).toHaveBeenCalledTimes(2);
   });
 
   it("送信に失敗した種類は抑制しない(送れていないものを送った扱いにしないため)", () => {
