@@ -11,7 +11,7 @@ import * as Sentry from "@sentry/node";
 import { HttpsError, onCall } from "firebase-functions/https";
 
 import { resolveProjectId } from "../project-id";
-import { scrubEvent } from "./scrub";
+import { redactSensitiveText, scrubEvent } from "./scrub";
 import { SENTRY_DSN } from "./secrets";
 
 import type {
@@ -134,6 +134,107 @@ const isExpectedFailure = (error: unknown): boolean =>
   error instanceof HttpsError && !FAILURE_CODES.has(error.code);
 
 /**
+ * 同じ種類のイベントを続けて送らない時間(ミリ秒)。
+ *
+ * **無料枠(5,000件/月)を1つの障害で使い切らせないための歯止め**([X3-6])。
+ * `sendContactMessage`(A11)は**サインイン不要で叩ける唯一のcallable**で、しかも失敗した
+ * 呼び出しには実質的なレート制限がかかっていない — 宛先未設定は送信枠の確保より前で投げ、
+ * 送信失敗は確保した枠を戻すため(`contact/functions.ts`)。枠を戻すのは
+ * docs/screen-requirements-public.md A11 が明記した要件なので、**監視の都合で曲げない**。
+ * 代わりに送る側で絞る。
+ *
+ * **最初の1件は必ず送る。** ここが「一定時間まったく送らない」になると、検知そのものを
+ * 落とすことになり本末転倒になる。Sentryのスパイク保護がイベントを無差別に落とすのに対し、
+ * こちらは種類ごとに1件目を通すので、**別種の障害が同時に起きても取りこぼさない**。
+ *
+ * 10分にしたのは、継続する障害ならインスタンスあたり1時間に6件前後は届き、
+ * 「まだ直っていない」ことも見えるため。
+ */
+const DUPLICATE_SUPPRESSION_WINDOW_MS = 600_000;
+
+/**
+ * 抑制の記録を保つ上限。
+ *
+ * インスタンスが生きている間ずっと溜まるので、際限なく増やさない。
+ * 超えたら期限切れを掃除し、それでも超えるなら**まるごと捨てる** — 記録を失うと
+ * 抑制が効かなくなるだけで、**送る側に倒れる**。監視の記録が監視を止めては困る。
+ */
+const MAX_SUPPRESSION_ENTRIES = 200;
+
+/** 種類ごとの最終送信時刻(ミリ秒)。インスタンスをまたいでは共有されない。 */
+const lastReportedAt = new Map<string, number>();
+
+/** `HttpsError`の`details`に載った機械可読な失敗理由。無ければ空文字。 */
+const readFailureReason = (details: unknown): string =>
+  typeof details === "object" && details !== null && "reason" in details && typeof details.reason === "string"
+    ? details.reason
+    : "";
+
+/** `Error`ですらない値を投げられたときの記述。`String()`は投げうるので保険を張る。 */
+const describeUnknown = (error: unknown): string => {
+  try {
+    return String(error);
+  } catch {
+    return typeof error;
+  }
+};
+
+/**
+ * イベントの「種類」を表すキー。
+ *
+ * **メッセージは`redactSensitiveText`を通してから使う。** UIDやメールアドレスが混ざったまま
+ * だと、同じ障害が利用者ごとに別の種類として数えられ、抑制が効かなくなる
+ * (`scrub.ts`がSentryへ送る直前に伏せているのと同じ値を、ここでは同一性の判定に使う)。
+ */
+const buildSuppressionKey = (error: unknown): string => {
+  if (error instanceof HttpsError) {
+    return `HttpsError:${error.code}:${readFailureReason(error.details)}`;
+  }
+
+  if (error instanceof Error) {
+    return `${error.name}:${redactSensitiveText(error.message)}`;
+  }
+
+  return `unknown:${redactSensitiveText(describeUnknown(error))}`;
+};
+
+/** 送信したことを覚える。上限を超えたら掃除する。 */
+const rememberReported = (key: string, now: number): void => {
+  if (lastReportedAt.size >= MAX_SUPPRESSION_ENTRIES) {
+    for (const [candidate, reportedAt] of lastReportedAt) {
+      if (now - reportedAt >= DUPLICATE_SUPPRESSION_WINDOW_MS) {
+        lastReportedAt.delete(candidate);
+      }
+    }
+
+    if (lastReportedAt.size >= MAX_SUPPRESSION_ENTRIES) {
+      lastReportedAt.clear();
+    }
+  }
+
+  lastReportedAt.set(key, now);
+};
+
+/**
+ * この種類を今送ってよければキーを、抑制するなら`undefined`を返す。
+ *
+ * **記録はここでしない。** 実際にSentryへ渡したあとで`rememberReported`を呼ぶ。
+ * 先に記録すると、`captureException`が投げた場合に「送れていない種類」を送った扱いで
+ * 抑制してしまい、次の10分ぶんを黙って落とすことになる。
+ *
+ * 判定から記録までの間に`await`を挟まないので、同一インスタンスで並行して走る呼び出しに
+ * 割り込まれることはない(Cloud Functions gen2は1インスタンスで複数リクエストを捌く)。
+ */
+const resolveReportKey = (error: unknown, now: number): string | undefined => {
+  const key = buildSuppressionKey(error);
+  const reportedAt = lastReportedAt.get(key);
+
+  return reportedAt !== undefined && now - reportedAt < DUPLICATE_SUPPRESSION_WINDOW_MS
+    ? undefined
+    : key;
+};
+
+/**
  * 例外をSentryへ送る。**送信完了を待たない。**
  *
  * Blocking Functions用。`beforeUserSignedIn`・`beforeUserCreated`には7秒の予算があり、
@@ -153,7 +254,17 @@ export const captureWithoutWaiting = (error: unknown): void => {
     if (!ensureInitialized()) {
       return;
     }
+
+    // 直前に同じ種類を送っていれば黙る([X3-6])。待たない経路なのでflushの心配は無い
+    const now = Date.now();
+    const key = resolveReportKey(error, now);
+
+    if (key === undefined) {
+      return;
+    }
+
     Sentry.captureException(error);
+    rememberReported(key, now);
   } catch (sentryError) {
     // Sentryの都合で呼び出し元を壊さない。ここで投げると握りつぶしの意味が消える
     console.error("Sentryへの送信に失敗しました", sentryError);
@@ -188,7 +299,21 @@ const captureAndWait = async (error: unknown): Promise<void> => {
     if (!ensureInitialized()) {
       return;
     }
-    Sentry.captureException(error);
+
+    /*
+      直前に同じ種類を送っていればこのイベントは積まない([X3-6])。
+      **ただしflushは行う。** 同じ呼び出しの中で`captureWithoutWaiting`が別の種類を
+      積んでいることがあり(お問い合わせ経路の`mailer.ts`)、ここで返してしまうと
+      [X3-5]で塞いだ穴がそのまま開く。積むのをやめるだけで、押し出すのはやめない。
+    */
+    const now = Date.now();
+    const key = resolveReportKey(error, now);
+
+    if (key !== undefined) {
+      Sentry.captureException(error);
+      rememberReported(key, now);
+    }
+
     await Sentry.flush(CALLABLE_FLUSH_TIMEOUT_MS);
   } catch (sentryError) {
     console.error("Sentryへの送信に失敗しました", sentryError);
@@ -240,4 +365,5 @@ export const onCallWithSentry = <Result>(
 export const resetSentryForTest = (): void => {
   initialized = false;
   enabled = false;
+  lastReportedAt.clear();
 };
