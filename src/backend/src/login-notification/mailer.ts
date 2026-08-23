@@ -104,6 +104,8 @@ export const sendMail = async (
       Sentryへ送られる。**同じ失敗でイベントが2件になるのは承知のうえ** — こちらだけが
       statusコードを持つため([X3-5]、`sentry/report.ts`の`captureAndWait`)。
       連投しても増え続けはしない。同じ種類は10分に1件へ絞られる([X3-6])。
+      **ただしステータスコードは種類の一部になる。** 429と500は別の障害なので別々に
+      1件ずつ通る — 上限はResendが返しうるステータスの数で頭打ちになる。
     */
     captureWithoutWaiting(new Error(`メールを送信できませんでした (status ${response.status})`));
     return { status: "failed" };
