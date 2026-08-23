@@ -55,6 +55,16 @@ export const sendMail = async (
   message: MailMessage,
 ): Promise<MailDeliveryResult> => {
   if (apiKey === "") {
+    /*
+      **本番でここに来たら設定漏れなので、Sentryへ送る。** シークレットが未登録なら
+      デプロイ自体が落ちるが、「登録済みだが値が空」は素通りし、メールが恒久的に
+      送れないまま誰も気づけない — 本カードが無くそうとしている状態そのもの。
+
+      ローカルとエミュレータではSecret Managerの値が解決されず必ずここへ来るが、
+      `SENTRY_DSN`も同時に空になるため`captureWithoutWaiting`は何も送らない
+      (`report.ts`の`ensureInitialized`)。ノイズにはならない。
+    */
+    captureWithoutWaiting(new Error("APIキーが未設定のため、メールを送信しませんでした"));
     return { status: "not-configured" };
   }
 

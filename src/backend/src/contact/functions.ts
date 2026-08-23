@@ -3,6 +3,7 @@ import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 
 import { sendMail } from "../login-notification/mailer";
+import { resolveProjectId } from "../project-id";
 import { onCallWithSentry } from "../sentry/report";
 import { SENTRY_DSN } from "../sentry/secrets";
 import { buildContactMail } from "./message";
@@ -86,23 +87,6 @@ const releaseSlotQuietly = async (key: string): Promise<void> => {
   }
 };
 
-/** 実行中のFirebaseプロジェクトID(`login-notification/functions.ts`と同じ判定) */
-const currentProjectId = (): string => {
-  const fromEnv =
-    process.env.GCLOUD_PROJECT ?? process.env.GOOGLE_CLOUD_PROJECT ?? process.env.GCP_PROJECT;
-
-  if (fromEnv !== undefined && fromEnv !== "") {
-    return fromEnv;
-  }
-
-  try {
-    const config = JSON.parse(process.env.FIREBASE_CONFIG ?? "{}") as { projectId?: string };
-    return config.projectId ?? "";
-  } catch {
-    return "";
-  }
-};
-
 /**
  * 問い合わせを1件送る。
  *
@@ -143,7 +127,7 @@ export const sendContactMessage = onCallWithSentry(
 
     const mail = buildContactMail(
       { email: input.data.email, body: input.data.body },
-      currentProjectId(),
+      resolveProjectId(),
       now,
     );
 
