@@ -193,6 +193,68 @@ describe("同じ種類のイベントの抑制([X3-6])", () => {
     expect(captureException).toHaveBeenCalledTimes(2);
   });
 
+  /**
+   * gRPCのデッドライン超過を模した例外。
+   *
+   * `@grpc/grpc-js`は`Deadline exceeded after 9.998s,...,remote_addr=...`の形で
+   * メッセージを組み立てる(`build/src/deadline.js`の`formatDateDifference`が
+   * `toFixed(3)`)。**ミリ秒精度の所要時間と接続先を含むので、呼び出しごとに一意**。
+   * `code`は`StatusObject`由来の数値(`4` = DEADLINE_EXCEEDED)。
+   */
+  const grpcDeadlineError = (seconds: string, remoteAddress: string): Error =>
+    Object.assign(
+      new Error(
+        `4 DEADLINE_EXCEEDED: Deadline exceeded after ${seconds}s,remote_addr=${remoteAddress}`,
+      ),
+      { code: 4 },
+    );
+
+  it("codeを持つ例外はメッセージが毎回変わっても同じ種類にする", () => {
+    /*
+      [X3-7]の回帰テスト。メッセージで判別していると、gRPCの障害が続く間ずっと
+      **1リクエストにつき1件**送られ、抑制がまったく効かない。
+    */
+    captureWithoutWaiting(grpcDeadlineError("9.998", "142.250.1.1:443"));
+    captureWithoutWaiting(grpcDeadlineError("10.001", "142.250.2.2:443"));
+    captureWithoutWaiting(grpcDeadlineError("9.512", "142.250.3.3:443"));
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it("codeが違えば別の種類として通す", () => {
+    /* 締めすぎない側。DEADLINE_EXCEEDEDとUNAVAILABLEは別の障害。 */
+    captureWithoutWaiting(Object.assign(new Error("4 DEADLINE_EXCEEDED: ..."), { code: 4 }));
+    captureWithoutWaiting(Object.assign(new Error("14 UNAVAILABLE: ..."), { code: 14 }));
+
+    expect(captureException).toHaveBeenCalledTimes(2);
+  });
+
+  it("文字列のcode(Nodeのシステムエラー)も同じように扱う", () => {
+    captureWithoutWaiting(Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:443"), {
+      code: "ECONNREFUSED",
+    }));
+    captureWithoutWaiting(Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:443"), {
+      code: "ECONNREFUSED",
+    }));
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it("codeを持たない例外は今までどおりメッセージで分ける", () => {
+    /*
+      `mailer.ts`の手作りメッセージがこれに当たる。[X3-6]の1往復目で
+      「429と503は別の障害でどちらも知りたい」と決めた挙動を、[X3-7]で崩していないこと。
+    */
+    const withoutCode = new Error("メールを送信できませんでした (status 500)");
+
+    expect((withoutCode as { code?: unknown }).code).toBeUndefined();
+
+    captureWithoutWaiting(withoutCode);
+    captureWithoutWaiting(new Error("メールを送信できませんでした (status 429)"));
+
+    expect(captureException).toHaveBeenCalledTimes(2);
+  });
+
   it("メッセージに混ざったUID・メールアドレスで種類が割れない", () => {
     /*
       伏せずに判定すると、同じ障害が利用者ごとに別の種類として数えられ、
