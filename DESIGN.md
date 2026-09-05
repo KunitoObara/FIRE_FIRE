@@ -27,6 +27,8 @@
 
 各追加ライブラリは特定の画面要件に対応づけて選定している(3章参照)。要件にない機能のために先回りして追加しない。
 
+**`shadcn` パッケージは「CLIを叩くときだけ要るもの」ではなく、ビルド時のCSS依存でもある。** `src/app/globals.css` が `@import "shadcn/tailwind.css"` でこのパッケージのCSS(keyframes と `@custom-variant` 群)を取り込んでいるため、依存から外すと `npm run build` が失敗する。JSからのimportは1件も無いので `devDependencies` に置いてあるが([X25](https://trello.com/c/9OiWOZDZ))、**「使っていない」とみなして消さないこと。**
+
 ### `npx shadcn add` で入れたコンポーネントは、そのままでは使わない
 
 `components.json` の `style` は **`radix-nova`** で、これは**コンパクトな寸法体系**を持つ。生成されるボタン・入力欄は `h-8`(32px)、カードの余白は16pxで、HTMLモック(`docs/html_mock/common.css`)の 40px / 24〜32px より一段小さい。`baseColor` も `neutral` で、3章のとおり配色はモック側を正としている。
