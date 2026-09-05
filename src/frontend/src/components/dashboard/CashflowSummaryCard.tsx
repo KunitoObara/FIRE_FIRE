@@ -14,6 +14,7 @@ import {
   buildCashflowEmptyState,
   buildExpenseBreakdownKey,
   CASHFLOW_DATA_QUERY_KEY,
+  CATEGORY_COLOR_SLOT_COUNT,
   CASHFLOW_DATA_STALE_TIME_MS,
   CASHFLOW_DETAIL_LINK,
   CASHFLOW_MONTH_PICKER_LABEL,
@@ -26,6 +27,7 @@ import { buildExpenseSlices } from "@/lib/dashboard/expense-color";
 import { resolveFailureView } from "@/lib/dashboard/failure-view";
 import { formatMonthLabel } from "@/lib/dashboard/month";
 import { formatJpy, formatPercent, formatSignedJpy } from "@/lib/format/currency";
+import { cn } from "@/lib/utils";
 
 import type { JSX } from "react";
 
@@ -212,7 +214,31 @@ export const CashflowSummaryCard = ({
                   key={buildExpenseBreakdownKey(month, expenseSlices)}
                   slices={expenseSlices}
                 />
-                <ul className="flex min-w-48 flex-1 flex-col gap-2 text-sm">
+                {/*
+                  **費目が多い月は凡例を2列にし、円グラフの下へ回り込ませる**
+                  ([B1-18](https://trello.com/c/UTWWqbpy) のレビュー指摘)。スライス数の上限が
+                  無くなったため、1列のままだと大項目が15前後ある月に凡例だけで400px以上になる。
+                  このカードは`DashboardScreen`で負債サマリと同じグリッド行にあり、
+                  CSS Gridの既定(`align-items: stretch`)で**行の高さが高いほうに揃う**ので、
+                  中身の少ない負債サマリが引き伸ばされて下部に大きな空白ができる。
+
+                  **スクロールで抑えない。** 高さは確実に止まるが、費目がスクロールの下に隠れる —
+                  「見えない費目がある」状態を別の形で作ることになり、その解消を目的にした
+                  このカードとは相性が悪い(PO判断)。2列なら何も隠さずに高さがおよそ半分になる。
+
+                  切り替えの境目は**色の切り替えと同じ8/9**にする。高さの問題は件数で決まるので
+                  独自の閾値を置くこともできるが、同じ画面の中に意味の違う境目を2つ作ると、
+                  どちらがどの見た目を決めているのかを画面から追えなくなる。
+                */}
+                <ul
+                  className={cn(
+                    "grid min-w-48 flex-1 gap-x-6 gap-y-2 text-sm",
+                    // `basis-full`で確実に円グラフの下へ落とす。2列ぶんの幅を横に並べて取れない
+                    expenseSlices.length > CATEGORY_COLOR_SLOT_COUNT
+                      ? "basis-full sm:grid-cols-2"
+                      : "grid-cols-1",
+                  )}
+                >
                   {expenseSlices.map((slice) => (
                     <li key={slice.categoryId} className="flex items-center gap-2">
                       {/*

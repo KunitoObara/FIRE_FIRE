@@ -531,7 +531,12 @@
               cx="60" cy="60" r="45" fill="none" stroke="var(--chart-4)" stroke-width="20" stroke-dashoffset="-260.3" transform="rotate(-90 60 60)"/>
           </svg>
           <!-- 凡例は色見本・費目名・構成比・金額(分類別内訳の凡例と同じ)。円グラフの色は
-               背景とのコントラストが3:1に届かないものがあるため、色だけに頼らせない -->
+               背景とのコントラストが3:1に届かないものがあるため、色だけに頼らせない。
+               **費目が9件以上の月は2列にし、円グラフの下へ回り込ませる**(PR #229 の
+               レビュー指摘)。上限が無いので1列のままだと凡例だけで400px以上になり、
+               負債サマリと同じグリッド行の高さがそちらに引きずられる。スクロールで
+               抑えると費目が隠れるので採らない。境目は色の切り替えと同じ8/9。
+               このモックは5件なので1列の側を描いている -->
           <ul class="text-sm flex flex-col gap-2 tabular-nums min-w-56 flex-1">
             <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-8);"></span>住居費 <span class="ml-auto text-slate-400">41%</span><span class="w-24 text-right text-slate-500">¥ 97,000</span></li>
             <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-7);"></span>食費 <span class="ml-auto text-slate-400">27%</span><span class="w-24 text-right text-slate-500">¥ 62,400</span></li>
