@@ -92,6 +92,47 @@ describe("CashflowSummaryCard", () => {
     expect(screen.getByText("¥ 62,400")).toBeInTheDocument();
   });
 
+  /**
+   * 8スロットに収まらない月でも**その月に現れた大項目を全て個別に出す**
+   * ([B1-18](https://trello.com/c/UTWWqbpy))。以前は9件以上の月で先頭7件だけが個別になり、
+   * 残りが受け皿「ほかの費目」へ入っていたため、税・社会保障費や日用品が毎月消えていた。
+   *
+   * 円グラフのスライス数と凡例の行数が食い違わないことを、8/9の境目をまたぐ側で押さえる
+   */
+  it("費目が9件以上でも全てを凡例に出し、受け皿にまとめない", async () => {
+    const names = [
+      "住居費",
+      "食費",
+      "水道・光熱費",
+      "通信費",
+      "税・社会保障",
+      "日用品",
+      "教養・教育",
+      "趣味・娯楽",
+      "交通費",
+    ];
+    fetchCashflowData.mockResolvedValue({
+      ok: true,
+      cashflow: {
+        month: "2026-08",
+        income: 420_000,
+        expense: 450_000,
+        expenseByCategory: names.map((name, index) => ({ name, amount: (9 - index) * 10_000 })),
+      },
+    });
+
+    renderCard();
+
+    expect(await screen.findByTestId("expense-breakdown-chart")).toHaveAttribute(
+      "data-slices",
+      "9",
+    );
+    names.forEach((name) => {
+      expect(screen.getByText(name)).toBeInTheDocument();
+    });
+    expect(screen.queryByText("ほかの費目")).not.toBeInTheDocument();
+  });
+
   it("選択中の年月の取引だけを読む", async () => {
     renderCard({ month: "2025-03" });
 

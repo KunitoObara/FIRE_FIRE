@@ -112,19 +112,22 @@ export const OTHER_CATEGORY_NAME = "その他";
 export const OTHER_CATEGORY_ID = "__other__";
 
 /**
- * 収支サマリの費目別支出で、色のスロットに収まらなかった費目をまとめるスライス
- * (docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」)。
+ * 収支サマリの費目別支出で、費目が8スロットに収まらない月に色を作るときの明度・彩度・起点の色相
+ * (docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」、[B1-18](https://trello.com/c/UTWWqbpy))。
  *
- * **表示名を資産側の「その他」と別にする**(PO判断)。費目名はマネーフォワードのCSVの値そのもので
- * (docs/transaction-import-requirements.md 6章)、大項目には**「その他」が実在する**。同じ名前を
- * 受け皿に使うと、費目が9件以上ある月に凡例へ「その他」が2行並び、どちらが何を指すのかが
- * 画面から読めなくなる。避けられるのはアプリ側が付ける名前だけなので、そちらを変える。
+ * **色の値をTypeScript側に置くのはここだけ**で、他のチャートの色はすべて`globals.css`の
+ * CSS変数にある(DESIGN.md 3章)。費目の件数は取り込んだ取引で決まり事前に分からないため、
+ * CSS変数として列挙できないことによる例外である。
  *
- * IDが擬似的なのは資産側と同じ理由 — 判定は`OTHER_EXPENSE_CATEGORY_ID`で行い、表示名との
- * 一致では見ない。
+ * - 明度は`--chart-*`の8色の平均(0.623)に合わせる。1つの円グラフの中で明るさがばらつかないよう固定する
+ * - 彩度も8色の平均(0.165)を**上限**として置く。色相によってはsRGBの外に出るので、
+ *   実際に使う値は`resolveInGamutChroma`が色相ごとに落とす
+ * - 起点の色相は`--chart-8`(#e34948、H=24.9)に合わせる。8件以下の月で金額最大の費目に当たるのが
+ *   `--chart-8`なので、9件目が現れて生成へ切り替わっても**いちばん大きい費目の色味だけは動かない**
  */
-export const OTHER_EXPENSE_CATEGORY_ID = "__other-expense__";
-export const OTHER_EXPENSE_CATEGORY_NAME = "ほかの費目";
+export const EXPENSE_COLOR_LIGHTNESS = 0.623;
+export const EXPENSE_COLOR_MAX_CHROMA = 0.165;
+export const EXPENSE_COLOR_START_HUE = 24.9;
 
 /**
  * 分類別内訳の負債スライスを表す擬似的な分類ID(`OTHER_CATEGORY_ID`と同じ考え方)。

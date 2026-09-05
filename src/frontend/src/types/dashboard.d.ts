@@ -267,9 +267,8 @@ declare global {
    */
   type ExpenseBreakdownSlice = {
     /**
-     * 費目名そのもの。溢れた分をまとめるスライスだけ擬似的なID
-     * (`OTHER_EXPENSE_CATEGORY_ID`)で、表示名との一致では判定しない —
-     * マネーフォワードの大項目には「その他」が実在する
+     * 費目名そのもの。**その月に現れた大項目は全て個別のスライスになる**ため、
+     * 資産側の「その他」に相当する擬似的なIDは持たない([B1-18](https://trello.com/c/UTWWqbpy))
      */
     categoryId: string;
     name: string;
@@ -282,7 +281,7 @@ declare global {
 
   /** 費目別支出の円グラフのProps */
   type ExpenseBreakdownChartProps = {
-    /** 描く順(=色スロット順=費目名順)に並んだスライス */
+    /** 描く順(=金額の多い順。同額は費目名順)に並んだスライス */
     slices: ExpenseBreakdownSlice[];
   };
 
