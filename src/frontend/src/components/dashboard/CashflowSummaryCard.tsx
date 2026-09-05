@@ -232,11 +232,19 @@ export const CashflowSummaryCard = ({
                 */}
                 <ul
                   className={cn(
-                    "grid min-w-48 flex-1 gap-x-6 gap-y-2 text-sm",
-                    // `basis-full`で確実に円グラフの下へ落とす。2列ぶんの幅を横に並べて取れない
+                    "grid min-w-48 gap-x-6 gap-y-2 text-sm",
+                    /*
+                      2列ぶんの幅は円グラフの横では取れないので、`w-full`で確実に下へ落とす。
+
+                      **`flex-1`と`basis-full`を同じ要素に並べない**(PR #229 のレビュー指摘)。
+                      `flex-1`は`flex-basis`を含むショートハンドなので、どちらが効くかが
+                      生成CSSでの登録順という暗黙の前提で決まる(実測では`.basis-full`が後に
+                      来て勝つが、コード側が保証しているわけではなく、テストでも押さえられない)。
+                      `w-full`なら`flex-basis`が幅から決まるので、順序に依存しない
+                    */
                     expenseSlices.length > CATEGORY_COLOR_SLOT_COUNT
-                      ? "basis-full sm:grid-cols-2"
-                      : "grid-cols-1",
+                      ? "w-full sm:grid-cols-2"
+                      : "flex-1 grid-cols-1",
                   )}
                 >
                   {expenseSlices.map((slice) => (
