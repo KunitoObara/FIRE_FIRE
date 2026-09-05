@@ -262,8 +262,8 @@ declare global {
    *
    * `AssetBreakdownSlice`と形は同じだが別の型にする。あちらは資産分類マスタ(B4)の登録順に
    * 紐づく色を持ち、負債の擬似スライスも入りうる。費目はマスタを持たず(同書6章)、色は
-   * **選択中の月に現れる費目の名前順**で決まるので、同じ型として扱うと取り違えても
-   * 気付けない(docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」)。
+   * **選択中の月に現れる費目を金額の多い順**(同額は費目名順)に並べて決まるので、同じ型として
+   * 扱うと取り違えても気付けない(docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」)。
    */
   type ExpenseBreakdownSlice = {
     /**
