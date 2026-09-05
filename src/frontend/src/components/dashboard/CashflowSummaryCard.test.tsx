@@ -133,6 +133,45 @@ describe("CashflowSummaryCard", () => {
     expect(screen.queryByText("ほかの費目")).not.toBeInTheDocument();
   });
 
+  /**
+   * 費目が多い月は凡例を2列にし、円グラフの下へ回り込ませる(PR #229 のレビュー指摘)。
+   * 1列のままだとカードが縦に伸び、同じグリッド行の負債サマリが引き伸ばされる。
+   *
+   * **jsdomはレイアウトを計算しないので、見た目そのものは確かめられない。** ここで固定するのは
+   * 「件数に応じてクラスが切り替わること」だけで、2列に見えるかどうかは別の手段で見る必要がある
+   */
+  it("費目が9件以上なら凡例を2列にし、8件以下なら1列のままにする", async () => {
+    const withCategories = (count: number): void => {
+      fetchCashflowData.mockResolvedValue({
+        ok: true,
+        cashflow: {
+          month: "2026-08",
+          income: 420_000,
+          expense: 450_000,
+          expenseByCategory: Array.from({ length: count }, (unused, index) => ({
+            name: `費目${index + 1}`,
+            amount: (count - index) * 10_000,
+          })),
+        },
+      });
+    };
+
+    withCategories(8);
+    const { unmount } = renderCard();
+
+    expect((await screen.findByRole("list")).className).toContain("grid-cols-1");
+
+    unmount();
+    withCategories(9);
+    renderCard();
+
+    const dense = await screen.findByRole("list");
+
+    expect(dense.className).toContain("sm:grid-cols-2");
+    // 2列ぶんの幅を円グラフの横では取れないので、下へ回り込ませる
+    expect(dense.className).toContain("basis-full");
+  });
+
   it("選択中の年月の取引だけを読む", async () => {
     renderCard({ month: "2025-03" });
 
