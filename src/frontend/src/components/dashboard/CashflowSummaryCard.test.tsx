@@ -169,7 +169,13 @@ describe("CashflowSummaryCard", () => {
 
     expect(dense.className).toContain("sm:grid-cols-2");
     // 2列ぶんの幅を円グラフの横では取れないので、下へ回り込ませる
-    expect(dense.className).toContain("basis-full");
+    expect(dense.className).toContain("w-full");
+    /*
+      `flex-1`は`flex-basis`を含むショートハンドなので、`w-full`と並べると
+      どちらが効くかが生成CSSの登録順で決まってしまう(PR #229 のレビュー指摘)。
+      **同じ要素に両方が乗らないこと**をここで固定する
+    */
+    expect(dense.className).not.toContain("flex-1");
   });
 
   it("選択中の年月の取引だけを読む", async () => {
