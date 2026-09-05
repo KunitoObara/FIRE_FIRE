@@ -96,8 +96,10 @@ export const CashflowSummaryCard = ({
 
   const balance = cashflow === null ? 0 : cashflow.income - cashflow.expense;
   /*
-    費目別支出の色は**費目名の順**に割り当てる(同要件B1「費目別支出の円グラフ」)。
-    費目マスタを持たない方針のため、資産分類のような登録順がそもそも無い
+    費目別支出の色は**金額の多い順**に割り当てる(同要件B1「費目別支出の円グラフ」)。
+    費目マスタを持たない方針のため、資産分類のような登録順がそもそも無い。
+    **その月に現れた大項目は全て個別のスライスになる**ので、凡例の行数もそのまま増える
+    ([B1-18](https://trello.com/c/UTWWqbpy))
   */
   const expenseSlices = buildExpenseSlices(cashflow?.expenseByCategory ?? []);
 
