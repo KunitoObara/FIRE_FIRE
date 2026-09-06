@@ -142,7 +142,7 @@ export const sendContactMessage = onCallWithSentry(
       await releaseSlotQuietly(throttleKey);
 
       if (result.status === "not-configured") {
-        console.error("RESEND_API_KEYが未設定のため、問い合わせを送信できませんでした");
+        console.error("RESEND_API_KEYが未設定、または形式が不正なため、問い合わせを送信できませんでした");
         throw failure("not-configured", "問い合わせを送信できませんでした");
       }
 

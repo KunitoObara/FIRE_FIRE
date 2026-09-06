@@ -13,7 +13,7 @@ import { captureWithoutWaiting } from "../sentry/report";
 /** 送信結果。失敗の理由は切り分け用にログへ残し、呼び出し元は成否だけ見る */
 export type MailDeliveryResult =
   | { status: "sent" }
-  /** APIキーが未設定で送信を試みなかった(ローカルのエミュレータ等) */
+  /** APIキーが未設定、または明らかに形式が違って送信を試みなかった */
   | { status: "not-configured" }
   | { status: "failed" };
 
@@ -24,6 +24,20 @@ export type MailMessage = {
 };
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
+
+/**
+ * ResendのAPIキーの接頭辞。
+ *
+ * 発行されるキーは必ず`re_`で始まる(docs/ci-cd-setup.md 13.1)。**キーの形式に依存する
+ * 判定をあえて置いている** — [X26]では`RESEND_API_KEY`にGoogleのAPIキーとおぼしき別の値が
+ * 登録されており、dev/prodとも一通も届かないまま1か月気づけなかった。401だけでは
+ * キーが失効したのか別物を貼ったのか区別が付かないが、接頭辞が違えば**登録した値
+ * そのものが誤り**だと名指しできる。
+ *
+ * Resendが接頭辞を変えた場合はここも変える。そのときは送信が止まるが、下の
+ * `captureWithoutWaiting`が理由を名指しするので、原因の分からない不達にはならない。
+ */
+const API_KEY_PREFIX = "re_";
 
 /**
  * 送信元アドレス。
@@ -49,6 +63,9 @@ const REQUEST_TIMEOUT_MS = 5_000;
  *
  * `apiKey`が空のときは送信を試みない。エミュレータではSecret Managerの値が解決されず
  * 空文字になるため、ローカル開発でシークレットの設定を要らなくする。
+ *
+ * **`re_`で始まらない値も送信を試みない。** 形式が違えばResendは401しか返さないので、
+ * Blocking Functionsの7秒の予算のうち5秒を確実に失敗する往復へ使う理由が無い。
  */
 export const sendMail = async (
   apiKey: string,
@@ -65,6 +82,16 @@ export const sendMail = async (
       (`report.ts`の`ensureInitialized`)。ノイズにはならない。
     */
     captureWithoutWaiting(new Error("APIキーが未設定のため、メールを送信しませんでした"));
+    return { status: "not-configured" };
+  }
+
+  if (!apiKey.startsWith(API_KEY_PREFIX)) {
+    /*
+      **未設定は弾くのに誤った値は素通りする、という非対称を埋める分岐**([X26])。
+      値そのものはログにもSentryにも出さない — 誤って登録されたのが別サービスの
+      有効なキーである可能性があるため、長さも接頭辞も含めて残さない。
+    */
+    captureWithoutWaiting(new Error("APIキーの形式が不正なため、メールを送信しませんでした"));
     return { status: "not-configured" };
   }
 

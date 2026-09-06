@@ -84,7 +84,7 @@ export const notifyLogin = async (event: AuthBlockingEvent): Promise<void> => {
   });
 
   if (result.status === "not-configured") {
-    console.warn("RESEND_API_KEYが未設定のため、ログイン通知を送信しませんでした");
+    console.warn("RESEND_API_KEYが未設定、または形式が不正なため、ログイン通知を送信しませんでした");
   }
 };
 
