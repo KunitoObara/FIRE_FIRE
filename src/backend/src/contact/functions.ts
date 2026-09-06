@@ -19,14 +19,24 @@ import { buildThrottleKey, releaseContactSlot, reserveContactSlot } from "./thro
  * 前提にしており、`request.auth`で弾ける。ここは弾けないため、代わりに次の3つで守る。
  *
  * - **ハニーポット**: 画面には出さない入力欄。埋まっていれば機械的な送信とみなす
- * - **送信間隔制限**: 同じ送信元からの連投を拒む(`throttle.ts`)
+ * - **送信量の制限**: 同じ送信元からの連投(1分)と反復(24時間に5件)を拒む(`throttle.ts`)
  * - **入力の長さ制限**: 巨大な本文をそのまま上流へ流さない
  *
- * App Checkはプロジェクト全体の設定作業(コンソール設定・サイトキー・既存callableへの影響)を
- * 伴うため、このカードには入れない。`noindex`と招待制で外部からの流入がほぼ無い現状に見合う
- * 強度から始め、足りなくなったら上げる(PO判断)。**その「足りなくなったか」を判断する材料が
- * 初めて出たため、判断そのものは[X29]に切り出してある** — 2026-08-17にprodのこの関数を叩いた
- * 2件は海外のデータセンターIPからで、ハニーポットにも送信間隔制限にも抵触していない([X27]の調査)。
+ * **App Checkは入れない([X29]でPOが判断した)。** 2026-08-17にprodのこの関数を叩いた2件は
+ * 海外のデータセンターIPからだったが([X27]の調査)、ハニーポットにも送信間隔制限にも抵触して
+ * おらず、**上の3つが破られた記録は無い**。App Checkはプロジェクト全体の設定作業(コンソール
+ * 設定・サイトキー・既存callableへの影響)を伴い、reCAPTCHAが読めない環境では**唯一の受け口が
+ * 閉じる**。`noindex`と招待制で外部からの流入がほぼ無い現状には見合わない。
+ *
+ * **代わりに、次に判断するための材料の残し方を決めてある。**
+ *
+ * - **24時間あたりの件数の上限**を`throttle.ts`に足した(同じ送信元からの反復に効く。ただし
+ *   観測された2件は別々のIPからで、IPを鍵にした制限では止まらない — 承知のうえの強度)
+ * - **再検討の目安は「呼び出しが1日3件、または1週間10件」**。この関数の呼び出しはCloud Runの
+ *   リクエストログに全件残るので、数えるのにコードは要らない。ログベースの指標とメール通知の
+ *   設定手順はdocs/ci-cd-setup.md 16章にある
+ *
+ * **入れることになったら、docs/screen-requirements-public.md A11「スパム対策」も同時に直す。**
  *
  * **問い合わせの内容はFirestoreに保存しない**(同じくPO判断)。A10の「取得しない情報」の方針と
  * 揃い、未ログインから書けるFirestoreの領域を増やさずに済む。送信に失敗した場合は画面が再送を促す。
@@ -45,7 +55,7 @@ import { buildThrottleKey, releaseContactSlot, reserveContactSlot } from "./thro
  *   **X26で1か月気づけなかったのは、この計装が入る前だったから**であって、保存しない設計の
  *   帰結ではない
  * - **退避先を作ると、未ログインから書けるFirestoreの領域が増える。** いま書けるのは
- *   `contactThrottle`(送信時刻だけ。IPすらハッシュ)に限られる。そこへ本文と返信先アドレスを
+ *   `contactThrottle`(送信時刻と件数だけ。IPすらハッシュ)に限られる。そこへ本文と返信先アドレスを
  *   置くと、保持期間・削除・`firestore.rules`・A10の記載までを一続きで抱えることになる
  * - **リトライでは防げない。** 実際に起きた失敗は401で、何度送り直しても同じ結果になる
  *
@@ -86,7 +96,7 @@ const contactInputSchema = z.object({
 
 /** 画面が出し分けに使う失敗理由(`src/frontend/src/lib/contact/send-contact-message.ts`が読む) */
 type ContactFailureReason =
-  /** 送信間隔が空いていない */
+  /** 送信量の制限に抵触した(連投・24時間あたりの件数のどちらか。`throttle.ts`) */
   | "throttled"
   /** Resendへ送れなかった */
   | "send-failed"
@@ -106,7 +116,7 @@ const releaseSlotQuietly = async (key: string): Promise<void> => {
   try {
     await releaseContactSlot(key);
   } catch (error) {
-    console.error("送信間隔の記録を戻せませんでした", error);
+    console.error("送信量の記録を戻せませんでした", error);
   }
 };
 
@@ -145,7 +155,13 @@ export const sendContactMessage = onCallWithSentry(
     const reservation = await reserveContactSlot(throttleKey, now);
 
     if (reservation.status === "throttled") {
-      throw failure("throttled", "送信の間隔を空けてください");
+      // どちらの制限が働いたかはログにだけ残す。画面には同じ`throttled`として返る
+      console.warn(
+        reservation.reason === "window"
+          ? "同じ送信元が24時間の送信件数の上限に達したため送信しませんでした"
+          : "送信の間隔が空いていないため送信しませんでした",
+      );
+      throw failure("throttled", "時間をおいてから送信してください");
     }
 
     const mail = buildContactMail(
