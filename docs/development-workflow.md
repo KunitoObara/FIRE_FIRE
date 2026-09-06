@@ -429,7 +429,7 @@ B11の `categoryAxes.debtIds` はこの形にできた(実際、既存ドキュ�
 | CI(4ジョブ) | 走る | 走る |
 | claude-review | 走る | **走らない**(9章。同じ差分をレビュー済みのため) |
 | マージ後に起きること | `fire-fire-dev`(STG)へデプロイ | **`fire-fire-prod`(本番)へデプロイ** |
-| 戻し方 | `develop` を直すPRを出す | **自動ロールバックは無い**([ci-cd-setup.md](./ci-cd-setup.md) 16章) |
+| 戻し方 | `develop` を直すPRを出す | **自動ロールバックは無い**([ci-cd-setup.md](./ci-cd-setup.md) 17章) |
 
 `main` への push が [deploy.yml](../.github/workflows/deploy.yml) を起動し、Functions / Firestore / Storage のデプロイと App Hosting のロールアウトが走る。GitHub Environment `production` に承認ルールは設定していないので、**マージした時点でデプロイが始まる**。押し戻す仕組みは無い。
 

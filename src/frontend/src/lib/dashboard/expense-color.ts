@@ -1,66 +1,86 @@
 import {
   CATEGORY_COLOR_SLOT_COUNT,
-  OTHER_EXPENSE_CATEGORY_ID,
-  OTHER_EXPENSE_CATEGORY_NAME,
+  EXPENSE_COLOR_LIGHTNESS,
+  EXPENSE_COLOR_MAX_CHROMA,
+  EXPENSE_COLOR_START_HUE,
 } from "@/constants/dashboard";
+import { formatOklch, resolveInGamutChroma } from "@/lib/color/oklch";
 
 /**
  * 費目別支出を、色と構成比を解決した円グラフ用の形へ変換する(B1の収支サマリ)。
  *
- * **資産分類カラー(`category-color.ts`)とはパレットだけを共有し、割り当ての軸は別。**
- * 同じ画面で「投資信託」と「食費」に同じ色が当たることはあるが、**色の一致に意味は無い** —
- * 資産と費目は別の軸の内訳で、見比べる関係にない(見比べる相手がある資産推移グラフと
- * 分類別内訳が同じ割り当てを使うのとは事情が違う。DESIGN.md 3章)。
+ * **その月に現れた大項目を全て個別のスライスとして出す**([B1-18](https://trello.com/c/UTWWqbpy))。
+ * 以前は8スロットに収まらない費目を「ほかの費目」へまとめていたが、マネーフォワードの大項目は
+ * 15前後あるため、9件以上の月は常に7件までしか個別に出ず、**税・社会保障費や日用品といった
+ * 生活費の見直しに要る費目が受け皿に消えていた**。
  *
- * **ただしスロットは末尾(`--chart-8`)から降順に配る**([B11-9-2](https://trello.com/c/zh3egdfo))。
- * 資産側が`--chart-1`から昇順に配るので、両方を先頭から埋めると**同じ画面に並ぶ2つの円グラフで
- * 無関係な資産種別と費目が同じ色になる組み合わせが構造的に起きる**(どちらも件数が少ない普通の
- * 月ほど確実に重なる)。逆から配れば、衝突するのは**資産種別の数 + 費目の数が9以上**になった
- * ときだけになる。
+ * **資産分類カラー(`category-color.ts`)とは割り当ての軸が別。** 同じ画面で「投資信託」と「食費」に
+ * 同じ色が当たることはあるが、**色の一致に意味は無い** — 資産と費目は別の軸の内訳で、見比べる
+ * 関係にない(見比べる相手がある資産推移グラフと分類別内訳が同じ割り当てを使うのとは事情が違う。
+ * DESIGN.md 3章)。
  *
- * **色の一致に意味を持たせるための変更ではない。** 読み違えを防いでいるのは今までどおり凡例の
- * 費目名で、これは「無関係なものが同じ色で並ぶ」見た目を減らすだけの措置である。8スロットを
- * 共有している以上、費目が増えれば結局重なる。
+ * **並びは金額の多い順。** 個別の色は支出の大きい費目から順に付く。DESIGN.md 3章は
+ * 「順位が入れ替わるたびに同じ費目の色が変わる」ことを理由に金額順を却下していたが、費目には
+ * そもそも**月をまたぐと色が変わりうる**ことが認められている(費目マスタを持たない方針の帰結。
+ * docs/transaction-import-requirements.md 6章)ので、費目に対しては却下の理由が成り立たない。
+ * 金額が同じ費目は費目名の順で並べ、実行のたびに順序が動かないようにする。
  *
- * 起点を`--chart-5`にずらして折り返す案は採らない。資産種別が5件以上あると費目の1件目から
- * 衝突するうえ、折り返しで`--chart-8`と`--chart-1`が隣接する。逆順ならパレットの隣接ペアが
- * 反転するだけなので、識別性の検証(DESIGN.md 3章)がそのまま生きる。
- *
- * **並びは費目名の順で決める。** 費目マスタは持たない方針なので
- * (docs/transaction-import-requirements.md 6章)、資産分類のような「マスタの登録順」が
- * そもそも無い。金額の多い順に配る案は採らない(DESIGN.md 3章。順位が入れ替わるたびに同じ費目の
- * 色が変わる)。
- *
- * **月をまたぐと同じ費目の色が変わりうる。** ある月にだけ現れる費目が名前順の並びを1つずらす
- * ため。「切り替えても同じ分類は同じ色」は資産分類カラーの約束であって、マスタを持たない費目に
- * 同じ保証は置けない(docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」)。
- * 凡例に費目名を出すことで、色が動いても費目を読み違えないようにしている。
- *
- * 並べ替えは資産種別と同じ`localeCompare(…, "ja")`で行う(`collectAssetCategories`と揃える)。
+ * **月をまたぐと同じ費目の色は変わる。** 金額の順位が動くだけでなく、費目の件数が8と9の境目を
+ * またぐと配色の作り方自体が切り替わるため。「切り替えても同じ分類は同じ色」は資産分類カラーの
+ * 約束であって、マスタを持たない費目に同じ保証は置けない
+ * (docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」)。凡例に費目名を出すことで、
+ * 色が動いても費目を読み違えないようにしている。
  */
 
 /**
- * 個別の色を割り当てられる費目の数。
+ * 費目が8件以下のときに使う、末尾から数えて`position`番目(0始まり)のスロットの色。
  *
- * **「ほかの費目」も8スロットのうち1つを使う。** 費目が8以下なら全てに個別の色が付き、
- * 9以上になった月だけ個別色が先頭7件に減る(資産分類カラーの`resolveIndividualSlotCount`と
- * 同じ数え方)。9色目は作らない — パレットは隣り合うスロットの識別性を検証したうえで8色に
- * 決めており、機械的に増やすと識別できない色同士が並ぶ(DESIGN.md 3章)。
- */
-const resolveIndividualSlotCount = (categoryCount: number): number =>
-  categoryCount > CATEGORY_COLOR_SLOT_COUNT
-    ? CATEGORY_COLOR_SLOT_COUNT - 1
-    : CATEGORY_COLOR_SLOT_COUNT;
-
-/**
- * 末尾から数えて`position`番目(0始まり)のスロットの色。
- *
- * `position`が0で`--chart-8`、1で`--chart-7`。名前順の先頭ほど大きい番号のスロットを使う
- * ことになるが、**番号そのものに意味は無い**(意味を持つのは資産側と重なりにくいことだけ)。
- * 受け皿もこの数え方の続きを使うので、個別色と受け皿で番号の付け方が分かれない。
+ * `position`が0で`--chart-8`、1で`--chart-7`。**資産側が`--chart-1`から昇順に配るので、
+ * こちらは降順に配る**([B11-9-2](https://trello.com/c/zh3egdfo))。両方を先頭から埋めると、
+ * 同じ画面に並ぶ2つの円グラフで無関係な資産種別と費目が同じ色になる組み合わせが構造的に
+ * 起きる(どちらも件数が少ない普通の月ほど確実に重なる)。
  */
 const slotColor = (position: number): string =>
   `var(--chart-${CATEGORY_COLOR_SLOT_COUNT - position})`;
+
+/**
+ * 費目が9件以上のときに使う、件数ぶんの色。色相を等間隔に取って作る。
+ *
+ * **9色目を`--chart-*`に足す形にはできない。** パレットは隣り合うスロットの識別性を検証した
+ * うえで8色に決めてあり(DESIGN.md 3章)、機械的に増やすと識別できない色同士が並ぶ。かといって
+ * 受け皿へまとめるとこのカードが解こうとしている問題に戻るので、**8色の枠組み自体を費目に
+ * 限って外す**。
+ *
+ * **生成した色は事前に識別性を検証できない。** 件数が実行時に決まる以上、隣接ペアを検証してから
+ * 使うことが原理的にできない。費目が増えるほど色相の間隔は詰まり、隣り合うスライスの区別は
+ * 付きにくくなる。**読み違えを防ぐのは凡例の費目名**であり、これは以前から色に頼らせない
+ * 作りになっている(凡例に色見本・費目名・構成比・金額を並べる。同要件B1)。
+ *
+ * 明度は固定し、彩度は色相ごとにsRGBへ収まる値まで落とす(`resolveInGamutChroma`)。彩度まで
+ * 固定すると色相環の半分以上が色域の外に出てブラウザ任せの丸めが入る。
+ */
+const generateColors = (count: number): string[] => {
+  const hueStep = 360 / count;
+
+  return Array.from({ length: count }, (unused, index) => {
+    const hue = (EXPENSE_COLOR_START_HUE + index * hueStep) % 360;
+    const chroma = resolveInGamutChroma(EXPENSE_COLOR_LIGHTNESS, hue, EXPENSE_COLOR_MAX_CHROMA);
+
+    return formatOklch(EXPENSE_COLOR_LIGHTNESS, chroma, hue);
+  });
+};
+
+/**
+ * 費目の件数に応じた色の一覧。
+ *
+ * **8件以下は既存の`--chart-*`をそのまま使う。** 8色は手で選んで識別性を検証した値で、
+ * 色相が等間隔ではない(緑が2つ、赤系が2つある)ため生成では再現できない。常に生成へ
+ * 切り替えると、費目が少ない普通の月の見た目まで検証済みの色から離れる。
+ */
+const resolveColors = (count: number): string[] =>
+  count > CATEGORY_COLOR_SLOT_COUNT
+    ? generateColors(count)
+    : Array.from({ length: count }, (unused, index) => slotColor(index));
 
 export const buildExpenseSlices = (expenses: ExpenseByCategory[]): ExpenseBreakdownSlice[] => {
   const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -70,39 +90,21 @@ export const buildExpenseSlices = (expenses: ExpenseByCategory[]): ExpenseBreakd
   */
   const toRatio = (amount: number): number => (total === 0 ? 0 : amount / total);
 
-  const sorted = [...expenses].sort((left, right) => left.name.localeCompare(right.name, "ja"));
-  const individualSlotCount = resolveIndividualSlotCount(sorted.length);
-
-  const slices: ExpenseBreakdownSlice[] = sorted
-    .slice(0, individualSlotCount)
-    .map((expense, index) => ({
-      categoryId: expense.name,
-      name: expense.name,
-      amount: expense.amount,
-      ratio: toRatio(expense.amount),
-      color: slotColor(index),
-    }));
-
-  const overflowAmount = sorted
-    .slice(individualSlotCount)
-    .reduce((sum, expense) => sum + expense.amount, 0);
-
   /*
-    溢れた費目は最後のスロットにまとめる。**擬似的な分類ID**で表し、表示名との一致では
-    判定しない — 費目名はCSVの値そのもの(同書6章)で、マネーフォワードの大項目には
-    「その他」が実在する。受け皿の表示名を「ほかの費目」にしてあるのも、同じ月に
-    費目名「その他」があったときに凡例へ同じ名前が2行並ばないようにするため(PO判断)
+    金額の多い順。同額のときは費目名の順で並べる — 同額が並ぶ月に`sort`の安定性と
+    渡された順に結果が依存すると、同じデータでも表示が変わりうる
   */
-  if (overflowAmount > 0) {
-    slices.push({
-      categoryId: OTHER_EXPENSE_CATEGORY_ID,
-      name: OTHER_EXPENSE_CATEGORY_NAME,
-      amount: overflowAmount,
-      ratio: toRatio(overflowAmount),
-      // 個別色の続き(名前順の末尾のさらに1つ先)を使う。降順なので実際にはいちばん小さい番号
-      color: slotColor(individualSlotCount),
-    });
-  }
+  const sorted = [...expenses].sort(
+    (left, right) => right.amount - left.amount || left.name.localeCompare(right.name, "ja"),
+  );
+  const colors = resolveColors(sorted.length);
 
-  return slices;
+  return sorted.map((expense, index) => ({
+    categoryId: expense.name,
+    name: expense.name,
+    amount: expense.amount,
+    ratio: toRatio(expense.amount),
+    // 件数ぶん作ってあるので必ず存在するが、型の上では省略可能なので既定を置く
+    color: colors[index] ?? slotColor(0),
+  }));
 };

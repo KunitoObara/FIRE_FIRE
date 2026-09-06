@@ -3,11 +3,20 @@
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { format, parseISO } from "date-fns";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
+import { TransactionsPagination } from "@/components/transactions/TransactionsPagination";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -17,17 +26,25 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  buildTransactionsPageSizeOptionLabel,
   NO_MATCHING_TRANSACTIONS_LABEL,
   NON_CALCULATION_TARGET_BADGE_DESCRIPTION,
   NON_CALCULATION_TARGET_BADGE_LABEL,
+  TRANSACTIONS_PAGE_SIZE_LABEL,
+  TRANSACTIONS_PAGE_SIZE_OPTIONS,
   TRANSFER_BADGE_DESCRIPTION,
   TRANSFER_BADGE_LABEL,
 } from "@/constants/transactions";
 import { formatSignedJpy } from "@/lib/format/currency";
-import { buildTransactionsHref, buildTransactionSortHref } from "@/lib/transactions/filters";
+import {
+  buildTransactionsPageSizeHref,
+  buildTransactionSortHref,
+} from "@/lib/transactions/filters";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { JSX } from "react";
+
+const PAGE_SIZE_SELECT_ID = "transactions-page-size";
 
 /** 並び替え可能な列見出し。押すたびにその列の昇順/降順を切り替える(TransactionsTable内専用) */
 const SortableColumnHeader = ({
@@ -119,9 +136,9 @@ const buildColumns = (filters: TransactionFilters): ColumnDef<Transaction>[] => 
 /**
  * B3の取引一覧テーブル(参照専用。編集・削除機能は持たない — DESIGN.md 6章)。
  *
- * 並び替えは列見出しのリンクでURLの`sort`/`dir`を切り替えて実現し、ページングも同様に
- * URL(`page`)に持たせる。@tanstack/react-tableはヘッダ・行の描画にのみ使い、並び替え・
- * ページングの状態はサーバー側(page.tsx)がURLから計算した結果をそのまま渡すだけの
+ * 並び替えは列見出しのリンクでURLの`sort`/`dir`を切り替えて実現し、ページング(`page`)と
+ * 表示件数(`size`)も同様にURLに持たせる。@tanstack/react-tableはヘッダ・行の描画にのみ使い、
+ * 並び替え・ページングの状態はサーバー側(page.tsx)がURLから計算した結果をそのまま渡すだけの
  * 手動制御とする(`manualSorting`相当。DESIGN.md 7章の指定に沿いつつ、状態はURLに一本化する
  * CODING_STANDARDS.md 2章の方針を優先する)。
  */
@@ -130,19 +147,23 @@ export const TransactionsTable = ({
   filters,
   totalCount,
   totalPages,
-  pageSize,
 }: TransactionsTableProps): JSX.Element => {
+  const router = useRouter();
   const columns = useMemo(() => buildColumns(filters), [filters]);
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
 
-  const rangeStart = totalCount === 0 ? 0 : (filters.page - 1) * pageSize + 1;
-  const rangeEnd = Math.min(filters.page * pageSize, totalCount);
-  const previousHref =
-    filters.page > 1 ? buildTransactionsHref({ ...filters, page: filters.page - 1 }) : null;
-  const nextHref =
-    filters.page < totalPages
-      ? buildTransactionsHref({ ...filters, page: filters.page + 1 })
-      : null;
+  const rangeStart = totalCount === 0 ? 0 : (filters.page - 1) * filters.pageSize + 1;
+  const rangeEnd = Math.min(filters.page * filters.pageSize, totalCount);
+
+  /*
+    表示件数はセレクタなので`Link`にできない(Radix `Select`はリンクを選択肢にしない)。
+    並び替え・ページ送りと同じ「選んだ時点でURLへ即反映する」グループの操作なので、
+    絞り込みバーのように送信ボタンで確定させず、その場で`router.push`する。
+    遷移先の組み立ては`buildTransactionsPageSizeHref`に寄せてあり、状態はURLに一本化したまま。
+  */
+  const handlePageSizeChange = (value: string): void => {
+    router.push(buildTransactionsPageSizeHref(Number(value), filters));
+  };
 
   return (
     <Card>
@@ -193,30 +214,32 @@ export const TransactionsTable = ({
           </TableBody>
         </Table>
       </CardContent>
-      <CardFooter className="flex items-center justify-between text-xs text-muted-foreground">
-        <span className="tabular-nums">
-          {totalCount}件中 {rangeStart}〜{rangeEnd}件を表示
-        </span>
-        <div className="flex gap-1">
-          {previousHref === null ? (
-            <Button variant="outline" size="sm" disabled>
-              前へ
-            </Button>
-          ) : (
-            <Button asChild variant="outline" size="sm">
-              <Link href={previousHref}>前へ</Link>
-            </Button>
-          )}
-          {nextHref === null ? (
-            <Button variant="outline" size="sm" disabled>
-              次へ
-            </Button>
-          ) : (
-            <Button asChild variant="outline" size="sm">
-              <Link href={nextHref}>次へ</Link>
-            </Button>
-          )}
+      <CardFooter className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="tabular-nums">
+            {totalCount}件中 {rangeStart}〜{rangeEnd}件を表示
+          </span>
+
+          <div className="flex items-center gap-2">
+            <Label htmlFor={PAGE_SIZE_SELECT_ID} className="text-xs text-muted-foreground">
+              {TRANSACTIONS_PAGE_SIZE_LABEL}
+            </Label>
+            <Select value={String(filters.pageSize)} onValueChange={handlePageSizeChange}>
+              <SelectTrigger id={PAGE_SIZE_SELECT_ID} size="sm" className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TRANSACTIONS_PAGE_SIZE_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {buildTransactionsPageSizeOptionLabel(option)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+
+        <TransactionsPagination filters={filters} totalPages={totalPages} />
       </CardFooter>
     </Card>
   );

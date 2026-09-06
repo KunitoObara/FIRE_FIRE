@@ -92,6 +92,92 @@ describe("CashflowSummaryCard", () => {
     expect(screen.getByText("¥ 62,400")).toBeInTheDocument();
   });
 
+  /**
+   * 8スロットに収まらない月でも**その月に現れた大項目を全て個別に出す**
+   * ([B1-18](https://trello.com/c/UTWWqbpy))。以前は9件以上の月で先頭7件だけが個別になり、
+   * 残りが受け皿「ほかの費目」へ入っていたため、税・社会保障費や日用品が毎月消えていた。
+   *
+   * 円グラフのスライス数と凡例の行数が食い違わないことを、8/9の境目をまたぐ側で押さえる
+   */
+  it("費目が9件以上でも全てを凡例に出し、受け皿にまとめない", async () => {
+    const names = [
+      "住居費",
+      "食費",
+      "水道・光熱費",
+      "通信費",
+      "税・社会保障",
+      "日用品",
+      "教養・教育",
+      "趣味・娯楽",
+      "交通費",
+    ];
+    fetchCashflowData.mockResolvedValue({
+      ok: true,
+      cashflow: {
+        month: "2026-08",
+        income: 420_000,
+        expense: 450_000,
+        expenseByCategory: names.map((name, index) => ({ name, amount: (9 - index) * 10_000 })),
+      },
+    });
+
+    renderCard();
+
+    expect(await screen.findByTestId("expense-breakdown-chart")).toHaveAttribute(
+      "data-slices",
+      "9",
+    );
+    names.forEach((name) => {
+      expect(screen.getByText(name)).toBeInTheDocument();
+    });
+    expect(screen.queryByText("ほかの費目")).not.toBeInTheDocument();
+  });
+
+  /**
+   * 費目が多い月は凡例を2列にし、円グラフの下へ回り込ませる(PR #229 のレビュー指摘)。
+   * 1列のままだとカードが縦に伸び、同じグリッド行の負債サマリが引き伸ばされる。
+   *
+   * **jsdomはレイアウトを計算しないので、見た目そのものは確かめられない。** ここで固定するのは
+   * 「件数に応じてクラスが切り替わること」だけで、2列に見えるかどうかは別の手段で見る必要がある
+   */
+  it("費目が9件以上なら凡例を2列にし、8件以下なら1列のままにする", async () => {
+    const withCategories = (count: number): void => {
+      fetchCashflowData.mockResolvedValue({
+        ok: true,
+        cashflow: {
+          month: "2026-08",
+          income: 420_000,
+          expense: 450_000,
+          expenseByCategory: Array.from({ length: count }, (unused, index) => ({
+            name: `費目${index + 1}`,
+            amount: (count - index) * 10_000,
+          })),
+        },
+      });
+    };
+
+    withCategories(8);
+    const { unmount } = renderCard();
+
+    expect((await screen.findByRole("list")).className).toContain("grid-cols-1");
+
+    unmount();
+    withCategories(9);
+    renderCard();
+
+    const dense = await screen.findByRole("list");
+
+    expect(dense.className).toContain("sm:grid-cols-2");
+    // 2列ぶんの幅を円グラフの横では取れないので、下へ回り込ませる
+    expect(dense.className).toContain("w-full");
+    /*
+      `flex-1`は`flex-basis`を含むショートハンドなので、`w-full`と並べると
+      どちらが効くかが生成CSSの登録順で決まってしまう(PR #229 のレビュー指摘)。
+      **同じ要素に両方が乗らないこと**をここで固定する
+    */
+    expect(dense.className).not.toContain("flex-1");
+  });
+
   it("選択中の年月の取引だけを読む", async () => {
     renderCard({ month: "2025-03" });
 

@@ -185,11 +185,32 @@
             </tbody>
           </table>
         </div>
-        <div class="flex items-center justify-between px-4 py-3 text-xs text-slate-400 border-t" style="border-color: hsl(var(--border));">
-          <span>342件中 1〜4件を表示</span>
-          <div class="flex gap-1">
-            <button class="btn btn-outline btn-sm">前へ</button>
-            <button class="btn btn-outline btn-sm">次へ</button>
+        <!-- ページ送りはページ番号 + 省略記号(…)+「前へ」「次へ」。全期間・20件表示だと
+             最大500ページになりうるので番号は全部並べず、先頭・末尾・現在ページの周辺だけを出す
+             (docs/screen-requirements-dashboard.md B3「ページ送り」)。
+             先頭ページの「前へ」は消さずに押せない状態で残す — 消すと「次へ」の位置が左へずれる。 -->
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs text-slate-400 border-t" style="border-color: hsl(var(--border));">
+          <div class="flex flex-wrap items-center gap-4">
+            <span>342件中 1〜20件を表示</span>
+            <div class="flex items-center gap-2">
+              <label for="page-size">表示件数</label>
+              <select id="page-size" class="input" style="width: 6rem; height: 2rem;">
+                <option>20件</option>
+                <option>50件</option>
+                <option>100件</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button class="btn btn-ghost btn-sm" disabled>‹ 前へ</button>
+            <button class="btn btn-outline btn-sm" style="min-width: 2rem;" aria-current="page">1</button>
+            <button class="btn btn-ghost btn-sm" style="min-width: 2rem;">2</button>
+            <button class="btn btn-ghost btn-sm" style="min-width: 2rem;">3</button>
+            <button class="btn btn-ghost btn-sm" style="min-width: 2rem;">4</button>
+            <button class="btn btn-ghost btn-sm" style="min-width: 2rem;">5</button>
+            <span class="px-1">…</span>
+            <button class="btn btn-ghost btn-sm" style="min-width: 2rem;">18</button>
+            <button class="btn btn-ghost btn-sm">次へ ›</button>
           </div>
         </div>
       </section>

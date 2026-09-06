@@ -97,8 +97,41 @@ export const ALL_TRANSACTION_ACCOUNTS_VALUE = "__all-accounts__";
 export const buildUnavailableOptionLabel = (value: string): string =>
   `${value}(この期間に該当なし)`;
 
-/** 1ページあたりの表示件数 */
-export const TRANSACTIONS_PAGE_SIZE = 20;
+/**
+ * 1ページあたりの表示件数の選択肢。
+ *
+ * 単一の定数ではなく選択肢の配列にしてあるのは、この値をユーザーが画面から選べるため。
+ * **既定は先頭の20件**で、`DEFAULT_TRANSACTIONS_PAGE_SIZE`がそれを指す。
+ *
+ * ページングは既に読み込んだ期間内の取引に対する**クライアント側の分割**であり、件数を変えても
+ * Firestoreは読み直さない(docs/transaction-import-requirements.md 8章)。したがって
+ * 100件を選んでも読み取りコストは増えない。
+ */
+export const TRANSACTIONS_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+
+/** 表示件数の既定値。URLに`size`が無い場合と、不正な値だった場合に使う */
+export const DEFAULT_TRANSACTIONS_PAGE_SIZE = TRANSACTIONS_PAGE_SIZE_OPTIONS[0];
+
+/** 表示件数セレクタのラベル */
+export const TRANSACTIONS_PAGE_SIZE_LABEL = "表示件数";
+
+/** 表示件数セレクタの選択肢に付ける単位 */
+export const buildTransactionsPageSizeOptionLabel = (pageSize: number): string => `${pageSize}件`;
+
+/**
+ * ページ番号を並べるときに、現在ページの左右へ何ページぶん出すか。
+ *
+ * 全期間・20件表示だと最大500ページ(`TRANSACTION_SCAN_LIMIT` 9,999件 ÷ 20)になりうるため、
+ * 番号を全部並べる形は取れない。先頭・末尾・現在ページの周辺だけを出し、間は省略記号で畳む。
+ *
+ * **狭いほうは別の値として持つ**(`TRANSACTION_PAGINATION_SIBLING_COUNT_COMPACT`)。
+ * モバイルでは横幅に収まらないため窓を狭めるが、同じ値を画面幅で出し分けると
+ * 「なぜ2つあるのか」がコードから読めなくなる。
+ */
+export const TRANSACTION_PAGINATION_SIBLING_COUNT = 2;
+
+/** モバイルでページ番号を並べるときの窓(上記の狭い版) */
+export const TRANSACTION_PAGINATION_SIBLING_COUNT_COMPACT = 0;
 
 /**
  * 絞り込み・並び替え・ページの状態をURLに載せるときのクエリパラメータ名。
@@ -113,6 +146,7 @@ export const TRANSACTION_KEYWORD_PARAM = "q";
 export const TRANSACTION_SORT_PARAM = "sort";
 export const TRANSACTION_SORT_DIRECTION_PARAM = "dir";
 export const TRANSACTION_PAGE_PARAM = "page";
+export const TRANSACTION_PAGE_SIZE_PARAM = "size";
 
 /** 「CSVを取り込む」ボタンの導線 */
 export const TRANSACTIONS_CSV_IMPORT_LINK = {

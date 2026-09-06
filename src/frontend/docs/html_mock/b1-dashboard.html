@@ -489,50 +489,59 @@
         <!--
           費目別支出(同要件B1「費目別支出の円グラフ」)。金額の一覧ではなく円グラフ+凡例にし、
           隣の分類別内訳カードと同じ構成に揃える。費目は大項目(同書6章)。
-          色は --chart-1〜8 の8スロット+「その他」で、**選択中の月に現れる費目を名前順**に
-          並べて割り当てる(費目マスタを持たない方針のため、資産分類のような登録順が無い。
-          実装は資産種別と同じ localeCompare(…, "ja") で並べる)。
-          **配る向きは分類別内訳と逆で、--chart-8 から降順**(B11-9-2)。あちらが --chart-1 から
-          昇順なので、両方を先頭から埋めると同じ画面の2枚の円グラフで無関係な資産種別と費目が
-          同じ色になる。逆から配れば、重なるのは資産種別の数 + 費目の数が9以上のときだけになる
-          (8スロットを共有している以上それ以上は避けられない)。色の一致に意味が生まれた
-          わけではなく、読み違えを防いでいるのは今までどおり凡例の費目名である。
-          費目が9件以上の月は、受け皿「ほかの費目」が降順の続きなので --chart-1 になる。
-          **このモックでは1組だけ重なったまま**(住居費=--chart-6 と、上の分類別内訳の
+          **その月に現れた大項目は全て個別のスライスにする**(B1-18)。以前は8スロットに
+          収めて溢れた分を受け皿「ほかの費目」へまとめていたが、マネーフォワードの大項目は
+          15前後あるため、9件以上の月は常に7件までしか個別に出ず、税・社会保障費や日用品が
+          毎月消えていた。受け皿は上限が無くなって到達しなくなったので廃止した。
+          **並びは金額の多い順**(同額は費目名順)。費目マスタを持たない方針のため、資産分類の
+          ような登録順が無い。名前順に配ると、どの費目に個別色が当たるかが金額と無関係に決まる。
+          **費目が8件までは --chart-1〜8 を使い、配る向きは分類別内訳と逆で --chart-8 から降順**
+          (B11-9-2)。あちらが --chart-1 から昇順なので、両方を先頭から埋めると同じ画面の2枚の
+          円グラフで無関係な資産種別と費目が同じ色になる。逆から配れば、重なるのは
+          資産種別の数 + 費目の数が9以上のときだけになる。色の一致に意味が生まれたわけではなく、
+          読み違えを防いでいるのは今までどおり凡例の費目名である。
+          **このモックでは1組だけ重なったまま**(趣味・娯楽=--chart-6 と、上の分類別内訳の
           株式=--chart-6)。資産種別が6件以上ある想定で組んであるため
           (6 + 費目5 = 11 ≧ 9)、要件に書いた限界がそのまま出ている状態であって
           間違いではない。直すなら費目か資産種別を減らすことになり、実態から離れる。
-          そのため月をまたぐと同じ費目の色が変わりうる — 「切り替えても同じ分類は同じ色」は
+          **費目が9件以上の月は色相を等間隔に取って件数ぶんの色を作る**ので、--chart-* を
+          使わない配色になる(明度は固定し、彩度は色相ごとにsRGBへ収まる値まで落とす。
+          DESIGN.md 3章)。起点の色相は --chart-8 に合わせてあるので、生成へ切り替わっても
+          金額最大の費目の色味だけは動かない。このモックは5件なので8件以下の側を描いている。
+          そのため月をまたぐと同じ費目の色が変わりうる — 金額の順位が動くことに加えて、
+          8と9の境目をまたぐと配色の作り方自体が切り替わるため。「切り替えても同じ分類は同じ色」は
           資産分類カラーの約束で、費目には置けない(DESIGN.md 3章)。凡例に費目名を出して担保する。
-          費目が8を超える月は、名前順の先頭7件+「ほかの費目」になる(受け皿の名前を資産側の
-          「その他」と別にするのは、マネーフォワードの大項目に「その他」が実在するため。
-          同じ名前だと凡例に2行並んでどちらが何か読めない)。
           構成比の分母はその月の支出合計(負債スライスのような符号違いが無いので、%はそのまま
           支出に占める割合になり、分母の断り書きは要らない)。
         -->
         <div class="flex flex-wrap items-center gap-6">
           <svg viewBox="0 0 120 120" class="w-32 h-32 shrink-0">
-            <!-- 描画順=スロット順(名前順)。手前の費目を描き終えてから次を描き、全体で
+            <!-- 描画順=スロット順(金額の多い順)。手前の費目を描き終えてから次を描き、全体で
                  1周600msのスイープにする(分類別内訳と同じ。DESIGN.md 9章)。
                  年月を切り替えたときも再生する(切り替えた先の月を最初から描く) -->
-            <circle class="chart-anim-arc" style="--arc-len: 25.4; --arc-dur: 54ms; --arc-delay: 0ms;"
+            <circle class="chart-anim-arc" style="--arc-len: 117.2; --arc-dur: 248ms; --arc-delay: 0ms;"
               cx="60" cy="60" r="45" fill="none" stroke="var(--chart-8)" stroke-width="20" transform="rotate(-90 60 60)"/>
-            <circle class="chart-anim-arc" style="--arc-len: 42.3; --arc-dur: 90ms; --arc-delay: 54ms;"
-              cx="60" cy="60" r="45" fill="none" stroke="var(--chart-7)" stroke-width="20" stroke-dashoffset="-25.4" transform="rotate(-90 60 60)"/>
-            <circle class="chart-anim-arc" style="--arc-len: 117.2; --arc-dur: 248ms; --arc-delay: 144ms;"
-              cx="60" cy="60" r="45" fill="none" stroke="var(--chart-6)" stroke-width="20" stroke-dashoffset="-67.7" transform="rotate(-90 60 60)"/>
-            <circle class="chart-anim-arc" style="--arc-len: 75.4; --arc-dur: 160ms; --arc-delay: 392ms;"
-              cx="60" cy="60" r="45" fill="none" stroke="var(--chart-5)" stroke-width="20" stroke-dashoffset="-184.9" transform="rotate(-90 60 60)"/>
+            <circle class="chart-anim-arc" style="--arc-len: 75.4; --arc-dur: 160ms; --arc-delay: 248ms;"
+              cx="60" cy="60" r="45" fill="none" stroke="var(--chart-7)" stroke-width="20" stroke-dashoffset="-117.2" transform="rotate(-90 60 60)"/>
+            <circle class="chart-anim-arc" style="--arc-len: 42.3; --arc-dur: 90ms; --arc-delay: 408ms;"
+              cx="60" cy="60" r="45" fill="none" stroke="var(--chart-6)" stroke-width="20" stroke-dashoffset="-192.6" transform="rotate(-90 60 60)"/>
+            <circle class="chart-anim-arc" style="--arc-len: 25.4; --arc-dur: 54ms; --arc-delay: 498ms;"
+              cx="60" cy="60" r="45" fill="none" stroke="var(--chart-5)" stroke-width="20" stroke-dashoffset="-234.9" transform="rotate(-90 60 60)"/>
             <circle class="chart-anim-arc" style="--arc-len: 22.8; --arc-dur: 48ms; --arc-delay: 552ms;"
               cx="60" cy="60" r="45" fill="none" stroke="var(--chart-4)" stroke-width="20" stroke-dashoffset="-260.3" transform="rotate(-90 60 60)"/>
           </svg>
           <!-- 凡例は色見本・費目名・構成比・金額(分類別内訳の凡例と同じ)。円グラフの色は
-               背景とのコントラストが3:1に届かないものがあるため、色だけに頼らせない -->
+               背景とのコントラストが3:1に届かないものがあるため、色だけに頼らせない。
+               **費目が9件以上の月は2列にし、円グラフの下へ回り込ませる**(PR #229 の
+               レビュー指摘)。上限が無いので1列のままだと凡例だけで400px以上になり、
+               負債サマリと同じグリッド行の高さがそちらに引きずられる。スクロールで
+               抑えると費目が隠れるので採らない。境目は色の切り替えと同じ8/9。
+               このモックは5件なので1列の側を描いている -->
           <ul class="text-sm flex flex-col gap-2 tabular-nums min-w-56 flex-1">
-            <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-8);"></span>交通費 <span class="ml-auto text-slate-400">9%</span><span class="w-24 text-right text-slate-500">¥ 21,000</span></li>
-            <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-7);"></span>趣味・娯楽 <span class="ml-auto text-slate-400">15%</span><span class="w-24 text-right text-slate-500">¥ 35,000</span></li>
-            <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-6);"></span>住居費 <span class="ml-auto text-slate-400">41%</span><span class="w-24 text-right text-slate-500">¥ 97,000</span></li>
-            <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-5);"></span>食費 <span class="ml-auto text-slate-400">27%</span><span class="w-24 text-right text-slate-500">¥ 62,400</span></li>
+            <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-8);"></span>住居費 <span class="ml-auto text-slate-400">41%</span><span class="w-24 text-right text-slate-500">¥ 97,000</span></li>
+            <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-7);"></span>食費 <span class="ml-auto text-slate-400">27%</span><span class="w-24 text-right text-slate-500">¥ 62,400</span></li>
+            <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-6);"></span>趣味・娯楽 <span class="ml-auto text-slate-400">15%</span><span class="w-24 text-right text-slate-500">¥ 35,000</span></li>
+            <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-5);"></span>交通費 <span class="ml-auto text-slate-400">9%</span><span class="w-24 text-right text-slate-500">¥ 21,000</span></li>
             <li class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background: var(--chart-4);"></span>水道・光熱費 <span class="ml-auto text-slate-400">8%</span><span class="w-24 text-right text-slate-500">¥ 18,900</span></li>
           </ul>
         </div>

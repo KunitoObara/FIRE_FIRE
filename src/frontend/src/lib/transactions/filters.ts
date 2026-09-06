@@ -7,15 +7,18 @@ import {
   DEFAULT_TRANSACTION_PERIOD_ID,
   DEFAULT_TRANSACTION_SORT_DIRECTION,
   DEFAULT_TRANSACTION_SORT_KEY,
+  DEFAULT_TRANSACTIONS_PAGE_SIZE,
   TRANSACTION_ACCOUNT_PARAM,
   TRANSACTION_CATEGORY_MINOR_PARAM,
   TRANSACTION_CATEGORY_PARAM,
   TRANSACTION_KEYWORD_PARAM,
   TRANSACTION_PAGE_PARAM,
+  TRANSACTION_PAGE_SIZE_PARAM,
   TRANSACTION_PERIODS,
   TRANSACTION_PERIOD_PARAM,
   TRANSACTION_SORT_DIRECTION_PARAM,
   TRANSACTION_SORT_PARAM,
+  TRANSACTIONS_PAGE_SIZE_OPTIONS,
 } from "@/constants/transactions";
 import { firstQueryValue } from "@/lib/query-params";
 
@@ -130,6 +133,19 @@ export const resolveTransactionPage = (value: TransactionSearchParamValue): numb
 };
 
 /**
+ * URLの`size`から1ページあたりの表示件数を決める。選択肢に無い値は既定の20件に落とす。
+ *
+ * **選択肢との一致で判定し、範囲や整数性では判定しない。** `page`と違って任意の数を許すと、
+ * 手で書き換えたURLで9,999件を1ページに並べられることになり、読み込んだ範囲の全件を
+ * 一度に描画してしまう。選択肢を増やすときは`TRANSACTIONS_PAGE_SIZE_OPTIONS`だけを直す。
+ */
+export const resolveTransactionPageSize = (value: TransactionSearchParamValue): number => {
+  const parsed = Number(firstQueryValue(value));
+  const matched = TRANSACTIONS_PAGE_SIZE_OPTIONS.find((option) => option === parsed);
+  return matched ?? DEFAULT_TRANSACTIONS_PAGE_SIZE;
+};
+
+/**
  * URLのクエリパラメータ一式から、B3の絞り込み・並び替え・ページの状態をまとめて決める。
  *
  * 取得したデータを引数に取らない。選択肢に無い値も残す方針にしたため、突き合わせる相手が
@@ -146,6 +162,7 @@ export const resolveTransactionFilters = (
   sortKey: resolveTransactionSortKey(searchParams[TRANSACTION_SORT_PARAM]),
   sortDirection: resolveTransactionSortDirection(searchParams[TRANSACTION_SORT_DIRECTION_PARAM]),
   page: resolveTransactionPage(searchParams[TRANSACTION_PAGE_PARAM]),
+  pageSize: resolveTransactionPageSize(searchParams[TRANSACTION_PAGE_SIZE_PARAM]),
 });
 
 /** 絞り込み・並び替え・ページの状態を反映したB3のURLを組み立てる */
@@ -175,6 +192,11 @@ export const buildTransactionsHref = (filters: TransactionFilters): string => {
 
   if (filters.page !== 1) {
     params.set(TRANSACTION_PAGE_PARAM, String(filters.page));
+  }
+
+  // 既定の20件はURLに出さない。`page`が1のときに載せないのと同じ扱い
+  if (filters.pageSize !== DEFAULT_TRANSACTIONS_PAGE_SIZE) {
+    params.set(TRANSACTION_PAGE_SIZE_PARAM, String(filters.pageSize));
   }
 
   const query = params.toString();
@@ -222,3 +244,15 @@ export const buildTransactionSortHref = (
     page: 1,
   });
 };
+
+/**
+ * 表示件数を変えたときの遷移先URLを組み立てる。
+ *
+ * **ページは1に戻す。** 20件で3ページ目を見ている状態で100件へ広げると、同じ3ページ目は
+ * 201〜300件目を指すことになり、いま見ていた行が画面から消える。絞り込み条件を変えたときに
+ * `page: 1`へ戻す既存の挙動(`TransactionsFilterBar`)と揃える。
+ */
+export const buildTransactionsPageSizeHref = (
+  pageSize: number,
+  filters: TransactionFilters,
+): string => buildTransactionsHref({ ...filters, pageSize, page: 1 });

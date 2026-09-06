@@ -181,9 +181,14 @@ export const CONTACT_SENT_MESSAGE =
  *
  * `throttled`だけは利用者の操作で解消できるので、待てばよいことまで書く。それ以外は
  * 利用者にできることが無いため、原因を細かく述べずやり直しを促す。
+ *
+ * **`throttled`に「1分」と書かない。** サーバー側の制限は連投(1分)と24時間あたりの件数の
+ * 2つで、どちらも同じ`throttled`で返る([X29]。`src/backend/src/contact/throttle.ts`)。
+ * 待ち時間を名指しすると、件数の上限に達した利用者に**1分待てば送れると嘘をつくことになる**。
  */
 export const CONTACT_FAILURE_MESSAGES: Record<ContactFailureReason, string> = {
-  throttled: "続けての送信はお受けできません。1分ほどおいてから、もう一度お試しください。",
+  throttled:
+    "続けての送信、または短期間に多数の送信をお受けすることはできません。しばらく時間をおいてから、もう一度お試しください。",
   "send-failed": "お問い合わせを送信できませんでした。時間をおいて再度お試しください。",
   // 宛先・APIキーの設定漏れ。入力をやり直しても直らないが、原因が利用者側に無いことは伝える
   "not-configured":

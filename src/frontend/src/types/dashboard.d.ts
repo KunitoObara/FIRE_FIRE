@@ -262,14 +262,13 @@ declare global {
    *
    * `AssetBreakdownSlice`と形は同じだが別の型にする。あちらは資産分類マスタ(B4)の登録順に
    * 紐づく色を持ち、負債の擬似スライスも入りうる。費目はマスタを持たず(同書6章)、色は
-   * **選択中の月に現れる費目の名前順**で決まるので、同じ型として扱うと取り違えても
-   * 気付けない(docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」)。
+   * **選択中の月に現れる費目を金額の多い順**(同額は費目名順)に並べて決まるので、同じ型として
+   * 扱うと取り違えても気付けない(docs/screen-requirements-dashboard.md B1「費目別支出の円グラフ」)。
    */
   type ExpenseBreakdownSlice = {
     /**
-     * 費目名そのもの。溢れた分をまとめるスライスだけ擬似的なID
-     * (`OTHER_EXPENSE_CATEGORY_ID`)で、表示名との一致では判定しない —
-     * マネーフォワードの大項目には「その他」が実在する
+     * 費目名そのもの。**その月に現れた大項目は全て個別のスライスになる**ため、
+     * 資産側の「その他」に相当する擬似的なIDは持たない([B1-18](https://trello.com/c/UTWWqbpy))
      */
     categoryId: string;
     name: string;
@@ -282,7 +281,7 @@ declare global {
 
   /** 費目別支出の円グラフのProps */
   type ExpenseBreakdownChartProps = {
-    /** 描く順(=色スロット順=費目名順)に並んだスライス */
+    /** 描く順(=金額の多い順。同額は費目名順)に並んだスライス */
     slices: ExpenseBreakdownSlice[];
   };
 

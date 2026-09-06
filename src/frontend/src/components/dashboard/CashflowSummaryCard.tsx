@@ -14,6 +14,7 @@ import {
   buildCashflowEmptyState,
   buildExpenseBreakdownKey,
   CASHFLOW_DATA_QUERY_KEY,
+  CATEGORY_COLOR_SLOT_COUNT,
   CASHFLOW_DATA_STALE_TIME_MS,
   CASHFLOW_DETAIL_LINK,
   CASHFLOW_MONTH_PICKER_LABEL,
@@ -26,6 +27,7 @@ import { buildExpenseSlices } from "@/lib/dashboard/expense-color";
 import { resolveFailureView } from "@/lib/dashboard/failure-view";
 import { formatMonthLabel } from "@/lib/dashboard/month";
 import { formatJpy, formatPercent, formatSignedJpy } from "@/lib/format/currency";
+import { cn } from "@/lib/utils";
 
 import type { JSX } from "react";
 
@@ -96,8 +98,10 @@ export const CashflowSummaryCard = ({
 
   const balance = cashflow === null ? 0 : cashflow.income - cashflow.expense;
   /*
-    費目別支出の色は**費目名の順**に割り当てる(同要件B1「費目別支出の円グラフ」)。
-    費目マスタを持たない方針のため、資産分類のような登録順がそもそも無い
+    費目別支出の色は**金額の多い順**に割り当てる(同要件B1「費目別支出の円グラフ」)。
+    費目マスタを持たない方針のため、資産分類のような登録順がそもそも無い。
+    **その月に現れた大項目は全て個別のスライスになる**ので、凡例の行数もそのまま増える
+    ([B1-18](https://trello.com/c/UTWWqbpy))
   */
   const expenseSlices = buildExpenseSlices(cashflow?.expenseByCategory ?? []);
 
@@ -210,7 +214,39 @@ export const CashflowSummaryCard = ({
                   key={buildExpenseBreakdownKey(month, expenseSlices)}
                   slices={expenseSlices}
                 />
-                <ul className="flex min-w-48 flex-1 flex-col gap-2 text-sm">
+                {/*
+                  **費目が多い月は凡例を2列にし、円グラフの下へ回り込ませる**
+                  ([B1-18](https://trello.com/c/UTWWqbpy) のレビュー指摘)。スライス数の上限が
+                  無くなったため、1列のままだと大項目が15前後ある月に凡例だけで400px以上になる。
+                  このカードは`DashboardScreen`で負債サマリと同じグリッド行にあり、
+                  CSS Gridの既定(`align-items: stretch`)で**行の高さが高いほうに揃う**ので、
+                  中身の少ない負債サマリが引き伸ばされて下部に大きな空白ができる。
+
+                  **スクロールで抑えない。** 高さは確実に止まるが、費目がスクロールの下に隠れる —
+                  「見えない費目がある」状態を別の形で作ることになり、その解消を目的にした
+                  このカードとは相性が悪い(PO判断)。2列なら何も隠さずに高さがおよそ半分になる。
+
+                  切り替えの境目は**色の切り替えと同じ8/9**にする。高さの問題は件数で決まるので
+                  独自の閾値を置くこともできるが、同じ画面の中に意味の違う境目を2つ作ると、
+                  どちらがどの見た目を決めているのかを画面から追えなくなる。
+                */}
+                <ul
+                  className={cn(
+                    "grid min-w-48 gap-x-6 gap-y-2 text-sm",
+                    /*
+                      2列ぶんの幅は円グラフの横では取れないので、`w-full`で確実に下へ落とす。
+
+                      **`flex-1`と`basis-full`を同じ要素に並べない**(PR #229 のレビュー指摘)。
+                      `flex-1`は`flex-basis`を含むショートハンドなので、どちらが効くかが
+                      生成CSSでの登録順という暗黙の前提で決まる(実測では`.basis-full`が後に
+                      来て勝つが、コード側が保証しているわけではなく、テストでも押さえられない)。
+                      `w-full`なら`flex-basis`が幅から決まるので、順序に依存しない
+                    */
+                    expenseSlices.length > CATEGORY_COLOR_SLOT_COUNT
+                      ? "w-full sm:grid-cols-2"
+                      : "flex-1 grid-cols-1",
+                  )}
+                >
                   {expenseSlices.map((slice) => (
                     <li key={slice.categoryId} className="flex items-center gap-2">
                       {/*
