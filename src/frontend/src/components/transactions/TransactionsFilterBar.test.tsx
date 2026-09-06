@@ -27,6 +27,7 @@ const baseFilters: TransactionFilters = {
   sortKey: "date",
   sortDirection: "desc",
   page: 1,
+  pageSize: 20,
 };
 
 const renderFilterBar = (

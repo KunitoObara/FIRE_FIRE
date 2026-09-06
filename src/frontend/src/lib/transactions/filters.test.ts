@@ -9,12 +9,14 @@ import {
   buildTransactionSelectOptions,
   buildTransactionsFilterBarKey,
   buildTransactionsHref,
+  buildTransactionsPageSizeHref,
   buildTransactionSortHref,
   resolveCategoryMinorOptions,
   resolveTransactionFilters,
   resolveTransactionKeyword,
   resolveTransactionOption,
   resolveTransactionPage,
+  resolveTransactionPageSize,
   resolveTransactionPeriodId,
   resolveTransactionSortDirection,
   resolveTransactionSortKey,
@@ -35,6 +37,7 @@ const baseFilters: TransactionFilters = {
   sortKey: "date",
   sortDirection: "desc",
   page: 1,
+  pageSize: 20,
 };
 
 describe("resolveTransactionPeriodId", () => {
@@ -171,6 +174,30 @@ describe("resolveTransactionPage", () => {
   });
 });
 
+describe("resolveTransactionPageSize", () => {
+  it("選択肢にある件数ならそのまま使う", () => {
+    expect(resolveTransactionPageSize("50")).toBe(50);
+    expect(resolveTransactionPageSize("100")).toBe(100);
+  });
+
+  it("未指定は既定の20件に落とす", () => {
+    expect(resolveTransactionPageSize(undefined)).toBe(20);
+  });
+
+  /**
+   * 任意の数を許すと、手で書き換えたURLで読み込んだ範囲の全件を1ページに並べられてしまう。
+   * 範囲ではなく選択肢との一致で判定する
+   */
+  it("選択肢に無い値・数値でない値は既定の20件に落とす", () => {
+    expect(resolveTransactionPageSize("30")).toBe(20);
+    expect(resolveTransactionPageSize("9999")).toBe(20);
+    expect(resolveTransactionPageSize("0")).toBe(20);
+    expect(resolveTransactionPageSize("-50")).toBe(20);
+    expect(resolveTransactionPageSize("abc")).toBe(20);
+    expect(resolveTransactionPageSize("")).toBe(20);
+  });
+});
+
 describe("resolveTransactionFilters", () => {
   it("クエリパラメータ一式から絞り込み・並び替え・ページの状態をまとめて決める", () => {
     expect(
@@ -183,6 +210,7 @@ describe("resolveTransactionFilters", () => {
         sort: "amount",
         dir: "asc",
         page: "2",
+        size: "50",
       }),
     ).toEqual({
       periodId: "3m",
@@ -193,6 +221,7 @@ describe("resolveTransactionFilters", () => {
       sortKey: "amount",
       sortDirection: "asc",
       page: 2,
+      pageSize: 50,
     });
   });
 
@@ -221,6 +250,45 @@ describe("buildTransactionsHref", () => {
       `/transactions?period=1m&category=${encodeURIComponent("食費")}&subcategory=${encodeURIComponent("外食")}&account=${encodeURIComponent("現金")}&q=${encodeURIComponent("スーパー")}&sort=date&dir=desc&page=3`,
     );
   });
+
+  /** 既定の20件は`page`が1のときと同じくURLに出さない */
+  it("既定以外の表示件数だけをクエリに載せる", () => {
+    expect(buildTransactionsHref({ ...baseFilters, pageSize: 20 })).not.toContain("size=");
+    expect(buildTransactionsHref({ ...baseFilters, pageSize: 100 })).toBe(
+      "/transactions?period=1m&sort=date&dir=desc&size=100",
+    );
+  });
+});
+
+describe("buildTransactionsPageSizeHref", () => {
+  it("選んだ表示件数をクエリに載せる", () => {
+    expect(buildTransactionsPageSizeHref(50, baseFilters)).toBe(
+      "/transactions?period=1m&sort=date&dir=desc&size=50",
+    );
+  });
+
+  /**
+   * 20件で3ページ目を見ている状態で100件へ広げると、同じ3ページ目は201〜300件目を指し、
+   * いま見ていた行が画面から消える
+   */
+  it("表示件数を変えるとページは1に戻す", () => {
+    expect(buildTransactionsPageSizeHref(100, { ...baseFilters, page: 3 })).toBe(
+      "/transactions?period=1m&sort=date&dir=desc&size=100",
+    );
+  });
+
+  it("絞り込み・並び替えは保ったままにする", () => {
+    expect(
+      buildTransactionsPageSizeHref(50, {
+        ...baseFilters,
+        category: "食費",
+        sortKey: "amount",
+        sortDirection: "asc",
+      }),
+    ).toBe(
+      `/transactions?period=1m&category=${encodeURIComponent("食費")}&sort=amount&dir=asc&size=50`,
+    );
+  });
 });
 
 describe("buildTransactionsFilterBarKey", () => {
@@ -234,8 +302,8 @@ describe("buildTransactionsFilterBarKey", () => {
     expect(buildTransactionsFilterBarKey({ ...baseFilters, keyword: "スーパー" })).not.toBe(base);
   });
 
-  /** 並び替え・ページはこのフォームが管理しない値なので、変わってもkeyは変えない */
-  it("並び替え・ページだけが変わってもkeyは変わらない", () => {
+  /** 並び替え・ページ・表示件数はこのフォームが管理しない値なので、変わってもkeyは変えない */
+  it("並び替え・ページ・表示件数だけが変わってもkeyは変わらない", () => {
     const base = buildTransactionsFilterBarKey(baseFilters);
 
     expect(
@@ -244,6 +312,7 @@ describe("buildTransactionsFilterBarKey", () => {
         sortKey: "amount",
         sortDirection: "asc",
         page: 3,
+        pageSize: 100,
       }),
     ).toBe(base);
   });

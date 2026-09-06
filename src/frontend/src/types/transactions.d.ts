@@ -93,6 +93,13 @@ declare global {
     sortDirection: TransactionSortDirection;
     /** 1始まり */
     page: number;
+    /**
+     * 1ページあたりの表示件数(`TRANSACTIONS_PAGE_SIZE_OPTIONS` のいずれか)。
+     *
+     * 絞り込み・並び替え・ページと同じくURLに載せる(docs/screen-requirements-dashboard.md B3)。
+     * 保存はしないので、画面を開き直すと既定の20件に戻る
+     */
+    pageSize: number;
   };
 
   /** B3が表示するデータ一式 */
@@ -192,13 +199,25 @@ declare global {
     onChange: (value: string) => void;
   };
 
+  /**
+   * ページ番号の並びの1要素。`"ellipsis"` は畳んだ区間を表す
+   * (`buildPaginationItems`)
+   */
+  type TransactionPaginationItem = number | "ellipsis";
+
   /** 取引一覧テーブル(TransactionsTable)のProps */
   type TransactionsTableProps = {
     rows: Transaction[];
+    /** 表示件数(`pageSize`)もここに含まれるので、別のPropsとしては受け取らない */
     filters: TransactionFilters;
     totalCount: number;
     totalPages: number;
-    pageSize: number;
+  };
+
+  /** ページネーション(TransactionsPagination)のProps */
+  type TransactionsPaginationProps = {
+    filters: TransactionFilters;
+    totalPages: number;
   };
 
   /** 並び替え可能な列見出し(TransactionsTable内)のProps */

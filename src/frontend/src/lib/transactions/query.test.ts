@@ -15,6 +15,7 @@ const baseFilters: TransactionFilters = {
   sortKey: "date",
   sortDirection: "desc",
   page: 1,
+  pageSize: 20,
 };
 
 /** 検証に関係する列だけを指定して1件作る(値はすべて架空) */

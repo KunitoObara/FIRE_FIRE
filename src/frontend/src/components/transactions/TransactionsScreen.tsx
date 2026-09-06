@@ -15,7 +15,6 @@ import {
   TRANSACTION_SCAN_LIMIT,
   TRANSACTIONS_DATA_QUERY_KEY,
   TRANSACTIONS_LOAD_FAILURE_MESSAGES,
-  TRANSACTIONS_PAGE_SIZE,
 } from "@/constants/transactions";
 import {
   buildTransactionsFilterBarKey,
@@ -85,7 +84,7 @@ export const TransactionsScreen = ({ searchParams }: TransactionsScreenProps): J
   const filters = resolveTransactionFilters(searchParams);
   const filtered = filterTransactions(data.transactions, filters);
   const sorted = sortTransactions(filtered, filters.sortKey, filters.sortDirection);
-  const paged = paginateTransactions(sorted, filters.page, TRANSACTIONS_PAGE_SIZE);
+  const paged = paginateTransactions(sorted, filters.page, filters.pageSize);
   const resolvedFilters: TransactionFilters = { ...filters, page: paged.page };
 
   return (
@@ -130,7 +129,6 @@ export const TransactionsScreen = ({ searchParams }: TransactionsScreenProps): J
           filters={resolvedFilters}
           totalCount={paged.totalCount}
           totalPages={paged.totalPages}
-          pageSize={TRANSACTIONS_PAGE_SIZE}
         />
       )}
     </>
