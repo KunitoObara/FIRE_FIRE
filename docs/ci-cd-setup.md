@@ -806,9 +806,9 @@ firebase functions:delete restrictSignUpToAllowlist \
 
 ## 15. Sentry（エラー監視）の準備
 
-未捕捉エラーの検知に Sentry を使う（[X3]）。repo の外の作業は、Sentry 側でプロジェクトと認証情報を作り、それを GitHub Secrets と Secret Manager の両方に登録することの 2 つ。
+未捕捉エラーの検知に Sentry を使う（[X3]）。repo の外の作業は、Sentry 側でプロジェクトと認証情報を作り、それを **Secret Manager に**登録することの 2 つ。**GitHub Secrets には登録しない**（[X28](https://trello.com/c/OYm1W6KK)。理由は 15.2）。
 
-**この登録を済ませる前に実装 PR を `develop` にマージしてはいけない。** `src/frontend/apphosting.yaml` が 4 つのシークレットを参照しているため、Secret Manager 側に実体が無いと App Hosting のビルドが失敗する。CI（`ci.yml`）の方は未登録でも空文字が渡るだけで落ちない（DSN が空なら Sentry は起動せず、トークンが空ならソースマップのアップロードごとスキップされる）。この非対称は意図的で、Secrets を受け取れないフォーク PR でも CI が通るようにするためのもの。
+**この登録を済ませる前に実装 PR を `develop` にマージしてはいけない。** `src/frontend/apphosting.yaml` が 4 つのシークレットを参照しているため、Secret Manager 側に実体が無いと App Hosting のビルドが失敗する。CI（`ci.yml`）は `SENTRY_*` をビルドに渡さないので、ここの影響を受けない — DSN が無ければ Sentry は起動せず、トークンが無ければソースマップのアップロードごとスキップされる（`src/frontend/next.config.ts`）。Secrets を受け取れないフォーク PR でも CI が通るのは、この分岐があるため。
 
 ### 15.1 Sentry 側の準備
 
@@ -820,16 +820,13 @@ firebase functions:delete restrictSignUpToAllowlist \
 
 `environment` タグには接続先の Firebase プロジェクト ID（`fire-fire-dev` / `fire-fire-prod`）がそのまま入る（`src/frontend/src/lib/sentry/options.ts`）。専用の環境変数を増やさないのは、接続先と表示が食い違うことを原理的に起こさないため。
 
-### 15.2 GitHub Secrets に登録する
+### 15.2 GitHub Secrets には登録しない
 
-CI のビルドステップ（`ci.yml` の frontend ジョブ）が読む。6 章の他のシークレットと同じ手順で登録する。
+**Sentry の認証情報の置き場は Secret Manager だけとする**（[X28]）。`RESEND_API_KEY` や `IDENTITY_PLATFORM_WEB_API_KEY`（5 章）と同じ扱いで、3 章の Secrets 一覧にも Sentry 系は入らない。
 
-| 名前 | 値 |
-|---|---|
-| `NEXT_PUBLIC_SENTRY_DSN` | 15.1 の DSN |
-| `SENTRY_AUTH_TOKEN` | 15.1 の Auth Token |
-| `SENTRY_ORG` | Organization のスラッグ |
-| `SENTRY_PROJECT` | Project のスラッグ |
+GitHub Secrets にも置くと、**PR のビルドごとにソースマップと Sentry のリリースが上がる**。デプロイされない成果物で無料枠（5,000 イベント/月）とリリース一覧を埋めることになり、しかも Secrets を受け取れないフォーク PR では結局値が無いので、検証としても穴が残る。Auth Token の置き場を 1 つ増やすことにもなる。
+
+**引き換えに、CI は「トークンがある側」のビルド経路を一度も通らない。** `next.config.ts` の `sourcemaps.disable` はトークンの有無で分岐するため、アップロード経路が壊れていても App Hosting のビルドで初めて表面化する。そこで落ちると `deploy.yml` の App Hosting ロールアウトだけが失敗し、**functions は新しくフロントエンドは古い**状態が残る（同じ形の事故は 5 章「Artifact Registry のクリーンアップポリシー」の節にある）。`@sentry/nextjs` の更新で壊れうる、という程度の確率なので**承知のうえで選んでいる** — 実際に何度か踏むようなら、そのときに GitHub Secrets へ登録する側へ寄せ直す。
 
 ### 15.3 Secret Manager に登録する
 
