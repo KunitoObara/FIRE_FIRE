@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TransactionsScreen } from "@/components/transactions/TransactionsScreen";
@@ -13,9 +14,11 @@ vi.mock("@/lib/transactions/transactions-data", () => ({
   fetchTransactionsData: (...args: unknown[]) => fetchTransactionsData(...args),
 }));
 
-/** 絞り込みバーの送信先。ここでは押さないので記録だけできればよい */
+/** 絞り込みバーの送信先と、表示件数セレクタの遷移先 */
+const push = vi.fn<(href: string) => void>();
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }));
 
 const buildTransaction = (transaction: Partial<Transaction> & { id: string }): Transaction => ({
@@ -30,6 +33,22 @@ const buildTransaction = (transaction: Partial<Transaction> & { id: string }): T
   isCalculationTarget: true,
   ...transaction,
 });
+
+/** ページングを確かめるための連番の取引。日付は新しい順に並ぶよう1日ずつ古くする */
+const buildTransactions = (count: number): Transaction[] =>
+  Array.from({ length: count }, (_, index) => {
+    const date = new Date(Date.UTC(2026, 6, 20));
+    date.setUTCDate(date.getUTCDate() - index);
+
+    return buildTransaction({
+      id: `id-${index}`,
+      content: `取引${index + 1}`,
+      date: date.toISOString().slice(0, 10),
+    });
+  });
+
+/** ヘッダ行を除いた、いま表示されている行数 */
+const countBodyRows = (table: HTMLElement): number => within(table).getAllByRole("row").length - 1;
 
 const resolveData = (transactions: Transaction[], truncated = false): void => {
   const categories = [...new Set(transactions.map((transaction) => transaction.categoryMajor))];
@@ -70,6 +89,7 @@ const renderScreen = (
 describe("TransactionsScreen", () => {
   beforeEach(() => {
     fetchTransactionsData.mockReset();
+    push.mockReset();
     resolveData([buildTransaction({ id: "aaaa1111" })]);
   });
 
@@ -263,5 +283,92 @@ describe("TransactionsScreen", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("ログイン状態が切れています");
     expect(screen.queryByText(/入出金明細のデータがまだありません/u)).not.toBeInTheDocument();
+  });
+
+  describe("ページネーション", () => {
+    it("既定では20件ずつ表示する", async () => {
+      resolveData(buildTransactions(25));
+      renderScreen();
+
+      expect(countBodyRows(await screen.findByRole("table"))).toBe(20);
+      expect(screen.getByText("25件中 1〜20件を表示")).toBeInTheDocument();
+    });
+
+    it("URLの表示件数を1ページの件数に反映する", async () => {
+      resolveData(buildTransactions(25));
+      renderScreen({ size: "50" });
+
+      expect(countBodyRows(await screen.findByRole("table"))).toBe(25);
+      expect(screen.getByText("25件中 1〜25件を表示")).toBeInTheDocument();
+    });
+
+    /**
+     * 任意の数を許すと、手で書き換えたURLで読み込んだ範囲の全件を1ページに並べられてしまう
+     * (`resolveTransactionPageSize`)
+     */
+    it("選択肢に無い表示件数は既定の20件に落とす", async () => {
+      resolveData(buildTransactions(25));
+      renderScreen({ size: "9999" });
+
+      expect(countBodyRows(await screen.findByRole("table"))).toBe(20);
+    });
+
+    it("ページ番号のリンクを並べ、現在のページを示す", async () => {
+      resolveData(buildTransactions(45));
+      renderScreen({ page: "2" });
+
+      expect(await screen.findByRole("link", { name: "1" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "3" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "2" })).toHaveAttribute("aria-current", "page");
+    });
+
+    /**
+     * 先頭・末尾では遷移先が無い。リンクごと消すとボタンの位置が左右にずれて
+     * 押し間違いを誘うので、押せない状態で残す
+     */
+    it("先頭ページでは「前へ」を押せない状態にする", async () => {
+      resolveData(buildTransactions(45));
+      renderScreen();
+
+      expect(await screen.findByRole("link", { name: "次のページ" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "前のページ" })).not.toBeInTheDocument();
+    });
+
+    it("末尾ページでは「次へ」を押せない状態にする", async () => {
+      resolveData(buildTransactions(45));
+      renderScreen({ page: "3" });
+
+      expect(await screen.findByRole("link", { name: "前のページ" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "次のページ" })).not.toBeInTheDocument();
+    });
+
+    /**
+     * 20件で3ページ目を見ている状態で100件へ広げると、同じ3ページ目は201〜300件目を指し、
+     * いま見ていた行が画面から消える
+     */
+    it("表示件数を変えるとページを1に戻して遷移する", async () => {
+      const user = userEvent.setup();
+      resolveData(buildTransactions(45));
+      renderScreen({ page: "3" });
+
+      await user.click(await screen.findByLabelText("表示件数"));
+      await user.click(await screen.findByRole("option", { name: "100件" }));
+
+      expect(push).toHaveBeenCalledWith("/transactions?period=1m&sort=date&dir=desc&size=100");
+    });
+
+    /** 表示件数は絞り込み・並び替えと独立して効く */
+    it("表示件数を変えても絞り込みと並び替えは保つ", async () => {
+      const user = userEvent.setup();
+      resolveData(buildTransactions(45));
+      renderScreen({ category: "食費", sort: "amount", dir: "asc" });
+
+      await user.click(await screen.findByLabelText("表示件数"));
+      await user.click(await screen.findByRole("option", { name: "50件" }));
+
+      expect(push).toHaveBeenCalledWith(
+        `/transactions?period=1m&category=${encodeURIComponent("食費")}&sort=amount&dir=asc&size=50`,
+      );
+    });
   });
 });
