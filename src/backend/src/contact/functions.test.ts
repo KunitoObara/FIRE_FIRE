@@ -92,11 +92,28 @@ describe("sendContactMessage", () => {
     expect(sendMail).toHaveBeenCalledOnce();
   });
 
-  it("送信間隔が空いていなければ送らない", async () => {
-    reserveContactSlot.mockResolvedValue({ status: "throttled", reason: "interval" });
+  /**
+   * **どちらの制限が働いたかは、画面ではなくログでしか分からない。** 利用者にはどちらも
+   * `throttled`で返すため、`reasonOf`で見分けることはできない。文言まで検証しないと、
+   * 出し分けの条件が反転しても全テストが通ってしまう。
+   *
+   * **文言そのものを書いておく。** docs/ci-cd-setup.md 16.4の障害切り分けは、この文字列が
+   * ログに出ているかを見る手順になっている。テストに写しておけば、手順書と食い違う変更が
+   * 無自覚に入ることはなくなる。
+   */
+  it.each([
+    ["送信間隔が空いていない", "interval", "送信の間隔が空いていないため送信しませんでした"],
+    [
+      "24時間の件数の上限に達している",
+      "window",
+      "同じ送信元が24時間の送信件数の上限に達したため送信しませんでした",
+    ],
+  ])("%sなら送らず、理由をログに残す", async (_name, reason, message) => {
+    reserveContactSlot.mockResolvedValue({ status: "throttled", reason });
 
     expect(await reasonOf(call(validInput))).toBe("throttled");
     expect(sendMail).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledWith(message);
   });
 
   it.each([
