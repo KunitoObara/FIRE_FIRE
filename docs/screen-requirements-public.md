@@ -243,7 +243,7 @@ A10 が問い合わせ先を掲げる以上、受け口が要る。メールア�
 - **失敗の文言そのものはここに書かない。** 正は `src/frontend/src/constants/public.ts` の `CONTACT_FAILURE_MESSAGES` で、写すと要件書の側が先に古くなる(実際、`invalid-argument` の追加とcallable共通の理由の導入に追随できておらず「3つ」のまま残っていた)。理由の種類が増えたかどうかは `ContactFailureReason`(`src/frontend/src/types/contact.d.ts`)を見る
   - callable共通の3つは他の画面と同じ扱いで、A11に固有の仕様ではない。`unavailable` / `unknown` は表示の文言が `send-failed` と同じなので、**画面に出る文言としては5種**になる
 - **保存しないのは、A10の「取得しない情報」の方針と揃えるため。** 併せて、**未ログインから書けるFirestoreの領域を増やさずに済む**
-- **この方針は、実際に問い合わせが失われたあとで見直したうえで維持している**([X27](https://trello.com/c/HKyjNZ27))。2026-08-17にprodで2件、送信に失敗して消えた — `RESEND_API_KEY` にResendのものではない値が登録されていたためで([X26](https://trello.com/c/jy5MlfUh))、残ったのは「2回叩かれて2回とも503を返した」という記録だけだった。**本文も返信先のアドレスも復旧できない。** それでも保存しないほうを選び直した理由は次のとおり
+- **この方針は、実際に問い合わせが失われたあとで見直したうえで維持している**([X27](https://trello.com/c/HKyjNZ27))。2026-08-17にprodで2件、送信に失敗して消えた — `RESEND_API_KEY` にResendのものではない値が登録されていたためで([X26](https://trello.com/c/jy5MlfUh))、残ったのは「**呼び出しが2回あり、いずれも Resend が 401 を返したため callable が 503 を返した**」という記録だけだった(401 は Resend が関数へ返した応答で Cloud Logging に、503 はその関数が呼び出し元へ返した応答 — `HttpsError("unavailable")` の HTTP マッピング — で Cloud Run のリクエストログに残る。**別のレイヤーの記録なので両立する**)。**本文も返信先のアドレスも復旧できない。** それでも保存しないほうを選び直した理由は次のとおり
   - **失敗に気づく手立てを別に用意してある。** 送信失敗はSentryへ上がる(`login-notification/mailer.ts` がstatusコード付きのイベントを積み、`sendContactMessage` が投げる `unavailable` がflushまで進める)。**1か月気づけなかったのは、この計装が入る前だったから**であって、保存しない設計の帰結ではない
   - **退避先を作ると、未ログインから書けるFirestoreの領域が増える。** いま書けるのは `contactThrottle`(送信時刻だけ)に限られる。そこへ本文と返信先アドレスを置くと、保持期間・削除・`firestore.rules`・**A10「取得しない情報」の記載**までを一続きで抱えることになる
   - **リトライでは防げない。** 実際に起きた失敗は401で、何度送り直しても同じ結果になる
