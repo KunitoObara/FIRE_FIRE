@@ -35,6 +35,20 @@ describe("sendMail", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("APIキーがre_で始まらないなら送信を試みない", async () => {
+    /*
+      [X26]の再発防止。`RESEND_API_KEY`に別サービスのキーが登録されたまま、
+      dev/prodとも一通も届かない状態が1か月続いた。401はResend側の拒否と
+      区別が付かないため、明らかに形式が違う値はここで止める。
+    */
+    const fetchMock = stubFetch({ ok: true, status: 200 });
+
+    await expect(sendMail("AIzaSyDummyValueForTest", MESSAGE)).resolves.toEqual({
+      status: "not-configured",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("宛先・件名・本文をResendの形式で送る", async () => {
     const fetchMock = stubFetch({ ok: true, status: 200 });
 

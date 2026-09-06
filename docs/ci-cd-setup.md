@@ -364,7 +364,8 @@ firebase functions:secrets:set RESEND_API_KEY --project fire-fire-dev
 ```
 
 - dev / prod それぞれのプロジェクトで実行する。値は同じ Resend アカウントのキーでよいが、どちらの環境からの通知かは**メールの件名**（本番以外は `[dev]` 付き）で見分ける
-- ローカルの Functions エミュレータでは未設定でよい。キーが空のときは送信を試みずログに残すだけになる（`src/backend/src/login-notification/mailer.ts`）
+- ローカルの Functions エミュレータでは未設定でよい。キーが空のときは送信を試みずログに残すだけになる（`src/backend/src/login-notification/mailer.ts`）。`re_` で始まらない値も同様に送信を試みず、Sentry へ「APIキーの形式が不正」として上げる
+- **登録し直したときは、値を確かめたうえで functions を再デプロイする**（13.1 の 4・5）。関数はシークレットを**バージョン番号で固定して**参照するため、新しいバージョンを登録しただけでは古い値を読み続ける
 
 デプロイ用サービスアカウントへの権限付与も `IDENTITY_PLATFORM_WEB_API_KEY` と同様に必要。
 
@@ -647,33 +648,67 @@ http://localhost:3000/reset-password?oobCode=<コピーした値>
 
 ## 13. ログイン通知メール（Resend）の準備
 
-ログイン通知（[auth-login-requirements.md](./auth-login-requirements.md) 3.6 / 3.8）は Blocking Function `sendLoginNotification` が Resend の HTTP API を叩いて送る。repo の外の作業は 2 つある。
+ログイン通知（[auth-login-requirements.md](./auth-login-requirements.md) 3.6 / 3.8）は Blocking Function `sendLoginNotification` が Resend の HTTP API を叩いて送る。**A11 のお問い合わせ（`sendContactMessage`）も同じ `RESEND_API_KEY` を使う**ので、この節はその両方の前提を作る。repo の外の作業は 2 つある。
 
-1. Resend の API キーを発行し、Secret Manager に登録する（13.1 → 5 章）
+1. Resend の API キーを発行し、Secret Manager に登録し、**実際に届くところまで確かめる**（13.1 → 5 章 → 13.3）
 2. デプロイ用サービスアカウントに Identity Platform の設定書き換え権限を付与する（2 章のカスタムロール）
 
 **Identity Platform 側へのトリガー登録そのものは `firebase deploy --only functions` が自動で行う**ためコンソールでの登録操作は不要だが、その書き込みを CI のサービスアカウントが行う以上、2 の権限が要る。これが無いと 13.4 のエラーになる。
 
-### 13.1 API キーを発行する
+### 13.1 API キーを発行し、登録して、反映されたことまで見る
 
-1. <https://resend.com> でアカウントを作る。ログイン通知の宛先になるメールアドレスで登録する（次項の制約のため）
+**登録して終わりにしない。** [X26](https://trello.com/c/jy5MlfUh) では `RESEND_API_KEY` に Resend のものではない別の値（39 バイト、`re_` で始まらない）が dev / prod とも登録されており、**ログイン通知もお問い合わせも 1 通も届かないまま約 1 か月気づけなかった**。以下の 5 手はひと続きで通す。
+
+1. <https://resend.com> でアカウントを作る。ログイン通知の宛先になるメールアドレスで登録する（13.2 の制約のため）
 2. API Keys → Create API Key。権限は **Sending access** で足りる
 3. 発行された `re_` で始まるキーを、5 章の手順で dev / prod 双方の Secret Manager に登録する
+4. **登録直後に、入った値が `re_` で始まることを確かめる。** 中身は表示せず接頭辞だけを見る
+
+   ```bash
+   for PROJECT_ID in fire-fire-dev fire-fire-prod; do
+     printf '%s: ' "$PROJECT_ID"
+     gcloud secrets versions access latest --secret=RESEND_API_KEY --project="$PROJECT_ID" | cut -c1-3
+   done
+   ```
+
+   `re_` 以外が出たら、Resend のキーではない別の値を登録している。**貼り付け先を取り違えても、デプロイもログインも成功したまま通ってしまう**（送信の失敗はログインを止めない設計）ため、この 1 手が唯一の早期の歯止めになる。`src/backend/src/login-notification/mailer.ts` も `re_` で始まらない値では送信を試みず Sentry へ上げるが、**それが出るのは誰かがログインしたあと**で、その 1 回の通知は届かない
+5. **functions を再デプロイする。** 関数はシークレットを**バージョン番号で固定して**参照するので、新しいバージョンを登録しただけでは古い値を読み続ける。現在どのバージョンを読んでいるかは次で見える
+
+   ```bash
+   gcloud functions describe sendLoginNotification --project fire-fire-dev --region asia-northeast1 \
+     --format="value(serviceConfig.secretEnvironmentVariables)"
+   ```
+
+   `{'key': 'RESEND_API_KEY', ..., 'version': '1'}` のように出る。デプロイは `develop` / `main` への push で走る [deploy.yml](../.github/workflows/deploy.yml) に任せる（手で `firebase deploy` を打たない運用）。デプロイ後にもう一度このコマンドを打ち、**バージョンが上がっていること**を確かめてから 13.3 へ進む。`sendContactMessage` も同じシークレットを共有しているので、あわせて上がる
 
 ### 13.2 送信元ドメインと宛先の制約
 
 送信元は Resend の共有ドメイン `onboarding@resend.dev` を使う（`src/backend/src/login-notification/mailer.ts` の定数）。DNS 設定なしで送れる代わりに、**宛先は Resend アカウントの登録メールアドレスに限られる**。利用者が開発者 1 人である現状は制約にならないが、他のユーザーへ送る必要が出た時点で所有ドメインの検証（SPF/DKIM）と定数の差し替えが要る（[auth-login-requirements.md](./auth-login-requirements.md) 8 章のオープン課題）。
 
-### 13.3 動作確認
+### 13.3 実際に届くところまで確かめる
 
-フロントエンドはローカル開発でも `fire-fire-dev` に直結するため（B0-1）、`npm run dev` からログインすれば実際に通知が届く。
+**この節は読むものではなく、キーを登録し直すたびに通すものである。** [X26](https://trello.com/c/jy5MlfUh) の時点でも確認項目はここに書かれていたが、**一度も実行されないまま公開に至った**。送信の失敗はログインを止めず、画面にも出ず、成功時は何もログに残らない — つまり**受信箱を見る以外に「届いている」ことを確かめる方法が無い**。書いてあるだけでは通らなかったので、手順の側を通す形にしてある。
 
-- 件名が `[FIRE-FIRE][dev] ログインがありました (パスワード)` / `(Google)` になっていること。ログイン方法が両方とも正しく出るかは、A4 のパスワードログインと「Googleで続ける」の両方で確かめる
-- **prod への初回デプロイ後は、本番のログインで件名に `[dev]` が付かないこと**を必ず確認する。環境の判定は実行環境のプロジェクト ID（`GCLOUD_PROJECT` 等、無ければ `FIREBASE_CONFIG`）に依存しており、どれも読めない場合は安全側に倒して本番以外として扱う。つまり設定漏れは「本番の通知に `[dev]` が付いたまま」という形で現れる
-- 本文の日時が JST、IP アドレスとブラウザが実際の環境と一致していること
-- 2FA を登録済みのアカウントで、**確認コードを入力する前には届かない**こと。`beforeUserSignedIn` は第 2 要素の検証後に発火するため、第 1 要素だけ通った時点では送られない
+登録し直したら、次の 4 つを**その場で**通す。1 つでも残したら、それは「たぶん届く」であって「届く」ではない。
 
-届かない場合は Cloud Functions のログ（`sendLoginNotification`）を見る。`RESEND_API_KEYが未設定` の警告が出ていればシークレットの登録漏れ、`メールを送信できませんでした` とステータスコードが出ていれば Resend 側の拒否（宛先制約か無効なキー）。**通知の失敗はログインを妨げない**設計なので、ログインが成功していても送信は失敗していることがある。
+1. **dev のログイン通知が受信箱に届く。** フロントエンドはローカル開発でも `fire-fire-dev` に直結するため（B0-1）、`npm run dev` からログインすればよい
+   - 件名が `[FIRE-FIRE][dev] ログインがありました (パスワード)` / `(Google)` になっていること。ログイン方法が両方とも正しく出るかは、A4 のパスワードログインと「Googleで続ける」の両方で確かめる
+   - 本文の日時が JST、IP アドレスとブラウザが実際の環境と一致していること
+   - 2FA を登録済みのアカウントで、**確認コードを入力する前には届かない**こと。`beforeUserSignedIn` は第 2 要素の検証後に発火するため、第 1 要素だけ通った時点では送られない
+2. **prod のログイン通知が届き、件名に `[dev]` が付かない。** 環境の判定は実行環境のプロジェクト ID（`GCLOUD_PROJECT` 等、無ければ `FIREBASE_CONFIG`）に依存しており、どれも読めない場合は安全側に倒して本番以外として扱う。つまり設定漏れは「本番の通知に `[dev]` が付いたまま」という形で現れる
+3. **A11 のお問い合わせが dev / prod の両方で届く。** `src/backend/src/contact/functions.ts` は `login-notification/mailer.ts` の `sendMail` を呼び、**同じ `RESEND_API_KEY` を共有している**。ログイン通知が通ればキーは正しいが、宛先は `CONTACT_RECIPIENT_EMAIL` と別物なので、そちらの登録漏れ・誤りはここでしか出ない。**A10 プライバシーポリシー 8 章が案内する唯一の連絡先**なので、prod を省かない
+4. **Sentry に新しい送信失敗のイベントが出ていない。** `メールを送信できませんでした (status ...)` は `sendMail` から直接上がる（`src/backend/src/sentry/report.ts`）。1〜3 を通した直後に issue を見て、再発なら regression として上がる状態にしておく
+
+届かない場合は Cloud Functions のログ（`sendLoginNotification` / `sendContactMessage`）を見る。
+
+| ログ | 意味 |
+|---|---|
+| `RESEND_API_KEYが未設定、または形式が不正なため…` | シークレットの登録漏れ、または `re_` で始まらない値。13.1 の 4 へ戻る |
+| `メールを送信できませんでした 401` | キーが無効（失効・別サービスの値・古いバージョンを読んだまま）。13.1 の 4・5 へ戻る |
+| `メールを送信できませんでした` とその他のステータス | Resend 側の拒否。まず 13.2 の宛先制約を疑う |
+| `CONTACT_RECIPIENT_EMAILが未設定のため…` | A11 の受信先の登録漏れ（5 章） |
+
+**通知の失敗はログインを妨げない**設計なので、ログインが成功していても送信は失敗していることがある。ログインできたことを届いた証拠にしない。
 
 ### 13.4 デプロイが `identitytoolkit` の 403 で失敗する場合
 
