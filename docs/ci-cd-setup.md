@@ -889,13 +889,72 @@ done
 
 `develop` へのデプロイ後、STG で意図的に失敗させて Sentry に届くことを見る。手軽なのは A11 のお問い合わせで、`CONTACT_RECIPIENT_EMAIL` を一時的に不正な値にすると送信が失敗する。届かない場合は Cloud Functions のログに `SENTRY_DSNが未設定のため、Sentryへの送信を行いません` が出ていないかを見る（出ていればシークレットの結び付け漏れ）。
 
-## 16. 今後の検討事項（オープン課題）
+## 16. お問い合わせ（A11）の呼び出し件数を監視する
+
+`sendContactMessage` は**このアプリで唯一、未ログインから叩ける callable** である（[docs/screen-requirements-public.md](./screen-requirements-public.md) A11）。防御はハニーポット・送信量の制限・入力長の制限の3つで、**App Check は入れないと判断した**（[X29](https://trello.com/c/XLSpgQTT)）。その判断を将来やり直せるよう、**呼び出しの頻度を見る手立てだけを先に用意しておく**。
+
+### 16.1 再検討の目安
+
+| 目安 | 値 |
+|---|---|
+| 1日あたりの呼び出し | **3件** |
+| 1週間あたりの呼び出し | **10件** |
+
+どちらかを超えたら、App Check を入れるかどうかを改めて判断する。実績は「公開後3週間で2件」（2026-08-16 のベータ公開から 2026-09-06 の計測まで）で、個人利用の受け口としてこの水準を超えたら人間の問い合わせだけでは説明しづらい。
+
+**この目安を超えたこと自体は障害ではない。** 本物の問い合わせが増えただけかもしれない。見に行く合図であって、自動で何かを止めるものではない。
+
+### 16.2 まず数えてみる
+
+呼び出しは Cloud Run のリクエストログに全件残る。**コードを足さなくても数えられる。**
+
+```bash
+# 直近7日の呼び出し件数（prod）
+gcloud logging read \
+  'resource.type="cloud_run_revision"
+   resource.labels.service_name="sendcontactmessage"
+   httpRequest.requestMethod="POST"' \
+  --project fire-fire-prod --freshness=7d --format='value(timestamp)' | wc -l
+```
+
+送信元 IP と User-Agent まで見たいときは `--format='table(timestamp, httpRequest.remoteIp, httpRequest.userAgent)'` にする。**ログに残るのはリクエストのメタデータだけで、問い合わせの本文は残らない**（保存しない方針。A11）。
+
+### 16.3 ログベースの指標とメール通知を作る
+
+能動的に見に行かなくても気づけるようにする。**Cloud Console での手作業で、リポジトリ側の変更は無い。**
+
+`fire-fire-prod` で実施する（dev は自分で叩くため鳴っても意味がない）。
+
+1. **通知チャンネルを作る** — Monitoring → アラート → 通知チャンネルを編集 → メールを追加し、開発者本人のアドレスを入れる
+   - **アドレスはコンソールにだけ入れる。リポジトリには書かない**（公開リポジトリのため。`CONTACT_RECIPIENT_EMAIL` と同じ理由）
+2. **ログベースの指標を作る** — Logging → ログベースの指標 → 指標を作成
+   - 種類: **カウンタ**
+   - 名前: `contact_form_invocations`
+   - フィルタ: 16.2 のクエリと同じ3行
+3. **アラートポリシーを作る** — Monitoring → アラート → ポリシーを作成
+   - 指標: 上で作った `logging/user/contact_form_invocations`
+   - ローリング window: **1日**、window 関数: **合計**
+   - 条件: しきい値より上、**3**
+   - 通知チャンネル: 1 で作ったもの
+   - **自動終了時間を長めに取る**（既定の 7 日で構わない）。件数が減っても自動では消えないほうが、後から気づける
+
+1週間10件のほうは、window を 7 日・しきい値 10 にした2つ目のポリシーとして同じ手順で作る。**片方だけでも用は足りる** — 1日3件のほうが先に鳴るため、まずそれだけ作って様子を見てもよい。
+
+### 16.4 鳴ったら見ること
+
+1. 16.2 のクエリを `--format='table(timestamp, httpRequest.remoteIp, httpRequest.userAgent)'` で叩き、送信元が分散しているかを見る
+2. Cloud Functions のログに `同じ送信元が24時間の送信件数の上限に達したため送信しませんでした` / `ハニーポットに入力があったため送信しませんでした` が出ているかを見る。**出ていれば既存の対策が実際に働いている**
+3. 実際に問い合わせが届いているかを見る。届いていれば、それは本物の利用である
+
+**送信元が毎回違い、かつ本物の問い合わせが届いていないなら、IP を鍵にした制限では止まらない。** そこが App Check を入れる判断の分かれ目になる（A11「スパム対策」）。
+
+## 17. 今後の検討事項（オープン課題）
 
 - デプロイ失敗時の自動ロールバックは導入していない。失敗は GitHub の通知で気づく運用とする
 - `docs` のみの変更でもデプロイジョブは走る構成。ビルド時間を節約したい場合は `paths-ignore` の追加を検討する
 - `src/backend` に Prettier を導入していない（`src/backend/docs/TECH_STACK.md` 9章では ESLint + Prettier としている）。CI の backend ジョブは現状 Lint / ビルド / テストのみ
 
-## 17. 参考リンク
+## 18. 参考リンク
 
 - [Firebase App Hosting のドキュメント](https://firebase.google.com/docs/app-hosting)
 - [google-github-actions/auth（Workload Identity 連携）](https://github.com/google-github-actions/auth)

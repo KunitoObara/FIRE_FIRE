@@ -93,7 +93,7 @@ describe("sendContactMessage", () => {
   });
 
   it("送信間隔が空いていなければ送らない", async () => {
-    reserveContactSlot.mockResolvedValue({ status: "throttled" });
+    reserveContactSlot.mockResolvedValue({ status: "throttled", reason: "interval" });
 
     expect(await reasonOf(call(validInput))).toBe("throttled");
     expect(sendMail).not.toHaveBeenCalled();
